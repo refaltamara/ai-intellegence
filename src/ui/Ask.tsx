@@ -136,6 +136,7 @@ export function Ask({ skills, layers, initialConversation, initialMessages, pref
                   {m.text && <RichText text={m.text} onChip={(id) => setOpen((o) => ({ ...o, [m.id]: o[m.id]?.[0] === id && o[m.id].length === 1 ? [] : [id] }))} />}
                   {open[m.id]?.length ? <EvidencePanel ids={open[m.id]} evidence={m.evidence} title={`Evidence · ${open[m.id].join(", ")}`} /> : null}
                   {m.error && <div className="errbox">{m.error}</div>}
+                  {!m.streaming && !m.error && !m.text && m.tools.length === 0 && <div className="errbox">This answer was cut off before it finished (the server did not save a reply). Ask again in a new conversation.</div>}
                   {!m.streaming && !m.error && m.text && (
                     <div className="acts">
                       <button className="btn sm" onClick={() => send("Get this every Monday")}>Get this every Monday</button>

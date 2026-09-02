@@ -83,7 +83,18 @@ export async function runChatTurn(input: ChatTurnInput, emit: (e: ChatEvent) => 
   let conversation = input.conversationId ? await getConversation(input.conversationId, workspaceId) : null;
   if (!conversation) conversation = await createConversation(workspaceId, userText.replace(/\s+/g, " ").slice(0, 80), input.userId ?? null);
   await emit({ type: "conversation", id: conversation.id, title: conversation.title });
+  try {
+    await runTurnBody(conversation, userText, emit);
+  } catch (e) {
+    const message = describeModelError(e);
+    console.error("chat turn failed:", conversation.id, message, (e as Error).stack?.split("\n").slice(0, 3).join(" | "));
+    await addMessage({ conversationId: conversation.id, role: "assistant", content: { text: "", error: message } }).catch(() => undefined);
+    await emit({ type: "error", message });
+  }
+}
 
+async function runTurnBody(conversation: { id: string; workspace_id: string }, userText: string, emit: (e: ChatEvent) => void | Promise<void>): Promise<void> {
+  const workspaceId = conversation.workspace_id;
   const history = await listMessages(conversation.id);
   await addMessage({ conversationId: conversation.id, role: "user", content: { text: userText } });
 
@@ -188,6 +199,7 @@ export async function runChatTurn(input: ChatTurnInput, emit: (e: ChatEvent) => 
     }
   } catch (e) {
     const msg = describeModelError(e);
+    console.error("chat model loop error:", conversation.id, msg, (e as any)?.request_id ?? "");
     await emit({ type: "error", message: msg });
     fullText += `\n\n(${msg})`;
   }
