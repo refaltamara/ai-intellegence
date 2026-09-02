@@ -49,7 +49,7 @@ Followers 0 or null → tier null, excluded from per-1k metrics. Discovery keeps
 - Time zone of `date_posted` in the raw files (assumed Asia/Jakarta local; confirm).
 - Whether the Fair Listening MCP topic taxonomy becomes the Phase 2 topic seed.
 
-## Skill engine (M1, 2 Sep 2026, Claude Code; confirm or change)
+## Skill engine (M1, 2 Sep 2026, Claude Code; confirmed by Refal 2 Sep 2026)
 - **Relative windows are anchored on the latest loaded post, not on today.** `window.last_n_days` (default 90) counts back from the newest `posted_at` in the workspace (30 Jun 2026 today), so "last 30 days" on a static export returns June, not nothing. Absolute `{from,to}` windows behave as written. `meta.data_window` always states the resolved dates.
 - **Default windows per skill**: 90 days (discovery, mercenaries, overlap), 30 days (compare, breakout, top-content, affiliates), 180 days (loyalists), latest month in the data (funnel-mix, brand-strategy), lookback 7 days vs 8 prior weeks (waves).
 - **Rate rankings carry a views floor.** `discovery` has `min_views` (default 1,000 total views in the window), `top-content` has `min_views` (default 1,000, applied only when ranking by a rate), `breakout` has `min_followers` (default 100). Without these the rankings are dominated by accounts with a few hundred views.
@@ -60,7 +60,7 @@ Followers 0 or null → tier null, excluded from per-1k metrics. Discovery keeps
 - **Skill runs are always persisted** to `skill_runs` (params, params_resolved, full result, status, actor). The CLI can pass `--no-persist`.
 - **Tests run against the live Neon database** (`src/skills/__tests__/skills.live.test.ts`, skipped without `DATABASE_URL`) rather than the PRD's synthetic fixture DB; the loaded exports are the fixture.
 
-## Ask / chat (M2, 2 Sep 2026, Claude Code; confirm or change)
+## Ask / chat (M2, 2 Sep 2026, Claude Code; confirmed by Refal 2 Sep 2026)
 - **Chat model** is `ANTHROPIC_MODEL_CHAT` (default `claude-sonnet-5`), streaming, `tool_choice: auto`, `strict: true` on all three tools, prompt caching on the system prompt and the tool list, no temperature, at most 6 tool calls per turn, one automatic continuation on `max_tokens`.
 - **Evidence ids are renumbered per turn** (`ev_01…` continues across tool calls in the same answer) so two skills in one answer never collide. Persisted per assistant message; ids from earlier turns stay citable, latest turn wins on a clash. Citations to unknown ids are stripped and counted as `evidence_miss`, shown as a small pill on the answer.
 - **Tool results sent to the model are trimmed** to 60 rows and 120-character sample texts; the full result is persisted in `skill_runs` and rendered in the UI from the stream.
@@ -70,7 +70,7 @@ Followers 0 or null → tier null, excluded from per-1k metrics. Discovery keeps
 - **No login in the proof of concept.** The app is single-workspace and every route is open; protect the Vercel deployment with Vercel's deployment protection (password) until users/SSO are in scope.
 - **Smoke test** (`pnpm smoke`) runs the 20 questions in `tests/smoke/questions.json` through the real chat loop and reports tools called and `evidence_miss`; it skips when no model credentials are set. It has not run yet: this environment has no `ANTHROPIC_API_KEY`.
 
-## Agents (M3, 2 Sep 2026, Claude Code; confirm or change)
+## Agents (M3, 2 Sep 2026, Claude Code; confirmed by Refal 2 Sep 2026)
 - **Scheduling**: `vercel.json` runs `/api/cron/agents` every 15 minutes; the route (protected by `CRON_SECRET` as `Authorization: Bearer …`) runs every active agent whose `next_run_at` has passed and advances it from its own cron expression in its own time zone. So an agent's cron can be anything (daily 08:00, weekdays, every 6 hours); it fires within 15 minutes of the scheduled time.
 - **Promotion freezes `params_resolved` verbatim**, except: absolute `{from,to}` windows become `{last_n_days: n}`, a `month` becomes `last_n_days: 30`, an ISO `week` becomes `last_n_days: 7`, and `"all"` placeholders are dropped. The notes are shown on the draft.
 - **Diff keys**: rows are keyed by `diff_key`, plus `source` when a row has one (compare) and `tier` when the key is a brand (funnel-mix). The first run is a baseline (everything "new", delivered once). Watched-metric thresholds come from the registry `watch` blocks and are stored per agent in `diff_config` so they can be edited: compare share-of-voice ±1 pt / posts ±50% / negative ±5 pts; affiliates accounts ±20% / share ±5 pts; alert skills (waves) deliver when a brand enters the alert state.
@@ -79,8 +79,15 @@ Followers 0 or null → tier null, excluded from per-1k metrics. Discovery keeps
 - **Free-text setup** ("Every Monday, compare …") calls the model with the `create_agent_draft` tool and needs `ANTHROPIC_API_KEY`; without it, agents are created from a run ("Run this weekly" on /discovery, "Create agent" on a draft card in Ask) or by posting a draft to `/api/agents`.
 - **Acceptance test** (`src/agents/__tests__/agents.live.test.ts`) promotes a /discovery run, runs it (baseline of 5), raises the limit to 7 as the seeded change, runs again and asserts exactly 2 new entrants and 0 gone, then a third run with no change is not delivered.
 
-## Reports (M4, 2 Sep 2026, Claude Code; confirm or change)
+## Reports (M4, 2 Sep 2026, Claude Code; confirmed by Refal 2 Sep 2026)
 - **A report is created for every agent run and on "Turn into a report" in Ask.** It stores Markdown plus JSON blocks (headline, what changed, first 50 rows, chart, caveats, cited evidence) and renders with the prototype's document structure: header with a "N changes" pill, lead paragraph, What changed, table (with share-of-voice bars when present), Worth acting on, caveats.
 - **The headline and "Worth acting on" are one non-streaming model call** (the Ask system rules plus a `write_report` tool, ≤700 output tokens) with the result JSON in the user message; citations are checked against the run's evidence and unknown ones are stripped. Without a model key the report gets a deterministic headline and is marked "no model headline"; the agent email carries the same headline.
 - **PDF export is "Print / Save as PDF"** from the browser in v1; a Markdown download exists at `/api/reports/[id]?format=md`. Server-side PDF (headless Chromium) stays later, as the PRD says.
 - **Deleting a report never deletes the run**; deleting an agent keeps its reports (agent_run_id set null).
+
+## Confirmations and changes (Refal, 2 Sep 2026, via chat)
+- Relative windows anchored on the newest post: confirmed ("last 30 days" = 1 to 30 June on the current data).
+- Views/followers floors on rankings, owned posts labelled and excluded from creator pools, loyalists retention, waves baseline, 15-minute cron polling, first-run baseline, month/week → relative window on promotion, model headline with fallback, browser print for PDF: all confirmed.
+- Share of voice: confirmed; it follows the `platform` param, so it can be Instagram only, TikTok only, or combined.
+- Chat model: `claude-sonnet-5` for now; Refal wants Opus later. That is the `ANTHROPIC_MODEL_CHAT` variable (`claude-opus-5`), no code change.
+- **Login is required (changed from "no login").** Email + password accounts in `users` (`password_hash`, scrypt), a signed HttpOnly session cookie (30 days, `AUTH_SECRET` or `CRON_SECRET`), and a request gate (`proxy.ts`) on every page and API route except `/login`, `/api/auth/*` and the cron route. Accounts are created by the owner with `pnpm user add <email>`; the first account is refal@fair-indonesia.com (owner). No self-signup, no password reset by email in v1; `pnpm user reset <email>` prints a new password.

@@ -23,6 +23,7 @@ pnpm db:stats         # live counts, months per platform, capture coverage, view
 pnpm test             # vitest: config sync, registry integrity, and every Phase 1 skill against the live DB
 pnpm dev              # Next.js app on http://localhost:3000 (Ask, Skills, /discovery, Data)
 pnpm smoke            # 20 chat questions through the real model; reports evidence_miss (needs ANTHROPIC_API_KEY)
+pnpm user add you@company.com --name "You" --role owner   # creates an account and prints its password once
 pnpm skill list       # the 24 registered skills
 pnpm skill run brand-strategy --params '{"brand":"skintific","month":"2026-06"}' --compact
 pnpm skill run discovery --params '{"used_by":["skintific_official"],"tiers":["nano"],"platform":"tiktok"}'
@@ -37,6 +38,7 @@ Reports (M4): every agent run and "Turn into a report" in Ask create a `reports`
 Skills (M1): `src/skills/registry.ts` loads `skills.registry.json`; `runner.ts` validates params (JSON Schema with defaults), checks the data layers a skill requires, runs it, rejects results without evidence, and persists to `skill_runs`. Twelve Phase 1 skills are implemented (discovery, mercenaries, loyalists, affiliates, breakout, funnel-mix, overlap, waves, top-content, compare, launch, brand-strategy); the rest return `status: "unavailable"` with a plain message until their data layer is loaded. Relative windows count back from the newest loaded post (see `docs/DECISIONS.md`, "Skill engine").
 
 Notes:
+- Login is required: every page and API route needs the session cookie set by `/api/auth/login`; only `/login`, `/api/auth/*` and `/api/cron/agents` (own `CRON_SECRET`) are open. Sessions are signed with `AUTH_SECRET` (falls back to `CRON_SECRET`).
 - Database access goes over Neon's HTTPS SQL endpoint (`@neondatabase/serverless` in TypeScript, `etl/neon_http.py` in Python), so nothing needs port 5432. The unpooled URL is derived from `DATABASE_URL` in `src/db/client.ts`. Node scripts set `NODE_USE_ENV_PROXY=1` so `fetch` honours `HTTPS_PROXY` in sandboxes.
 - The loader rejects rows with unknown brand slugs, missing urls, or unparseable dates and reports them; it never guesses. Re-running is idempotent (upsert on `(workspace_id, platform, url, brand_id)`).
 - Timestamps in the raw files are read as `Asia/Jakarta` local time and stored in UTC (`SOURCE_TZ` in config; still an open item in `docs/DECISIONS.md`).

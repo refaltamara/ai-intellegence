@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 
 const NAV = [
   { href: "/", label: "Ask", icon: <path d="M21 12a8 8 0 0 1-8 8H7l-4 3V12a8 8 0 0 1 8-8h2a8 8 0 0 1 8 8z" /> },
@@ -10,8 +10,15 @@ const NAV = [
   { href: "/data", label: "Data", icon: <><ellipse cx="12" cy="6" rx="8" ry="3" /><path d="M4 6v12c0 1.7 3.6 3 8 3s8-1.3 8-3V6" /><path d="M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3" /></> },
 ];
 
-export function Sidebar({ recent }: { recent: { id: string; title: string }[] }) {
+export function Sidebar({ recent, user }: { recent: { id: string; title: string }[]; user: { email: string; role: string } }) {
   const path = usePathname();
+  const router = useRouter();
+  const initials = user.email.slice(0, 2).toUpperCase();
+  async function logout() {
+    await fetch("/api/auth/logout", { method: "POST" });
+    router.push("/login");
+    router.refresh();
+  }
   const active = (href: string) => (href === "/" ? path === "/" : path.startsWith(href));
   return (
     <aside className="side">
@@ -35,7 +42,10 @@ export function Sidebar({ recent }: { recent: { id: string; title: string }[] })
       </div>
       <div className="bottom">
         <div className="ws"><div><span>Category workspace</span><b>Beauty · Indonesia</b></div></div>
-        <div className="user"><div className="avatar">FI</div><div><b>Fair team</b><span>proof workspace</span></div></div>
+        <div className="user" style={{ justifyContent: "space-between" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}><div className="avatar">{initials}</div><div style={{ minWidth: 0 }}><b style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 120 }}>{user.email}</b><span>{user.role}</span></div></div>
+          <button className="btn sm ghost" onClick={logout} title="Sign out">Out</button>
+        </div>
       </div>
     </aside>
   );

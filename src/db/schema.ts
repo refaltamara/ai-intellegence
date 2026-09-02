@@ -52,6 +52,7 @@ export const users = pgTable(
     email: text("email").notNull(),
     name: text("name"),
     role: text("role").notNull().default("member"),
+    passwordHash: text("password_hash"),
     whatsappE164: text("whatsapp_e164"),
     createdAt: createdAt(),
   },

@@ -13,7 +13,8 @@
     "etl:load": "python3 etl/load.py --all",
     "test": "NODE_USE_ENV_PROXY=1 vitest run",
     "smoke": "NODE_USE_ENV_PROXY=1 tsx scripts/smoke.ts",
-    "skill": "NODE_USE_ENV_PROXY=1 tsx scripts/skill.ts"
+    "skill": "NODE_USE_ENV_PROXY=1 tsx scripts/skill.ts",
+    "user": "NODE_USE_ENV_PROXY=1 tsx scripts/user.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.123.0",
