@@ -17,7 +17,7 @@
     "user": "NODE_USE_ENV_PROXY=1 tsx scripts/user.ts"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.123.0",
+    "@anthropic-ai/sdk": "0.122.0",
     "@neondatabase/serverless": "^1.1.0",
     "ajv": "^8.20.0",
     "ajv-formats": "^3.0.1",
@@ -30,12 +30,16 @@
     "zod": "^4.5.4"
   },
   "devDependencies": {
-    "@types/node": "^26.4.1",
+    "@types/node": "26.4.0",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.5",
     "drizzle-kit": "^0.31.10",
     "tsx": "^4.23.13",
     "typescript": "^7.0.2",
     "vitest": "^4.1.11"
+  },
+  "packageManager": "pnpm@10.33.0",
+  "engines": {
+    "node": ">=22"
   }
 }
