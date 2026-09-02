@@ -20,8 +20,13 @@ pnpm db:generate      # regenerate src/db/migrations from src/db/schema.ts after
 pnpm db:migrate       # apply migrations, then (re)create the materialized views in src/db/views.sql
 pnpm etl:load         # python3 etl/load.py --all: brands seed + the three raw files + refresh views
 pnpm db:stats         # live counts, months per platform, capture coverage, view sizes, recent loads
-pnpm test             # vitest (config-sync between src/config/thresholds.ts and etl/config.py)
+pnpm test             # vitest: config sync, registry integrity, and every Phase 1 skill against the live DB
+pnpm skill list       # the 24 registered skills
+pnpm skill run brand-strategy --params '{"brand":"skintific","month":"2026-06"}' --compact
+pnpm skill run discovery --params '{"used_by":["skintific_official"],"tiers":["nano"],"platform":"tiktok"}'
 ```
+
+Skills (M1): `src/skills/registry.ts` loads `skills.registry.json`; `runner.ts` validates params (JSON Schema with defaults), checks the data layers a skill requires, runs it, rejects results without evidence, and persists to `skill_runs`. Twelve Phase 1 skills are implemented (discovery, mercenaries, loyalists, affiliates, breakout, funnel-mix, overlap, waves, top-content, compare, launch, brand-strategy); the rest return `status: "unavailable"` with a plain message until their data layer is loaded. Relative windows count back from the newest loaded post (see `docs/DECISIONS.md`, "Skill engine").
 
 Notes:
 - Database access goes over Neon's HTTPS SQL endpoint (`@neondatabase/serverless` in TypeScript, `etl/neon_http.py` in Python), so nothing needs port 5432. The unpooled URL is derived from `DATABASE_URL` in `src/db/client.ts`. Node scripts set `NODE_USE_ENV_PROXY=1` so `fetch` honours `HTTPS_PROXY` in sandboxes.
