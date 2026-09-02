@@ -1,0 +1,27 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1788341428050,
+      "tag": "0000_strange_chat",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1788350903300,
+      "tag": "0001_nice_kate_bishop",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1788352758953,
+      "tag": "0002_cheerful_gamma_corps",
+      "breakpoints": true
+    }
+  ]
+}

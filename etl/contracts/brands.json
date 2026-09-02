@@ -1,0 +1,5 @@
+{
+  "kind": "brands",
+  "required": ["brand", "tiktok_handle", "instagram_handle", "tracked_on"],
+  "optional": ["tiktok_posts", "instagram_posts", "notes"]
+}

@@ -1,18 +1,18 @@
 {
-  "version": "1.0",
+  "version": "1.1",
   "generated": "2026-09-02",
   "layers": {
     "creators": {
       "title": "Creators",
-      "blurb": "104K creators with brand history — who they posted for, how often, and how it performed"
+      "blurb": "71K creators with brand history across TikTok and Instagram — who they posted for, how often, and how it performed"
     },
     "posts": {
       "title": "Posts",
-      "blurb": "Every post tracked for 7 days after publishing"
+      "blurb": "Post-level performance for every tracked post, one row per post per brand"
     },
     "brands": {
       "title": "Brands",
-      "blurb": "50 brands, owned and earned, across four platforms"
+      "blurb": "91 brands; owned and earned on TikTok, earned on Instagram"
     },
     "comments": {
       "title": "Comments",
@@ -28,28 +28,24 @@
     }
   },
   "tiers": {
-    "sub": [
-      0,
-      999
-    ],
     "nano": [
-      1000,
-      9999
+      1,
+      10000
     ],
     "micro": [
-      10000,
-      99999
+      10001,
+      50000
     ],
     "mid": [
-      100000,
-      499999
+      50001,
+      500000
     ],
     "macro": [
-      500000,
-      999999
+      500001,
+      1000000
     ],
     "mega": [
-      1000000,
+      1000001,
       null
     ]
   },
@@ -115,7 +111,6 @@
             "items": {
               "type": "string",
               "enum": [
-                "sub",
                 "nano",
                 "micro",
                 "mid",
@@ -136,7 +131,7 @@
             "items": {
               "type": "string"
             },
-            "description": "Default: the client brand"
+            "description": "Brands the creator must NOT have posted for in the window. Default: the client brand when the workspace has one, else empty"
           },
           "min_posts_for_brands": {
             "type": "integer",
@@ -153,13 +148,20 @@
             "default": "comment_rate"
           },
           "min_followers": {
-            "type": "integer"
+            "type": "integer",
+            "description": "Ignore accounts below this many followers (also excludes unknown follower counts)"
           },
           "max_followers": {
             "type": "integer"
           },
           "location": {
             "type": "string"
+          },
+          "min_views": {
+            "type": "integer",
+            "default": 1000,
+            "minimum": 0,
+            "description": "Minimum total views across the creator's posts in the window; keeps rate rankings (comment_rate, er_pct) from surfacing accounts with a few hundred views"
           }
         },
         "required": [],
@@ -180,8 +182,8 @@
       "layer": "creators",
       "phase": 1,
       "title": "Mercenaries",
-      "description": "Creators who posted for four or more competitors in a quarter. See who's for hire, who's saturated, and who just posted for a rival.",
-      "example": "Which creators worked for 4+ brands in Q2, and for whom?",
+      "description": "Creators who posted for several competitors inside the window. See who's for hire, who's saturated, and who just posted for a rival.",
+      "example": "Which creators worked for 4+ brands in the last 90 days, and for whom?",
       "input_schema": {
         "type": "object",
         "properties": {
@@ -304,7 +306,8 @@
             "default": 50
           },
           "brand": {
-            "type": "string"
+            "type": "string",
+            "description": "Brand slug (required)"
           },
           "min_months": {
             "type": "integer",
@@ -336,7 +339,7 @@
       "phase": 1,
       "first_release": true,
       "title": "Affiliate detection",
-      "description": "Separates reseller and affiliate armies from real creators: accounts posting 30+ times a month with a yellow cart on almost every post. Sizes the network per brand and tracks its growth.",
+      "description": "Sizes each brand's affiliate network on TikTok. Rule: a post with a shoppable (yellow cart) link is an affiliate post; a creator with at least one affiliate post in the window is an affiliator. Stricter volume-based settings are optional. Resellers are counted separately.",
       "example": "How big is MS Glow's affiliate network on TikTok, and is it growing?",
       "input_schema": {
         "type": "object",
@@ -391,18 +394,24 @@
           },
           "month": {
             "type": "string",
-            "description": "YYYY-MM; default latest full month"
+            "description": "YYYY-MM; alternative to window. Default: window (last 30 days of data)"
           },
           "rule": {
             "type": "object",
             "properties": {
-              "min_posts": {
+              "min_cart_posts": {
                 "type": "integer",
-                "default": 30
+                "default": 1,
+                "minimum": 1,
+                "description": "Affiliator = creator with at least this many cart posts in the window"
               },
-              "min_cart_pct": {
+              "strict_min_posts": {
+                "type": "integer",
+                "description": "Optional stricter rule: also require at least this many posts in the window (PRD used 30)"
+              },
+              "strict_min_cart_pct": {
                 "type": "number",
-                "default": 50
+                "description": "Optional stricter rule: also require this cart share of the creator's posts (PRD used 50)"
               }
             },
             "additionalProperties": false
@@ -433,7 +442,7 @@
       "phase": 1,
       "title": "Breakout creators",
       "description": "Small accounts whose posts travel far beyond their followers. Catches a 200-follower creator doing 2M views the week it happens.",
-      "example": "Nano creators with 5,000× views per follower this week",
+      "example": "Nano creators doing 5 views per follower or more this week",
       "input_schema": {
         "type": "object",
         "properties": {
@@ -487,7 +496,6 @@
             "items": {
               "type": "string",
               "enum": [
-                "sub",
                 "nano",
                 "micro",
                 "mid",
@@ -496,17 +504,22 @@
               ]
             },
             "default": [
-              "sub",
               "nano"
             ]
           },
           "min_views_per_1k": {
             "type": "number",
-            "default": 5000
+            "default": 5000,
+            "description": "Minimum views per 1,000 followers. 5000 means 5 views per follower."
           },
           "min_views": {
             "type": "integer",
             "default": 100000
+          },
+          "min_followers": {
+            "type": "integer",
+            "default": 100,
+            "description": "Ignore accounts below this many followers; tiny follower counts make views-per-follower meaningless"
           }
         },
         "required": [],
@@ -584,10 +597,11 @@
             "items": {
               "type": "string"
             },
-            "description": "Default: client brand"
+            "description": "Brands to compare with. Default: client brand when the workspace has one, else none"
           },
           "month": {
-            "type": "string"
+            "type": "string",
+            "description": "YYYY-MM; default latest month in the data"
           }
         },
         "required": [
@@ -678,86 +692,6 @@
       "requires": [
         "posts",
         "creators"
-      ]
-    },
-    {
-      "name": "spend-estimate",
-      "layer": "creators",
-      "phase": 1,
-      "title": "Spend estimate",
-      "description": "Estimates a competitor's monthly creator spend from tier, post count, and Fair's rate-card ranges. Shown as a low–high range and always labelled as an estimate; affiliate accounts are excluded.",
-      "example": "What did Wardah roughly spend on TikTok creators in June?",
-      "input_schema": {
-        "type": "object",
-        "properties": {
-          "platform": {
-            "type": "string",
-            "enum": [
-              "tiktok",
-              "instagram",
-              "threads",
-              "x",
-              "all"
-            ],
-            "default": "all",
-            "description": "Platform to query"
-          },
-          "window": {
-            "type": "object",
-            "description": "Time window. Either {last_n_days} or {from,to} (ISO dates)",
-            "properties": {
-              "last_n_days": {
-                "type": "integer",
-                "minimum": 1,
-                "maximum": 400
-              },
-              "from": {
-                "type": "string",
-                "format": "date"
-              },
-              "to": {
-                "type": "string",
-                "format": "date"
-              }
-            },
-            "additionalProperties": false
-          },
-          "brands": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            },
-            "description": "Brand slugs; default = all tracked brands in the workspace"
-          },
-          "limit": {
-            "type": "integer",
-            "minimum": 1,
-            "maximum": 200,
-            "default": 50
-          },
-          "brand": {
-            "type": "string"
-          },
-          "month": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "brand"
-        ],
-        "additionalProperties": false
-      },
-      "output": {
-        "kind": "table",
-        "diff_key": "tier",
-        "always_caveat": "estimate"
-      },
-      "requires": [
-        "posts",
-        "creators"
-      ],
-      "config": [
-        "ratecard"
       ]
     },
     {
@@ -996,6 +930,131 @@
       ]
     },
     {
+      "name": "top-content",
+      "layer": "posts",
+      "phase": 1,
+      "first_release": true,
+      "title": "Top content",
+      "description": "Best posts by views, comment rate, or engagement rate, filtered by brand, affiliate (cart) tag, content format, product category, tier and platform. The evidence is the posts themselves.",
+      "example": "Most performing content with affiliate tags last month",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "platform": {
+            "type": "string",
+            "enum": [
+              "tiktok",
+              "instagram",
+              "threads",
+              "x",
+              "all"
+            ],
+            "default": "all",
+            "description": "Platform to query"
+          },
+          "window": {
+            "type": "object",
+            "description": "Time window. Either {last_n_days} or {from,to} (ISO dates)",
+            "properties": {
+              "last_n_days": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 400
+              },
+              "from": {
+                "type": "string",
+                "format": "date"
+              },
+              "to": {
+                "type": "string",
+                "format": "date"
+              }
+            },
+            "additionalProperties": false
+          },
+          "brands": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Brand slugs; default = all tracked brands in the workspace"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "default": 50
+          },
+          "has_cart": {
+            "type": "boolean",
+            "description": "true = only posts with a shoppable link (TikTok); false = only posts without"
+          },
+          "content_format": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "product_showcase",
+                "review",
+                "tutorial",
+                "tips_educational",
+                "grwm",
+                "pov_storytelling",
+                "trend_challenge",
+                "before_after",
+                "comparison",
+                "other"
+              ]
+            }
+          },
+          "product_category": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "e.g. lip, serum, sunscreen, cushion"
+          },
+          "tiers": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "nano",
+                "micro",
+                "mid",
+                "macro",
+                "mega"
+              ]
+            }
+          },
+          "rank_by": {
+            "type": "string",
+            "enum": [
+              "views",
+              "comment_rate",
+              "er_pct",
+              "engagements"
+            ],
+            "default": "views"
+          },
+          "min_views": {
+            "type": "integer",
+            "default": 1000,
+            "description": "Floor applied when ranking by a rate"
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "output": {
+        "kind": "table",
+        "diff_key": "post_id"
+      },
+      "requires": [
+        "posts"
+      ]
+    },
+    {
       "name": "compare",
       "layer": "brands",
       "phase": 1,
@@ -1177,6 +1236,90 @@
       "phase2_columns": [
         "top_questions",
         "topics"
+      ]
+    },
+    {
+      "name": "brand-strategy",
+      "layer": "brands",
+      "phase": 1,
+      "first_release": true,
+      "title": "Brand strategy",
+      "description": "One brand, one month or ISO week: posts, creators, tier mix, owned vs earned (TikTok), cart share, content format mix, product category mix, top 10 posts, and week-by-week volume. The fastest way to read what a competitor is doing.",
+      "example": "Tell me Skintific's strategy in June",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "platform": {
+            "type": "string",
+            "enum": [
+              "tiktok",
+              "instagram",
+              "threads",
+              "x",
+              "all"
+            ],
+            "default": "all",
+            "description": "Platform to query"
+          },
+          "window": {
+            "type": "object",
+            "description": "Time window. Either {last_n_days} or {from,to} (ISO dates)",
+            "properties": {
+              "last_n_days": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 400
+              },
+              "from": {
+                "type": "string",
+                "format": "date"
+              },
+              "to": {
+                "type": "string",
+                "format": "date"
+              }
+            },
+            "additionalProperties": false
+          },
+          "brands": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Brand slugs; default = all tracked brands in the workspace"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "default": 50
+          },
+          "brand": {
+            "type": "string",
+            "description": "Brand slug (required)"
+          },
+          "month": {
+            "type": "string",
+            "description": "YYYY-MM. Default: latest month in the data"
+          },
+          "week": {
+            "type": "string",
+            "description": "ISO week, e.g. 2026-W24; alternative to month"
+          }
+        },
+        "required": [
+          "brand"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "kind": "table+chart",
+        "chart": "line_weekly_volume",
+        "diff_key": "brand_id"
+      },
+      "requires": [
+        "posts",
+        "creators"
       ]
     },
     {
@@ -1871,7 +2014,7 @@
       "layer": "conversation",
       "phase": 2,
       "title": "Narrative watch",
-      "description": "Text-first narratives on Threads and X before they reach video: complaints, rumours, price talk. Usually the earliest signal you'll get.",
+      "description": "Text-first narratives on Threads and X before they reach video: complaints, rumours, price talk. Usually the earliest signal you'll get. Unavailable until Threads or X data is loaded.",
       "example": "What are people saying about my brand on Threads this week?",
       "input_schema": {
         "type": "object",
@@ -1944,7 +2087,13 @@
       "platforms": [
         "threads",
         "x"
-      ]
+      ],
+      "gate": {
+        "platforms_present": [
+          "threads",
+          "x"
+        ]
+      }
     }
   ]
 }

@@ -1,0 +1,41 @@
+{
+  "name": "fair-intel",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "NODE_USE_ENV_PROXY=1 next dev",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "NODE_USE_ENV_PROXY=1 tsx scripts/migrate.ts",
+    "db:stats": "NODE_USE_ENV_PROXY=1 tsx scripts/db-stats.ts",
+    "etl:load": "python3 etl/load.py --all",
+    "test": "NODE_USE_ENV_PROXY=1 vitest run",
+    "smoke": "NODE_USE_ENV_PROXY=1 tsx scripts/smoke.ts",
+    "skill": "NODE_USE_ENV_PROXY=1 tsx scripts/skill.ts",
+    "user": "NODE_USE_ENV_PROXY=1 tsx scripts/user.ts"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.123.0",
+    "@neondatabase/serverless": "^1.1.0",
+    "ajv": "^8.20.0",
+    "ajv-formats": "^3.0.1",
+    "cron-parser": "^5.10.0",
+    "drizzle-orm": "^0.45.2",
+    "next": "^16.3.4",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "resend": "^6.25.0",
+    "zod": "^4.5.4"
+  },
+  "devDependencies": {
+    "@types/node": "^26.4.1",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.5",
+    "drizzle-kit": "^0.31.10",
+    "tsx": "^4.23.13",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.11"
+  }
+}

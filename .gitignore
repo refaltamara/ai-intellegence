@@ -7,3 +7,5 @@ node_modules/
 __pycache__/
 .venv/
 .DS_Store
+*.tsbuildinfo
+next-env.d.ts

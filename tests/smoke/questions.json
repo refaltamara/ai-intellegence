@@ -1,0 +1,22 @@
+[
+  { "q": "What were competitors doing last week?", "expect_tool": ["compare", "waves", "brand-strategy"] },
+  { "q": "Tell me Skintific's strategy in June", "expect_tool": ["brand-strategy"] },
+  { "q": "Most performing content with affiliate tags last month", "expect_tool": ["top-content"] },
+  { "q": "/discovery 50 nano creators competitors used on TikTok, never used by us", "expect_tool": ["discovery"] },
+  { "q": "List nano influencers Skintific used on TikTok", "expect_tool": ["discovery"] },
+  { "q": "Which creators worked for 4+ brands in the last 90 days?", "expect_tool": ["mercenaries"] },
+  { "q": "Who has Skintific kept for three months straight?", "expect_tool": ["loyalists"] },
+  { "q": "How big is MS Glow's affiliate network on TikTok, and is it growing?", "expect_tool": ["affiliates"] },
+  { "q": "Nano creators doing 5 views per follower or more this month", "expect_tool": ["breakout"] },
+  { "q": "Is Glad2Glow buying awareness or conversion this month?", "expect_tool": ["funnel-mix"] },
+  { "q": "Which brands share creators with Timephoria?", "expect_tool": ["overlap"] },
+  { "q": "Is any competitor running a launch wave right now?", "expect_tool": ["waves"] },
+  { "q": "Compare Skintific, Somethinc and Emina over the last 30 days", "expect_tool": ["compare"] },
+  { "q": "How did Skintific's June go, week by week, starting 1 June?", "expect_tool": ["launch", "brand-strategy"] },
+  { "q": "Top serum posts by comment rate in June", "expect_tool": ["top-content"] },
+  { "q": "Strategi Wardah bulan Mei gimana?", "expect_tool": ["brand-strategy"] },
+  { "q": "How many Instagram posts per brand did we track in March, top 10?", "expect_tool": ["query_metrics", "compare"] },
+  { "q": "What are the top objections under Emina posts?", "expect_tool": ["objections"], "expect_unavailable": true },
+  { "q": "Which posts are still climbing today?", "expect_tool": ["velocity"], "expect_unavailable": true },
+  { "q": "Get me the weekly nano discovery for Skintific every Monday", "expect_tool": ["discovery", "create_agent_draft"] }
+]
