@@ -1,4 +1,5 @@
 /** Reports persistence and creation (PRD §7). A report is a rendered skill run (+ optional agent diff). */
+import { appUrl } from "../config/app";
 import { sql } from "../db/client";
 import type { Diff } from "../agents/diff";
 import type { SkillResult } from "../skills/types";
@@ -56,7 +57,7 @@ export async function createReport(opts: { workspaceId: string; result: SkillRes
   const sections = await generateSections(result, diff, opts.workspaceId);
   const changes = diff && !diff.first_run ? diff.new.length + diff.gone.length + diff.changed.length : 0;
   const title = opts.title ?? (opts.source === "agent" && opts.agentName ? `${opts.agentName} — ${diff?.first_run ? "first run" : `${changes} change${changes === 1 ? "" : "s"}`}` : `/${result.skill} · ${result.meta.data_window.from} to ${result.meta.data_window.to}`);
-  const markdown = renderMarkdown({ title, result, diff, headline: sections.headline.replace(/<ev id="(ev_\d+)"><\/ev>/g, "[$1]"), appUrl: process.env.APP_URL });
+  const markdown = renderMarkdown({ title, result, diff, headline: sections.headline.replace(/<ev id="(ev_\d+)"><\/ev>/g, "[$1]"), appUrl: appUrl() });
   const citedEvidence = result.evidence.filter((e) => sections.evidence_ids.includes(e.id));
   const blocks: ReportBlocks = {
     skill: result.skill, status: result.status, summary: result.summary, rows: result.rows.slice(0, 50), rows_total: result.rows.length, chart: result.chart ?? null,

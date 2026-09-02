@@ -2,6 +2,7 @@
  * Runs one agent (PRD §6.3): skill with frozen params -> new skill_run, diff
  * against the previous successful run, report row, delivery, next_run_at.
  */
+import { appUrl as publicUrl } from "../config/app";
 import { runSkill } from "../skills/runner";
 import { renderHtml } from "../reports/render";
 import { createReport } from "../reports/store";
@@ -26,7 +27,7 @@ export async function runAgent(agent: AgentRow, opts: { reason?: "schedule" | "m
   if (result.status === "ok") {
     diff = diffResults(previous ? previous.rows : null, result.rows, result.diff_key, agent.diff_config ?? {});
     should = shouldDeliver(diff, agent.only_if_changed, agent.diff_config ?? {});
-    const appUrl = process.env.APP_URL;
+    const appUrl = publicUrl();
     const { report, sections, markdown } = await createReport({ workspaceId: agent.workspace_id, result, diff, source: "agent", agentName: agent.name, agentRunId: run.id });
     reportId = report.id;
     const title = report.title;
