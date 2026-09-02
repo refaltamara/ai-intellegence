@@ -1,3 +1,4 @@
+import { notFound } from "next/navigation";
 import { DEFAULT_WORKSPACE_ID } from "@/config/thresholds";
 import { getReport, listReports } from "@/reports/store";
 import { ReportDoc } from "@/ui/ReportDoc";
@@ -5,9 +6,11 @@ import { ReportList } from "@/ui/ReportList";
 
 export const dynamic = "force-dynamic";
 
-export default async function ReportsPage() {
-  const reports = await listReports(DEFAULT_WORKSPACE_ID);
-  const latest = reports[0] ? await getReport(reports[0].id, DEFAULT_WORKSPACE_ID) : null;
+export default async function ReportPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  if (!/^[0-9a-f-]{36}$/.test(id)) notFound();
+  const [report, reports] = await Promise.all([getReport(id, DEFAULT_WORKSPACE_ID), listReports(DEFAULT_WORKSPACE_ID)]);
+  if (!report) notFound();
   return (
     <section className="screen">
       <div className="topbar">
@@ -16,8 +19,8 @@ export default async function ReportsPage() {
       </div>
       <div className="wrap wide">
         <div className="two" style={{ gridTemplateColumns: "260px 1fr" }}>
-          <ReportList reports={reports} activeId={latest?.id ?? null} />
-          {latest ? <ReportDoc report={latest} /> : <div className="empty">The newest report opens here.</div>}
+          <ReportList reports={reports} activeId={report.id} />
+          <ReportDoc report={report} />
         </div>
       </div>
     </section>

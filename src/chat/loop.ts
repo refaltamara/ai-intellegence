@@ -40,7 +40,7 @@ export function hasModelCredentials(): boolean {
   return !!(process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_AUTH_TOKEN);
 }
 
-async function buildSystem(workspaceId: string): Promise<string> {
+export async function buildSystem(workspaceId: string): Promise<string> {
   const db = new SkillDb();
   const ctx = await loadContext(db, workspaceId);
   const ws = await db.one<{ name: string }>("select name from workspaces where id = $1", [workspaceId]);

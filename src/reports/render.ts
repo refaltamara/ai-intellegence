@@ -80,7 +80,7 @@ export function renderHtml(opts: { title: string; result: SkillResult; diff: Dif
       <tbody>${result.rows.slice(0, 20).map((r) => `<tr>${cols.map((c) => `<td style="padding:8px;border-bottom:1px solid #E6EBF2;white-space:nowrap">${esc(fmt(r[c]))}</td>`).join("")}</tr>`).join("")}</tbody></table>
       ${result.rows.length > 20 ? `<div style="font-size:12px;color:#8593A8;margin-top:8px">${result.rows.length - 20} more rows in the app.</div>` : ""}</div>` : ""}
     ${result.meta.caveats.length ? `<div style="padding:14px 24px;border-top:1px solid #E6EBF2;font-size:12px;color:#8593A8"><ul style="margin:0;padding-left:18px">${result.meta.caveats.map((c) => `<li>${esc(c)}</li>`).join("")}</ul></div>` : ""}
-    ${opts.appUrl ? `<div style="padding:14px 24px;border-top:1px solid #E6EBF2"><a href="${esc(opts.appUrl)}/agents" style="color:#1E5EFF;font-weight:600;font-size:13px">Open in Fair Intel</a></div>` : ""}
+    ${opts.appUrl ? `<div style="padding:14px 24px;border-top:1px solid #E6EBF2"><a href="${esc(opts.appUrl)}" style="color:#1E5EFF;font-weight:600;font-size:13px">Open the report in Fair Intel</a></div>` : ""}
   </div>
 </div></body></html>`;
 }

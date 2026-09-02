@@ -32,6 +32,8 @@ Ask (M2): `POST /api/chat` streams SSE events (`conversation`, `text`, `tool_sta
 
 Agents (M3): `POST /api/agents` with `{from_skill_run_id}` promotes a run (frozen params, relative window, weekly Monday 07:00 WIB), or with a full draft. `/api/agents/[id]` PATCH pauses, resumes or edits; `/api/agents/[id]/run` runs now. `/api/cron/agents` (Vercel Cron every 15 min, `CRON_SECRET`) runs due agents: skill → diff vs the previous run on `diff_key` → `reports` row → delivery (in-app, Resend email, WhatsApp stub). The Agents screen lists agents and runs and turns free text into a draft via the model.
 
+Reports (M4): every agent run and "Turn into a report" in Ask create a `reports` row via `src/reports/store.ts` (model-written headline with a deterministic fallback in `headline.ts`). `/reports` lists them and shows the newest; `/reports/[id]` shows one; `/api/reports/[id]?format=md` downloads the Markdown. The Data page shows live counts, capture coverage and recent loads.
+
 Skills (M1): `src/skills/registry.ts` loads `skills.registry.json`; `runner.ts` validates params (JSON Schema with defaults), checks the data layers a skill requires, runs it, rejects results without evidence, and persists to `skill_runs`. Twelve Phase 1 skills are implemented (discovery, mercenaries, loyalists, affiliates, breakout, funnel-mix, overlap, waves, top-content, compare, launch, brand-strategy); the rest return `status: "unavailable"` with a plain message until their data layer is loaded. Relative windows count back from the newest loaded post (see `docs/DECISIONS.md`, "Skill engine").
 
 Notes:

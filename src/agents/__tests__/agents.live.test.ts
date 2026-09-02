@@ -10,6 +10,7 @@ import { runSkill } from "../../skills/runner";
 import { agentFromBody } from "../api";
 import { runAgent } from "../runner";
 import { deleteAgent, getAgent, insertAgent, listRuns, updateAgent, type AgentRow } from "../store";
+import { sql } from "../../db/client";
 
 const live = !!process.env.DATABASE_URL;
 const d = live ? describe : describe.skip;
@@ -19,6 +20,7 @@ let agent: AgentRow | null = null;
 d("agents (live)", () => {
   afterAll(async () => {
     if (agent) await deleteAgent(agent.id, WS);
+    await sql.query("delete from reports where workspace_id = $1 and title like '[test]%'", [WS]);
   });
 
   it("promotes a discovery run with frozen, relativised params", async () => {

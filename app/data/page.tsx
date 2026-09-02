@@ -34,6 +34,13 @@ export default async function DataPage() {
             <tbody>{s.per_month.map((m) => <tr key={m.platform + m.month}><td>{m.platform}</td><td>{m.month}</td><td className="num">{fmtNum(m.posts)}</td><td className="num">{m.days_captured}/{m.days_in_month}</td><td><div className="bar" style={{ width: 120 }}><i style={{ width: `${pct(m.days_captured, m.days_in_month)}%`, background: pct(m.days_captured, m.days_in_month) < 100 ? "var(--amber)" : "var(--green)" }} /></div></td></tr>)}</tbody>
           </table>
         </div>
+        <h4 style={{ fontSize: 13, color: "var(--text-2)", marginBottom: 10, fontWeight: 600 }}>Recent loads</h4>
+        <div className="tablewrap" style={{ marginBottom: 24 }}>
+          <table>
+            <thead><tr><th>File</th><th>Platform</th><th className="num">Rows in</th><th className="num">Loaded</th><th className="num">Rejected</th><th>Finished (WIB)</th></tr></thead>
+            <tbody>{s.loads.map((l, i) => <tr key={i} style={{ cursor: "default" }}><td>{l.file}</td><td>{l.platform ?? "–"}</td><td className="num">{fmtNum(l.rows_in)}</td><td className="num">{fmtNum(l.rows_loaded)}</td><td className="num">{fmtNum(l.rows_rejected)}</td><td>{l.finished_at ?? "running"}</td></tr>)}</tbody>
+          </table>
+        </div>
         <h4 style={{ fontSize: 13, color: "var(--text-2)", marginBottom: 10, fontWeight: 600 }}>Brands in this workspace</h4>
         <div className="grid-b">
           {ctx.brands.map((b) => <div className={`bchip ${b.is_client ? "me" : ""}`} key={b.id} title={b.id}>{b.name}<small>{b.tiktok_handle && b.instagram_handle ? "TikTok + IG" : b.tiktok_handle ? "TikTok" : "Instagram"}</small></div>)}

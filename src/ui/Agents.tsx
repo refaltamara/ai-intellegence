@@ -1,5 +1,6 @@
 "use client";
 /** Agents screen (PRD §6, §8): list with runs, and the conversational "New agent" panel. */
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { AgentRow, AgentRunRow } from "@/agents/store";
@@ -99,7 +100,7 @@ export function Agents({ agents, skills, modelConfigured, emailConfigured }: { a
                                 <td>{r.finished_at ? (r.diff ? (r.diff.first_run ? "baseline" : "ok") : "failed") : "running"}</td>
                                 <td className="num">{r.diff?.new.length ?? "–"}</td><td className="num">{r.diff?.gone.length ?? "–"}</td><td className="num">{r.diff?.changed.length ?? "–"}</td>
                                 <td>{r.should_deliver === false ? "skipped (no change)" : r.delivered_at ? "delivered" : r.delivery_error ?? "in-app"}</td>
-                                <td>{r.report_id ? <span title={r.report_id}>{r.report_id.slice(0, 8)}</span> : "–"}</td>
+                                <td>{r.report_id ? <Link className="linkbtn" href={`/reports/${r.report_id}`}>open</Link> : "–"}</td>
                               </tr>
                             ))}
                           </tbody>

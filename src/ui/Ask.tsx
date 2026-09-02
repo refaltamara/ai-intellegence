@@ -139,7 +139,15 @@ export function Ask({ skills, layers, initialConversation, initialMessages, pref
                   {!m.streaming && !m.error && m.text && (
                     <div className="acts">
                       <button className="btn sm" onClick={() => send("Get this every Monday")}>Get this every Monday</button>
-                      <button className="btn sm" onClick={() => showToast("Reports arrive in M4")}>Turn into a report</button>
+                      <button className="btn sm" disabled={!m.tools.some((t) => t.run_id)} title={m.tools.some((t) => t.run_id) ? "" : "No skill run in this answer"} onClick={async () => {
+                        const run = [...m.tools].reverse().find((t) => t.run_id);
+                        if (!run) return;
+                        showToast("Writing the report…");
+                        const r = await fetch("/api/reports", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ skill_run_id: run.run_id }) });
+                        const j = await r.json();
+                        if (j.error) { showToast(j.error); return; }
+                        router.push(`/reports/${j.id}`);
+                      }}>Turn into a report</button>
                       <button className="btn sm" onClick={() => { navigator.clipboard?.writeText(m.text.replace(/<ev id="(ev_\d+)"><\/ev>/g, "[$1]")); showToast("Copied"); }}>Copy</button>
                       {m.miss ? <span className="pill" title="citations the model made to evidence that does not exist were removed">evidence_miss {m.miss}</span> : null}
                     </div>
