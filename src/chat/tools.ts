@@ -47,7 +47,10 @@ export function buildTools(): Anthropic.Tool[] {
       required: ["skill", "params"],
       additionalProperties: false,
     },
-    strict: true,
+    // Not strict: strict mode caps optional parameters at 24 across all tools and the
+    // union of skill parameters is far larger. Inputs are validated server-side against
+    // each skill's own schema and errors are returned to the model (PRD §5.2).
+    strict: false,
   } as Anthropic.Tool;
 
   const queryMetrics: Anthropic.Tool = {
@@ -98,7 +101,7 @@ export function buildTools(): Anthropic.Tool[] {
       required: ["name", "skill", "params", "schedule", "delivery", "only_if_changed"],
       additionalProperties: false,
     },
-    strict: true,
+    strict: false, // same reason as run_skill; validated by agentFromBody
   } as Anthropic.Tool;
 
   return [runSkill, queryMetrics, createAgentDraft];

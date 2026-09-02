@@ -27,11 +27,13 @@ describe("evidence citations", () => {
 });
 
 describe("tool definitions", () => {
-  it("are generated from the registry and are strict", () => {
+  it("are generated from the registry; query_metrics is strict, the dynamic tools are not", () => {
     const tools = buildTools();
     expect(tools.map((t) => t.name)).toEqual(["run_skill", "query_metrics", "create_agent_draft"]);
     const run = tools[0] as any;
-    expect(run.strict).toBe(true);
+    expect(run.strict).toBe(false);
+    expect((tools[1] as any).strict).toBe(true);
+    expect((tools[2] as any).strict).toBe(false);
     expect(run.input_schema.properties.skill.enum).toEqual(skillNames());
     for (const n of skillNames()) expect(run.description).toContain(`${n} — `);
   });

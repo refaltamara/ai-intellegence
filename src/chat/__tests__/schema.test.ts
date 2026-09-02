@@ -27,6 +27,23 @@ describe("strict tool schemas", () => {
   it("every tool's input_schema stays inside the strict subset", () => {
     for (const t of buildTools()) expect(violations((t as any).input_schema), t.name).toEqual([]);
   });
+  it("strict tools stay under Anthropic's limit of 24 optional parameters in total", () => {
+    const count = (node: unknown): number => {
+      if (!node || typeof node !== "object") return 0;
+      const s = node as Record<string, any>;
+      let n = 0;
+      if (s.properties) {
+        const req = new Set<string>(s.required ?? []);
+        for (const [k, v] of Object.entries(s.properties)) n += (req.has(k) ? 0 : 1) + count(v);
+      }
+      if (s.items) n += count(s.items);
+      return n;
+    };
+    const strictTools = buildTools().filter((t) => (t as any).strict);
+    expect(strictTools.map((t) => t.name)).toEqual(["query_metrics"]);
+    const total = strictTools.reduce((a, t) => a + count((t as any).input_schema), 0);
+    expect(total).toBeLessThanOrEqual(24);
+  });
   it("run_skill params carry every registry parameter with merged enums", () => {
     const u = unionSkillParamsSchema();
     const p = u.properties as Record<string, any>;
