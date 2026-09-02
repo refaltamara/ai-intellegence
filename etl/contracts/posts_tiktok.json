@@ -1,0 +1,6 @@
+{
+  "kind": "posts",
+  "platform": "tiktok",
+  "required": ["brand", "account_name_raw", "universe", "content_type", "tier", "followers_numeric", "creator_username", "account_type", "is_owned_account", "date_posted", "views", "likes", "comments", "shares", "saves", "engagement_platform_native", "engagement_likes_comments_only", "yc_flag", "description", "url"],
+  "optional": ["category", "category_new", "category_derived_from_product_title", "content_format", "followers_raw", "month_name", "engagement_rate_platform_native_pct", "engagement_rate_comparable_pct", "yc_status_raw", "product_name", "product_url", "price", "price_original", "discount_percent", "content_id", "owned", "cap", "brand_s", "suspect"]
+}

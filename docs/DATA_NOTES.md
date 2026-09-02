@@ -60,3 +60,14 @@ Instagram Q1 only: `shares`, `saves` (both always 0), `category_new` (86% filled
 1. "Tell me Skintific's strategy in a given month or week" → new skill `brand-strategy` (see DECISIONS).
 2. "Most performing content with affiliate tags" → new skill `top-content` with `has_cart` filter.
 3. "List of nano influencers for Skintific" → `discovery` with `used_by=[skintific_official]`, `tiers=[nano]`.
+
+## Loader findings (M0, 2 Sep 2026)
+
+All three files load with zero rejects: 204,995 post rows, 197,008 unique (platform, url) posts, 91 brands, 71,163 creators (30,752 TikTok, 40,411 Instagram). Cross-checks against the figures above all hold: Instagram Q1 has 11,785 rows across 3,798 shared urls; TikTok has 9,074 owned posts, 1,093 rows with no creator handle, 27,586 cart posts (28,916 tagged without link, 3,709 untagged), 603 reseller posts; TikTok April has 23 of 30 days.
+
+Additional things the load surfaced:
+- Instagram Q2 has 2,338 rows with unknown followers (207 null plus 2,131 rows with followers = 0), not just the 207 nulls. Together with Q1's 4,465 and TikTok's 83, 6,886 rows carry `tier = null`.
+- `views_per_1k_followers` explodes for accounts with a handful of followers (one creator shows 645k views per 1k followers). Skills that rank on it must apply `min_followers`.
+- Instagram brand count per month: 53 in Q1, 90 in April, 76 in May and June. The roster is not stable within Q2 either.
+- Owned-account posts have `creator_id = null` (handle kept in `creator_handle`), so creator-level views never mix a brand's own account into its creator pool.
+- Instagram `shares`/`saves` are stored as null (the source columns are always 0 and the API does not expose them).

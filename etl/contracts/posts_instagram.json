@@ -1,0 +1,6 @@
+{
+  "kind": "posts",
+  "platform": "instagram",
+  "required": ["brand", "account_name_raw", "content_type", "tier", "followers_numeric", "creator_username", "date_posted", "views", "likes", "comments", "engagement_platform_native", "engagement_likes_comments_only", "description", "url"],
+  "optional": ["universe", "category", "category_new", "category_derived", "content_format", "followers_raw", "month_name", "shares", "saves", "engagement_rate_platform_native_pct", "engagement_rate_comparable_pct", "owned", "cap", "brand_s", "suspect"]
+}

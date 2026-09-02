@@ -1,0 +1,35 @@
+{
+  "name": "fair-intel",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "NODE_USE_ENV_PROXY=1 tsx scripts/migrate.ts",
+    "db:stats": "NODE_USE_ENV_PROXY=1 tsx scripts/db-stats.ts",
+    "etl:load": "python3 etl/load.py --all",
+    "test": "vitest run",
+    "smoke": "echo 'smoke: not yet implemented (M2)' && exit 0",
+    "skill": "NODE_USE_ENV_PROXY=1 tsx scripts/skill.ts"
+  },
+  "dependencies": {
+    "@neondatabase/serverless": "^1.1.0",
+    "drizzle-orm": "^0.45.2",
+    "next": "^16.3.4",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "zod": "^4.5.4"
+  },
+  "devDependencies": {
+    "@types/node": "^26.4.1",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.5",
+    "drizzle-kit": "^0.31.10",
+    "tsx": "^4.23.13",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.11"
+  }
+}
