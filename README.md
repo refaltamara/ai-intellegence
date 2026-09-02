@@ -21,10 +21,14 @@ pnpm db:migrate       # apply migrations, then (re)create the materialized views
 pnpm etl:load         # python3 etl/load.py --all: brands seed + the three raw files + refresh views
 pnpm db:stats         # live counts, months per platform, capture coverage, view sizes, recent loads
 pnpm test             # vitest: config sync, registry integrity, and every Phase 1 skill against the live DB
+pnpm dev              # Next.js app on http://localhost:3000 (Ask, Skills, /discovery, Data)
+pnpm smoke            # 20 chat questions through the real model; reports evidence_miss (needs ANTHROPIC_API_KEY)
 pnpm skill list       # the 24 registered skills
 pnpm skill run brand-strategy --params '{"brand":"skintific","month":"2026-06"}' --compact
 pnpm skill run discovery --params '{"used_by":["skintific_official"],"tiers":["nano"],"platform":"tiktok"}'
 ```
+
+Ask (M2): `POST /api/chat` streams SSE events (`conversation`, `text`, `tool_start`, `tool_result`, `done`, `error`). `src/chat/loop.ts` builds the three tools from the registry (`src/chat/tools.ts`), runs them server-side (`run_skill` → skill runner, `query_metrics` → the whitelisted builder in `src/query/builder.ts`, `create_agent_draft` → a draft card), rewrites `[ev_xx]` citations to chips and strips unknown ones (`evidence_miss`), and persists conversations and messages. The UI lives in `src/ui/` (Ask thread with slash menu, result cards and charts, Skills grid, discovery screen) on the prototype's design tokens in `app/globals.css`.
 
 Skills (M1): `src/skills/registry.ts` loads `skills.registry.json`; `runner.ts` validates params (JSON Schema with defaults), checks the data layers a skill requires, runs it, rejects results without evidence, and persists to `skill_runs`. Twelve Phase 1 skills are implemented (discovery, mercenaries, loyalists, affiliates, breakout, funnel-mix, overlap, waves, top-content, compare, launch, brand-strategy); the rest return `status: "unavailable"` with a plain message until their data layer is loaded. Relative windows count back from the newest loaded post (see `docs/DECISIONS.md`, "Skill engine").
 

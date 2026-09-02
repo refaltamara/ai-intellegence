@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "NODE_USE_ENV_PROXY=1 next dev",
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
@@ -12,10 +12,11 @@
     "db:stats": "NODE_USE_ENV_PROXY=1 tsx scripts/db-stats.ts",
     "etl:load": "python3 etl/load.py --all",
     "test": "NODE_USE_ENV_PROXY=1 vitest run",
-    "smoke": "echo 'smoke: not yet implemented (M2)' && exit 0",
+    "smoke": "NODE_USE_ENV_PROXY=1 tsx scripts/smoke.ts",
     "skill": "NODE_USE_ENV_PROXY=1 tsx scripts/skill.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.123.0",
     "@neondatabase/serverless": "^1.1.0",
     "ajv": "^8.20.0",
     "ajv-formats": "^3.0.1",
