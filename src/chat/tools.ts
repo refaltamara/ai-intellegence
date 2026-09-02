@@ -5,6 +5,30 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import { describeSkillsForTool, skillNames } from "../skills/registry";
 import { ENTITIES, FILTERS, GROUP_BY, METRICS } from "../query/builder";
+import { unionSkillParamsSchema } from "./schema";
+
+/** Strict-compatible schema for query_metrics filters: one property per whitelisted filter. */
+const FILTER_SCHEMA = {
+  type: "object",
+  properties: {
+    brand_id: { type: "array", items: { type: "string" }, description: "brand slugs, handles or names" },
+    platform: { type: "array", items: { type: "string", enum: ["tiktok", "instagram"] } },
+    source: { type: "string", enum: ["owned", "earned"] },
+    tier: { type: "array", items: { type: "string", enum: ["nano", "micro", "mid", "macro", "mega"] } },
+    has_cart: { type: "boolean" },
+    content_format: { type: "array", items: { type: "string" } },
+    product_category: { type: "array", items: { type: "string" } },
+    universe: { type: "string" },
+    creator_handle: { type: "array", items: { type: "string" } },
+    date_from: { type: "string", format: "date" },
+    date_to: { type: "string", format: "date" },
+    min_views: { type: "integer" },
+    min_followers: { type: "integer" },
+    earned_only: { type: "boolean" },
+  },
+  required: [],
+  additionalProperties: false,
+} as const;
 
 export function buildTools(): Anthropic.Tool[] {
   const runSkill: Anthropic.Tool = {
@@ -18,7 +42,7 @@ export function buildTools(): Anthropic.Tool[] {
       type: "object",
       properties: {
         skill: { type: "string", enum: skillNames() },
-        params: { type: "object", description: "Parameters for the skill, per the list above. Use {} for defaults.", additionalProperties: true },
+        params: { ...unionSkillParamsSchema(), description: "Parameters for the chosen skill, per the list above; only pass the ones that skill defines. Use {} for defaults." },
       },
       required: ["skill", "params"],
       additionalProperties: false,
@@ -34,11 +58,11 @@ export function buildTools(): Anthropic.Tool[] {
       type: "object",
       properties: {
         entity: { type: "string", enum: [...ENTITIES] },
-        filters: { type: "object", additionalProperties: true },
+        filters: FILTER_SCHEMA,
         group_by: { type: "array", items: { type: "string", enum: [...GROUP_BY] } },
         metrics: { type: "array", items: { type: "string", enum: [...METRICS] } },
         order_by: { type: "string", description: "metric or dimension name, optionally followed by ' desc' or ' asc'" },
-        limit: { type: "integer", maximum: 200 },
+        limit: { type: "integer", description: "at most 200" },
       },
       required: ["entity", "metrics"],
       additionalProperties: false,
@@ -55,7 +79,7 @@ export function buildTools(): Anthropic.Tool[] {
       properties: {
         name: { type: "string" },
         skill: { type: "string", enum: skillNames() },
-        params: { type: "object", additionalProperties: true },
+        params: { ...unionSkillParamsSchema(), description: "The skill's parameters, carried over unchanged from the most recent run when there is one" },
         schedule: {
           type: "object",
           properties: { cron: { type: "string" }, tz: { type: "string" }, human: { type: "string" } },

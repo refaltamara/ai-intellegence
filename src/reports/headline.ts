@@ -20,7 +20,7 @@ const TOOL: Anthropic.Tool = {
     type: "object",
     properties: {
       headline: { type: "string" },
-      worth_acting_on: { type: ["string", "null"] },
+      worth_acting_on: { anyOf: [{ type: "string" }, { type: "null" }] },
     },
     required: ["headline", "worth_acting_on"],
     additionalProperties: false,
