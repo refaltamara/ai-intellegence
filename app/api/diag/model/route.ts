@@ -4,7 +4,7 @@
  */
 import Anthropic from "@anthropic-ai/sdk";
 import { DEFAULT_WORKSPACE_ID } from "@/config/thresholds";
-import { anthropicClient, describeModelError } from "@/chat/client";
+import { anthropicClient, chatEffort, describeModelError } from "@/chat/client";
 import { buildSystem, hasModelCredentials, modelId } from "@/chat/loop";
 import { buildTools } from "@/chat/tools";
 
@@ -15,7 +15,7 @@ export const maxDuration = 60;
 export async function GET(req: Request) {
   const started = Date.now();
   const withTools = new URL(req.url).searchParams.get("tools") !== "0";
-  const steps: Record<string, unknown> = { model: modelId(), credentials: hasModelCredentials(), workspace_header: !!process.env.ANTHROPIC_WORKSPACE_ID, with_tools: withTools };
+  const steps: Record<string, unknown> = { model: modelId(), effort: chatEffort(), credentials: hasModelCredentials(), workspace_header: !!process.env.ANTHROPIC_WORKSPACE_ID, with_tools: withTools };
   try {
     const t0 = Date.now();
     const system = await buildSystem(DEFAULT_WORKSPACE_ID);
@@ -27,6 +27,7 @@ export async function GET(req: Request) {
     const res = await client.messages.create({
       model: modelId(),
       max_tokens: 60,
+      output_config: { effort: chatEffort() },
       system: [{ type: "text", text: system, cache_control: { type: "ephemeral" } }],
       ...(withTools ? { tools, tool_choice: { type: "auto" as const } } : {}),
       messages: [{ role: "user", content: "Reply with the single word OK and do not call any tool." }],

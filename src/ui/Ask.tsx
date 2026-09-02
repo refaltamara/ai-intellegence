@@ -8,7 +8,7 @@ import type { Evidence } from "@/skills/types";
 import { EvidencePanel, ResultCard } from "./ResultCard";
 
 export type SkillMeta = { name: string; layer: string; title: string; description: string; first_release?: boolean; available: boolean };
-type Msg = { id: string; role: "user" | "assistant"; text: string; tools: ToolCallRecord[]; evidence: Record<string, Evidence>; streaming?: boolean; status?: string; error?: string; miss?: number };
+type Msg = { id: string; role: "user" | "assistant"; text: string; tools: ToolCallRecord[]; evidence: Record<string, Evidence>; streaming?: boolean; status?: string; error?: string; miss?: number; timings?: { total_ms: number; model_ms: number; model_calls: number; tools_ms: number; tool_calls: number; setup_ms: number; effort: string } };
 
 const SUGGESTED = ["What were competitors doing last week?", "Tell me Skintific's strategy in June", "Most performing content with affiliate tags last month", "Is any competitor running a launch wave right now?"];
 
@@ -65,7 +65,7 @@ export function Ask({ skills, layers, initialConversation, initialMessages, pref
             update((m) => ({ ...m, tools: [...m.tools, e.tool], evidence: { ...m.evidence, ...ev }, status: "Writing…" }));
             if (e.tool.skill === "discovery" && e.tool.run_id && q.toLowerCase().startsWith("/discovery")) discoveryRun = e.tool.run_id;
           }
-          if (e.type === "done") update((m) => ({ ...m, id: e.message_id, evidence: { ...m.evidence, ...e.evidence }, streaming: false, status: undefined, miss: e.evidence_miss }));
+          if (e.type === "done") update((m) => ({ ...m, id: e.message_id, evidence: { ...m.evidence, ...e.evidence }, streaming: false, status: undefined, miss: e.evidence_miss, timings: e.timings }));
           if (e.type === "error") update((m) => ({ ...m, error: e.message, streaming: false, status: undefined }));
         }
       }
@@ -151,6 +151,7 @@ export function Ask({ skills, layers, initialConversation, initialMessages, pref
                       }}>Turn into a report</button>
                       <button className="btn sm" onClick={() => { navigator.clipboard?.writeText(m.text.replace(/<ev id="(ev_\d+)"><\/ev>/g, "[$1]")); showToast("Copied"); }}>Copy</button>
                       {m.miss ? <span className="pill" title="citations the model made to evidence that does not exist were removed">evidence_miss {m.miss}</span> : null}
+                      {m.timings && <span className="pill" title={`setup ${m.timings.setup_ms} ms · effort ${m.timings.effort}`}>{(m.timings.total_ms / 1000).toFixed(1)}s · model {(m.timings.model_ms / 1000).toFixed(1)}s ×{m.timings.model_calls} · skills {(m.timings.tools_ms / 1000).toFixed(1)}s</span>}
                     </div>
                   )}
                 </div>

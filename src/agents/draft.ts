@@ -25,6 +25,7 @@ export async function draftFromText(text: string, workspaceId: string, opts: { e
     response = await client.messages.create({
     model: modelId(),
     max_tokens: 2000,
+    output_config: { effort: "low" },
     system: `You turn a request for a recurring analysis into an agent draft for Fair Intel. Call the create_agent_draft tool exactly once with your best reading, then stop; do not answer in prose. Choose the skill from this list and pass parameters as that skill defines them (brands accept slugs, handles or display names; relative windows are {last_n_days}). Default schedule when not stated: weekly Monday 07:00 Asia/Jakarta (cron "0 7 * * 1"). Delivery channels: email when the user mentions email or a person to send to, whatsapp when they mention WhatsApp, in_app always. only_if_changed defaults to true unless they ask for every run.\nSkills:\n${buildTools()[0].description}\nTracked brands: ${ctx.brands.map((b) => `${b.id} (${b.name})`).join(", ")}. Newest data: ${ctx.asOf}.`,
     tools: [tool],
     tool_choice: { type: "auto" },

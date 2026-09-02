@@ -12,7 +12,7 @@ import { SkillDb } from "../skills/db";
 import { loadContext } from "../skills/params";
 import { runSkill } from "../skills/runner";
 import type { Evidence, SkillResult } from "../skills/types";
-import { anthropicClient, describeModelError } from "./client";
+import { anthropicClient, chatEffort, describeModelError } from "./client";
 import { CitationStream, renumberEvidence } from "./evidence";
 import { addMessage, createConversation, getConversation, listMessages, type ToolCallRecord } from "./persist";
 import { buildTools } from "./tools";
@@ -26,8 +26,10 @@ export type ChatEvent =
   | { type: "text"; text: string }
   | { type: "tool_start"; id: string; name: string; input: unknown }
   | { type: "tool_result"; tool: ToolCallRecord; evidence: Evidence[] }
-  | { type: "done"; message_id: string; evidence: Record<string, Evidence>; evidence_miss: number; tokens_in: number; tokens_out: number; stop_reason: string | null }
+  | { type: "done"; message_id: string; evidence: Record<string, Evidence>; evidence_miss: number; tokens_in: number; tokens_out: number; stop_reason: string | null; timings: Timings }
   | { type: "error"; message: string };
+
+export type Timings = { total_ms: number; model_ms: number; model_calls: number; tools_ms: number; tool_calls: number; setup_ms: number; effort: string };
 
 export type ChatTurnInput = { workspaceId?: string; conversationId?: string | null; userText: string; userId?: string | null };
 
@@ -41,7 +43,19 @@ export function hasModelCredentials(): boolean {
   return !!(process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_AUTH_TOKEN);
 }
 
+const SYSTEM_TTL_MS = 5 * 60 * 1000;
+const systemCache = new Map<string, { text: string; at: number }>();
+
+/** System prompt per workspace, cached for five minutes: it only changes when data is loaded. */
 export async function buildSystem(workspaceId: string): Promise<string> {
+  const hit = systemCache.get(workspaceId);
+  if (hit && Date.now() - hit.at < SYSTEM_TTL_MS) return hit.text;
+  const text = await buildSystemUncached(workspaceId);
+  systemCache.set(workspaceId, { text, at: Date.now() });
+  return text;
+}
+
+async function buildSystemUncached(workspaceId: string): Promise<string> {
   const db = new SkillDb();
   const ctx = await loadContext(db, workspaceId);
   const ws = await db.one<{ name: string }>("select name from workspaces where id = $1", [workspaceId]);
@@ -109,9 +123,11 @@ async function runTurnBody(conversation: { id: string; workspace_id: string }, u
     return;
   }
 
+  const turnStart = Date.now();
   const client = anthropicClient();
   const system = await buildSystem(workspaceId);
   const tools = buildTools();
+  const timings: Timings = { total_ms: 0, model_ms: 0, model_calls: 0, tools_ms: 0, tool_calls: 0, setup_ms: Date.now() - turnStart, effort: chatEffort() };
   const messages: Anthropic.MessageParam[] = [];
   for (const m of history.slice(-MAX_HISTORY_MESSAGES)) {
     const text = m.content_json?.text ?? "";
@@ -138,9 +154,11 @@ async function runTurnBody(conversation: { id: string; workspace_id: string }, u
 
   try {
     for (let iter = 0; iter < MAX_TOOL_CALLS + 2; iter++) {
+      const callStart = Date.now();
       const stream = client.messages.stream({
         model: modelId(),
         max_tokens: 8000,
+        output_config: { effort: chatEffort() },
         system: [{ type: "text", text: system, cache_control: { type: "ephemeral" } }],
         tools: toolsWithCache,
         tool_choice: { type: "auto" },
@@ -155,6 +173,8 @@ async function runTurnBody(conversation: { id: string; workspace_id: string }, u
         }
       });
       const message = await stream.finalMessage();
+      timings.model_ms += Date.now() - callStart;
+      timings.model_calls += 1;
       const tail = cite.flush();
       if (tail) {
         fullText += tail;
@@ -188,7 +208,10 @@ async function runTurnBody(conversation: { id: string; workspace_id: string }, u
           continue;
         }
         await emit({ type: "tool_start", id: use.id, name: use.name, input: use.input });
+        const toolStart = Date.now();
         const record = await executeTool(use, workspaceId, counter, turnEvidence);
+        timings.tools_ms += Date.now() - toolStart;
+        timings.tool_calls += 1;
         toolRecords.push(record.record);
         if (record.record.run_id) runIds.push(record.record.run_id);
         if (record.record.draft) draft = record.record.draft;
@@ -220,7 +243,9 @@ async function runTurnBody(conversation: { id: string; workspace_id: string }, u
     tokensIn,
     tokensOut,
   });
-  await emit({ type: "done", message_id: saved.id, evidence: evidenceMap, evidence_miss: cite.miss.length, tokens_in: tokensIn, tokens_out: tokensOut, stop_reason: stopReason });
+  timings.total_ms = Date.now() - turnStart;
+  console.log(`chat turn ${conversation.id}: ${timings.total_ms}ms total, model ${timings.model_ms}ms/${timings.model_calls} calls, tools ${timings.tools_ms}ms/${timings.tool_calls}, setup ${timings.setup_ms}ms, effort ${timings.effort}, tokens ${tokensIn}/${tokensOut}`);
+  await emit({ type: "done", message_id: saved.id, evidence: evidenceMap, evidence_miss: cite.miss.length, tokens_in: tokensIn, tokens_out: tokensOut, stop_reason: stopReason, timings });
 }
 
 async function executeTool(use: Anthropic.ToolUseBlock, workspaceId: string, counter: { n: number }, turnEvidence: Map<string, Evidence>): Promise<{ record: ToolCallRecord; evidence: Evidence[]; content: string; isError: boolean }> {

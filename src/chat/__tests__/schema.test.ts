@@ -40,7 +40,7 @@ describe("strict tool schemas", () => {
       return n;
     };
     const strictTools = buildTools().filter((t) => (t as any).strict);
-    expect(strictTools.map((t) => t.name)).toEqual(["query_metrics"]);
+    expect(strictTools).toEqual([]); // strict is off: the grammar compiler rejected the filter schema as "too complex"
     const total = strictTools.reduce((a, t) => a + count((t as any).input_schema), 0);
     expect(total).toBeLessThanOrEqual(24);
   });
