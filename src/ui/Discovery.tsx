@@ -75,7 +75,12 @@ export function Discovery({ brands }: { brands: { id: string; name: string }[] }
         <div style={{ display: "flex", gap: 8 }}>
           <button className="btn sm" onClick={() => showToast("Shortlists arrive with Agents (M3)")}>Save shortlist</button>
           <button className="btn sm" onClick={exportCsv} disabled={!result?.rows?.length}>Export CSV</button>
-          <button className="btn pri sm" onClick={() => showToast("Scheduling arrives with Agents (M3)")}>Run this weekly</button>
+          <button className="btn pri sm" disabled={!runId || !result} onClick={async () => {
+            const r = await fetch("/api/agents", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ from_skill_run_id: runId }) });
+            const j = await r.json();
+            if (j.error) { showToast(j.error); return; }
+            showToast(`Agent "${j.agent.name}" created`); setTimeout(() => router.push("/agents"), 900);
+          }}>Run this weekly</button>
         </div>
       </div>
       <div className="wrap wide">

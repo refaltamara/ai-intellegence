@@ -77,18 +77,29 @@ export function ResultCard({ tool, evidence, onOpenEvidence }: { tool: ToolCallR
 }
 
 export function DraftCard({ draft }: { draft: Record<string, unknown> }) {
+  const [state, setState] = useState<{ busy: boolean; msg: string; done: boolean }>({ busy: false, msg: "", done: false });
   if (!draft) return null;
   const schedule = (draft.schedule ?? {}) as { human?: string; cron?: string; tz?: string };
-  const delivery = (draft.delivery ?? {}) as { channels?: string[] };
+  const delivery = (draft.delivery ?? {}) as { channels?: string[]; email?: string };
+  async function create() {
+    setState({ busy: true, msg: "", done: false });
+    const r = await fetch("/api/agents", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(draft) });
+    const j = await r.json();
+    setState({ busy: false, msg: j.error ? j.error : `Created "${j.agent.name}"`, done: !j.error });
+  }
   return (
     <div className="draft">
-      <h4>Agent draft — here's how we read that. Editing and creation arrive with Agents (M3).</h4>
+      <h4>Agent draft — here's how we read that. Create it as is, or edit it on the Agents page after creating.</h4>
       <div className="field"><span>Name</span><b>{String(draft.name ?? "")}</b></div>
       <div className="field"><span>Skill</span><b><span className="slash">/</span>{String(draft.skill ?? "")}</b></div>
       <div className="field"><span>Schedule</span><b>{schedule.human ?? schedule.cron} · {schedule.tz}</b></div>
       <div className="field"><span>Params</span><b style={{ fontFamily: "monospace", fontSize: 12 }}>{JSON.stringify(draft.params ?? {})}</b></div>
       <div className="field"><span>Deliver to</span><b>{(delivery.channels ?? []).join(", ") || "in_app"}</b></div>
       <div className="field"><span>Only if changed</span><b>{draft.only_if_changed ? "yes" : "no"}</b></div>
+      <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 10, alignItems: "center" }}>
+        {state.msg && <span style={{ fontSize: 12, color: state.done ? "var(--green)" : "var(--red)" }}>{state.msg}</span>}
+        {state.done ? <Link className="btn sm" href="/agents">Open Agents</Link> : <button className="btn pri sm" disabled={state.busy} onClick={create}>{state.busy ? "Creating…" : "Create agent"}</button>}
+      </div>
     </div>
   );
 }

@@ -1,8 +1,13 @@
-export default function AgentsPage() {
-  return (
-    <section className="screen">
-      <div className="topbar"><div><h1>Agents</h1><span className="meta">Skills on a schedule</span></div><span className="pill">arrives in M3</span></div>
-      <div className="wrap wide"><div className="empty">Agents (schedule a skill, diff against the previous run, email delivery) are built in milestone M3. In Ask, "Get this every Monday" already produces an editable draft.</div></div>
-    </section>
-  );
+import { Agents } from "@/ui/Agents";
+import { DEFAULT_WORKSPACE_ID } from "@/config/thresholds";
+import { listAgents, listRuns } from "@/agents/store";
+import { hasModelCredentials } from "@/chat/loop";
+import { impls } from "@/skills/index";
+
+export const dynamic = "force-dynamic";
+
+export default async function AgentsPage() {
+  const agents = await listAgents(DEFAULT_WORKSPACE_ID);
+  const withRuns = await Promise.all(agents.map(async (a) => ({ ...a, runs: await listRuns(a.id, 8) })));
+  return <Agents agents={withRuns} skills={Object.keys(impls)} modelConfigured={hasModelCredentials()} emailConfigured={!!(process.env.RESEND_API_KEY && process.env.EMAIL_FROM)} />;
 }
