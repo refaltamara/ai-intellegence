@@ -12,6 +12,7 @@ import { SkillDb } from "../skills/db";
 import { loadContext } from "../skills/params";
 import { runSkill } from "../skills/runner";
 import type { Evidence, SkillResult } from "../skills/types";
+import { anthropicClient, describeModelError } from "./client";
 import { CitationStream, renumberEvidence } from "./evidence";
 import { addMessage, createConversation, getConversation, listMessages, type ToolCallRecord } from "./persist";
 import { buildTools } from "./tools";
@@ -97,7 +98,7 @@ export async function runChatTurn(input: ChatTurnInput, emit: (e: ChatEvent) => 
     return;
   }
 
-  const client = new Anthropic();
+  const client = anthropicClient();
   const system = await buildSystem(workspaceId);
   const tools = buildTools();
   const messages: Anthropic.MessageParam[] = [];
@@ -186,8 +187,7 @@ export async function runChatTurn(input: ChatTurnInput, emit: (e: ChatEvent) => 
       messages.push({ role: "user", content: results });
     }
   } catch (e) {
-    const err = e as Error;
-    const msg = e instanceof Anthropic.APIError ? `Model error ${e.status}: ${e.message}` : err.message;
+    const msg = describeModelError(e);
     await emit({ type: "error", message: msg });
     fullText += `\n\n(${msg})`;
   }

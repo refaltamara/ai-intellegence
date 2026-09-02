@@ -5,6 +5,7 @@
  */
 import Anthropic from "@anthropic-ai/sdk";
 import type { Diff } from "../agents/diff";
+import { anthropicClient, describeModelError } from "../chat/client";
 import { rewriteCitations } from "../chat/evidence";
 import { buildSystem, hasModelCredentials, modelId } from "../chat/loop";
 import type { Evidence, SkillResult } from "../skills/types";
@@ -43,7 +44,7 @@ export function fallbackHeadline(result: SkillResult, diff: Diff | null): Report
 export async function generateSections(result: SkillResult, diff: Diff | null, workspaceId: string, evidence: Evidence[] = result.evidence): Promise<ReportSections> {
   if (!hasModelCredentials() || result.status !== "ok") return fallbackHeadline(result, diff);
   try {
-    const client = new Anthropic();
+    const client = anthropicClient();
     const system = await buildSystem(workspaceId);
     const payload = {
       skill: result.skill,
@@ -73,7 +74,7 @@ export async function generateSections(result: SkillResult, diff: Diff | null, w
     if (!h.text.trim()) return fallbackHeadline(result, diff);
     return { headline: h.text, worth_acting_on: w?.text ?? null, evidence_ids: ids, evidence_miss: h.miss.length + (w?.miss.length ?? 0), generated_by: "model" };
   } catch (e) {
-    console.error("headline generation failed:", (e as Error).message);
+    console.error("headline generation failed:", describeModelError(e));
     return fallbackHeadline(result, diff);
   }
 }
