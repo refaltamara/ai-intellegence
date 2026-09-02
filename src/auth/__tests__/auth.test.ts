@@ -26,7 +26,7 @@ describe("sessions", () => {
     expect(readCookie(`x=1; fi_session=${t}; y=2`)).toBe(t);
   });
   it("keeps login, auth and cron public and everything else private", () => {
-    for (const p of ["/login", "/api/auth/login", "/api/cron/agents", "/_next/static/x.js"]) expect(isPublicPath(p), p).toBe(true);
+    for (const p of ["/login", "/api/health", "/api/auth/login", "/api/cron/agents", "/_next/static/x.js"]) expect(isPublicPath(p), p).toBe(true);
     for (const p of ["/", "/skills", "/api/chat", "/api/agents", "/reports/x"]) expect(isPublicPath(p), p).toBe(false);
   });
 });

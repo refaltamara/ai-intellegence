@@ -63,5 +63,5 @@ export function readCookie(cookieHeaderValue: string | null | undefined, name = 
 
 /** Paths that never require a session. The cron route has its own secret. */
 export function isPublicPath(pathname: string): boolean {
-  return pathname === "/login" || pathname.startsWith("/api/auth/") || pathname.startsWith("/api/cron/") || pathname.startsWith("/_next/") || pathname === "/favicon.ico" || pathname.startsWith("/icon");
+  return pathname === "/login" || pathname === "/api/health" || pathname.startsWith("/api/auth/") || pathname.startsWith("/api/cron/") || pathname.startsWith("/_next/") || pathname === "/favicon.ico" || pathname.startsWith("/icon");
 }

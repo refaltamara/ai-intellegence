@@ -39,6 +39,7 @@ Skills (M1): `src/skills/registry.ts` loads `skills.registry.json`; `runner.ts` 
 
 Notes:
 - If `ANTHROPIC_API_KEY` is a multi-workspace key, also set `ANTHROPIC_WORKSPACE_ID`; the app sends it as the `anthropic-workspace-id` header on every model request.
+- `/api/health` (public, no secrets) reports whether the database, model key, workspace header, email and cron secret are configured on a deployment.
 - Login is required: every page and API route needs the session cookie set by `/api/auth/login`; only `/login`, `/api/auth/*` and `/api/cron/agents` (own `CRON_SECRET`) are open. Sessions are signed with `AUTH_SECRET` (falls back to `CRON_SECRET`).
 - Database access goes over Neon's HTTPS SQL endpoint (`@neondatabase/serverless` in TypeScript, `etl/neon_http.py` in Python), so nothing needs port 5432. The unpooled URL is derived from `DATABASE_URL` in `src/db/client.ts`. Node scripts set `NODE_USE_ENV_PROXY=1` so `fetch` honours `HTTPS_PROXY` in sandboxes.
 - The loader rejects rows with unknown brand slugs, missing urls, or unparseable dates and reports them; it never guesses. Re-running is idempotent (upsert on `(workspace_id, platform, url, brand_id)`).
