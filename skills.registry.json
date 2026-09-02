@@ -1,0 +1,1950 @@
+{
+  "version": "1.0",
+  "generated": "2026-09-02",
+  "layers": {
+    "creators": {
+      "title": "Creators",
+      "blurb": "104K creators with brand history — who they posted for, how often, and how it performed"
+    },
+    "posts": {
+      "title": "Posts",
+      "blurb": "Every post tracked for 7 days after publishing"
+    },
+    "brands": {
+      "title": "Brands",
+      "blurb": "50 brands, owned and earned, across four platforms"
+    },
+    "comments": {
+      "title": "Comments",
+      "blurb": "Every comment fetched and classified into topics"
+    },
+    "audience": {
+      "title": "Audience",
+      "blurb": "Commenter graph — the same people, seen across brands"
+    },
+    "conversation": {
+      "title": "Conversation",
+      "blurb": "Threads and X keyword tracking"
+    }
+  },
+  "tiers": {
+    "sub": [
+      0,
+      999
+    ],
+    "nano": [
+      1000,
+      9999
+    ],
+    "micro": [
+      10000,
+      99999
+    ],
+    "mid": [
+      100000,
+      499999
+    ],
+    "macro": [
+      500000,
+      999999
+    ],
+    "mega": [
+      1000000,
+      null
+    ]
+  },
+  "skills": [
+    {
+      "name": "discovery",
+      "layer": "creators",
+      "phase": 1,
+      "first_release": true,
+      "title": "Creator discovery",
+      "description": "Find creators by platform, tier, who they've posted for, and whether they've ever posted for you. Ranked with live performance from the latest snapshot.",
+      "example": "50 nano creators competitors used on TikTok in the last 90 days, never used by us",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "platform": {
+            "type": "string",
+            "enum": [
+              "tiktok",
+              "instagram",
+              "threads",
+              "x",
+              "all"
+            ],
+            "default": "all",
+            "description": "Platform to query"
+          },
+          "window": {
+            "type": "object",
+            "description": "Time window. Either {last_n_days} or {from,to} (ISO dates)",
+            "properties": {
+              "last_n_days": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 400
+              },
+              "from": {
+                "type": "string",
+                "format": "date"
+              },
+              "to": {
+                "type": "string",
+                "format": "date"
+              }
+            },
+            "additionalProperties": false
+          },
+          "brands": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Brand slugs; default = all tracked brands in the workspace"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "default": 50
+          },
+          "tiers": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "sub",
+                "nano",
+                "micro",
+                "mid",
+                "macro",
+                "mega"
+              ]
+            }
+          },
+          "used_by": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Brands the creator must have posted for in the window"
+          },
+          "exclude_used_by": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Default: the client brand"
+          },
+          "min_posts_for_brands": {
+            "type": "integer",
+            "default": 1
+          },
+          "rank_by": {
+            "type": "string",
+            "enum": [
+              "comment_rate",
+              "er_pct",
+              "views_per_1k",
+              "median_views"
+            ],
+            "default": "comment_rate"
+          },
+          "min_followers": {
+            "type": "integer"
+          },
+          "max_followers": {
+            "type": "integer"
+          },
+          "location": {
+            "type": "string"
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "output": {
+        "kind": "table",
+        "diff_key": "creator_id",
+        "screen": "discovery"
+      },
+      "requires": [
+        "posts",
+        "creators"
+      ]
+    },
+    {
+      "name": "mercenaries",
+      "layer": "creators",
+      "phase": 1,
+      "title": "Mercenaries",
+      "description": "Creators who posted for four or more competitors in a quarter. See who's for hire, who's saturated, and who just posted for a rival.",
+      "example": "Which creators worked for 4+ brands in Q2, and for whom?",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "platform": {
+            "type": "string",
+            "enum": [
+              "tiktok",
+              "instagram",
+              "threads",
+              "x",
+              "all"
+            ],
+            "default": "all",
+            "description": "Platform to query"
+          },
+          "window": {
+            "type": "object",
+            "description": "Time window. Either {last_n_days} or {from,to} (ISO dates)",
+            "properties": {
+              "last_n_days": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 400
+              },
+              "from": {
+                "type": "string",
+                "format": "date"
+              },
+              "to": {
+                "type": "string",
+                "format": "date"
+              }
+            },
+            "additionalProperties": false
+          },
+          "brands": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Brand slugs; default = all tracked brands in the workspace"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "default": 50
+          },
+          "min_brands": {
+            "type": "integer",
+            "default": 4,
+            "minimum": 2
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "output": {
+        "kind": "table",
+        "diff_key": "creator_id"
+      },
+      "requires": [
+        "posts",
+        "creators"
+      ]
+    },
+    {
+      "name": "loyalists",
+      "layer": "creators",
+      "phase": 1,
+      "title": "Loyalists",
+      "description": "Creators a brand keeps month after month. Only ~15% of top creators return, so this shows who each brand retains and who is about to churn.",
+      "example": "Who has Skintific kept for three months straight?",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "platform": {
+            "type": "string",
+            "enum": [
+              "tiktok",
+              "instagram",
+              "threads",
+              "x",
+              "all"
+            ],
+            "default": "all",
+            "description": "Platform to query"
+          },
+          "window": {
+            "type": "object",
+            "description": "Time window. Either {last_n_days} or {from,to} (ISO dates)",
+            "properties": {
+              "last_n_days": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 400
+              },
+              "from": {
+                "type": "string",
+                "format": "date"
+              },
+              "to": {
+                "type": "string",
+                "format": "date"
+              }
+            },
+            "additionalProperties": false
+          },
+          "brands": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Brand slugs; default = all tracked brands in the workspace"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "default": 50
+          },
+          "brand": {
+            "type": "string"
+          },
+          "min_months": {
+            "type": "integer",
+            "default": 2,
+            "minimum": 2
+          }
+        },
+        "required": [
+          "brand"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "kind": "table",
+        "diff_key": "creator_id",
+        "diff_surface": [
+          "new",
+          "gone"
+        ]
+      },
+      "requires": [
+        "posts",
+        "creators"
+      ]
+    },
+    {
+      "name": "affiliates",
+      "layer": "creators",
+      "phase": 1,
+      "first_release": true,
+      "title": "Affiliate detection",
+      "description": "Separates reseller and affiliate armies from real creators: accounts posting 30+ times a month with a yellow cart on almost every post. Sizes the network per brand and tracks its growth.",
+      "example": "How big is MS Glow's affiliate network on TikTok, and is it growing?",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "platform": {
+            "type": "string",
+            "enum": [
+              "tiktok",
+              "instagram",
+              "threads",
+              "x",
+              "all"
+            ],
+            "default": "all",
+            "description": "Platform to query"
+          },
+          "window": {
+            "type": "object",
+            "description": "Time window. Either {last_n_days} or {from,to} (ISO dates)",
+            "properties": {
+              "last_n_days": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 400
+              },
+              "from": {
+                "type": "string",
+                "format": "date"
+              },
+              "to": {
+                "type": "string",
+                "format": "date"
+              }
+            },
+            "additionalProperties": false
+          },
+          "brands": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Brand slugs; default = all tracked brands in the workspace"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "default": 50
+          },
+          "brand": {
+            "type": "string"
+          },
+          "month": {
+            "type": "string",
+            "description": "YYYY-MM; default latest full month"
+          },
+          "rule": {
+            "type": "object",
+            "properties": {
+              "min_posts": {
+                "type": "integer",
+                "default": 30
+              },
+              "min_cart_pct": {
+                "type": "number",
+                "default": 50
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "output": {
+        "kind": "table",
+        "diff_key": "brand_id",
+        "watch": [
+          "affiliate_accounts",
+          "affiliate_share_of_posts"
+        ]
+      },
+      "requires": [
+        "posts",
+        "creators"
+      ],
+      "platforms": [
+        "tiktok"
+      ]
+    },
+    {
+      "name": "breakout",
+      "layer": "creators",
+      "phase": 1,
+      "title": "Breakout creators",
+      "description": "Small accounts whose posts travel far beyond their followers. Catches a 200-follower creator doing 2M views the week it happens.",
+      "example": "Nano creators with 5,000× views per follower this week",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "platform": {
+            "type": "string",
+            "enum": [
+              "tiktok",
+              "instagram",
+              "threads",
+              "x",
+              "all"
+            ],
+            "default": "all",
+            "description": "Platform to query"
+          },
+          "window": {
+            "type": "object",
+            "description": "Time window. Either {last_n_days} or {from,to} (ISO dates)",
+            "properties": {
+              "last_n_days": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 400
+              },
+              "from": {
+                "type": "string",
+                "format": "date"
+              },
+              "to": {
+                "type": "string",
+                "format": "date"
+              }
+            },
+            "additionalProperties": false
+          },
+          "brands": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Brand slugs; default = all tracked brands in the workspace"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "default": 50
+          },
+          "tiers": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "sub",
+                "nano",
+                "micro",
+                "mid",
+                "macro",
+                "mega"
+              ]
+            },
+            "default": [
+              "sub",
+              "nano"
+            ]
+          },
+          "min_views_per_1k": {
+            "type": "number",
+            "default": 5000
+          },
+          "min_views": {
+            "type": "integer",
+            "default": 100000
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "output": {
+        "kind": "table",
+        "diff_key": "post_id"
+      },
+      "requires": [
+        "posts",
+        "creators"
+      ]
+    },
+    {
+      "name": "funnel-mix",
+      "layer": "creators",
+      "phase": 1,
+      "title": "Funnel mix",
+      "description": "Scores a brand's creator mix by funnel stage. Mega creators drive awareness; micro and nano carry carts. Compare any brand's mix with yours.",
+      "example": "Is Glad2Glow buying awareness or conversion this month?",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "platform": {
+            "type": "string",
+            "enum": [
+              "tiktok",
+              "instagram",
+              "threads",
+              "x",
+              "all"
+            ],
+            "default": "all",
+            "description": "Platform to query"
+          },
+          "window": {
+            "type": "object",
+            "description": "Time window. Either {last_n_days} or {from,to} (ISO dates)",
+            "properties": {
+              "last_n_days": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 400
+              },
+              "from": {
+                "type": "string",
+                "format": "date"
+              },
+              "to": {
+                "type": "string",
+                "format": "date"
+              }
+            },
+            "additionalProperties": false
+          },
+          "brands": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Brand slugs; default = all tracked brands in the workspace"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "default": 50
+          },
+          "brand": {
+            "type": "string"
+          },
+          "compare_to": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Default: client brand"
+          },
+          "month": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "brand"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "kind": "chart+table",
+        "chart": "stacked_bar",
+        "diff_key": "brand_id"
+      },
+      "requires": [
+        "posts",
+        "creators"
+      ]
+    },
+    {
+      "name": "overlap",
+      "layer": "creators",
+      "phase": 1,
+      "title": "Creator overlap",
+      "description": "Which competitors hire from the same creator pool. A talent map of the category, with the creators shared between any two brands.",
+      "example": "Which brands share creators with Timephoria?",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "platform": {
+            "type": "string",
+            "enum": [
+              "tiktok",
+              "instagram",
+              "threads",
+              "x",
+              "all"
+            ],
+            "default": "all",
+            "description": "Platform to query"
+          },
+          "window": {
+            "type": "object",
+            "description": "Time window. Either {last_n_days} or {from,to} (ISO dates)",
+            "properties": {
+              "last_n_days": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 400
+              },
+              "from": {
+                "type": "string",
+                "format": "date"
+              },
+              "to": {
+                "type": "string",
+                "format": "date"
+              }
+            },
+            "additionalProperties": false
+          },
+          "brands": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Brand slugs; default = all tracked brands in the workspace"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "default": 50
+          },
+          "brand": {
+            "type": "string"
+          },
+          "min_shared": {
+            "type": "integer",
+            "default": 2
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "output": {
+        "kind": "table",
+        "diff_key": "pair_id"
+      },
+      "requires": [
+        "posts",
+        "creators"
+      ]
+    },
+    {
+      "name": "spend-estimate",
+      "layer": "creators",
+      "phase": 1,
+      "title": "Spend estimate",
+      "description": "Estimates a competitor's monthly creator spend from tier, post count, and Fair's rate-card ranges. Shown as a low–high range and always labelled as an estimate; affiliate accounts are excluded.",
+      "example": "What did Wardah roughly spend on TikTok creators in June?",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "platform": {
+            "type": "string",
+            "enum": [
+              "tiktok",
+              "instagram",
+              "threads",
+              "x",
+              "all"
+            ],
+            "default": "all",
+            "description": "Platform to query"
+          },
+          "window": {
+            "type": "object",
+            "description": "Time window. Either {last_n_days} or {from,to} (ISO dates)",
+            "properties": {
+              "last_n_days": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 400
+              },
+              "from": {
+                "type": "string",
+                "format": "date"
+              },
+              "to": {
+                "type": "string",
+                "format": "date"
+              }
+            },
+            "additionalProperties": false
+          },
+          "brands": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Brand slugs; default = all tracked brands in the workspace"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "default": 50
+          },
+          "brand": {
+            "type": "string"
+          },
+          "month": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "brand"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "kind": "table",
+        "diff_key": "tier",
+        "always_caveat": "estimate"
+      },
+      "requires": [
+        "posts",
+        "creators"
+      ],
+      "config": [
+        "ratecard"
+      ]
+    },
+    {
+      "name": "velocity",
+      "layer": "posts",
+      "phase": "1b",
+      "title": "Post velocity",
+      "description": "Which posts are still climbing on day 3 of their 7-day tracking. Momentum, not totals, so you see what's going viral before it has.",
+      "example": "Competitor posts from this week that are still accelerating",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "platform": {
+            "type": "string",
+            "enum": [
+              "tiktok",
+              "instagram",
+              "threads",
+              "x",
+              "all"
+            ],
+            "default": "all",
+            "description": "Platform to query"
+          },
+          "window": {
+            "type": "object",
+            "description": "Time window. Either {last_n_days} or {from,to} (ISO dates)",
+            "properties": {
+              "last_n_days": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 400
+              },
+              "from": {
+                "type": "string",
+                "format": "date"
+              },
+              "to": {
+                "type": "string",
+                "format": "date"
+              }
+            },
+            "additionalProperties": false
+          },
+          "brands": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Brand slugs; default = all tracked brands in the workspace"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "default": 50
+          },
+          "day": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 6,
+            "default": 3
+          },
+          "min_views": {
+            "type": "integer",
+            "default": 20000
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "output": {
+        "kind": "table",
+        "diff_key": "post_id"
+      },
+      "requires": [
+        "posts",
+        "post_snapshots"
+      ]
+    },
+    {
+      "name": "forecast",
+      "layer": "posts",
+      "phase": "1b",
+      "title": "Post forecast",
+      "description": "Projects a post's day-7 views from its first day, using tier-specific curves learned from history. Decide on day 2 whether to boost, repost, or move on.",
+      "example": "Will yesterday's @skinbyalya post clear 500K by Sunday?",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "platform": {
+            "type": "string",
+            "enum": [
+              "tiktok",
+              "instagram",
+              "threads",
+              "x",
+              "all"
+            ],
+            "default": "all",
+            "description": "Platform to query"
+          },
+          "window": {
+            "type": "object",
+            "description": "Time window. Either {last_n_days} or {from,to} (ISO dates)",
+            "properties": {
+              "last_n_days": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 400
+              },
+              "from": {
+                "type": "string",
+                "format": "date"
+              },
+              "to": {
+                "type": "string",
+                "format": "date"
+              }
+            },
+            "additionalProperties": false
+          },
+          "brands": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Brand slugs; default = all tracked brands in the workspace"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "default": 50
+          },
+          "post_id": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "output": {
+        "kind": "chart",
+        "chart": "line",
+        "diff_key": "post_id"
+      },
+      "requires": [
+        "posts",
+        "post_snapshots"
+      ]
+    },
+    {
+      "name": "waves",
+      "layer": "posts",
+      "phase": 1,
+      "first_release": true,
+      "title": "Creator waves",
+      "description": "Detects a creator burst as it starts: an unusual number of creators posting for one brand within days. Alerts on day 2, not in the monthly report.",
+      "example": "Is any competitor running a launch wave right now?",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "platform": {
+            "type": "string",
+            "enum": [
+              "tiktok",
+              "instagram",
+              "threads",
+              "x",
+              "all"
+            ],
+            "default": "all",
+            "description": "Platform to query"
+          },
+          "window": {
+            "type": "object",
+            "description": "Time window. Either {last_n_days} or {from,to} (ISO dates)",
+            "properties": {
+              "last_n_days": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 400
+              },
+              "from": {
+                "type": "string",
+                "format": "date"
+              },
+              "to": {
+                "type": "string",
+                "format": "date"
+              }
+            },
+            "additionalProperties": false
+          },
+          "brands": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Brand slugs; default = all tracked brands in the workspace"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "default": 50
+          },
+          "lookback_days": {
+            "type": "integer",
+            "default": 7
+          },
+          "min_creators": {
+            "type": "integer",
+            "default": 8
+          },
+          "multiple_of_baseline": {
+            "type": "number",
+            "default": 3
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "output": {
+        "kind": "flag",
+        "diff_key": "brand_id",
+        "alert_state": "in_wave"
+      },
+      "requires": [
+        "posts",
+        "creators"
+      ]
+    },
+    {
+      "name": "compare",
+      "layer": "brands",
+      "phase": 1,
+      "title": "Brand compare",
+      "description": "Any brands side by side on volume, creators, views, engagements, cart share, and (Phase 2) sentiment and top comment topics. Owned and earned reported separately.",
+      "example": "My brand vs Skintific, Somethinc and Emina, last 30 days",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "platform": {
+            "type": "string",
+            "enum": [
+              "tiktok",
+              "instagram",
+              "threads",
+              "x",
+              "all"
+            ],
+            "default": "all",
+            "description": "Platform to query"
+          },
+          "window": {
+            "type": "object",
+            "description": "Time window. Either {last_n_days} or {from,to} (ISO dates)",
+            "properties": {
+              "last_n_days": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 400
+              },
+              "from": {
+                "type": "string",
+                "format": "date"
+              },
+              "to": {
+                "type": "string",
+                "format": "date"
+              }
+            },
+            "additionalProperties": false
+          },
+          "brands": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 2,
+            "maxItems": 6
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "default": 50
+          },
+          "split_owned_earned": {
+            "type": "boolean",
+            "default": true
+          },
+          "compare_prev": {
+            "type": "boolean",
+            "default": true,
+            "description": "Also compute the previous equal window and deltas"
+          }
+        },
+        "required": [
+          "brands"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "kind": "table+chart",
+        "chart": "line_sov_weekly",
+        "diff_key": "brand_id",
+        "watch": {
+          "share_of_voice_pts": 1,
+          "creator_posts_pct": 50,
+          "negative_pct_pts": 5
+        }
+      },
+      "requires": [
+        "posts",
+        "creators"
+      ],
+      "phase2_columns": [
+        "positive_pct",
+        "negative_pct",
+        "top_topics"
+      ]
+    },
+    {
+      "name": "launch",
+      "layer": "brands",
+      "phase": 1,
+      "title": "Launch read",
+      "description": "A week-by-week read of a product launch: creator wave, new vs returning creators, cart share, and (Phase 2) comment topics and unanswered questions.",
+      "example": "How is Skintific's 5X Ceramide serum doing, four weeks in?",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "platform": {
+            "type": "string",
+            "enum": [
+              "tiktok",
+              "instagram",
+              "threads",
+              "x",
+              "all"
+            ],
+            "default": "all",
+            "description": "Platform to query"
+          },
+          "window": {
+            "type": "object",
+            "description": "Time window. Either {last_n_days} or {from,to} (ISO dates)",
+            "properties": {
+              "last_n_days": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 400
+              },
+              "from": {
+                "type": "string",
+                "format": "date"
+              },
+              "to": {
+                "type": "string",
+                "format": "date"
+              }
+            },
+            "additionalProperties": false
+          },
+          "brands": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Brand slugs; default = all tracked brands in the workspace"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "default": 50
+          },
+          "brand": {
+            "type": "string"
+          },
+          "start_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "keywords": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "weeks": {
+            "type": "integer",
+            "default": 4,
+            "maximum": 12
+          }
+        },
+        "required": [
+          "brand",
+          "start_date"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "kind": "table",
+        "diff_key": "week"
+      },
+      "requires": [
+        "posts",
+        "creators"
+      ],
+      "phase2_columns": [
+        "top_questions",
+        "topics"
+      ]
+    },
+    {
+      "name": "objections",
+      "layer": "comments",
+      "phase": 2,
+      "first_release": true,
+      "title": "Objections",
+      "description": "Why people aren't buying, from the comments under any brand's posts: price, availability, skin type, halal, packaging. Ranked and trended.",
+      "example": "Top objections under Emina posts this month vs last",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "platform": {
+            "type": "string",
+            "enum": [
+              "tiktok",
+              "instagram",
+              "threads",
+              "x",
+              "all"
+            ],
+            "default": "all",
+            "description": "Platform to query"
+          },
+          "window": {
+            "type": "object",
+            "description": "Time window. Either {last_n_days} or {from,to} (ISO dates)",
+            "properties": {
+              "last_n_days": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 400
+              },
+              "from": {
+                "type": "string",
+                "format": "date"
+              },
+              "to": {
+                "type": "string",
+                "format": "date"
+              }
+            },
+            "additionalProperties": false
+          },
+          "brands": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Brand slugs; default = all tracked brands in the workspace"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "default": 50
+          },
+          "brand": {
+            "type": "string"
+          },
+          "compare_prev": {
+            "type": "boolean",
+            "default": true
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "output": {
+        "kind": "table",
+        "diff_key": "topic_id"
+      },
+      "requires": [
+        "comments",
+        "topics"
+      ]
+    },
+    {
+      "name": "questions",
+      "layer": "comments",
+      "phase": 2,
+      "title": "Unanswered questions",
+      "description": "What people ask under competitor posts that nobody answers. Unanswered questions are your next content brief.",
+      "example": "Most common unanswered questions under serum posts",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "platform": {
+            "type": "string",
+            "enum": [
+              "tiktok",
+              "instagram",
+              "threads",
+              "x",
+              "all"
+            ],
+            "default": "all",
+            "description": "Platform to query"
+          },
+          "window": {
+            "type": "object",
+            "description": "Time window. Either {last_n_days} or {from,to} (ISO dates)",
+            "properties": {
+              "last_n_days": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 400
+              },
+              "from": {
+                "type": "string",
+                "format": "date"
+              },
+              "to": {
+                "type": "string",
+                "format": "date"
+              }
+            },
+            "additionalProperties": false
+          },
+          "brands": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Brand slugs; default = all tracked brands in the workspace"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "default": 50
+          },
+          "brand": {
+            "type": "string"
+          },
+          "keywords": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "unanswered_only": {
+            "type": "boolean",
+            "default": true
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "output": {
+        "kind": "table",
+        "diff_key": "cluster_id"
+      },
+      "requires": [
+        "comments",
+        "topics"
+      ]
+    },
+    {
+      "name": "dupes",
+      "layer": "comments",
+      "phase": 2,
+      "title": "Dupe map",
+      "description": "Comments comparing brands (\"mirip X tapi lebih murah\") build a substitution map. See which brands people treat as interchangeable with yours.",
+      "example": "Which brands get compared to mine, and on what?",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "platform": {
+            "type": "string",
+            "enum": [
+              "tiktok",
+              "instagram",
+              "threads",
+              "x",
+              "all"
+            ],
+            "default": "all",
+            "description": "Platform to query"
+          },
+          "window": {
+            "type": "object",
+            "description": "Time window. Either {last_n_days} or {from,to} (ISO dates)",
+            "properties": {
+              "last_n_days": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 400
+              },
+              "from": {
+                "type": "string",
+                "format": "date"
+              },
+              "to": {
+                "type": "string",
+                "format": "date"
+              }
+            },
+            "additionalProperties": false
+          },
+          "brands": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Brand slugs; default = all tracked brands in the workspace"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "default": 50
+          },
+          "brand": {
+            "type": "string"
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "output": {
+        "kind": "table",
+        "diff_key": "pair_id"
+      },
+      "requires": [
+        "comments"
+      ]
+    },
+    {
+      "name": "claims",
+      "layer": "comments",
+      "phase": 2,
+      "title": "Claims vs trust",
+      "description": "What creators claim about a product, and whether the comments believe it. Claim versus trust, per creator and per brand.",
+      "example": "Which \"7-day barrier\" claims did commenters push back on?",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "platform": {
+            "type": "string",
+            "enum": [
+              "tiktok",
+              "instagram",
+              "threads",
+              "x",
+              "all"
+            ],
+            "default": "all",
+            "description": "Platform to query"
+          },
+          "window": {
+            "type": "object",
+            "description": "Time window. Either {last_n_days} or {from,to} (ISO dates)",
+            "properties": {
+              "last_n_days": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 400
+              },
+              "from": {
+                "type": "string",
+                "format": "date"
+              },
+              "to": {
+                "type": "string",
+                "format": "date"
+              }
+            },
+            "additionalProperties": false
+          },
+          "brands": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Brand slugs; default = all tracked brands in the workspace"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "default": 50
+          },
+          "brand": {
+            "type": "string"
+          },
+          "claim_keywords": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "output": {
+        "kind": "table",
+        "diff_key": "claim_id"
+      },
+      "requires": [
+        "comments",
+        "topics"
+      ]
+    },
+    {
+      "name": "whitespace",
+      "layer": "comments",
+      "phase": 2,
+      "title": "Whitespace",
+      "description": "Topics rising in category comments that no brand's own content addresses yet. Where the conversation is going before anyone owns it.",
+      "example": "What are people asking for that no beauty brand is talking about?",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "platform": {
+            "type": "string",
+            "enum": [
+              "tiktok",
+              "instagram",
+              "threads",
+              "x",
+              "all"
+            ],
+            "default": "all",
+            "description": "Platform to query"
+          },
+          "window": {
+            "type": "object",
+            "description": "Time window. Either {last_n_days} or {from,to} (ISO dates)",
+            "properties": {
+              "last_n_days": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 400
+              },
+              "from": {
+                "type": "string",
+                "format": "date"
+              },
+              "to": {
+                "type": "string",
+                "format": "date"
+              }
+            },
+            "additionalProperties": false
+          },
+          "brands": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Brand slugs; default = all tracked brands in the workspace"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "default": 50
+          },
+          "min_growth_pct": {
+            "type": "number",
+            "default": 50
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "output": {
+        "kind": "table",
+        "diff_key": "topic_id"
+      },
+      "requires": [
+        "comments",
+        "topics",
+        "posts"
+      ]
+    },
+    {
+      "name": "seeding",
+      "layer": "comments",
+      "phase": 2,
+      "title": "Seeding detection",
+      "description": "Coordinated comment activity: repeated phrasing, timing clusters, and account patterns on any brand's posts. Flags the incident and estimates its size.",
+      "example": "Is anyone seeding comments on Wardah right now?",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "platform": {
+            "type": "string",
+            "enum": [
+              "tiktok",
+              "instagram",
+              "threads",
+              "x",
+              "all"
+            ],
+            "default": "all",
+            "description": "Platform to query"
+          },
+          "window": {
+            "type": "object",
+            "description": "Time window. Either {last_n_days} or {from,to} (ISO dates)",
+            "properties": {
+              "last_n_days": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 400
+              },
+              "from": {
+                "type": "string",
+                "format": "date"
+              },
+              "to": {
+                "type": "string",
+                "format": "date"
+              }
+            },
+            "additionalProperties": false
+          },
+          "brands": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Brand slugs; default = all tracked brands in the workspace"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "default": 50
+          },
+          "brand": {
+            "type": "string"
+          },
+          "lookback_hours": {
+            "type": "integer",
+            "default": 48
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "output": {
+        "kind": "flag",
+        "diff_key": "incident_id",
+        "alert_state": "incident"
+      },
+      "requires": [
+        "comments"
+      ]
+    },
+    {
+      "name": "audience",
+      "layer": "audience",
+      "phase": 2,
+      "first_release": true,
+      "title": "Audience overlap",
+      "description": "Real audience overlap from commenter handles across all tracked brands. How many of a competitor's commenters have also commented on you.",
+      "example": "What share of Skintific's commenters also engage with my brand?",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "platform": {
+            "type": "string",
+            "enum": [
+              "tiktok",
+              "instagram",
+              "threads",
+              "x",
+              "all"
+            ],
+            "default": "all",
+            "description": "Platform to query"
+          },
+          "window": {
+            "type": "object",
+            "description": "Time window. Either {last_n_days} or {from,to} (ISO dates)",
+            "properties": {
+              "last_n_days": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 400
+              },
+              "from": {
+                "type": "string",
+                "format": "date"
+              },
+              "to": {
+                "type": "string",
+                "format": "date"
+              }
+            },
+            "additionalProperties": false
+          },
+          "brands": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Brand slugs; default = all tracked brands in the workspace"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "default": 50
+          },
+          "brand": {
+            "type": "string"
+          },
+          "compare_to": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "brand"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "kind": "table",
+        "diff_key": "pair_id"
+      },
+      "requires": [
+        "comments"
+      ]
+    },
+    {
+      "name": "switchers",
+      "layer": "audience",
+      "phase": 2,
+      "title": "Switchers",
+      "description": "Commenters active on one brand who moved to another over time. Where a brand's audience is leaking to, and where yours is coming from.",
+      "example": "Who commented on Somethinc in April and on Skintific in June?",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "platform": {
+            "type": "string",
+            "enum": [
+              "tiktok",
+              "instagram",
+              "threads",
+              "x",
+              "all"
+            ],
+            "default": "all",
+            "description": "Platform to query"
+          },
+          "window": {
+            "type": "object",
+            "description": "Time window. Either {last_n_days} or {from,to} (ISO dates)",
+            "properties": {
+              "last_n_days": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 400
+              },
+              "from": {
+                "type": "string",
+                "format": "date"
+              },
+              "to": {
+                "type": "string",
+                "format": "date"
+              }
+            },
+            "additionalProperties": false
+          },
+          "brands": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Brand slugs; default = all tracked brands in the workspace"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "default": 50
+          },
+          "from_brand": {
+            "type": "string"
+          },
+          "to_brand": {
+            "type": "string"
+          },
+          "period_a": {
+            "type": "string"
+          },
+          "period_b": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "from_brand",
+          "to_brand"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "kind": "table",
+        "diff_key": "author_hash"
+      },
+      "requires": [
+        "comments"
+      ]
+    },
+    {
+      "name": "superfans",
+      "layer": "audience",
+      "phase": 2,
+      "title": "Superfans",
+      "description": "Repeat commenters on a brand, ranked. Your future nano creators, community seeds, and the first people to notice when something is wrong.",
+      "example": "My 100 most frequent commenters this quarter",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "platform": {
+            "type": "string",
+            "enum": [
+              "tiktok",
+              "instagram",
+              "threads",
+              "x",
+              "all"
+            ],
+            "default": "all",
+            "description": "Platform to query"
+          },
+          "window": {
+            "type": "object",
+            "description": "Time window. Either {last_n_days} or {from,to} (ISO dates)",
+            "properties": {
+              "last_n_days": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 400
+              },
+              "from": {
+                "type": "string",
+                "format": "date"
+              },
+              "to": {
+                "type": "string",
+                "format": "date"
+              }
+            },
+            "additionalProperties": false
+          },
+          "brands": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Brand slugs; default = all tracked brands in the workspace"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "default": 50
+          },
+          "brand": {
+            "type": "string"
+          },
+          "min_comments": {
+            "type": "integer",
+            "default": 3
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "output": {
+        "kind": "table",
+        "diff_key": "author_hash"
+      },
+      "requires": [
+        "comments"
+      ]
+    },
+    {
+      "name": "narrative",
+      "layer": "conversation",
+      "phase": 2,
+      "title": "Narrative watch",
+      "description": "Text-first narratives on Threads and X before they reach video: complaints, rumours, price talk. Usually the earliest signal you'll get.",
+      "example": "What are people saying about my brand on Threads this week?",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "platform": {
+            "type": "string",
+            "enum": [
+              "tiktok",
+              "instagram",
+              "threads",
+              "x",
+              "all"
+            ],
+            "default": "all",
+            "description": "Platform to query"
+          },
+          "window": {
+            "type": "object",
+            "description": "Time window. Either {last_n_days} or {from,to} (ISO dates)",
+            "properties": {
+              "last_n_days": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 400
+              },
+              "from": {
+                "type": "string",
+                "format": "date"
+              },
+              "to": {
+                "type": "string",
+                "format": "date"
+              }
+            },
+            "additionalProperties": false
+          },
+          "brands": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Brand slugs; default = all tracked brands in the workspace"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "default": 50
+          },
+          "brand": {
+            "type": "string"
+          },
+          "keywords": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "output": {
+        "kind": "table",
+        "diff_key": "cluster_id"
+      },
+      "requires": [
+        "posts"
+      ],
+      "platforms": [
+        "threads",
+        "x"
+      ]
+    }
+  ]
+}

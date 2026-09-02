@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fair Intel — prototype v2</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#FFFFFF; --side:#F7F9FC; --surface:#F7F9FC; --line:#E6EBF2; --line-2:#D5DDE8;
+  --text:#0F1B2D; --text-2:#526278; --text-3:#8593A8;
+  --blue:#1E5EFF; --blue-2:#1749D6; --blue-10:#EDF2FF; --blue-20:#D6E1FF;
+  --green:#0E9F6E; --green-10:#E6F6F0; --red:#E5484D; --red-10:#FDECEC; --amber:#D98E04; --amber-10:#FFF4DE; --violet:#7C5CFF;
+  --r:12px; --r-sm:8px;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+body{font-family:'Plus Jakarta Sans',system-ui,sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+a{color:inherit;text-decoration:none}
+:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+
+/* ---------- shell ---------- */
+.app{display:grid;grid-template-columns:240px 1fr;height:100vh}
+.side{background:var(--side);border-right:1px solid var(--line);display:flex;flex-direction:column;padding:20px 14px;gap:22px;overflow:auto}
+.brand{display:flex;align-items:center;gap:10px;padding:0 8px}
+.brand .mark{width:32px;height:32px;border-radius:9px;background:var(--blue);display:grid;place-items:center;color:#fff;font-weight:800;font-size:15px}
+.brand b{font-size:15px;font-weight:700;display:block;line-height:1.2}
+.brand small{color:var(--text-3);font-size:11px;font-weight:500}
+.nav{display:flex;flex-direction:column;gap:2px}
+.nav button{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:9px;color:var(--text-2);font-weight:500;text-align:left;width:100%}
+.nav button svg{width:17px;height:17px;flex:none}
+.nav button:hover{background:#fff;color:var(--text)}
+.nav button.on{background:#fff;color:var(--blue);box-shadow:0 1px 2px rgba(15,27,45,.06);font-weight:600}
+.side h6{font-size:11px;font-weight:600;color:var(--text-3);padding:0 10px;margin-bottom:6px}
+.recent{display:flex;flex-direction:column;gap:1px}
+.recent a{padding:7px 10px;border-radius:8px;color:var(--text-2);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.recent a:hover{background:#fff;color:var(--text)}
+.side .bottom{margin-top:auto;display:flex;flex-direction:column;gap:10px}
+.ws{border:1px solid var(--line);background:#fff;border-radius:10px;padding:10px 12px;display:flex;justify-content:space-between;align-items:center}
+.ws span{display:block;font-size:11px;color:var(--text-3)}
+.ws b{font-weight:600;font-size:13px}
+.user{display:flex;align-items:center;gap:10px;padding:4px 8px}
+.avatar{width:30px;height:30px;border-radius:50%;background:var(--blue-20);color:var(--blue-2);display:grid;place-items:center;font-weight:700;font-size:12px}
+.user b{font-size:13px;font-weight:600;display:block;line-height:1.2}
+.user span{font-size:11px;color:var(--text-3)}
+
+.main{overflow:auto;position:relative;background:var(--bg)}
+.screen{display:none;min-height:100%}
+.screen.on{display:block}
+.topbar{position:sticky;top:0;z-index:5;background:rgba(255,255,255,.9);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);padding:14px 32px;display:flex;justify-content:space-between;align-items:center;min-height:58px}
+.topbar h1{font-size:15px;font-weight:700}
+.topbar .meta{color:var(--text-3);font-size:12px;margin-left:10px;font-weight:500}
+.pill{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;font-size:12px;font-weight:600;border:1px solid var(--line);color:var(--text-2);background:#fff}
+.pill.live{border-color:var(--green-10);background:var(--green-10);color:var(--green)}
+.pill.live::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--green)}
+.pill.blue{background:var(--blue-10);border-color:var(--blue-10);color:var(--blue)}
+.btn{padding:9px 14px;border-radius:9px;font-weight:600;font-size:13px;border:1px solid var(--line-2);color:var(--text);background:#fff}
+.btn:hover{background:var(--surface)}
+.btn.pri{background:var(--blue);border-color:var(--blue);color:#fff}
+.btn.pri:hover{background:var(--blue-2)}
+.btn.sm{padding:6px 11px;font-size:12px}
+.btn.ghost{border-color:transparent;color:var(--blue)}
+.btn.ghost:hover{background:var(--blue-10)}
+.wrap{max-width:880px;margin:0 auto;padding:32px}
+.wrap.wide{max-width:1120px}
+.slash{color:var(--blue);font-weight:800}
+
+/* ---------- ask ---------- */
+.hero{padding:40px 0 20px}
+.hero h2{font-size:28px;font-weight:700;letter-spacing:-.02em;line-height:1.2;max-width:24ch}
+.hero p{color:var(--text-2);margin-top:10px;max-width:58ch;font-size:15px}
+.composer{border:1px solid var(--line-2);background:#fff;border-radius:14px;padding:14px 16px 12px;margin-top:22px;position:relative;box-shadow:0 1px 2px rgba(15,27,45,.04)}
+.composer:focus-within{border-color:var(--blue);box-shadow:0 0 0 3px var(--blue-10)}
+.composer textarea{width:100%;background:none;border:0;color:var(--text);font:inherit;font-size:15px;resize:none;min-height:46px;outline:none}
+.composer textarea::placeholder{color:var(--text-3)}
+.composer .row{display:flex;justify-content:space-between;align-items:center;margin-top:8px}
+.composer .row span{color:var(--text-3);font-size:12px}
+.composer .row kbd{font:inherit;font-weight:700;color:var(--blue)}
+.slashmenu{display:none;position:absolute;left:0;right:0;top:calc(100% + 8px);background:#fff;border:1px solid var(--line);border-radius:12px;padding:6px;z-index:8;box-shadow:0 16px 40px rgba(15,27,45,.12);max-height:360px;overflow:auto}
+.slashmenu.on{display:block}
+.slashmenu .g{font-size:11px;font-weight:600;color:var(--text-3);padding:8px 10px 4px}
+.slashmenu button{display:grid;grid-template-columns:120px 1fr;gap:12px;width:100%;text-align:left;padding:8px 10px;border-radius:8px;align-items:baseline}
+.slashmenu button:hover{background:var(--blue-10)}
+.slashmenu b{color:var(--blue);font-weight:700}
+.slashmenu span{color:var(--text-2);font-size:13px}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
+.chips button{padding:8px 13px;border-radius:999px;border:1px solid var(--line-2);color:var(--text-2);font-size:13px;background:#fff}
+.chips button:hover{border-color:var(--blue);color:var(--blue);background:var(--blue-10)}
+.chips button.skill{color:var(--blue);border-color:var(--blue-20);background:var(--blue-10)}
+.thread{display:flex;flex-direction:column;gap:26px;padding:26px 0 70px}
+.msg-u{align-self:flex-end;background:var(--blue);color:#fff;padding:11px 15px;border-radius:14px 14px 4px 14px;max-width:70%;font-size:14px;font-weight:500}
+.msg-a{display:grid;grid-template-columns:30px 1fr;gap:14px}
+.msg-a .who{width:30px;height:30px;border-radius:9px;background:var(--blue-10);display:grid;place-items:center;color:var(--blue);font-weight:800;font-size:12px}
+.ans{display:flex;flex-direction:column;gap:14px;min-width:0}
+.ans p{max-width:66ch;font-size:15px}
+.ev{display:inline-grid;place-items:center;min-width:19px;height:19px;padding:0 5px;border-radius:5px;background:var(--blue-10);color:var(--blue);font-size:11px;font-weight:700;vertical-align:2px;margin:0 2px;cursor:pointer;border:1px solid transparent}
+.ev:hover,.ev.open{border-color:var(--blue);background:#fff}
+.card{border:1px solid var(--line);border-radius:var(--r);background:#fff}
+.card>h4{padding:12px 16px;border-bottom:1px solid var(--line);font-size:13px;font-weight:600;color:var(--text-2);display:flex;justify-content:space-between}
+.card>h4 span{font-weight:500;color:var(--text-3)}
+.changed ul{list-style:none}
+.changed li{display:grid;grid-template-columns:auto 1fr auto;gap:14px;align-items:center;padding:11px 16px;border-bottom:1px solid var(--line)}
+.changed li:last-child{border-bottom:0}
+.changed .b{font-weight:600;min-width:90px}
+.changed .d{color:var(--text-2)}
+.delta{font-weight:700;font-size:13px;font-variant-numeric:tabular-nums}
+.up{color:var(--green)}.down{color:var(--red)}
+.chart{padding:0 16px 10px}
+.chart svg{width:100%;height:auto;display:block;margin-top:10px}
+.legend{display:flex;gap:14px;flex-wrap:wrap;margin-top:8px;font-size:12px;color:var(--text-2)}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+.evidence{display:none;border:1px solid var(--blue-20);border-radius:var(--r);background:var(--blue-10);padding:12px 14px}
+.evidence.on{display:block}
+.evidence h4{font-size:12px;font-weight:600;color:var(--blue-2);margin-bottom:10px}
+.post{display:grid;grid-template-columns:36px 1fr auto;gap:10px;padding:10px 12px;border-radius:10px;background:#fff;margin-bottom:8px;align-items:start;border:1px solid var(--blue-20)}
+.post:last-child{margin-bottom:0}
+.post .pf{width:36px;height:36px;border-radius:8px;display:grid;place-items:center;font-size:10px;font-weight:700;color:#fff}
+.post .t{font-size:13px}
+.post .t b{font-weight:600}
+.post .t small{display:block;color:var(--text-3);font-size:11px;margin-top:2px}
+.post .n{font-size:12px;color:var(--text-2);text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+.acts{display:flex;gap:8px;flex-wrap:wrap}
+.rec{border:1px solid var(--line);border-radius:var(--r);padding:18px 20px;background:#fff}
+.rec h3{font-size:17px;font-weight:700;letter-spacing:-.01em;margin-bottom:6px;line-height:1.3}
+.rec>p{color:var(--text-2);font-size:13px;margin-bottom:14px;max-width:64ch}
+.why{display:grid;gap:8px}
+.why div{display:grid;grid-template-columns:22px 1fr;gap:10px;padding:11px 13px;background:var(--surface);border-radius:10px;font-size:13px}
+.why div em{font-style:normal;color:var(--blue);font-weight:700}
+.sample{position:fixed;right:16px;bottom:14px;font-size:11px;color:var(--text-3);background:#fff;border:1px solid var(--line);padding:5px 10px;border-radius:999px;z-index:9}
+
+/* ---------- skills ---------- */
+.sk-hero{padding:8px 0 22px;display:flex;justify-content:space-between;align-items:flex-end;gap:20px;flex-wrap:wrap}
+.sk-hero h2{font-size:26px;font-weight:700;letter-spacing:-.02em}
+.sk-hero p{color:var(--text-2);margin-top:6px;max-width:60ch}
+.sk-filters{display:flex;gap:6px;flex-wrap:wrap}
+.sk-filters button{padding:7px 12px;border-radius:999px;border:1px solid var(--line-2);font-size:12px;font-weight:600;color:var(--text-2);background:#fff}
+.sk-filters button.on{background:var(--text);border-color:var(--text);color:#fff}
+.sk-group{margin-bottom:34px}
+.sk-group>header{display:flex;align-items:baseline;gap:12px;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid var(--line)}
+.sk-group>header h3{font-size:15px;font-weight:700}
+.sk-group>header span{color:var(--text-3);font-size:13px}
+.sk-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.sk{border:1px solid var(--line);border-radius:var(--r);padding:16px 16px 14px;background:#fff;display:flex;flex-direction:column;gap:8px;text-align:left;transition:border-color .12s}
+.sk:hover{border-color:var(--blue)}
+.sk .top{display:flex;justify-content:space-between;align-items:center}
+.sk .name{font-weight:700;font-size:15px}
+.sk .name .slash{margin-right:1px}
+.sk .p1{font-size:10px;font-weight:700;color:var(--blue);background:var(--blue-10);padding:2px 7px;border-radius:999px}
+.sk .desc{color:var(--text-2);font-size:13px;line-height:1.5;flex:1}
+.sk .ex{font-size:12px;color:var(--text-3);border-top:1px solid var(--line);padding-top:8px;margin-top:2px;line-height:1.4}
+.sk .ex b{color:var(--text-2);font-weight:600}
+
+/* ---------- discovery ---------- */
+.query{border:1px solid var(--line);border-radius:var(--r);background:var(--surface);padding:16px 18px}
+.q-text{font-size:15px;font-weight:600}
+.q-text .slash{font-size:16px}
+.q-parsed{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.q-parsed .f{display:inline-flex;flex-direction:column;padding:6px 11px;border-radius:8px;background:#fff;border:1px solid var(--line);font-size:13px;font-weight:600}
+.q-parsed .f small{font-size:10px;font-weight:500;color:var(--text-3)}
+.runinfo{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;padding:18px 4px;color:var(--text-2);font-size:13px}
+.runinfo>div:first-child{max-width:62ch}
+.runinfo b{color:var(--text)}
+.fresh{display:flex;flex-direction:column;gap:6px;align-items:flex-end;flex:none}
+.tablewrap{border:1px solid var(--line);border-radius:var(--r);background:#fff;overflow:auto}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;font-weight:600;color:var(--text-3);font-size:12px;padding:10px 12px;border-bottom:1px solid var(--line);white-space:nowrap;background:var(--surface)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);white-space:nowrap;vertical-align:middle}
+tr:last-child td{border-bottom:0}
+.num{text-align:right;font-variant-numeric:tabular-nums}
+.tablewrap tbody tr{cursor:pointer}
+.tablewrap tbody tr:hover td{background:var(--blue-10)}
+.cr{display:flex;align-items:center;gap:10px}
+.cr .pf{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font-size:11px;font-weight:700;color:#fff}
+.cr b{font-weight:600;display:block}
+.cr small{color:var(--text-3);font-size:11px}
+.used{display:flex;gap:4px}
+.used span{padding:2px 7px;border-radius:5px;background:var(--surface);border:1px solid var(--line);font-size:11px;font-weight:600}
+.used span i{font-style:normal;color:var(--text-3);font-weight:500;margin-left:3px}
+.theme{padding:2px 9px;border-radius:999px;background:var(--surface);font-size:12px;color:var(--text-2);font-weight:500}
+.never{color:var(--green);font-weight:600;font-size:12px}
+.rank{color:var(--text-3);font-variant-numeric:tabular-nums}
+.more{display:flex;justify-content:space-between;align-items:center;padding:12px;border-top:1px solid var(--line);font-size:12px;color:var(--text-3)}
+
+/* ---------- agents ---------- */
+.two{display:grid;grid-template-columns:1fr 380px;gap:24px;align-items:start}
+.list{display:flex;flex-direction:column;gap:10px}
+.agent{border:1px solid var(--line);border-radius:var(--r);padding:16px 18px;display:grid;grid-template-columns:1fr auto;gap:10px;background:#fff}
+.agent h4{font-size:14px;font-weight:700}
+.agent p{color:var(--text-2);font-size:13px;margin-top:3px;max-width:56ch}
+.agent .row{display:flex;gap:14px;margin-top:10px;font-size:12px;color:var(--text-3);flex-wrap:wrap}
+.agent .row b{color:var(--text-2);font-weight:600}
+.state{font-size:12px;font-weight:600;padding:4px 10px;border-radius:999px;height:fit-content}
+.state.run{background:var(--green-10);color:var(--green)}
+.state.pause{background:var(--amber-10);color:var(--amber)}
+.state.new{background:var(--blue-10);color:var(--blue)}
+.setup{border:1px solid var(--line);border-radius:var(--r);background:var(--surface);padding:18px;position:sticky;top:76px}
+.setup h3{font-size:15px;font-weight:700}
+.setup>p{color:var(--text-2);font-size:13px;margin:4px 0 12px}
+.setup textarea{width:100%;background:#fff;border:1px solid var(--line-2);border-radius:10px;color:var(--text);font:inherit;padding:10px 12px;min-height:78px;resize:vertical;outline:none}
+.setup textarea:focus{border-color:var(--blue);box-shadow:0 0 0 3px var(--blue-10)}
+.parsed{margin-top:14px;border-top:1px solid var(--line);padding-top:12px;display:none}
+.parsed.on{display:block}
+.parsed h5{font-size:12px;color:var(--blue);font-weight:600;margin-bottom:6px}
+.field{display:grid;grid-template-columns:96px 1fr;gap:10px;padding:9px 0;border-bottom:1px solid var(--line);font-size:13px;align-items:center}
+.field:last-of-type{border-bottom:0}
+.field span{color:var(--text-3)}
+.field b{font-weight:500}
+.tags{display:flex;gap:6px;flex-wrap:wrap}
+.tag{padding:2px 8px;border-radius:6px;background:#fff;border:1px solid var(--line);font-size:12px;font-weight:600}
+.tag.me{background:var(--blue-10);border-color:var(--blue-20);color:var(--blue)}
+.switch{width:34px;height:20px;border-radius:999px;background:var(--line-2);position:relative;cursor:pointer;transition:background .15s}
+.switch::after{content:"";position:absolute;top:3px;left:3px;width:14px;height:14px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.2);transition:left .15s}
+.switch.on{background:var(--blue)}.switch.on::after{left:17px}
+.toast{position:fixed;left:50%;bottom:24px;transform:translate(-50%,20px);background:var(--text);color:#fff;padding:10px 16px;border-radius:10px;font-size:13px;opacity:0;pointer-events:none;transition:.2s;z-index:20;box-shadow:0 8px 24px rgba(15,27,45,.2)}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+/* ---------- reports ---------- */
+.rep-list{display:flex;flex-direction:column;gap:4px}
+.rep-list a{padding:10px 12px;border-radius:10px;border:1px solid transparent}
+.rep-list a b{display:block;font-size:13px;font-weight:600}
+.rep-list a span{font-size:12px;color:var(--text-3)}
+.rep-list a.on{background:var(--blue-10);border-color:var(--blue-20)}
+.rep-list a:hover{background:var(--surface)}
+.doc{border:1px solid var(--line);border-radius:var(--r);background:#fff;overflow:hidden}
+.doc header{padding:20px 24px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.doc header h2{font-size:20px;font-weight:700;letter-spacing:-.01em}
+.doc header p{color:var(--text-3);font-size:12px;margin-top:4px}
+.doc section{padding:18px 24px;border-bottom:1px solid var(--line)}
+.doc section:last-child{border-bottom:0}
+.doc h4{font-size:13px;font-weight:600;color:var(--text-2);margin-bottom:10px}
+.lead{font-size:15px;line-height:1.55;max-width:64ch}
+.bar{height:6px;border-radius:3px;background:var(--line);overflow:hidden;min-width:120px}
+.bar i{display:block;height:100%;background:var(--text-3);border-radius:3px}
+tr.me td{background:var(--blue-10)}
+tr.me td:first-child{color:var(--blue);font-weight:700}
+tr.me .bar i{background:var(--blue)}
+
+/* ---------- data ---------- */
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px}
+.stat{border:1px solid var(--line);border-radius:var(--r);padding:18px;background:#fff}
+.stat b{display:block;font-size:28px;font-weight:700;letter-spacing:-.02em;line-height:1.1}
+.stat span{font-size:12px;color:var(--text-3)}
+.layers{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:24px}
+.layer{border:1px solid var(--line);border-radius:var(--r);padding:16px;background:#fff}
+.layer h4{font-size:14px;font-weight:700;margin-bottom:4px}
+.layer p{font-size:13px;color:var(--text-2)}
+.layer small{display:block;margin-top:8px;font-size:11px;color:var(--text-3)}
+.grid-b{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+.bchip{border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:13px;font-weight:600;display:flex;justify-content:space-between;align-items:center;background:#fff}
+.bchip small{font-weight:500;color:var(--text-3);font-size:11px}
+.bchip.me{border-color:var(--blue);color:var(--blue);background:var(--blue-10)}
+.cats{display:flex;gap:8px;margin-bottom:18px}
+.cats span{padding:6px 12px;border-radius:999px;border:1px solid var(--line-2);font-size:12px;color:var(--text-3);font-weight:600;background:#fff}
+.cats span.on{border-color:var(--blue);color:var(--blue);background:var(--blue-10)}
+
+@media (max-width:960px){
+  .app{grid-template-columns:1fr}
+  .side{display:none}
+  .two{grid-template-columns:1fr}
+  .setup{position:static}
+  .stats{grid-template-columns:repeat(2,1fr)}
+  .layers{grid-template-columns:1fr}
+  .grid-b{grid-template-columns:repeat(2,1fr)}
+  .sk-grid{grid-template-columns:1fr}
+  .hero h2{font-size:23px}
+  .wrap{padding:20px}
+  .runinfo{flex-direction:column}
+  .fresh{align-items:flex-start}
+}
+</style>
+</head>
+<body>
+<div class="app">
+
+<!-- ================= SIDEBAR ================= -->
+<aside class="side">
+  <div class="brand"><div class="mark">F</div><div><b>Fair Intel</b><small>working title</small></div></div>
+  <nav class="nav">
+    <button class="on" data-go="chat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a8 8 0 0 1-8 8H7l-4 3V12a8 8 0 0 1 8-8h2a8 8 0 0 1 8 8z"/></svg>Ask</button>
+    <button data-go="skills"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l2.4 5.6L20 11l-5.6 2.4L12 19l-2.4-5.6L4 11l5.6-2.4z"/></svg>Skills</button>
+    <button data-go="agents"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Agents</button>
+    <button data-go="reports"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3h9l4 4v14H6z"/><path d="M9 12h6M9 16h6"/></svg>Reports</button>
+    <button data-go="data"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v12c0 1.7 3.6 3 8 3s8-1.3 8-3V6"/><path d="M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/></svg>Data</button>
+  </nav>
+  <div>
+    <h6>Recent</h6>
+    <div class="recent">
+      <a href="#">What competitors did last week</a>
+      <a href="#">Serum launch — campaign angle</a>
+      <a href="#">/discovery nano creators, TikTok</a>
+      <a href="#">/objections Emina, August</a>
+      <a href="#">Who's seeding on Wardah right now</a>
+    </div>
+  </div>
+  <div class="bottom">
+    <div class="ws"><div><span>Category workspace</span><b>Beauty · Indonesia</b></div><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg></div>
+    <div class="user"><div class="avatar">NA</div><div><b>Nadia</b><span>Brand manager</span></div></div>
+  </div>
+</aside>
+
+<main class="main">
+
+<!-- ================= ASK ================= -->
+<section class="screen on" id="chat">
+  <div class="topbar">
+    <div><h1>Ask</h1><span class="meta">Beauty · Indonesia</span></div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <span class="pill live">Refreshed 04:10 today</span>
+      <span class="pill">50 brands · 4 platforms · 14 months</span>
+    </div>
+  </div>
+  <div class="wrap">
+    <div class="hero">
+      <h2>What's happening in Indonesian beauty this week?</h2>
+      <p>Every answer is built from posts and comments we collected — your brand and 49 competitors, refreshed daily. Nothing is guessed, and every claim shows its evidence.</p>
+      <div class="composer">
+        <textarea id="ask" placeholder="Ask anything, or type / to use a skill…" oninput="slash(this)"></textarea>
+        <div class="row"><span><kbd>/</kbd> for skills · ⌘↵ to send · attach a brief for context</span><button class="btn pri sm" onclick="toast('Sent — this prototype shows a pre-rendered thread below')">Ask</button></div>
+        <div class="slashmenu" id="slashmenu"></div>
+      </div>
+      <div class="chips">
+        <button class="skill" onclick="go('discovery')">/discovery 50 nano creators competitors use, never used by us</button>
+        <button onclick="fill(this)">What were competitors doing last week?</button>
+        <button onclick="fill(this)">Give me a campaign idea for my serum launch</button>
+        <button onclick="fill(this)">Is anyone seeding comments on Wardah right now?</button>
+      </div>
+    </div>
+
+    <div class="thread">
+      <div class="msg-u">What were competitors doing last week?</div>
+      <div class="msg-a">
+        <div class="who">F</div>
+        <div class="ans">
+          <p>Three things moved between 25–31 Aug. Skintific ran a creator burst on TikTok around its new 5X ceramide barrier serum, 41 posts across 27 creators in seven days <span class="ev" onclick="ev(this,'ev1')">1</span>. Somethinc's share of voice dropped for the second week in a row while comment sentiment held, so it looks like a quiet week rather than a problem <span class="ev" onclick="ev(this,'ev2')">2</span>. Emina picked up a spike of price complaints on Instagram after a repackaging post <span class="ev" onclick="ev(this,'ev3')">3</span>. Your brand was flat on volume and slightly up on positive sentiment.</p>
+
+          <div class="card changed">
+            <h4>What changed vs. the week before</h4>
+            <ul>
+              <li><span class="b">Skintific</span><span class="d">Creator posts on TikTok, barrier serum launch</span><span class="delta up">+168%</span></li>
+              <li><span class="b">Somethinc</span><span class="d">Share of voice, all platforms</span><span class="delta down">−2.1 pts</span></li>
+              <li><span class="b">Emina</span><span class="d">Negative comments mentioning price</span><span class="delta down">+3.4×</span></li>
+              <li><span class="b">Your brand</span><span class="d">Positive sentiment share</span><span class="delta up">+1.8 pts</span></li>
+            </ul>
+          </div>
+
+          <div class="card">
+            <h4>Share of voice, last 7 days <span>Posts + comments, all platforms</span></h4>
+            <div class="chart">
+              <svg viewBox="0 0 640 170" role="img" aria-label="Share of voice line chart">
+                <g stroke="#E6EBF2" stroke-width="1"><line x1="40" y1="20" x2="620" y2="20"/><line x1="40" y1="65" x2="620" y2="65"/><line x1="40" y1="110" x2="620" y2="110"/><line x1="40" y1="150" x2="620" y2="150"/></g>
+                <g fill="#8593A8" font-size="10"><text x="8" y="24">30%</text><text x="8" y="69">20%</text><text x="8" y="114">10%</text><text x="14" y="154">0</text></g>
+                <g fill="#8593A8" font-size="10" text-anchor="middle"><text x="40" y="166">25</text><text x="137" y="166">26</text><text x="233" y="166">27</text><text x="330" y="166">28</text><text x="427" y="166">29</text><text x="523" y="166">30</text><text x="620" y="166">31 Aug</text></g>
+                <polyline fill="none" stroke="#7C5CFF" stroke-width="2.5" points="40,84 137,80 233,74 330,52 427,38 523,34 620,30"/>
+                <polyline fill="none" stroke="#D98E04" stroke-width="2.5" points="40,60 137,66 233,70 330,74 427,76 523,80 620,82"/>
+                <polyline fill="none" stroke="#0E9F6E" stroke-width="2.5" points="40,98 137,96 233,99 330,92 427,88 523,95 620,94"/>
+                <polyline fill="none" stroke="#1E5EFF" stroke-width="3" points="40,104 137,103 233,102 330,104 427,101 523,102 620,100"/>
+                <polyline fill="none" stroke="#E5484D" stroke-width="2" stroke-dasharray="4 3" points="40,112 137,110 233,112 330,109 427,111 523,108 620,110"/>
+              </svg>
+              <div class="legend"><span><i style="background:#1E5EFF"></i>Your brand</span><span><i style="background:#7C5CFF"></i>Skintific</span><span><i style="background:#D98E04"></i>Somethinc</span><span><i style="background:#0E9F6E"></i>Emina</span><span><i style="background:#E5484D"></i>Wardah</span></div>
+            </div>
+          </div>
+
+          <div class="evidence" id="ev1">
+            <h4>Evidence · Skintific creator burst — 41 posts, 27 creators</h4>
+            <div class="post"><div class="pf" style="background:#0F1B2D">TT</div><div class="t"><b>@skincarebyrara</b> — "Barrier rusak? 7 hari pakai 5X Ceramide, jujur ini beda…"<small>27 Aug · paid-partnership tag · 1 of 27 creators in this wave</small></div><div class="n">312K views<br>4.1K comments</div></div>
+            <div class="post"><div class="pf" style="background:#0F1B2D">TT</div><div class="t"><b>@dr.aisha.skin</b> — "Dermatologist react: Skintific serum baru, worth it?"<small>28 Aug · organic · dermatologist tier</small></div><div class="n">198K views<br>2.2K comments</div></div>
+            <div class="post"><div class="pf" style="background:#E1306C">IG</div><div class="t"><b>@skintific_id</b> — launch carousel, "5X Ceramide Barrier Serum, now on Shopee & TikTok Shop"<small>25 Aug · brand-owned · pinned</small></div><div class="n">44K likes<br>1.9K comments</div></div>
+          </div>
+          <div class="evidence" id="ev2">
+            <h4>Evidence · Somethinc — volume down, sentiment steady</h4>
+            <div class="post"><div class="pf" style="background:#E1306C">IG</div><div class="t"><b>@somethincofficial</b> — 4 posts this week vs. 11 the week before, no creator wave detected<small>25–31 Aug · brand-owned</small></div><div class="n">Positive 71%<br>Negative 6%</div></div>
+            <div class="post"><div class="pf" style="background:#0F1B2D">TT</div><div class="t"><b>Comment sample</b> — "tetap favorit sih, tapi kok sepi promo minggu ini"<small>29 Aug · representative of top topic "promo"</small></div><div class="n">Topic share<br>18%</div></div>
+          </div>
+          <div class="evidence" id="ev3">
+            <h4>Evidence · Emina — price complaints after repackaging</h4>
+            <div class="post"><div class="pf" style="background:#E1306C">IG</div><div class="t"><b>@eminacosmetics</b> — "New look, same you ✨" repackaging announcement<small>26 Aug · brand-owned · 2,340 comments, 31% negative</small></div><div class="n">Price topic<br>+3.4× WoW</div></div>
+            <div class="post"><div class="pf" style="background:#E1306C">IG</div><div class="t"><b>Comment sample</b> — "kemasan baru harga naik 8rb, isinya sama aja"<small>27 Aug · 412 likes on comment</small></div><div class="n">Cluster<br>287 similar</div></div>
+          </div>
+
+          <div class="acts">
+            <button class="btn sm" onclick="go('agents');toast('Draft agent created from this question')">Get this every Monday</button>
+            <button class="btn sm" onclick="go('reports')">Turn into a report</button>
+            <button class="btn sm" onclick="toast('Chart copied')">Copy chart</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="msg-u">Give me a campaign idea for my serum launch next month.</div>
+      <div class="msg-a">
+        <div class="who">F</div>
+        <div class="ans">
+          <p>One idea, grounded in what the category actually rewarded in the last 60 days rather than in general best practice.</p>
+          <div class="rec">
+            <h3>Run a dermatologist-led "barrier test" week on TikTok, then hand the format to mid-tier creators</h3>
+            <p>Two phases: 5–7 dermatologist or pharmacist creators post a 7-day test with a shared before/after format, then 25–30 mid-tier creators reuse the format with their own results.</p>
+            <div class="why">
+              <div><em>1</em><span>Dermatologist-tier posts about serums drew 2.3× the comment rate of lifestyle creators across the category since July, and 64% of their comments are questions, which means purchase intent <span class="ev" onclick="ev(this,'ev4')">4</span></span></div>
+              <div><em>2</em><span>Skintific's wave last week used 27 creators but only 2 were derm-tier, so the expert lane is open for the next four weeks <span class="ev" onclick="ev(this,'ev1')">1</span></span></div>
+              <div><em>3</em><span>"Barrier" is the fastest-growing serum topic in comments this quarter, up from 9% to 23% of serum mentions, and your brand currently owns 4% of it <span class="ev" onclick="ev(this,'ev5')">5</span></span></div>
+            </div>
+          </div>
+          <div class="evidence" id="ev4">
+            <h4>Evidence · Derm-tier vs lifestyle creators, serum posts, Jul–Aug</h4>
+            <div class="post"><div class="pf" style="background:#0F1B2D">TT</div><div class="t"><b>112 serum posts by derm/pharmacist creators</b> — median comment rate 1.9% vs 0.8% for lifestyle tier<small>1 Jul – 31 Aug · all brands in workspace</small></div><div class="n">n = 112 vs 640</div></div>
+          </div>
+          <div class="evidence" id="ev5">
+            <h4>Evidence · "Barrier" topic growth in serum comments</h4>
+            <div class="post"><div class="pf" style="background:#1E5EFF">Σ</div><div class="t"><b>Topic share, serum mentions</b> — barrier 9% (Jun) → 15% (Jul) → 23% (Aug)<small>Comment classification across 50 brands · 214K comments</small></div><div class="n">Your share<br>4%</div></div>
+          </div>
+          <div class="acts">
+            <button class="btn sm" onclick="go('discovery')">Shortlist derm-tier creators</button>
+            <button class="btn sm" onclick="toast('Draft brief created')">Draft the brief</button>
+            <button class="btn sm" onclick="toast('Alternative angle requested')">Show a different angle</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= SKILLS ================= -->
+<section class="screen" id="skills">
+  <div class="topbar">
+    <div><h1>Skills</h1><span class="meta">23 skills · 6 data layers</span></div>
+    <span class="pill blue">Type / in Ask to use any skill</span>
+  </div>
+  <div class="wrap wide">
+    <div class="sk-hero">
+      <div>
+        <h2>Skills are questions only this data can answer</h2>
+        <p>Each skill is a named analysis with a defined output — a list, a flag, a chart — built on one of the six data layers below. Run any skill once in Ask, or schedule it as an agent.</p>
+      </div>
+      <div class="sk-filters" id="skFilters"></div>
+    </div>
+    <div id="skGroups"></div>
+  </div>
+</section>
+
+<!-- ================= DISCOVERY ================= -->
+<section class="screen" id="discovery">
+  <div class="topbar">
+    <div><h1><span class="slash">/</span>discovery</h1><span class="meta">Creators layer</span></div>
+    <div style="display:flex;gap:8px"><button class="btn sm" onclick="toast('Shortlist saved — 50 creators')">Save shortlist</button><button class="btn sm" onclick="toast('Exported as CSV')">Export</button><button class="btn pri sm" onclick="go('agents');toast('Draft agent created from this /discovery')">Run this weekly</button></div>
+  </div>
+  <div class="wrap wide">
+    <div class="query">
+      <div class="q-text"><span class="slash">/</span>discovery &nbsp;50 nano creators used by competitors on TikTok in the last 90 days, never used by us</div>
+      <div class="q-parsed">
+        <span class="f"><small>Platform</small>TikTok</span>
+        <span class="f"><small>Tier</small>Nano · 1K–10K</span>
+        <span class="f"><small>Used by</small>Skintific, Somethinc, Emina, Wardah</span>
+        <span class="f"><small>Window</small>Last 90 days</span>
+        <span class="f"><small>Exclude</small>Posted for your brand</span>
+        <span class="f"><small>Rank by</small>Comment rate</span>
+      </div>
+    </div>
+    <div class="runinfo">
+      <div><b>Matched 1,284</b> of 104,212 creators in the database, returning the top 50. Ranked by average comment rate on paid posts, because comments track purchase intent better than views in this category.</div>
+      <div class="fresh"><span class="pill live">Performance refreshed now · 50 creators</span><span class="pill">Brand history from database · up to 14 months</span></div>
+    </div>
+    <div class="tablewrap">
+      <table id="dtable">
+        <thead><tr><th>#</th><th>Creator</th><th class="num">Followers</th><th>Used by</th><th>Last paid post</th><th class="num">Avg comment rate</th><th class="num">Avg views</th><th>Top comment topic</th><th>For you</th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <div class="more"><button class="btn sm" onclick="toast('Showing 12 of 50 in this prototype')">Show all 50</button><span>Open a creator to see every brand post and its comments</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= AGENTS ================= -->
+<section class="screen" id="agents">
+  <div class="topbar">
+    <div><h1>Agents</h1><span class="meta">Skills on a schedule</span></div>
+    <span class="pill">3 running · next run Mon 07:00</span>
+  </div>
+  <div class="wrap wide">
+    <div class="two">
+      <div class="list" id="agentList">
+        <div class="agent"><div><h4>Weekly competitor read</h4><p>/compare · Skintific, Somethinc, Emina, Wardah vs. your brand. Only sends when something moved.</p><div class="row"><span>Every <b>Monday 07:00</b></span><span>Via <b>WhatsApp</b> + email</span><span>Last sent <b>1 Sep</b> · 3 changes</span></div></div><span class="state run">Running</span></div>
+        <div class="agent"><div><h4>Seeding alert</h4><p>/seeding · Flags coordinated comment activity on your posts or any tracked competitor within 6 hours.</p><div class="row"><span>Runs <b>every 6 hours</b></span><span>Via <b>WhatsApp</b></span><span>Last fired <b>27 Aug</b> on Wardah</span></div></div><span class="state run">Running</span></div>
+        <div class="agent"><div><h4>Serum launch — week-4 read</h4><p>/launch · Trial signal, repeat mentions, and which creators drove them. Starts when the campaign goes live.</p><div class="row"><span>Waiting for <b>launch date</b></span><span>Via <b>email</b></span><span>Template <b>Launch read</b></span></div></div><span class="state pause">Scheduled</span></div>
+        <div class="agent"><div><h4>Price-complaint watch</h4><p>/objections · Daily check on price topics across your brand and Emina. Threshold 2× baseline.</p><div class="row"><span>Runs <b>daily 08:00</b></span><span>Via <b>WhatsApp</b></span><span>Fired <b>0</b> times</span></div></div><span class="state run">Running</span></div>
+      </div>
+      <div class="setup">
+        <h3>New agent</h3>
+        <p>Describe it the way you'd brief a colleague. We turn it into a schedule you can edit.</p>
+        <textarea id="agentText">Every Monday, compare Somethinc, Skintific and Emina with my brand and send it to my WhatsApp. Only if something changed.</textarea>
+        <div style="display:flex;justify-content:flex-end;margin-top:10px"><button class="btn pri sm" onclick="parse()">Set it up</button></div>
+        <div class="parsed" id="parsed">
+          <h5>Here's how we read that. Edit anything.</h5>
+          <div class="field"><span>Skill</span><b><span class="slash">/</span>compare</b></div>
+          <div class="field"><span>Schedule</span><b>Weekly · Monday 07:00 WIB</b></div>
+          <div class="field"><span>Brands</span><div class="tags"><span class="tag me">Your brand</span><span class="tag">Somethinc</span><span class="tag">Skintific</span><span class="tag">Emina</span></div></div>
+          <div class="field"><span>Compare on</span><b>Share of voice, sentiment, creator posts, top topics</b></div>
+          <div class="field"><span>Deliver to</span><b>WhatsApp (+62 812 ···· 4471)</b></div>
+          <div class="field"><span>Only if changed</span><div class="switch on" onclick="this.classList.toggle('on')" role="switch" aria-checked="true" tabindex="0"></div></div>
+          <div class="field"><span>Attach</span><b>1-page report + chart</b></div>
+          <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button class="btn sm" onclick="toast('Preview sent to your WhatsApp')">Send a preview</button><button class="btn pri sm" onclick="create()">Create agent</button></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= REPORTS ================= -->
+<section class="screen" id="reports">
+  <div class="topbar">
+    <div><h1>Reports</h1><span class="meta">Outputs from agents and Ask</span></div>
+    <div style="display:flex;gap:8px"><button class="btn sm" onclick="toast('Editing enabled')">Edit</button><button class="btn sm" onclick="toast('PDF exported')">Export PDF</button><button class="btn pri sm" onclick="toast('Sent to WhatsApp')">Send to WhatsApp</button></div>
+  </div>
+  <div class="wrap wide">
+    <div class="two" style="grid-template-columns:240px 1fr">
+      <div class="rep-list">
+        <a href="#" class="on"><b>Weekly competitor read</b><span>Week 35 · 1 Sep · from agent</span></a>
+        <a href="#"><b>Weekly competitor read</b><span>Week 34 · 25 Aug · from agent</span></a>
+        <a href="#"><b>Seeding incident — Wardah</b><span>27 Aug · from alert</span></a>
+        <a href="#"><b>Serum category, H1 recap</b><span>12 Aug · from Ask</span></a>
+        <a href="#"><b>Creator overlap audit</b><span>3 Aug · from Ask</span></a>
+      </div>
+      <article class="doc">
+        <header><div><h2>Weekly competitor read — week 35</h2><p>25–31 Aug 2026 · Your brand vs. Skintific, Somethinc, Emina, Wardah · Generated 1 Sep 07:00 by "Weekly competitor read"</p></div><span class="pill blue">3 changes</span></header>
+        <section><p class="lead">Skintific took the week with a 27-creator TikTok launch wave. Somethinc went quiet without losing sentiment. Emina has a price problem it created itself. You held position and gained a little goodwill, but your share of the fastest-growing serum conversation is still small.</p></section>
+        <section>
+          <h4>What changed</h4>
+          <div class="changed"><ul>
+            <li><span class="b">Skintific</span><span class="d">Creator posts on TikTok around barrier serum launch</span><span class="delta up">+168%</span></li>
+            <li><span class="b">Somethinc</span><span class="d">Share of voice, second consecutive weekly drop</span><span class="delta down">−2.1 pts</span></li>
+            <li><span class="b">Emina</span><span class="d">Price complaints after repackaging post</span><span class="delta down">+3.4×</span></li>
+          </ul></div>
+        </section>
+        <section>
+          <h4>Brand table</h4>
+          <div style="overflow:auto"><table>
+            <thead><tr><th>Brand</th><th>Share of voice</th><th class="num">Posts</th><th class="num">Comments</th><th class="num">Positive</th><th class="num">Negative</th><th class="num">Creators</th></tr></thead>
+            <tbody>
+              <tr><td>Skintific</td><td><div class="bar"><i style="width:82%"></i></div></td><td class="num">96</td><td class="num">41.2K</td><td class="num">66%</td><td class="num">9%</td><td class="num">27</td></tr>
+              <tr><td>Somethinc</td><td><div class="bar"><i style="width:48%"></i></div></td><td class="num">31</td><td class="num">14.8K</td><td class="num">71%</td><td class="num">6%</td><td class="num">4</td></tr>
+              <tr><td>Emina</td><td><div class="bar"><i style="width:40%"></i></div></td><td class="num">24</td><td class="num">12.6K</td><td class="num">49%</td><td class="num">31%</td><td class="num">6</td></tr>
+              <tr class="me"><td>Your brand</td><td><div class="bar"><i style="width:34%"></i></div></td><td class="num">28</td><td class="num">9.9K</td><td class="num">74%</td><td class="num">5%</td><td class="num">9</td></tr>
+              <tr><td>Wardah</td><td><div class="bar"><i style="width:30%"></i></div></td><td class="num">19</td><td class="num">8.1K</td><td class="num">61%</td><td class="num">12%</td><td class="num">3</td></tr>
+            </tbody>
+          </table></div>
+        </section>
+        <section>
+          <h4>Worth acting on</h4>
+          <p style="max-width:64ch;color:var(--text-2)">The derm-tier creator lane around "barrier" is open for roughly four weeks. If the serum launch can move earlier, this is the window. Full reasoning and evidence in the <a href="#" style="color:var(--blue);font-weight:600" onclick="go('chat');return false">Ask thread</a>.</p>
+        </section>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ================= DATA ================= -->
+<section class="screen" id="data">
+  <div class="topbar">
+    <div><h1>Data</h1><span class="meta">What every answer is built from</span></div>
+    <span class="pill live">Last fetch 04:10 today · next 04:00 tomorrow</span>
+  </div>
+  <div class="wrap wide">
+    <div class="cats"><span class="on">Beauty · Indonesia</span><span>FMCG · soon</span><span>F&amp;B · soon</span></div>
+    <div class="stats">
+      <div class="stat"><b>50</b><span>brands tracked, owned + earned, refreshed daily</span></div>
+      <div class="stat"><b>104K</b><span>creators with brand history and performance</span></div>
+      <div class="stat"><b>18.4M</b><span>comments fetched and classified into topics</span></div>
+      <div class="stat"><b>14 mo</b><span>of history, since Jul 2025</span></div>
+    </div>
+    <div class="layers">
+      <div class="layer"><h4>TikTok</h4><p>Owned accounts plus keyword and hashtag search. Every post tracked for 7 days; yellow-cart presence recorded.</p><small>Powers /discovery, /affiliates, /breakout, /velocity, /waves</small></div>
+      <div class="layer"><h4>Instagram</h4><p>Owned accounts plus tagged posts. Tagged content is the creator layer; comments feed topics and objections.</p><small>Powers /discovery, /loyalists, /objections, /questions, /seeding</small></div>
+      <div class="layer"><h4>Threads &amp; X</h4><p>Keyword tracking. Text-first, so complaints, rumours, and price talk usually show up here first.</p><small>Powers /narrative, /dupes, /whitespace</small></div>
+    </div>
+    <h4 style="font-size:13px;color:var(--text-2);margin-bottom:10px;font-weight:600">Brands in this workspace</h4>
+    <div class="grid-b">
+      <div class="bchip me">Your brand<small>owner</small></div>
+      <div class="bchip">Skintific<small>4 platforms</small></div>
+      <div class="bchip">Somethinc<small>4 platforms</small></div>
+      <div class="bchip">Emina<small>3 platforms</small></div>
+      <div class="bchip">Wardah<small>4 platforms</small></div>
+      <div class="bchip">Azarine<small>3 platforms</small></div>
+      <div class="bchip">Scarlett<small>4 platforms</small></div>
+      <div class="bchip">Avoskin<small>3 platforms</small></div>
+      <div class="bchip">Glad2Glow<small>4 platforms</small></div>
+      <div class="bchip">MS Glow<small>4 platforms</small></div>
+      <div class="bchip">Implora<small>3 platforms</small></div>
+      <div class="bchip">Hanasui<small>2 platforms</small></div>
+      <div class="bchip">Luxcrime<small>3 platforms</small></div>
+      <div class="bchip">Timephoria<small>3 platforms</small></div>
+      <div class="bchip" style="color:var(--text-3)">+ 36 more</div>
+    </div>
+  </div>
+</section>
+
+</main>
+</div>
+
+<div class="sample">Sample data for prototype</div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ---------- skills catalogue ---------- */
+const GROUPS={
+  Creators:"104K creators with brand history — who they posted for, how often, and how it performed",
+  Posts:"Every post tracked for 7 days after publishing",
+  Brands:"50 brands, owned and earned, across four platforms",
+  Comments:"Every comment fetched and classified into topics",
+  Audience:"Commenter graph — the same people, seen across brands",
+  Conversation:"Threads and X keyword tracking"
+};
+const SKILLS=[
+ {n:"discovery",g:"Creators",p1:1,d:"Find creators by platform, tier, who they've posted for, and whether they've ever posted for you. Ranked with live performance.",ex:"50 nano creators competitors used on TikTok in the last 90 days, never used by us"},
+ {n:"mercenaries",g:"Creators",d:"Creators who posted for four or more competitors in a quarter. See who's for hire, who's saturated, and who just posted for a rival.",ex:"Which creators worked for 4+ brands in Q2, and for whom?"},
+ {n:"loyalists",g:"Creators",d:"Creators a brand keeps month after month. Only 15% of top creators return, so this shows who each brand retains and who's about to churn.",ex:"Who has Skintific kept for three months straight?"},
+ {n:"affiliates",g:"Creators",p1:1,d:"Separates reseller and affiliate armies from real creators: accounts posting 30+ times a month with a yellow cart on almost every post. Sizes the network per brand.",ex:"How big is MS Glow's affiliate network on TikTok, and is it growing?"},
+ {n:"breakout",g:"Creators",d:"Small accounts whose posts travel far beyond their followers. Catches a 200-follower creator doing 2M views the week it happens.",ex:"Nano creators with 5,000× views per follower this week"},
+ {n:"funnel-mix",g:"Creators",d:"Scores a brand's creator mix by funnel stage. Mega creators drive awareness; micro and nano carry carts. Compare any brand's mix with yours.",ex:"Is Glad2Glow buying awareness or conversion this month?"},
+ {n:"overlap",g:"Creators",d:"Which competitors hire from the same creator pool. A talent map of the category, with the creators shared between any two brands.",ex:"Which brands share creators with Timephoria?"},
+ {n:"spend-estimate",g:"Creators",d:"Estimates a competitor's monthly creator spend from tier, post count, and Fair's rate-card knowledge. Shown as a range and always labelled as an estimate.",ex:"What did Wardah roughly spend on TikTok creators in June?"},
+ {n:"velocity",g:"Posts",d:"Which posts are still climbing on day 3 of their 7-day tracking. Momentum, not totals, so you see what's going viral before it has.",ex:"Competitor posts from this week that are still accelerating"},
+ {n:"forecast",g:"Posts",d:"Projects a post's day-7 views from its first day, using tier-specific curves. Decide on day 2 whether to boost, repost, or move on.",ex:"Will yesterday's @skinbyalya post clear 500K by Sunday?"},
+ {n:"waves",g:"Posts",p1:1,d:"Detects a creator burst as it starts: an unusual number of creators posting for one brand within days. Alerts on day 2, not in the monthly report.",ex:"Is any competitor running a launch wave right now?"},
+ {n:"compare",g:"Brands",d:"Any brands side by side on volume, sentiment, creator count, cart share, and top comment topics. Owned and earned reported separately.",ex:"My brand vs Skintific, Somethinc and Emina, last 30 days"},
+ {n:"launch",g:"Brands",d:"A week-by-week read of a product launch: creator wave, comment topics, unanswered questions, and where the conversation went after week 2.",ex:"How is Skintific's 5X Ceramide serum doing, four weeks in?"},
+ {n:"objections",g:"Comments",p1:1,d:"Why people aren't buying, from the comments under any brand's posts: price, availability, skin type, halal, packaging. Ranked and trended.",ex:"Top objections under Emina posts this month vs last"},
+ {n:"questions",g:"Comments",d:"What people ask under competitor posts that nobody answers. Unanswered questions are your next content brief.",ex:"Most common unanswered questions under serum posts"},
+ {n:"dupes",g:"Comments",d:"Comments comparing brands (\"mirip X tapi lebih murah\") build a substitution map. See which brands people treat as interchangeable with yours.",ex:"Which brands get compared to mine, and on what?"},
+ {n:"claims",g:"Comments",d:"What creators claim about a product, and whether the comments believe it. Claim versus trust, per creator and per brand.",ex:"Which \"7-day barrier\" claims did commenters push back on?"},
+ {n:"whitespace",g:"Comments",d:"Topics rising in category comments that no brand's own content addresses yet. Where the conversation is going before anyone owns it.",ex:"What are people asking for that no beauty brand is talking about?"},
+ {n:"seeding",g:"Comments",d:"Coordinated comment activity: repeated phrasing, timing clusters, and account patterns on any brand's posts. Flags the incident and estimates its size.",ex:"Is anyone seeding comments on Wardah right now?"},
+ {n:"audience",g:"Audience",p1:1,d:"Real audience overlap from commenter handles across all tracked brands. How many of a competitor's commenters have also commented on you.",ex:"What share of Skintific's commenters also engage with my brand?"},
+ {n:"switchers",g:"Audience",d:"Commenters active on one brand who moved to another over time. Where a brand's audience is leaking to, and where yours is coming from.",ex:"Who commented on Somethinc in April and on Skintific in June?"},
+ {n:"superfans",g:"Audience",d:"Repeat commenters on a brand, ranked. Your future nano creators, community seeds, and the first people to notice when something is wrong.",ex:"My 100 most frequent commenters this quarter"},
+ {n:"narrative",g:"Conversation",d:"Text-first narratives on Threads and X before they reach video: complaints, rumours, price talk. Usually the earliest signal you'll get.",ex:"What are people saying about my brand on Threads this week?"}
+];
+function useSkill(n){
+  if(n==="discovery"){go("discovery");return}
+  go("chat");const t=document.getElementById("ask");t.value="/"+n+" ";t.focus();slash(t);
+}
+function renderSkills(filter){
+  const root=document.getElementById("skGroups");root.innerHTML="";
+  Object.keys(GROUPS).forEach(g=>{
+    if(filter&&filter!==g)return;
+    const items=SKILLS.filter(s=>s.g===g);
+    const sec=document.createElement("div");sec.className="sk-group";
+    sec.innerHTML=`<header><h3>${g}</h3><span>${GROUPS[g]}</span></header><div class="sk-grid"></div>`;
+    const grid=sec.querySelector(".sk-grid");
+    items.forEach(s=>{
+      const b=document.createElement("button");b.className="sk";
+      b.innerHTML=`<div class="top"><span class="name"><span class="slash">/</span>${s.n}</span>${s.p1?'<span class="p1">First release</span>':''}</div><div class="desc">${s.d}</div><div class="ex"><b>Try:</b> ${s.ex}</div>`;
+      b.onclick=()=>useSkill(s.n);grid.appendChild(b);
+    });
+    root.appendChild(sec);
+  });
+  const f=document.getElementById("skFilters");f.innerHTML="";
+  ["All",...Object.keys(GROUPS)].forEach(k=>{
+    const b=document.createElement("button");b.textContent=k;b.className=(k==="All"&&!filter)||k===filter?"on":"";
+    b.onclick=()=>renderSkills(k==="All"?null:k);f.appendChild(b);
+  });
+}
+renderSkills(null);
+
+/* ---------- slash menu ---------- */
+function slash(t){
+  const v=t.value.trim();const m=document.getElementById("slashmenu");
+  if(!v.startsWith("/")||v.includes(" ")){m.classList.remove("on");return}
+  const q=v.slice(1).toLowerCase();let html="";
+  Object.keys(GROUPS).forEach(g=>{
+    const items=SKILLS.filter(s=>s.g===g&&s.n.startsWith(q));if(!items.length)return;
+    html+=`<div class="g">${g}</div>`+items.map(s=>`<button onclick="useSkill('${s.n}')"><b>/${s.n}</b><span>${s.d.split(". ")[0]}.</span></button>`).join("");
+  });
+  m.innerHTML=html||`<div class="g">No skill matches "/${q}"</div>`;m.classList.add("on");
+}
+document.addEventListener("click",e=>{if(!e.target.closest(".composer"))document.getElementById("slashmenu").classList.remove("on")});
+
+/* ---------- navigation ---------- */
+function go(id){
+  document.querySelectorAll(".screen").forEach(s=>s.classList.toggle("on",s.id===id));
+  document.querySelectorAll(".nav button").forEach(b=>b.classList.toggle("on",b.dataset.go===id||(id==="discovery"&&b.dataset.go==="skills")));
+  document.querySelector(".main").scrollTop=0;
+}
+document.querySelectorAll(".nav button").forEach(b=>b.addEventListener("click",()=>go(b.dataset.go)));
+function ev(chip,id){
+  const el=document.getElementById(id);const open=el.classList.contains("on");
+  el.closest(".ans").querySelectorAll(".evidence").forEach(e=>e.classList.remove("on"));
+  el.closest(".ans").querySelectorAll(".ev").forEach(e=>e.classList.remove("open"));
+  if(!open){el.classList.add("on");chip.classList.add("open");el.scrollIntoView({behavior:"smooth",block:"nearest"})}
+}
+function fill(b){const t=document.getElementById("ask");t.value=b.textContent;t.focus();slash(t)}
+function parse(){document.getElementById("parsed").classList.add("on")}
+function create(){
+  const list=document.getElementById("agentList");const d=document.createElement("div");d.className="agent";
+  d.innerHTML='<div><h4>Weekly competitor read — Somethinc, Skintific, Emina</h4><p>/compare · Compared with your brand. Sends only if something changed.</p><div class="row"><span>Every <b>Monday 07:00</b></span><span>Via <b>WhatsApp</b></span><span>First run <b>Mon 7 Sep</b></span></div></div><span class="state new">Created</span>';
+  list.prepend(d);document.getElementById("parsed").classList.remove("on");toast("Agent created — first run Monday 07:00");
+}
+
+/* ---------- discovery table ---------- */
+const creators=[
+ ["skinbyalya","Alya · Bandung",8400,[["Skintific",3],["Emina",1]],"4 days ago",2.9,41200,"barrier","#7C5CFF"],
+ ["glowwithnisa","Nisa · Jakarta",6100,[["Skintific",2]],"9 days ago",2.6,28900,"texture","#1E5EFF"],
+ ["reviewjujur.dea","Dea · Surabaya",9200,[["Somethinc",2],["Wardah",1]],"2 days ago",2.4,55100,"price","#0E9F6E"],
+ ["acnejourney_rio","Rio · Jakarta",4700,[["Skintific",1],["Emina",2]],"12 days ago",2.3,19800,"acne","#D98E04"],
+ ["mbakskincare","Tania · Yogyakarta",7800,[["Somethinc",3]],"6 days ago",2.2,33400,"ingredients","#E5484D"],
+ ["dry.skin.diaries","Putri · Malang",3900,[["Skintific",2]],"1 day ago",2.1,16700,"barrier","#7C5CFF"],
+ ["bunda.skincare","Rina · Bekasi",9800,[["Wardah",4]],"3 days ago",2.0,61300,"halal","#1E5EFF"],
+ ["ceritakulitku","Fani · Semarang",5600,[["Emina",2],["Somethinc",1]],"15 days ago",1.9,24100,"texture","#0E9F6E"],
+ ["skincare.hemat","Vira · Depok",8900,[["Emina",3]],"8 days ago",1.9,47200,"price","#D98E04"],
+ ["apotekerandi","Andi · Medan",7200,[["Skintific",1]],"5 days ago",1.8,38800,"ingredients","#E5484D"],
+ ["sensitiveskin.id","Mia · Tangerang",2800,[["Somethinc",1],["Skintific",1]],"11 days ago",1.8,12300,"barrier","#7C5CFF"],
+ ["glowup.kevin","Kevin · Jakarta",6500,[["Wardah",2]],"7 days ago",1.7,29600,"routine","#1E5EFF"]
+];
+(function(){
+  const tb=document.querySelector("#dtable tbody");
+  creators.forEach((c,i)=>{
+    const [h,loc,f,used,last,cr,v,theme,col]=c;const tr=document.createElement("tr");
+    tr.innerHTML=`<td class="rank">${i+1}</td><td><div class="cr"><div class="pf" style="background:${col}">${h.slice(0,2).toUpperCase()}</div><div><b>@${h}</b><small>${loc}</small></div></div></td><td class="num">${(f/1000).toFixed(1)}K</td><td><div class="used">${used.map(u=>`<span>${u[0]}<i>×${u[1]}</i></span>`).join("")}</div></td><td>${last}</td><td class="num"><b>${cr.toFixed(1)}%</b></td><td class="num">${(v/1000).toFixed(1)}K</td><td><span class="theme">${theme}</span></td><td><span class="never">Never</span></td>`;
+    tr.onclick=()=>toast("@"+h+" — "+used.reduce((a,u)=>a+u[1],0)+" brand posts on file. Creator profile opens in the next build.");
+    tb.appendChild(tr);
+  });
+})();
+
+let tt;function toast(m){const t=document.getElementById("toast");t.textContent=m;t.classList.add("show");clearTimeout(tt);tt=setTimeout(()=>t.classList.remove("show"),2200)}
+</script>
+</body>
+</html>
