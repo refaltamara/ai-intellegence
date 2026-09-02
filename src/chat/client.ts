@@ -23,3 +23,12 @@ export function describeModelError(e: unknown): string {
   }
   return (e as Error).message;
 }
+
+const EFFORTS = ["low", "medium", "high", "xhigh", "max"] as const;
+export type Effort = (typeof EFFORTS)[number];
+
+/** Effort for chat turns (ANTHROPIC_EFFORT_CHAT, default medium): the main latency lever with adaptive thinking on. */
+export function chatEffort(): Effort {
+  const e = (process.env.ANTHROPIC_EFFORT_CHAT ?? "medium").trim().toLowerCase() as Effort;
+  return EFFORTS.includes(e) ? e : "medium";
+}

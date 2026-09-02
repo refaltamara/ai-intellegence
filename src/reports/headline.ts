@@ -25,7 +25,7 @@ const TOOL: Anthropic.Tool = {
     required: ["headline", "worth_acting_on"],
     additionalProperties: false,
   },
-  strict: true,
+  strict: false,
 } as Anthropic.Tool;
 
 export function fallbackHeadline(result: SkillResult, diff: Diff | null): ReportSections {
@@ -59,6 +59,7 @@ export async function generateSections(result: SkillResult, diff: Diff | null, w
     const response = await client.messages.create({
       model: modelId(),
       max_tokens: 700,
+      output_config: { effort: "medium" },
       system: [{ type: "text", text: system + "\n\nYou are writing a report, not chatting: call write_report exactly once with the two sections and nothing else.", cache_control: { type: "ephemeral" } }],
       tools: [TOOL],
       tool_choice: { type: "auto" },

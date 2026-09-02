@@ -70,7 +70,9 @@ export function buildTools(): Anthropic.Tool[] {
       required: ["entity", "metrics"],
       additionalProperties: false,
     },
-    strict: true,
+    // Not strict either: the grammar compiler rejected this schema as "too complex" and
+    // strict mode adds compile latency; the builder whitelists every field server-side.
+    strict: false,
   } as Anthropic.Tool;
 
   const createAgentDraft: Anthropic.Tool = {

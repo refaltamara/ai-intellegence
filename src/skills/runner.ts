@@ -15,7 +15,25 @@ export type SkillImpl = (db: SkillDb, ctx: Context, def: SkillDef, params: Recor
 
 const LAYER_TABLES = ["posts", "creators", "comments", "topics", "post_snapshots"] as const;
 
+const LAYER_TTL_MS = 5 * 60 * 1000;
+const layerCache = new Map<string, { counts: Record<string, number>; platforms: string[]; at: number }>();
+
 async function layerCounts(db: SkillDb, workspaceId: string): Promise<Record<string, number>> {
+  const hit = layerCache.get(workspaceId);
+  if (hit && Date.now() - hit.at < LAYER_TTL_MS) return hit.counts;
+  const [counts, platforms] = await Promise.all([layerCountsUncached(db, workspaceId), platformsPresentUncached(db, workspaceId)]);
+  layerCache.set(workspaceId, { counts, platforms, at: Date.now() });
+  return counts;
+}
+
+async function platformsPresent(db: SkillDb, workspaceId: string): Promise<string[]> {
+  const hit = layerCache.get(workspaceId);
+  if (hit && Date.now() - hit.at < LAYER_TTL_MS) return hit.platforms;
+  await layerCounts(db, workspaceId);
+  return layerCache.get(workspaceId)?.platforms ?? [];
+}
+
+async function layerCountsUncached(db: SkillDb, workspaceId: string): Promise<Record<string, number>> {
   const r = await db.one<Record<string, number>>(
     `select (select count(*) from posts where workspace_id = $1)::int as posts,
             (select count(*) from creators where workspace_id = $1)::int as creators,
@@ -27,7 +45,7 @@ async function layerCounts(db: SkillDb, workspaceId: string): Promise<Record<str
   return r ?? {};
 }
 
-async function platformsPresent(db: SkillDb, workspaceId: string): Promise<string[]> {
+async function platformsPresentUncached(db: SkillDb, workspaceId: string): Promise<string[]> {
   const rows = await db.q<{ platform: string }>("select distinct platform from posts where workspace_id = $1", [workspaceId]);
   return rows.map((r) => r.platform);
 }
@@ -79,8 +97,7 @@ export async function runSkill(req: SkillRequest): Promise<SkillResult> {
 
   let result: SkillResult;
   try {
-    const ctx = await loadContext(db, workspaceId);
-    const missing = await missingLayers();
+    const [ctx, missing] = await Promise.all([loadContext(db, workspaceId), missingLayers()]);
     let out: SkillOutput;
     if (missing.length) {
       out = unavailable(def, missing, params);
