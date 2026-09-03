@@ -104,3 +104,12 @@ Followers 0 or null → tier null, excluded from per-1k metrics. Discovery keeps
 - Email delivery is verified from the Agents page ("Send me a test email"), which posts to `/api/diag/email` and sends to the signed-in user's address through the same Resend adapter agents use.
 - Caption and hashtag skill ideas are collected in `docs/CAPTIONS_AND_HASHTAGS.md`; none is built yet.
 
+## Caption and hashtag skills (3 Sep 2026, Refal: build hashtags, campaigns, themes, products, hashtag-overlap; not affiliate-tags)
+
+- Five new Phase 1 skills on the posts layer: `/hashtags`, `/campaigns`, `/themes`, `/products`, `/hashtag-overlap` (specs in PRD §4.3). 29 skills in the registry, 17 runnable.
+- Reach tags and bare category words are a stoplist in `src/config/hashtags.ts`; excluded from leaderboards, campaigns and overlap by default, never from evidence.
+- The theme lexicon is `src/config/themes.ts` (37 themes in four groups, Indonesian and English variants). Matching is whole-word full text over a generated `posts.caption_tsv` column (migration 0003, GIN index) so a 37-theme pass over a month runs in about 2 s. Extend the lexicon there; the query builder never takes free theme text.
+- A campaign = hashtag with ≥ 15 distinct creators on one brand's earned posts and ≥ 70% of the tag's posts on that brand (defaults, both params). Tags contained in the brand's own name or handles are not campaigns.
+- Products come from TikTok product tags only (`product_name`, 11% of posts, TikTok only); Instagram has no product tag, so keyword mode reports caption mentions across platforms separately.
+- `/affiliate-tags` is not built (Refal).
+

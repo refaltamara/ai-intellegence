@@ -340,6 +340,39 @@ Detect an unusual number of creators posting for one brand in a short window.
 - rows: brand, creators_7d, baseline_weekly_median, multiple, first_post_at, top_posts.
 - diff_key: `brand_id`. This is the canonical alert skill; `only_if_changed` fires when a brand enters "wave" state.
 
+#### Caption and hashtag skills (added 3 Sep 2026; posts layer, no comments needed)
+
+**/hashtags** — Phase 1
+Hashtag leaderboard and rising hashtags. Reach tags and bare category words (`src/config/hashtags.ts`) are excluded by default.
+- params: `rank_by` (`views|posts|creators|growth`, default `views`), `min_posts` (default 3), `exclude_generic` (default true), `tiers[]`.
+- rows: hashtag, posts, creators, brands, views, share_of_posts_pct, top_brand, prev_posts, change_posts_pct (vs the previous window of the same length).
+- evidence: aggregate per hashtag plus up to 2 top posts. chart: bar of the top 12.
+- diff_key: `hashtag`; watch `change_posts_pct` ≥ 50.
+
+**/campaigns** — Phase 1
+Campaign detection from hashtags: a tag with ≥ `min_creators` distinct creators on one brand's earned posts where that brand holds ≥ `min_brand_share_pct` of the tag's posts. Tags that are the brand's own name (or part of it) are excluded unless `include_brand_tags`.
+- params: `min_creators` (default 15), `min_brand_share_pct` (default 70), `include_brand_tags` (default false), `active_within_days` (default 14).
+- rows: campaign_id (`brand|hashtag`), brand_id, hashtag, posts, creators, views, brand_share_pct, share_of_brand_posts_pct, share_of_brand_views_pct, first_seen, last_seen, active_days, peak_week, peak_week_posts, tier_mix, active.
+- evidence: aggregate per campaign plus top posts. diff_key: `campaign_id` (new/gone surfaced); watch `creators` change ≥ 10.
+
+**/themes** — Phase 1
+Share of posts whose caption matches each theme of the lexicon in `src/config/themes.ts` (claims, ingredients, concerns, commerce), full-text on `posts.caption_tsv` ('simple' config, whole words, `:*` prefixes), brand scope against the category.
+- params: `group` (`all|claims|ingredients|concerns|commerce`), `themes[]` (keys), `rank_by` (`index|share|posts|views`; default index with brands, else share), `tiers[]`.
+- rows: theme, group, label, posts, creators, views, share_of_posts_pct, share_of_views_pct, category_posts, category_share_pct, index_vs_category, top_brand.
+- evidence: aggregate per theme plus top posts. chart: bar brand vs category. diff_key: `theme`; watch `share_of_posts_pct` ± 5.
+
+**/products** — Phase 1 (TikTok product tags; captions on all platforms for the keyword)
+Product lines from `posts.product_name` per brand, with an optional `keyword` (prefix full-text on captions and product names) and caption-mention counts across all platforms.
+- params: `keyword`, `rank_by` (`views|posts|creators|cart_posts`), `min_posts` (default 2), `tiers[]`.
+- rows: brand_id, product_id (listing slug), product (label), posts, creators, views, avg_views, cart_posts, cart_share_pct, owned_posts, price_min, price_max, discount_max_pct, first_seen, last_seen, product_url.
+- summary.caption_mentions when a keyword is given: posts, creators, brands, by_brand[]. diff_key: `product_id`.
+
+**/hashtag-overlap** — Phase 1
+Shared hashtag space between brands (tags on ≥ `min_tag_posts` of a brand's posts), Jaccard, and with `brand` the busiest tags each side uses alone.
+- params: `brand` (focus), `min_shared` (default 3), `min_tag_posts` (default 2), `exclude_generic` (default true).
+- rows: pair_id, brand_a, brand_b, shared_tags, tags_a, tags_b, jaccard, share_of_smaller_pct, shared_list, shared_posts, only_focus, only_other.
+- diff_key: `pair_id`.
+
 #### Brands layer (owned + earned)
 
 **/compare** — Phase 1 (topics/sentiment columns null until Phase 2)

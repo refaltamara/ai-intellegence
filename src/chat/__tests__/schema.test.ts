@@ -54,7 +54,7 @@ describe("strict tool schemas", () => {
     expect(p.rule.additionalProperties).toBe(false);
     expect(p.limit).not.toHaveProperty("maximum");
     expect(p.brand.description).toMatch(/used by/);
-    expect(skillNames().length).toBe(24);
+    expect(skillNames().length).toBe(29);
   });
   it("strictify drops unsupported keywords and closes objects", () => {
     const s = strictify({ type: "object", properties: { n: { type: "integer", minimum: 1, maximum: 5 }, list: { type: "array", items: { type: "string" }, minItems: 2, maxItems: 9 }, o: { properties: { x: { type: "string" } } } } });

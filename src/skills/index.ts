@@ -12,6 +12,11 @@ import { topContent } from "./top-content";
 import { compare } from "./compare";
 import { launch } from "./launch";
 import { brandStrategy } from "./brand-strategy";
+import { hashtags } from "./hashtags";
+import { campaigns } from "./campaigns";
+import { themes } from "./themes";
+import { products } from "./products";
+import { hashtagOverlap } from "./hashtag-overlap";
 
 export const impls: Record<string, SkillImpl> = {
   discovery,
@@ -26,4 +31,9 @@ export const impls: Record<string, SkillImpl> = {
   compare,
   launch,
   "brand-strategy": brandStrategy,
+  hashtags,
+  campaigns,
+  themes,
+  products,
+  "hashtag-overlap": hashtagOverlap,
 };

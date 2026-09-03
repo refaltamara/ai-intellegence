@@ -1326,6 +1326,512 @@
       ]
     },
     {
+      "name": "hashtags",
+      "layer": "posts",
+      "phase": 1,
+      "first_release": true,
+      "title": "Hashtag leaderboard",
+      "description": "Top and rising hashtags for a brand, a platform or the whole category, ranked by views with the change against the previous window of the same length. Reach tags (fyp, viral) are excluded by default.",
+      "example": "What hashtags is Wardah pushing this month, and which are rising across the category?",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "platform": {
+            "type": "string",
+            "enum": [
+              "tiktok",
+              "instagram",
+              "threads",
+              "x",
+              "all"
+            ],
+            "default": "all",
+            "description": "Platform to query"
+          },
+          "window": {
+            "type": "object",
+            "description": "Time window. Either {last_n_days} or {from,to} (ISO dates)",
+            "properties": {
+              "last_n_days": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 400
+              },
+              "from": {
+                "type": "string",
+                "format": "date"
+              },
+              "to": {
+                "type": "string",
+                "format": "date"
+              }
+            },
+            "additionalProperties": false
+          },
+          "brands": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Brand slugs; default = all tracked brands in the workspace"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "default": 50
+          },
+          "tiers": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "nano",
+                "micro",
+                "mid",
+                "macro",
+                "mega"
+              ]
+            },
+            "description": "Restrict to posts by creators of these tiers"
+          },
+          "rank_by": {
+            "type": "string",
+            "enum": [
+              "views",
+              "posts",
+              "creators",
+              "growth"
+            ],
+            "default": "views",
+            "description": "growth = change in posts vs the previous window"
+          },
+          "min_posts": {
+            "type": "integer",
+            "default": 3,
+            "description": "Ignore hashtags on fewer posts in the window"
+          },
+          "exclude_generic": {
+            "type": "boolean",
+            "default": true,
+            "description": "Drop reach tags (fyp, viral, reels) and bare category words (makeup, skincare)"
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "output": {
+        "kind": "table+chart",
+        "chart": "bar_top_hashtags",
+        "diff_key": "hashtag",
+        "watch": {
+          "change_posts_pct": 50
+        }
+      },
+      "requires": [
+        "posts"
+      ]
+    },
+    {
+      "name": "campaigns",
+      "layer": "posts",
+      "phase": 1,
+      "first_release": true,
+      "title": "Campaign detection",
+      "description": "Competitor campaigns found from hashtags: a tag concentrated on one brand, used by many distinct creators, with its timing, views, share of the brand's posts and the tier mix of creators used. No manual tagging.",
+      "example": "Which campaigns did competitors run in the last 90 days with 20+ creators?",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "platform": {
+            "type": "string",
+            "enum": [
+              "tiktok",
+              "instagram",
+              "threads",
+              "x",
+              "all"
+            ],
+            "default": "all",
+            "description": "Platform to query"
+          },
+          "window": {
+            "type": "object",
+            "description": "Time window. Either {last_n_days} or {from,to} (ISO dates)",
+            "properties": {
+              "last_n_days": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 400
+              },
+              "from": {
+                "type": "string",
+                "format": "date"
+              },
+              "to": {
+                "type": "string",
+                "format": "date"
+              }
+            },
+            "additionalProperties": false
+          },
+          "brands": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Brand slugs; default = all tracked brands in the workspace"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "default": 50
+          },
+          "min_creators": {
+            "type": "integer",
+            "default": 15,
+            "description": "Distinct creators posting the hashtag for the brand"
+          },
+          "min_brand_share_pct": {
+            "type": "number",
+            "default": 70,
+            "description": "The brand must hold at least this share of the hashtag's posts"
+          },
+          "include_brand_tags": {
+            "type": "boolean",
+            "default": false,
+            "description": "Also count tags that are only the brand's own name or handle"
+          },
+          "active_within_days": {
+            "type": "integer",
+            "default": 14,
+            "description": "A campaign is active when its last post is within this many days of the window end"
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "output": {
+        "kind": "table",
+        "diff_key": "campaign_id",
+        "diff_surface": [
+          "new",
+          "gone"
+        ],
+        "watch": {
+          "creators": 10
+        }
+      },
+      "requires": [
+        "posts",
+        "creators"
+      ]
+    },
+    {
+      "name": "themes",
+      "layer": "posts",
+      "phase": 1,
+      "first_release": true,
+      "title": "Caption themes",
+      "description": "Share of posts whose caption mentions each theme of a curated beauty lexicon (claims, ingredients, skin concerns, commerce cues), for a brand set against the whole category with an index. Whole-word matching in Indonesian and English.",
+      "example": "What does Skintific talk about in June compared with the category: barrier, glowing, SPF?",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "platform": {
+            "type": "string",
+            "enum": [
+              "tiktok",
+              "instagram",
+              "threads",
+              "x",
+              "all"
+            ],
+            "default": "all",
+            "description": "Platform to query"
+          },
+          "window": {
+            "type": "object",
+            "description": "Time window. Either {last_n_days} or {from,to} (ISO dates)",
+            "properties": {
+              "last_n_days": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 400
+              },
+              "from": {
+                "type": "string",
+                "format": "date"
+              },
+              "to": {
+                "type": "string",
+                "format": "date"
+              }
+            },
+            "additionalProperties": false
+          },
+          "brands": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Brand slugs; default = all tracked brands in the workspace"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "default": 50
+          },
+          "tiers": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "nano",
+                "micro",
+                "mid",
+                "macro",
+                "mega"
+              ]
+            },
+            "description": "Restrict to posts by creators of these tiers"
+          },
+          "group": {
+            "type": "string",
+            "enum": [
+              "all",
+              "claims",
+              "ingredients",
+              "concerns",
+              "commerce"
+            ],
+            "default": "all"
+          },
+          "themes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Theme keys to restrict to (see src/config/themes.ts); default all in the group"
+          },
+          "rank_by": {
+            "type": "string",
+            "enum": [
+              "index",
+              "share",
+              "posts",
+              "views"
+            ],
+            "description": "Default: index when brands are given, else share"
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "output": {
+        "kind": "table+chart",
+        "chart": "bar_theme_share",
+        "diff_key": "theme",
+        "watch": {
+          "share_of_posts_pct": 5
+        }
+      },
+      "requires": [
+        "posts"
+      ]
+    },
+    {
+      "name": "products",
+      "layer": "posts",
+      "phase": 1,
+      "first_release": true,
+      "title": "Product lines",
+      "description": "Product lines behind the posts: TikTok Shop products tagged on posts, with posts, creators, views, cart share and price per brand; an optional keyword narrows to a product and counts caption mentions across all platforms.",
+      "example": "Which Implora products get the most creator posts, and who else mentions lip cream?",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "platform": {
+            "type": "string",
+            "enum": [
+              "tiktok",
+              "instagram",
+              "threads",
+              "x",
+              "all"
+            ],
+            "default": "all",
+            "description": "Platform to query"
+          },
+          "window": {
+            "type": "object",
+            "description": "Time window. Either {last_n_days} or {from,to} (ISO dates)",
+            "properties": {
+              "last_n_days": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 400
+              },
+              "from": {
+                "type": "string",
+                "format": "date"
+              },
+              "to": {
+                "type": "string",
+                "format": "date"
+              }
+            },
+            "additionalProperties": false
+          },
+          "brands": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Brand slugs; default = all tracked brands in the workspace"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "default": 50
+          },
+          "tiers": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "nano",
+                "micro",
+                "mid",
+                "macro",
+                "mega"
+              ]
+            },
+            "description": "Restrict to posts by creators of these tiers"
+          },
+          "keyword": {
+            "type": "string",
+            "description": "Product words to search in product names and captions, e.g. 'lip cream', 'cushion', 'sunscreen'"
+          },
+          "rank_by": {
+            "type": "string",
+            "enum": [
+              "views",
+              "posts",
+              "creators",
+              "cart_posts"
+            ],
+            "default": "views"
+          },
+          "min_posts": {
+            "type": "integer",
+            "default": 2
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "output": {
+        "kind": "table",
+        "diff_key": "product_id",
+        "diff_surface": [
+          "new",
+          "gone"
+        ]
+      },
+      "requires": [
+        "posts"
+      ]
+    },
+    {
+      "name": "hashtag-overlap",
+      "layer": "brands",
+      "phase": 1,
+      "first_release": true,
+      "title": "Hashtag overlap",
+      "description": "Which brands share hashtag space: shared tags, Jaccard overlap, and with a focus brand the busiest tags each side uses that the other never does.",
+      "example": "Which brands use the same hashtags as Somethinc, and what does Somethinc use that they don't?",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "platform": {
+            "type": "string",
+            "enum": [
+              "tiktok",
+              "instagram",
+              "threads",
+              "x",
+              "all"
+            ],
+            "default": "all",
+            "description": "Platform to query"
+          },
+          "window": {
+            "type": "object",
+            "description": "Time window. Either {last_n_days} or {from,to} (ISO dates)",
+            "properties": {
+              "last_n_days": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 400
+              },
+              "from": {
+                "type": "string",
+                "format": "date"
+              },
+              "to": {
+                "type": "string",
+                "format": "date"
+              }
+            },
+            "additionalProperties": false
+          },
+          "brands": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Brand slugs; default = all tracked brands in the workspace"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "default": 50
+          },
+          "brand": {
+            "type": "string",
+            "description": "Focus brand: only pairs including it, with the tags each side uses alone"
+          },
+          "min_shared": {
+            "type": "integer",
+            "default": 3
+          },
+          "min_tag_posts": {
+            "type": "integer",
+            "default": 2,
+            "description": "A tag belongs to a brand's set when on at least this many of its posts"
+          },
+          "exclude_generic": {
+            "type": "boolean",
+            "default": true
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "output": {
+        "kind": "table",
+        "diff_key": "pair_id"
+      },
+      "requires": [
+        "posts"
+      ]
+    },
+    {
       "name": "objections",
       "layer": "comments",
       "phase": 2,
