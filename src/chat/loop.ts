@@ -94,7 +94,7 @@ export async function runChatTurn(input: ChatTurnInput, emit: (e: ChatEvent) => 
     await emit({ type: "error", message: "Empty message" });
     return;
   }
-  let conversation = input.conversationId ? await getConversation(input.conversationId, workspaceId) : null;
+  let conversation = input.conversationId ? await getConversation(input.conversationId, workspaceId, input.userId ?? null) : null;
   if (!conversation) conversation = await createConversation(workspaceId, userText.replace(/\s+/g, " ").slice(0, 80), input.userId ?? null);
   await emit({ type: "conversation", id: conversation.id, title: conversation.title });
   try {

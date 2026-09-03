@@ -40,7 +40,7 @@ describe("skills.registry.json", () => {
     const p = validateParams(d, {});
     expect(p.platform).toBe("all");
     expect(p.limit).toBe(50);
-    expect(p.rank_by).toBe("comment_rate");
+    expect(p.rank_by).toBe("views");
     expect(() => validateParams(d, { nope: 1 })).toThrow(/Invalid params/);
     expect(() => validateParams(d, { tiers: ["sub"] })).toThrow(/allowed values/);
     expect(() => validateParams(getSkill("loyalists")!, {})).toThrow(/brand/);

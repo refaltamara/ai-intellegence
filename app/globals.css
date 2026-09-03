@@ -298,3 +298,27 @@ tr.me .bar i{background:var(--blue)}
 .form .actions{grid-column:1/-1;display:flex;justify-content:flex-end;gap:8px}
 .sk.off{opacity:.55}
 .sk .p2{font-size:10px;font-weight:700;color:var(--amber);background:var(--amber-10);padding:2px 7px;border-radius:999px}
+
+/* searchable multi-select and toggle chips (discovery form) */
+.ms{position:relative}
+.ms-box{display:flex;flex-wrap:wrap;gap:4px;min-height:34px;padding:4px 6px;border:1px solid var(--line-2);border-radius:8px;background:#fff;cursor:text}
+.ms.open .ms-box{border-color:var(--blue)}
+.ms-box input{flex:1;min-width:80px;border:0 !important;padding:3px 4px !important;outline:none;font:inherit;font-size:13px;background:transparent}
+.ms-chip{display:inline-flex;align-items:center;gap:4px;padding:2px 6px 2px 8px;border-radius:6px;background:var(--blue-10);color:var(--blue);font-size:12px;font-weight:600;border:1px solid var(--blue-20)}
+.ms-chip i{font-style:normal;cursor:pointer;padding:0 2px;opacity:.7}
+.ms-chip i:hover{opacity:1}
+.ms-list{position:absolute;z-index:20;left:0;right:0;top:calc(100% + 4px);max-height:260px;overflow:auto;background:#fff;border:1px solid var(--line-2);border-radius:8px;box-shadow:0 8px 24px rgba(15,27,45,.12)}
+.ms-opt{display:flex;align-items:center;gap:8px;padding:7px 10px;font-size:13px;font-weight:500;color:var(--text);cursor:pointer}
+.ms-opt:hover{background:var(--blue-10)}
+.ms-opt.on{color:var(--blue)}
+.ms-opt small{margin-left:auto;color:var(--text-3);font-weight:500;font-size:11px}
+.ms-check{width:14px;color:var(--blue);font-weight:700}
+.ms-empty{padding:8px 10px;font-size:12px;color:var(--text-3)}
+.tog{display:flex;flex-wrap:wrap;gap:6px}
+.tog button{padding:6px 10px;border-radius:999px;border:1px solid var(--line-2);background:#fff;color:var(--text-2);font-size:12px;font-weight:600;cursor:pointer}
+.tog button.on{background:var(--blue-10);border-color:var(--blue);color:var(--blue)}
+.tog button:hover{border-color:var(--blue)}
+.form label.wide{grid-column:span 2}
+.form .pair{display:flex;gap:6px}
+.form .pair input{width:100%;min-width:0}
+.form .hint{font-weight:500;font-size:11px;color:var(--text-3)}

@@ -4,6 +4,8 @@ import type { SkillImpl } from "./runner";
 import type { Row } from "./types";
 
 const RANK: Record<string, string> = {
+  views: "pc.views",
+  avg_views: "avg_views",
   comment_rate: "comment_rate_pct",
   er_pct: "er_pct",
   views_per_1k: "views_per_1k",
@@ -20,7 +22,7 @@ export const discovery: SkillImpl = async (db, ctx, _def, params) => {
     ? (ctx.clientBrandId ? [ctx.clientBrandId] : [])
     : (resolveBrands(params.exclude_used_by, ctx) ?? []);
   const limit = limitOf(params);
-  const rankBy = RANK[String(params.rank_by ?? "comment_rate")] ?? "comment_rate_pct";
+  const rankBy = RANK[String(params.rank_by ?? "views")] ?? "pc.views";
   const minPosts = Number(params.min_posts_for_brands ?? 1);
   const minViews = Number(params.min_views ?? 1000);
 
@@ -60,7 +62,7 @@ export const discovery: SkillImpl = async (db, ctx, _def, params) => {
        from base group by creator_id
      )
      select c.id as creator_id, c.handle as creator_handle, c.platform, c.followers_latest as followers, c.tier_latest as tier,
-            pc.posts, pc.brand_count, u.used_by, pc.last_brand_post_at, pc.comment_rate_pct, pc.er_pct, pc.avg_views, pc.median_views,
+            pc.posts, pc.brand_count, u.used_by, pc.last_brand_post_at, pc.views, pc.comment_rate_pct, pc.er_pct, pc.avg_views, pc.median_views,
             case when c.followers_latest > 0 then round((pc.avg_views / (c.followers_latest / 1000.0))::numeric, 2)::float8 end as views_per_1k,
             case when u.client_posts > 0 then 'yes:' || u.client_posts else 'never' end as for_you,
             count(*) over() as matched
@@ -106,8 +108,8 @@ export const discovery: SkillImpl = async (db, ctx, _def, params) => {
   }
 
   return {
-    params_resolved: { ...params, window: { from: w.from, to: w.to }, platform: params.platform ?? "all", brands: brands ?? "all", used_by: usedBy ?? [], exclude_used_by: exclude, rank_by: params.rank_by ?? "comment_rate", min_views: minViews, limit },
-    summary: { matched, returned: rows.length, of_total_creators: total?.n ?? 0, window: w.label, rank_by: rankBy, min_views: minViews },
+    params_resolved: { ...params, window: { from: w.from, to: w.to }, platform: params.platform ?? "all", brands: brands ?? "all", used_by: usedBy ?? [], exclude_used_by: exclude, rank_by: params.rank_by ?? "views", min_views: minViews, limit },
+    summary: { matched, returned: rows.length, of_total_creators: total?.n ?? 0, window: w.label, rank_by: String(params.rank_by ?? "views"), min_views: minViews },
     rows,
     evidence: ev.list,
     matched,

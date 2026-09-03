@@ -4,6 +4,7 @@ import { impls } from "@/skills/index";
 import { DEFAULT_WORKSPACE_ID } from "@/config/thresholds";
 import { getConversation, listMessages } from "@/chat/persist";
 import { workspaceStats } from "@/ui/stats";
+import { currentSession } from "@/auth/current";
 
 export const dynamic = "force-dynamic";
 
@@ -14,7 +15,8 @@ export default async function AskPage({ searchParams }: { searchParams: Promise<
   let conversation: string | null = null;
   let messages: Awaited<ReturnType<typeof listMessages>> = [];
   if (sp.c && /^[0-9a-f-]{36}$/.test(sp.c)) {
-    const c = await getConversation(sp.c, DEFAULT_WORKSPACE_ID);
+    const session = await currentSession();
+    const c = await getConversation(sp.c, DEFAULT_WORKSPACE_ID, session?.uid ?? null);
     if (c) {
       conversation = c.id;
       messages = await listMessages(c.id);
