@@ -122,6 +122,18 @@ export function Agents({ agents, skills, modelConfigured, emailConfigured }: { a
             </div>
             {!modelConfigured && <p style={{ marginTop: 8, fontSize: 12, color: "var(--amber)" }}>The model is not configured here, so free-text setup is off. Use "Run this weekly" on a /discovery run or "Get this every Monday" in Ask.</p>}
             {!emailConfigured && <p style={{ marginTop: 8, fontSize: 12, color: "var(--text-3)" }}>Email delivery needs RESEND_API_KEY and EMAIL_FROM; until then runs are listed here only.</p>}
+            {emailConfigured && (
+              <p style={{ marginTop: 8, fontSize: 12, color: "var(--text-3)", display: "flex", alignItems: "center", gap: 8 }}>
+                Email delivery is configured.
+                <button className="btn sm" disabled={busy === "email"} onClick={async () => {
+                  setBusy("email");
+                  const r = await fetch("/api/diag/email", { method: "POST" });
+                  const j = await r.json();
+                  setBusy(null);
+                  showToast(j.ok ? `Test email sent to ${j.to} from ${j.from}` : `Email failed: ${j.error ?? r.status}`);
+                }}>{busy === "email" ? "Sending…" : "Send me a test email"}</button>
+              </p>
+            )}
             {error && <div className="errbox" style={{ marginTop: 10 }}>{error}</div>}
             {draft && (
               <div className="parsed on">

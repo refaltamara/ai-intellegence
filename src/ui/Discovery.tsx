@@ -5,11 +5,36 @@ import { useEffect, useState } from "react";
 import type { Evidence, SkillResult } from "@/skills/types";
 import { EvidenceList } from "./Evidence";
 import { fmtDate, fmtNum } from "./format";
+import { MultiSelect } from "./MultiSelect";
 
 const TIERS = ["nano", "micro", "mid", "macro", "mega"];
 const TIER_LABEL: Record<string, string> = { nano: "Nano · ≤10K", micro: "Micro · 10K–50K", mid: "Mid · 50K–500K", macro: "Macro · 500K–1M", mega: "Mega · 1M+" };
+const RANK_LABEL: Record<string, string> = { views: "Views (total in window)", avg_views: "Avg views per post", comment_rate: "Comment rate", er_pct: "Engagement rate", views_per_1k: "Views per 1k followers", median_views: "Median views" };
+const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
-export function Discovery({ brands }: { brands: { id: string; name: string }[] }) {
+/** "2026-03" -> "Mar 2026" */
+export function monthLabel(m: string): string {
+  const [y, mm] = m.split("-").map(Number);
+  return `${MONTH_NAMES[(mm ?? 1) - 1]} ${y}`;
+}
+/** Selected months (YYYY-MM) -> one contiguous {from,to}; months between the first and last are included. */
+export function monthsToWindow(months: string[]): { from: string; to: string } | null {
+  if (!months.length) return null;
+  const sorted = [...months].sort();
+  const [ly, lm] = sorted[sorted.length - 1].split("-").map(Number);
+  const lastDay = new Date(Date.UTC(ly, lm, 0)).getUTCDate();
+  return { from: `${sorted[0]}-01`, to: `${sorted[sorted.length - 1]}-${String(lastDay).padStart(2, "0")}` };
+}
+function monthsBetween(months: string[]): number {
+  if (months.length < 2) return 0;
+  const sorted = [...months].sort();
+  const idx = (m: string) => { const [y, mm] = m.split("-").map(Number); return y * 12 + mm; };
+  return idx(sorted[sorted.length - 1]) - idx(sorted[0]) + 1 - sorted.length;
+}
+
+type Form = { platform: string; tiers: string[]; used_by: string[]; exclude_used_by: string[]; rank_by: string; months: string[]; min_followers: string; max_followers: string; limit: string };
+
+export function Discovery({ brands, months }: { brands: { id: string; name: string; hint?: string }[]; months: string[] }) {
   const sp = useSearchParams();
   const router = useRouter();
   const runId = sp.get("run");
@@ -17,7 +42,12 @@ export function Discovery({ brands }: { brands: { id: string; name: string }[] }
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [openRow, setOpenRow] = useState<string | null>(null);
-  const [form, setForm] = useState({ platform: "tiktok", tiers: "nano", used_by: "", exclude_used_by: "", rank_by: "comment_rate", window: "90", limit: "50", min_followers: "" });
+  const [form, setForm] = useState<Form>({ platform: "tiktok", tiers: [], used_by: [], exclude_used_by: [], rank_by: "views", months: months.slice(-3), min_followers: "", max_followers: "", limit: "50" });
+  const set = <K extends keyof Form>(k: K, v: Form[K]) => setForm((f) => ({ ...f, [k]: v }));
+  const toggleIn = (k: "tiers" | "months", v: string) => set(k, form[k].includes(v) ? form[k].filter((x) => x !== v) : [...form[k], v]);
+  const gap = monthsBetween(form.months);
+  const minF = Number(form.min_followers), maxF = Number(form.max_followers);
+  const followersInvalid = form.min_followers !== "" && form.max_followers !== "" && minF > maxF;
   const [toast, setToast] = useState("");
   const showToast = (m: string) => { setToast(m); setTimeout(() => setToast(""), 2200); };
 
@@ -33,12 +63,15 @@ export function Discovery({ brands }: { brands: { id: string; name: string }[] }
   }, [runId]);
 
   async function run() {
+    if (followersInvalid) { setError("Min followers is above max followers."); return; }
     setLoading(true); setError("");
-    const params: Record<string, unknown> = { platform: form.platform, rank_by: form.rank_by, limit: Number(form.limit) || 50, window: { last_n_days: Number(form.window) || 90 } };
-    if (form.tiers) params.tiers = form.tiers.split(",").map((s) => s.trim()).filter(Boolean);
-    if (form.used_by) params.used_by = form.used_by.split(",").map((s) => s.trim()).filter(Boolean);
-    if (form.exclude_used_by) params.exclude_used_by = form.exclude_used_by.split(",").map((s) => s.trim()).filter(Boolean);
-    if (form.min_followers) params.min_followers = Number(form.min_followers);
+    const window = monthsToWindow(form.months) ?? { last_n_days: 90 };
+    const params: Record<string, unknown> = { platform: form.platform, rank_by: form.rank_by, limit: Number(form.limit) || 50, window };
+    if (form.tiers.length) params.tiers = form.tiers;
+    if (form.used_by.length) params.used_by = form.used_by;
+    if (form.exclude_used_by.length) params.exclude_used_by = form.exclude_used_by;
+    if (form.min_followers !== "" && Number.isFinite(minF)) params.min_followers = minF;
+    if (form.max_followers !== "" && Number.isFinite(maxF)) params.max_followers = maxF;
     const r = await fetch("/api/skills/discovery/run", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ params }) });
     const j = (await r.json()) as SkillResult;
     setLoading(false);
@@ -48,7 +81,7 @@ export function Discovery({ brands }: { brands: { id: string; name: string }[] }
 
   function exportCsv() {
     if (!result) return;
-    const cols = ["creator_handle", "platform", "followers", "tier", "posts", "brand_count", "used_by", "last_brand_post_at", "comment_rate_pct", "er_pct", "avg_views", "median_views", "views_per_1k", "for_you"];
+    const cols = ["creator_handle", "platform", "followers", "tier", "posts", "brand_count", "used_by", "last_brand_post_at", "views", "avg_views", "median_views", "comment_rate_pct", "er_pct", "views_per_1k", "for_you"];
     const esc = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
     const lines = [cols.join(","), ...result.rows.map((r) => cols.map((c) => esc(c === "used_by" ? ((r.used_by as any[]) ?? []).map((u) => `${u.brand}×${u.posts}`).join("; ") : r[c])).join(","))];
     const blob = new Blob([lines.join("\n")], { type: "text/csv" });
@@ -65,7 +98,8 @@ export function Discovery({ brands }: { brands: { id: string; name: string }[] }
     ["Used by", (p.used_by as string[] | undefined)?.length ? (p.used_by as string[]).map(brandName).join(", ") : "Any tracked brand"],
     ["Window", `${p.window?.from} to ${p.window?.to}`],
     ["Exclude", (p.exclude_used_by as string[] | undefined)?.length ? (p.exclude_used_by as string[]).map(brandName).join(", ") : "Nothing (no client brand)"],
-    ["Rank by", String(p.rank_by ?? "comment_rate").replace(/_/g, " ")],
+    ["Followers", p.min_followers != null || p.max_followers != null ? `${p.min_followers != null ? fmtNum(p.min_followers) : "0"} – ${p.max_followers != null ? fmtNum(p.max_followers) : "any"}` : "Any"],
+    ["Rank by", RANK_LABEL[String(p.rank_by ?? "views")] ?? String(p.rank_by).replace(/_/g, " ")],
   ] : [];
 
   return (
@@ -86,15 +120,24 @@ export function Discovery({ brands }: { brands: { id: string; name: string }[] }
       <div className="wrap wide">
         {!runId && (
           <div className="form">
-            <label>Platform<select value={form.platform} onChange={(e) => setForm({ ...form, platform: e.target.value })}><option value="tiktok">TikTok</option><option value="instagram">Instagram</option><option value="all">All</option></select></label>
-            <label>Tiers (comma)<input value={form.tiers} onChange={(e) => setForm({ ...form, tiers: e.target.value })} placeholder={TIERS.join(",")} /></label>
-            <label>Used by (brand slugs)<input value={form.used_by} onChange={(e) => setForm({ ...form, used_by: e.target.value })} placeholder="skintific_official, wardahofficial" /></label>
-            <label>Exclude used by<input value={form.exclude_used_by} onChange={(e) => setForm({ ...form, exclude_used_by: e.target.value })} placeholder="your brand" /></label>
-            <label>Rank by<select value={form.rank_by} onChange={(e) => setForm({ ...form, rank_by: e.target.value })}><option value="comment_rate">Comment rate</option><option value="er_pct">Engagement rate</option><option value="views_per_1k">Views per 1k followers</option><option value="median_views">Median views</option></select></label>
-            <label>Window (days of data)<input value={form.window} onChange={(e) => setForm({ ...form, window: e.target.value })} /></label>
-            <label>Min followers<input value={form.min_followers} onChange={(e) => setForm({ ...form, min_followers: e.target.value })} placeholder="e.g. 1000" /></label>
-            <label>Limit<input value={form.limit} onChange={(e) => setForm({ ...form, limit: e.target.value })} /></label>
-            <div className="actions"><button className="btn pri" onClick={run} disabled={loading}>{loading ? "Running…" : "Run /discovery"}</button></div>
+            <label>Platform<select value={form.platform} onChange={(e) => set("platform", e.target.value)}><option value="tiktok">TikTok</option><option value="instagram">Instagram</option><option value="all">All</option></select></label>
+            <label>Rank by<select value={form.rank_by} onChange={(e) => set("rank_by", e.target.value)}>{Object.entries(RANK_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></label>
+            <label>Followers<div className="pair"><input inputMode="numeric" value={form.min_followers} onChange={(e) => set("min_followers", e.target.value.replace(/[^\d]/g, ""))} placeholder="min" /><input inputMode="numeric" value={form.max_followers} onChange={(e) => set("max_followers", e.target.value.replace(/[^\d]/g, ""))} placeholder="max" /></div>{followersInvalid && <span className="hint" style={{ color: "var(--amber)" }}>min is above max</span>}</label>
+            <label>Limit<input inputMode="numeric" value={form.limit} onChange={(e) => set("limit", e.target.value.replace(/[^\d]/g, ""))} /></label>
+            <label className="wide">Tiers <span className="hint">{form.tiers.length ? `${form.tiers.length} selected` : "none selected = any tier"}</span>
+              <div className="tog">{TIERS.map((t) => <button type="button" key={t} className={form.tiers.includes(t) ? "on" : ""} onClick={() => toggleIn("tiers", t)}>{TIER_LABEL[t]}</button>)}</div>
+            </label>
+            <label className="wide">Months <span className="hint">{form.months.length === 0 ? "none selected = last 90 days of data" : gap > 0 ? `${gap} month${gap > 1 ? "s" : ""} in between included too (one continuous window)` : `${form.months.length} selected`}</span>
+              <div className="tog">{months.map((m) => <button type="button" key={m} className={form.months.includes(m) ? "on" : ""} onClick={() => toggleIn("months", m)}>{monthLabel(m)}</button>)}
+                <button type="button" onClick={() => set("months", form.months.length === months.length ? [] : [...months])} style={{ borderStyle: "dashed" }}>{form.months.length === months.length ? "Clear" : "All"}</button></div>
+            </label>
+            <label className="wide">Used by brands <span className="hint">creator must have posted for any of these; empty = any tracked brand</span>
+              <MultiSelect options={brands} value={form.used_by} onChange={(v) => set("used_by", v)} placeholder="Search a brand…" />
+            </label>
+            <label className="wide">Exclude used by <span className="hint">creator must not have posted for these</span>
+              <MultiSelect options={brands} value={form.exclude_used_by} onChange={(v) => set("exclude_used_by", v)} placeholder="Search a brand…" />
+            </label>
+            <div className="actions"><button className="btn pri" onClick={run} disabled={loading || followersInvalid}>{loading ? "Running…" : "Run /discovery"}</button></div>
           </div>
         )}
         {error && <div className="errbox" style={{ marginBottom: 16 }}>{error}</div>}
@@ -102,16 +145,16 @@ export function Discovery({ brands }: { brands: { id: string; name: string }[] }
         {result && result.status === "ok" && (
           <>
             <div className="query">
-              <div className="q-text"><span className="slash">/</span>discovery &nbsp;{s.matched?.toLocaleString?.() ?? s.matched} creators matched · ranked by {String(s.rank_by ?? "").replace(/_pct$/, "").replace(/_/g, " ")}</div>
+              <div className="q-text"><span className="slash">/</span>discovery &nbsp;{s.matched?.toLocaleString?.() ?? s.matched} creators matched · ranked by {(RANK_LABEL[String(s.rank_by ?? "")] ?? String(s.rank_by ?? "").replace(/_pct$/, "").replace(/_/g, " ")).toLowerCase()}</div>
               <div className="q-parsed">{chips.map(([k, v]) => <span className="f" key={k}><small>{k}</small>{v}</span>)}</div>
             </div>
             <div className="runinfo">
-              <div><b>Matched {fmtNum(s.matched)}</b> of {fmtNum(s.of_total_creators)} creators in the database, returning the top {result.rows.length}. Ranked by {String(s.rank_by ?? "").replace(/_/g, " ")}{s.min_views ? `, among creators with at least ${fmtNum(s.min_views)} views in the window` : ""}. {result.meta.caveats[0]}</div>
+              <div><b>Matched {fmtNum(s.matched)}</b> of {fmtNum(s.of_total_creators)} creators in the database, returning the top {result.rows.length}. Ranked by {(RANK_LABEL[String(s.rank_by ?? "")] ?? String(s.rank_by ?? "").replace(/_/g, " ")).toLowerCase()}{s.min_views ? `, among creators with at least ${fmtNum(s.min_views)} views in the window` : ""}. {result.meta.caveats[0]}</div>
               <div className="fresh"><span className="pill live">Data through {fmtDate(result.meta.freshness)}</span><span className="pill">{result.meta.duration_ms} ms · run {String(runId ?? "").slice(0, 8)}</span></div>
             </div>
             <div className="tablewrap">
               <table>
-                <thead><tr><th>#</th><th>Creator</th><th className="num">Followers</th><th>Used by</th><th>Last brand post</th><th className="num">Comment rate</th><th className="num">ER</th><th className="num">Avg views</th><th className="num">Views / 1k</th><th>For you</th></tr></thead>
+                <thead><tr><th>#</th><th>Creator</th><th className="num">Followers</th><th>Used by</th><th>Last brand post</th><th className="num">Views</th><th className="num">Avg views</th><th className="num">Comment rate</th><th className="num">ER</th><th className="num">Views / 1k</th><th>For you</th></tr></thead>
                 <tbody>
                   {result.rows.map((r, i) => (
                     <tr key={String(r.creator_id)} onClick={() => setOpenRow(openRow === r.creator_id ? null : String(r.creator_id))}>
@@ -120,9 +163,10 @@ export function Discovery({ brands }: { brands: { id: string; name: string }[] }
                       <td className="num">{fmtNum(r.followers)}</td>
                       <td><div className="used">{((r.used_by as any[]) ?? []).slice(0, 4).map((u) => <span key={u.brand}>{brandName(u.brand)}<i>×{u.posts}</i></span>)}</div></td>
                       <td>{fmtDate(r.last_brand_post_at)}</td>
-                      <td className="num"><b>{fmtNum(r.comment_rate_pct)}%</b></td>
-                      <td className="num">{fmtNum(r.er_pct)}%</td>
+                      <td className="num"><b>{fmtNum(r.views)}</b></td>
                       <td className="num">{fmtNum(r.avg_views)}</td>
+                      <td className="num">{fmtNum(r.comment_rate_pct)}%</td>
+                      <td className="num">{fmtNum(r.er_pct)}%</td>
                       <td className="num">{fmtNum(r.views_per_1k)}</td>
                       <td><span className="never">{String(r.for_you ?? "never")}</span></td>
                     </tr>

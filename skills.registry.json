@@ -56,7 +56,7 @@
       "phase": 1,
       "first_release": true,
       "title": "Creator discovery",
-      "description": "Find creators by platform, tier, who they've posted for, and whether they've ever posted for you. Ranked with live performance from the latest snapshot.",
+      "description": "Find creators by platform, tier, who they've posted for, and whether they've ever posted for you. Ranked by views (default), average views, comment rate, engagement rate, views per 1k followers or median views.",
       "example": "50 nano creators competitors used on TikTok in the last 90 days, never used by us",
       "input_schema": {
         "type": "object",
@@ -140,12 +140,15 @@
           "rank_by": {
             "type": "string",
             "enum": [
+              "views",
+              "avg_views",
               "comment_rate",
               "er_pct",
               "views_per_1k",
               "median_views"
             ],
-            "default": "comment_rate"
+            "default": "views",
+            "description": "views = total views across the creator's posts in the window (default); avg_views = per post; comment_rate/er_pct are rates on views; views_per_1k normalises by followers"
           },
           "min_followers": {
             "type": "integer",

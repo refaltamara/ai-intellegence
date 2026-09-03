@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 
 export default async function RootLayout({ children }: { children: ReactNode }) {
   const session = await currentSession();
-  const recent = session ? await listConversations(DEFAULT_WORKSPACE_ID, 8).catch(() => []) : [];
+  const recent = session ? await listConversations(DEFAULT_WORKSPACE_ID, session.uid, 8).catch(() => []) : [];
   return (
     <html lang="en">
       <head>

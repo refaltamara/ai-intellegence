@@ -95,3 +95,12 @@ Followers 0 or null → tier null, excluded from per-1k metrics. Discovery keeps
 ## Strict tool use (2 Sep 2026, after the first production run)
 - Anthropic's strict mode only accepts a JSON Schema subset (every object closed, no size/number constraints) and caps optional parameters at 24 across all strict tools. `run_skill` and `create_agent_draft` carry the union of all skill parameters (45), so they run **non-strict**; their inputs are validated server-side against the skill's own schema and validation errors go back to the model as tool errors. `query_metrics` (fixed filter list, 18 optionals) and the report tool stay strict.
 - **Update (same day):** `query_metrics` also failed strict ("Schema is too complex"), so **no tool is strict** any more. Every tool input is validated server-side (per-skill JSON Schema, the query builder whitelist, the agent draft validator) and errors go back to the model. Chat runs at `ANTHROPIC_EFFORT_CHAT` (default medium) to keep adaptive thinking short; the system prompt and data-layer checks are cached for five minutes; each answer shows its timing split.
+
+## Accounts and chat ownership (3 Sep 2026)
+
+- Accounts: refal (owner), arneta, audia, wega, rafli, shahrukh (members), all `<firstname>@fair-indonesia.com`. Created with `pnpm user add`; passwords shown once in chat. There is no self-signup; the owner asks for new accounts.
+- A conversation belongs to the user who started it. The sidebar, the Ask page, `/api/conversations` and the chat loop only return conversations whose `user_id` is the signed-in user. Conversations created before login existed were assigned to Refal.
+- /discovery `rank_by` gained `views` (total views in the window, the default) and `avg_views`. The form selects tiers and months as toggles, brands from a searchable dropdown, and a followers min/max range. Selecting non-adjacent months yields one continuous window from the first to the last month, and the form says so.
+- Email delivery is verified from the Agents page ("Send me a test email"), which posts to `/api/diag/email` and sends to the signed-in user's address through the same Resend adapter agents use.
+- Caption and hashtag skill ideas are collected in `docs/CAPTIONS_AND_HASHTAGS.md`; none is built yet.
+

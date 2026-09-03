@@ -2,7 +2,7 @@
 import { sql } from "../db/client";
 import type { Evidence } from "../skills/types";
 
-export type ConversationRow = { id: string; workspace_id: string; title: string | null; created_at: string; updated_at: string };
+export type ConversationRow = { id: string; workspace_id: string; user_id: string | null; title: string | null; created_at: string; updated_at: string };
 export type MessageRow = {
   id: string;
   conversation_id: string;
@@ -37,13 +37,16 @@ export async function createConversation(workspaceId: string, title: string, use
   return rows[0];
 }
 
-export async function getConversation(id: string, workspaceId: string): Promise<ConversationRow | null> {
-  const rows = (await sql.query("select * from conversations where id = $1 and workspace_id = $2", [id, workspaceId])) as ConversationRow[];
+/** A conversation belongs to the user who started it; other accounts in the workspace never see it. */
+export async function getConversation(id: string, workspaceId: string, userId: string | null): Promise<ConversationRow | null> {
+  if (!userId) return null;
+  const rows = (await sql.query("select * from conversations where id = $1 and workspace_id = $2 and user_id = $3", [id, workspaceId, userId])) as ConversationRow[];
   return rows[0] ?? null;
 }
 
-export async function listConversations(workspaceId: string, limit = 12): Promise<ConversationRow[]> {
-  return (await sql.query("select * from conversations where workspace_id = $1 order by updated_at desc limit $2", [workspaceId, limit])) as ConversationRow[];
+export async function listConversations(workspaceId: string, userId: string | null, limit = 12): Promise<ConversationRow[]> {
+  if (!userId) return [];
+  return (await sql.query("select * from conversations where workspace_id = $1 and user_id = $2 order by updated_at desc limit $3", [workspaceId, userId, limit])) as ConversationRow[];
 }
 
 export async function listMessages(conversationId: string): Promise<MessageRow[]> {

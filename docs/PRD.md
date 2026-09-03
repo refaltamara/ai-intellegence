@@ -269,7 +269,7 @@ Common params (all skills): `platform` (`tiktok|instagram|all`, default `all`), 
 
 **/discovery** — Phase 1
 Find creators by platform, tier, brand history, and exclusion.
-- params: `tiers[]`, `used_by[]` (brands they posted for in window), `exclude_used_by[]` (default: client brand), `min_posts_for_brands` (default 1), `rank_by` (`comment_rate|er_pct|views_per_1k|median_views`, default `comment_rate`), `min_followers`, `max_followers`, `location`.
+- params: `tiers[]`, `used_by[]` (brands they posted for in window), `exclude_used_by[]` (default: client brand), `min_posts_for_brands` (default 1), `rank_by` (`views|avg_views|comment_rate|er_pct|views_per_1k|median_views`, default `views`), `min_followers`, `max_followers`, `location`.
 - rows: creator, followers, tier, used_by [{brand, posts}], last_brand_post_at, avg_comment_rate, avg_views, top_topic (Phase 2; null now), for_you (`never|yes:<n>`).
 - evidence: for each returned creator, up to 3 most recent brand posts.
 - diff_key: `creator_id`.
