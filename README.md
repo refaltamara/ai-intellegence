@@ -6,7 +6,7 @@ Start with `CLAUDE.md`, then `docs/DECISIONS.md`, `docs/DATA_NOTES.md`, `docs/PR
 
 Layout:
 - `docs/` — PRD, decisions log, data notes, UI prototype
-- `skills.registry.json` — the 23-skill catalogue (to be revised per DECISIONS)
+- `skills.registry.json` — the 29-skill catalogue (revised per DECISIONS)
 - `data/raw/` — Q1/Q2 2026 post-level exports as gzipped CSV, with the original README notes
 - `data/seed/` — canonical brand mapping across TikTok and Instagram
 
@@ -24,7 +24,7 @@ pnpm test             # vitest: config sync, registry integrity, and every Phase
 pnpm dev              # Next.js app on http://localhost:3000 (Ask, Skills, /discovery, Data)
 pnpm smoke            # 20 chat questions through the real model; reports evidence_miss (needs ANTHROPIC_API_KEY)
 pnpm user add you@company.com --name "You" --role owner   # creates an account and prints its password once
-pnpm skill list       # the 24 registered skills
+pnpm skill list       # the 29 registered skills
 pnpm skill run brand-strategy --params '{"brand":"skintific","month":"2026-06"}' --compact
 pnpm skill run discovery --params '{"used_by":["skintific_official"],"tiers":["nano"],"platform":"tiktok"}'
 ```
@@ -35,7 +35,7 @@ Agents (M3): `POST /api/agents` with `{from_skill_run_id}` promotes a run (froze
 
 Reports (M4): every agent run and "Turn into a report" in Ask create a `reports` row via `src/reports/store.ts` (model-written headline with a deterministic fallback in `headline.ts`). `/reports` lists them and shows the newest; `/reports/[id]` shows one; `/api/reports/[id]?format=md` downloads the Markdown. The Data page shows live counts, capture coverage and recent loads.
 
-Skills (M1): `src/skills/registry.ts` loads `skills.registry.json`; `runner.ts` validates params (JSON Schema with defaults), checks the data layers a skill requires, runs it, rejects results without evidence, and persists to `skill_runs`. Twelve Phase 1 skills are implemented (discovery, mercenaries, loyalists, affiliates, breakout, funnel-mix, overlap, waves, top-content, compare, launch, brand-strategy); the rest return `status: "unavailable"` with a plain message until their data layer is loaded. Relative windows count back from the newest loaded post (see `docs/DECISIONS.md`, "Skill engine").
+Skills (M1): `src/skills/registry.ts` loads `skills.registry.json`; `runner.ts` validates params (JSON Schema with defaults), checks the data layers a skill requires, runs it, rejects results without evidence, and persists to `skill_runs`. Seventeen Phase 1 skills are implemented (discovery, mercenaries, loyalists, affiliates, breakout, funnel-mix, overlap, waves, top-content, compare, launch, brand-strategy, and the caption/hashtag set: hashtags, campaigns, themes, products, hashtag-overlap); the rest return `status: "unavailable"` with a plain message until their data layer is loaded. Relative windows count back from the newest loaded post (see `docs/DECISIONS.md`, "Skill engine").
 
 Notes:
 - If `ANTHROPIC_API_KEY` is a multi-workspace key, also set `ANTHROPIC_WORKSPACE_ID`; the app sends it as the `anthropic-workspace-id` header on every model request.

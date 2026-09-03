@@ -1,0 +1,2 @@
+ALTER TABLE "posts" ADD COLUMN "caption_tsv" "tsvector" GENERATED ALWAYS AS (to_tsvector('simple', coalesce(caption, ''))) STORED;--> statement-breakpoint
+CREATE INDEX "posts_caption_tsv_gin" ON "posts" USING gin ("caption_tsv");

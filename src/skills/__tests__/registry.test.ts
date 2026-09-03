@@ -4,13 +4,13 @@ import { describeSkillsForTool, getSkill, listSkills, registry } from "../regist
 import { validateParams } from "../params";
 import { TIER_BANDS } from "../../config/thresholds";
 
-const PHASE1 = ["discovery", "mercenaries", "loyalists", "affiliates", "breakout", "funnel-mix", "overlap", "waves", "top-content", "compare", "launch", "brand-strategy"];
+const PHASE1 = ["discovery", "mercenaries", "loyalists", "affiliates", "breakout", "funnel-mix", "overlap", "waves", "top-content", "compare", "launch", "brand-strategy", "hashtags", "campaigns", "themes", "products", "hashtag-overlap"];
 
 describe("skills.registry.json", () => {
-  it("has 24 skills with unique names and the DECISIONS changes applied", () => {
+  it("has 29 skills with unique names and the DECISIONS changes applied", () => {
     const names = listSkills().map((s) => s.name);
-    expect(names.length).toBe(24);
-    expect(new Set(names).size).toBe(24);
+    expect(names.length).toBe(29);
+    expect(new Set(names).size).toBe(29);
     expect(names).not.toContain("spend-estimate");
     expect(names).toContain("brand-strategy");
     expect(names).toContain("top-content");

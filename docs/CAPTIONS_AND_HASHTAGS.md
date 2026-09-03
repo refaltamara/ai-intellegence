@@ -1,4 +1,6 @@
-# Caption and hashtag skills (brainstorm, not yet built)
+# Caption and hashtag skills
+
+Status (3 Sep 2026): `/hashtags`, `/campaigns`, `/themes`, `/products` and `/hashtag-overlap` are built (specs in PRD §4.3). `/affiliate-tags` will not be built. The original brainstorm follows.
 
 What the posts table already holds, per post: `caption` (99% of rows), `hashtags[]` (86% of rows, 3.9 tags per post on average, 696k tag mentions), `content_format` (81%), `product_category` (37%), `product_name` (11%). Comments are not loaded, so everything below is caption-side only: what creators and brands *say*, not how audiences react.
 

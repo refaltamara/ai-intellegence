@@ -25,7 +25,7 @@ import {
   timestamp,
   uniqueIndex,
   uuid,
-} from "drizzle-orm/pg-core";
+ customType } from "drizzle-orm/pg-core";
 
 const ts = (name: string) => timestamp(name, { withTimezone: true, mode: "string" });
 const createdAt = () => ts("created_at").notNull().defaultNow();
@@ -35,6 +35,8 @@ export const SOURCES = ["owned", "earned"] as const;
 export const TIERS = ["nano", "micro", "mid", "macro", "mega"] as const;
 
 // ---------------------------------------------------------------- workspace
+const tsvector = customType<{ data: string }>({ dataType: () => "tsvector" });
+
 export const workspaces = pgTable("workspaces", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
@@ -139,6 +141,8 @@ export const posts = pgTable(
     month: date("month").notNull(),
     url: text("url").notNull(),
     caption: text("caption"),
+    /** full-text form of the caption ('simple' config: no stemming, mixed Indonesian/English); drives /themes and /products keyword search */
+    captionTsv: tsvector("caption_tsv").generatedAlwaysAs(sql`to_tsvector('simple', coalesce(caption, ''))`),
     hashtags: text("hashtags").array(),
     isPaid: boolean("is_paid"),
     /** TikTok yc_flag: true = shoppable link, false = product tagged without link, null = nothing tagged / Instagram */
@@ -178,6 +182,7 @@ export const posts = pgTable(
     index("posts_month_platform_idx").on(t.month, t.platform),
     index("posts_workspace_platform_posted_idx").on(t.workspaceId, t.platform, t.postedAt),
     index("posts_hashtags_gin").using("gin", t.hashtags),
+    index("posts_caption_tsv_gin").using("gin", t.captionTsv),
     check("posts_platform_chk", sql`${t.platform} in ('tiktok','instagram','threads','x')`),
     check("posts_source_chk", sql`${t.source} in ('owned','earned')`),
     check("posts_tier_chk", sql`${t.tier} is null or ${t.tier} in ('nano','micro','mid','macro','mega')`),

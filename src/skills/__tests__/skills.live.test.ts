@@ -23,6 +23,11 @@ const CASES: Record<string, Record<string, unknown>> = {
   compare: { brands: ["skintific_official", "somethincofficial", "eminacosmeticsid"], window: { last_n_days: 30 } },
   launch: { brand: "skintific_official", start_date: "2026-06-01", weeks: 4 },
   "brand-strategy": { brand: "skintific", month: "2026-06" },
+  hashtags: { brands: ["wardahofficial"], window: { last_n_days: 30 }, limit: 10 },
+  campaigns: { window: { last_n_days: 90 }, limit: 10 },
+  themes: { brands: ["skintific_official"], window: { last_n_days: 30 }, group: "concerns" },
+  products: { keyword: "lip cream", window: { last_n_days: 90 }, limit: 10 },
+  "hashtag-overlap": { brand: "somethincofficial", limit: 5 },
 };
 
 function run(skill: string, params: Record<string, unknown>): Promise<SkillResult> {
