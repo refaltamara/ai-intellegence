@@ -15,7 +15,7 @@ export type ReportSections = { headline: string; worth_acting_on: string | null;
 
 const TOOL: Anthropic.Tool = {
   name: "write_report",
-  description: "Write the two prose sections of a Fair Intel report from the analysis result provided. headline: 3 to 4 sentences that lead with the answer and cite evidence ids inline like [ev_03]. worth_acting_on: optional, 1 to 2 sentences on what a marketer should do, or null when nothing is actionable. No headers, no bullet points, no numbers that are not in the result.",
+  description: "Write the two prose sections of a Fair Intel report from the analysis result provided. headline: the answer in one or two sentences, then a bulleted list of three to six supporting points, one line each, every bullet starting with a bold label and an em dash, e.g. \"- **Share of voice** — Wardah 7.48% vs Skintific 3.38% [ev_01]\". Cite evidence ids inline like [ev_03]. worth_acting_on: optional, 1 to 2 sentences on what a marketer should do, or null when nothing is actionable. Use markdown bold and '-' bullets; no markdown headers, and no numbers that are not in the result.",
   input_schema: {
     type: "object",
     properties: {

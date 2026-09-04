@@ -113,3 +113,9 @@ Followers 0 or null → tier null, excluded from per-1k metrics. Discovery keeps
 - Products come from TikTok product tags only (`product_name`, 11% of posts, TikTok only); Instagram has no product tag, so keyword mode reports caption mentions across platforms separately.
 - `/affiliate-tags` is not built (Refal).
 
+## Answer formatting (4 Sep 2026, Refal: answers read as a wall of text)
+
+- Every Ask answer and report headline now follows one shape: the answer in one or two sentences, then three to six one-line bullets each led by a bold label and an em dash, then an optional closing "so what" line. The old rules said "No headers" and "no bullet points", which is what produced the wall of prose; both prompts were rewritten.
+- `RichText` groups consecutive bullet lines into a list wherever they appear, so a lead sentence followed straight by bullets with no blank line still renders correctly. `-`, `*`, `•` and numbered markers are all accepted. Covered by `src/ui/__tests__/richtext.test.ts`.
+- Evidence chips keep any punctuation that follows them on the same line, so a comma never wraps alone.
+

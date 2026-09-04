@@ -166,17 +166,34 @@ export function Ask({ skills, layers, initialConversation, initialMessages, pref
   );
 }
 
+const BULLET = /^\s*(?:[-•*]|\d+[.)])\s+/;
+
+/** Split assistant text into paragraph and list groups. Consecutive bullet lines
+ *  form one list wherever they appear, so a lead sentence followed straight by a
+ *  list (no blank line between) still renders as a list, not literal dashes. */
+export function textGroups(text: string): { list: boolean; lines: string[] }[] {
+  const groups: { list: boolean; lines: string[] }[] = [];
+  for (const raw of text.split("\n")) {
+    if (!raw.trim()) { groups.push({ list: false, lines: [] }); continue; } // a blank line ends the current group
+    const list = BULLET.test(raw);
+    const last = groups[groups.length - 1];
+    if (last?.lines.length && last.list === list) last.lines.push(list ? raw.replace(BULLET, "") : raw);
+    else groups.push({ list, lines: [list ? raw.replace(BULLET, "") : raw] });
+  }
+  return groups.filter((g) => g.lines.length);
+}
+
 /** Renders assistant text: paragraphs, "- " bullets, **bold**, and <ev id> chips. */
 export function RichText({ text, onChip }: { text: string; onChip?: (id: string) => void }) {
-  const blocks = text.split(/\n{2,}/).filter((b) => b.trim());
   return (
     <>
-      {blocks.map((b, i) => {
-        const lines = b.split("\n");
-        const isList = lines.every((l) => /^\s*[-•*]\s+/.test(l));
-        if (isList) return <ul key={i}>{lines.map((l, j) => <li key={j}>{inline(l.replace(/^\s*[-•*]\s+/, ""), onChip)}</li>)}</ul>;
-        return <p key={i}>{lines.map((l, j) => <Fragment key={j}>{j > 0 && <br />}{inline(l, onChip)}</Fragment>)}</p>;
-      })}
+      {textGroups(text).map((g, i) =>
+        g.list ? (
+          <ul key={i}>{g.lines.map((l, j) => <li key={j}>{inline(l, onChip)}</li>)}</ul>
+        ) : (
+          <p key={i}>{g.lines.map((l, j) => <Fragment key={j}>{j > 0 && <br />}{inline(l, onChip)}</Fragment>)}</p>
+        ),
+      )}
     </>
   );
 }
@@ -187,9 +204,19 @@ function inline(s: string, onChip?: (id: string) => void): ReactNode[] {
   let last = 0, m: RegExpExecArray | null, k = 0;
   while ((m = re.exec(s))) {
     if (m.index > last) out.push(s.slice(last, m.index));
-    if (m[1]) out.push(<span key={k++} className="ev" onClick={() => onChip?.(m![1])} title={m[1]}>{m[1].replace("ev_", "")}</span>);
-    else out.push(<b key={k++}>{m[2]}</b>);
     last = m.index + m[0].length;
+    if (m[1]) {
+      const id = m[1];
+      // keep punctuation that follows a chip on the same line as the chip
+      const tail = /^[,.;:!?)]+/.exec(s.slice(last))?.[0] ?? "";
+      last += tail.length;
+      out.push(
+        <span key={k++} className={tail ? "nb tight" : "nb"}>
+          <span className="ev" onClick={() => onChip?.(id)} title={id}>{id.replace("ev_", "")}</span>
+          {tail}
+        </span>,
+      );
+    } else out.push(<b key={k++}>{m[2]}</b>);
   }
   if (last < s.length) out.push(s.slice(last));
   return out;
