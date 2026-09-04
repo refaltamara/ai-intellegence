@@ -7,7 +7,7 @@ export type MessageRow = {
   id: string;
   conversation_id: string;
   role: "user" | "assistant";
-  content_json: { text: string; tools?: ToolCallRecord[]; draft?: unknown; error?: string };
+  content_json: { text: string; tools?: ToolCallRecord[]; draft?: unknown; error?: string; attachments?: { id: string; filename: string; bytes: number }[] };
   evidence_json: Record<string, Evidence> | null;
   skill_run_ids: string[] | null;
   tokens_in: number | null;

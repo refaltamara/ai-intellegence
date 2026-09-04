@@ -113,3 +113,17 @@ Followers 0 or null → tier null, excluded from per-1k metrics. Discovery keeps
 - Products come from TikTok product tags only (`product_name`, 11% of posts, TikTok only); Instagram has no product tag, so keyword mode reports caption mentions across platforms separately.
 - `/affiliate-tags` is not built (Refal).
 
+## Answer formatting (4 Sep 2026, Refal: answers read as a wall of text)
+
+- Every Ask answer and report headline now follows one shape: the answer in one or two sentences, then three to six one-line bullets each led by a bold label and an em dash, then an optional closing "so what" line. The old rules said "No headers" and "no bullet points", which is what produced the wall of prose; both prompts were rewritten.
+- `RichText` groups consecutive bullet lines into a list wherever they appear, so a lead sentence followed straight by bullets with no blank line still renders correctly. `-`, `*`, `•` and numbered markers are all accepted. Covered by `src/ui/__tests__/richtext.test.ts`.
+- Evidence chips keep any punctuation that follows them on the same line, so a comma never wraps alone.
+
+## Ask layout and document attachments (4 Sep 2026, Refal)
+
+- **Composer docked at the bottom.** The Ask screen is now a chat layout: the thread scrolls in its own region and the composer is pinned below it, so a new answer appears above the box you typed in and scrolling up keeps the box in view. The slash menu opens upward. The empty state uses the class `feed.start`, not `empty` — `.empty` is the muted placeholder utility and collided with it.
+- **PDF attachments are context, never data.** A brief or competitor deck can be attached to a conversation; the model reads it for intent (brands, competitors, window, tiers, themes, budget) and still answers from the panel. System prompt rule 9: a figure in a document never gets an `[ev_]` citation, it is attributed ("the brief targets 4%") and compared with a cited figure where the panel can check it.
+- Storage: `attachments` table (migration 0004), base64 in Neon, no new infrastructure. PDF only, 8 MB and 3 documents per message, magic-bytes checked server-side so a mislabelled file is rejected. Attachments belong to the uploading user and are bound to the conversation when the message is sent, so they inherit the per-user privacy rule.
+- Documents ride on the current user turn with a cache breakpoint on the last one, so follow-up questions about the same brief are not re-charged for it.
+- Not supported: .pptx/.docx (export to PDF), and image-only scans are read as page images rather than text.
+

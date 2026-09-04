@@ -309,6 +309,30 @@ export const conversations = pgTable("conversations", {
   updatedAt: ts("updated_at").notNull().defaultNow(),
 });
 
+/** Documents a user attaches to a conversation (client briefs, competitor decks).
+ *  They supply context and parameters to the model, never facts: numbers read from
+ *  a document are never cited as evidence. Base64 is stored as sent to the model. */
+export const attachments = pgTable(
+  "attachments",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workspaceId: text("workspace_id").notNull().references(() => workspaces.id),
+    /** null until the message that carries it creates the conversation */
+    conversationId: uuid("conversation_id").references(() => conversations.id, { onDelete: "cascade" }),
+    userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
+    filename: text("filename").notNull(),
+    mediaType: text("media_type").notNull(),
+    bytes: integer("bytes").notNull(),
+    /** base64 without newlines, as the Messages API document block expects */
+    data: text("data").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index("attachments_conversation_idx").on(t.conversationId),
+    index("attachments_user_idx").on(t.userId, t.createdAt),
+  ],
+);
+
 export const messages = pgTable(
   "messages",
   {
