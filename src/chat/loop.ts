@@ -14,6 +14,7 @@ import { runSkill } from "../skills/runner";
 import type { Evidence, SkillResult } from "../skills/types";
 import { anthropicClient, chatEffort, describeModelError } from "./client";
 import { CitationStream, renumberEvidence } from "./evidence";
+import { claimAttachments, conversationAttachments, type AttachmentRow } from "./attachments";
 import { addMessage, createConversation, getConversation, listMessages, type ToolCallRecord } from "./persist";
 import { buildTools } from "./tools";
 
@@ -31,7 +32,7 @@ export type ChatEvent =
 
 export type Timings = { total_ms: number; model_ms: number; model_calls: number; tools_ms: number; tool_calls: number; setup_ms: number; effort: string };
 
-export type ChatTurnInput = { workspaceId?: string; conversationId?: string | null; userText: string; userId?: string | null };
+export type ChatTurnInput = { workspaceId?: string; conversationId?: string | null; userText: string; userId?: string | null; attachmentIds?: string[] };
 
 const SYSTEM_TEMPLATE = readFileSync(path.join(process.cwd(), "src/chat/system.md"), "utf8");
 
@@ -97,8 +98,10 @@ export async function runChatTurn(input: ChatTurnInput, emit: (e: ChatEvent) => 
   let conversation = input.conversationId ? await getConversation(input.conversationId, workspaceId, input.userId ?? null) : null;
   if (!conversation) conversation = await createConversation(workspaceId, userText.replace(/\s+/g, " ").slice(0, 80), input.userId ?? null);
   await emit({ type: "conversation", id: conversation.id, title: conversation.title });
+  // Bind any freshly uploaded documents to this conversation before the turn runs.
+  const claimed = await claimAttachments(input.attachmentIds ?? [], conversation.id, workspaceId, input.userId ?? null).catch(() => [] as AttachmentRow[]);
   try {
-    await runTurnBody(conversation, userText, emit);
+    await runTurnBody(conversation, userText, emit, claimed);
   } catch (e) {
     const message = describeModelError(e);
     console.error("chat turn failed:", conversation.id, message, (e as Error).stack?.split("\n").slice(0, 3).join(" | "));
@@ -107,10 +110,28 @@ export async function runChatTurn(input: ChatTurnInput, emit: (e: ChatEvent) => 
   }
 }
 
-async function runTurnBody(conversation: { id: string; workspace_id: string }, userText: string, emit: (e: ChatEvent) => void | Promise<void>): Promise<void> {
+/** The user turn for the model: any attached documents first, then the text.
+ *  The last document carries the cache breakpoint so follow-up questions about
+ *  the same brief re-read it from cache instead of re-paying for it. */
+export function userTurn(userText: string, docs: { filename: string; data: string }[]): Anthropic.MessageParam {
+  if (!docs.length) return { role: "user", content: userText };
+  const blocks: Anthropic.ContentBlockParam[] = docs.map((d, i) => ({
+    type: "document",
+    source: { type: "base64", media_type: "application/pdf", data: d.data },
+    title: d.filename,
+    ...(i === docs.length - 1 ? { cache_control: { type: "ephemeral" as const } } : {}),
+  }));
+  return { role: "user", content: [...blocks, { type: "text", text: userText }] };
+}
+
+async function runTurnBody(conversation: { id: string; workspace_id: string }, userText: string, emit: (e: ChatEvent) => void | Promise<void>, claimed: AttachmentRow[] = []): Promise<void> {
   const workspaceId = conversation.workspace_id;
   const history = await listMessages(conversation.id);
-  await addMessage({ conversationId: conversation.id, role: "user", content: { text: userText } });
+  await addMessage({
+    conversationId: conversation.id,
+    role: "user",
+    content: { text: userText, ...(claimed.length ? { attachments: claimed.map((a) => ({ id: a.id, filename: a.filename, bytes: a.bytes })) } : {}) },
+  });
 
   // Evidence from earlier turns stays citable (ids are per turn, so latest wins on collision).
   const known = new Map<string, Evidence>();
@@ -134,7 +155,10 @@ async function runTurnBody(conversation: { id: string; workspace_id: string }, u
     if (!text) continue;
     messages.push({ role: m.role, content: text.replace(/<ev id="(ev_\d+)"><\/ev>/g, "[$1]") });
   }
-  messages.push({ role: "user", content: userText });
+  // Documents attached anywhere in this conversation ride on the current user turn,
+  // cached so follow-up questions about the same brief do not re-pay for it.
+  const docs = await conversationAttachments(conversation.id).catch(() => []);
+  messages.push(userTurn(userText, docs));
 
   const turnEvidence = new Map<string, Evidence>();
   const counter = { n: 0 };
