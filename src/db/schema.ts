@@ -300,10 +300,65 @@ export const skillRuns = pgTable(
   (t) => [index("skill_runs_workspace_created_idx").on(t.workspaceId, t.createdAt)],
 );
 
+/** Work attaches to a decision, not a date (PRD-v2 §6). A decision may override the workspace client. */
+export const decisions = pgTable(
+  "decisions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workspaceId: text("workspace_id").notNull().references(() => workspaces.id),
+    userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
+    name: text("name").notNull(),
+    /** open | decided | archived */
+    status: text("status").notNull().default("open"),
+    outcome: text("outcome"),
+    /** the brand CeMO is on the side of for this decision; null = workspace client */
+    clientBrandId: text("client_brand_id").references(() => brands.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+    updatedAt: ts("updated_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("decisions_workspace_status_idx").on(t.workspaceId, t.status, t.updatedAt),
+    check("decisions_status_chk", sql`${t.status} in ('open','decided','archived')`),
+  ],
+);
+
+/** Evidence objects pinned to a decision (a persisted skill run). */
+export const pins = pgTable(
+  "pins",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workspaceId: text("workspace_id").notNull().references(() => workspaces.id),
+    decisionId: uuid("decision_id").notNull().references(() => decisions.id, { onDelete: "cascade" }),
+    skillRunId: uuid("skill_run_id").notNull().references(() => skillRuns.id, { onDelete: "cascade" }),
+    note: text("note"),
+    createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("pins_decision_run_uq").on(t.decisionId, t.skillRunId)],
+);
+
+/** The brief CeMO opens the day with. One per data state (data_key), regenerated when the data changes. */
+export const briefs = pgTable(
+  "briefs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workspaceId: text("workspace_id").notNull().references(() => workspaces.id),
+    /** freshness + last load timestamp; a new key means new data */
+    dataKey: text("data_key").notNull(),
+    content: jsonb("content").notNull(),
+    evidence: jsonb("evidence"),
+    quiet: boolean("quiet").notNull().default(false),
+    generatedAt: ts("generated_at").notNull().defaultNow(),
+    seenAt: ts("seen_at"),
+  },
+  (t) => [index("briefs_workspace_generated_idx").on(t.workspaceId, t.generatedAt)],
+);
+
 export const conversations = pgTable("conversations", {
   id: uuid("id").primaryKey().defaultRandom(),
   workspaceId: text("workspace_id").notNull().references(() => workspaces.id),
   userId: uuid("user_id").references(() => users.id),
+  decisionId: uuid("decision_id").references(() => decisions.id, { onDelete: "set null" }),
   title: text("title"),
   createdAt: createdAt(),
   updatedAt: ts("updated_at").notNull().defaultNow(),
@@ -360,6 +415,7 @@ export const agents = pgTable(
     /** frozen params_resolved from the source run */
     params: jsonb("params").notNull().default(sql`'{}'::jsonb`),
     fromSkillRunId: uuid("from_skill_run_id"),
+    decisionId: uuid("decision_id").references(() => decisions.id, { onDelete: "set null" }),
     scheduleCron: text("schedule_cron").notNull(),
     scheduleTz: text("schedule_tz").notNull().default("Asia/Jakarta"),
     scheduleHuman: text("schedule_human"),
@@ -403,6 +459,7 @@ export const reports = pgTable(
     source: text("source").notNull(),
     skillRunId: uuid("skill_run_id").references(() => skillRuns.id, { onDelete: "set null" }),
     agentRunId: uuid("agent_run_id").references(() => agentRuns.id, { onDelete: "set null" }),
+    decisionId: uuid("decision_id").references(() => decisions.id, { onDelete: "set null" }),
     bodyMd: text("body_md"),
     blocks: jsonb("blocks"),
     createdAt: createdAt(),

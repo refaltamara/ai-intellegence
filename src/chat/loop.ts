@@ -19,6 +19,7 @@ import { anthropicClient, chatEffort, describeModelError } from "./client";
 import { renumberEvidence } from "./evidence";
 import { scrubMechanism } from "./leak";
 import { AnswerStream, usableFollowups, type Followup } from "./stream";
+import { createDecision, decisionContext, decisionNameFrom } from "../decisions/store";
 import { claimAttachments, conversationAttachments, type AttachmentRow } from "./attachments";
 import { addMessage, createConversation, getConversation, listMessages, type ToolCallRecord } from "./persist";
 import { buildTools } from "./tools";
@@ -50,6 +51,8 @@ export type ChatTurnInput = {
   attachmentIds?: string[];
   /** set when the user tapped a suggested follow-up; the model gets the exact analysis and parameters as a hint */
   followup?: { label: string; skill: string; params?: Record<string, unknown> };
+  /** the decision a new thread belongs to; when absent a new decision is opened, named from the first message */
+  decisionId?: string | null;
 };
 
 const SYSTEM_TEMPLATE = readFileSync(path.join(process.cwd(), "src/chat/system.md"), "utf8");
@@ -124,7 +127,11 @@ export async function runChatTurn(input: ChatTurnInput, emit: (e: ChatEvent) => 
     return;
   }
   let conversation = input.conversationId ? await getConversation(input.conversationId, workspaceId, input.userId ?? null) : null;
-  if (!conversation) conversation = await createConversation(workspaceId, userText.replace(/\s+/g, " ").slice(0, 80), input.userId ?? null);
+  if (!conversation) {
+    const title = userText.replace(/\s+/g, " ").slice(0, 80);
+    const decisionId = input.decisionId ?? (await createDecision(workspaceId, input.userId ?? null, decisionNameFrom(userText))).id;
+    conversation = await createConversation(workspaceId, title, input.userId ?? null, decisionId);
+  }
   await emit({ type: "conversation", id: conversation.id, title: conversation.title });
   // Bind any freshly uploaded documents to this conversation before the turn runs.
   const claimed = await claimAttachments(input.attachmentIds ?? [], conversation.id, workspaceId, input.userId ?? null).catch(() => [] as AttachmentRow[]);
@@ -184,7 +191,7 @@ export function historyTurns(history: { role: "user" | "assistant"; content_json
   return { messages, pendingAsk };
 }
 
-async function runTurnBody(conversation: { id: string; workspace_id: string }, userText: string, emit: (e: ChatEvent) => void | Promise<void>, claimed: AttachmentRow[] = [], followup?: ChatTurnInput["followup"]): Promise<void> {
+async function runTurnBody(conversation: { id: string; workspace_id: string; decision_id?: string | null }, userText: string, emit: (e: ChatEvent) => void | Promise<void>, claimed: AttachmentRow[] = [], followup?: ChatTurnInput["followup"]): Promise<void> {
   const workspaceId = conversation.workspace_id;
   const history = await listMessages(conversation.id);
   await addMessage({
@@ -206,7 +213,8 @@ async function runTurnBody(conversation: { id: string; workspace_id: string }, u
 
   const turnStart = Date.now();
   const client = anthropicClient();
-  const [system, counts] = await Promise.all([buildSystem(workspaceId), workspaceCounts(workspaceId)]);
+  const [system, counts, decisionNote] = await Promise.all([buildSystem(workspaceId), workspaceCounts(workspaceId), conversation.decision_id ? decisionContext(conversation.decision_id, workspaceId).catch(() => "") : Promise.resolve("")]);
+  const systemBlocks: Anthropic.TextBlockParam[] = [{ type: "text", text: system, cache_control: { type: "ephemeral" } }, ...(decisionNote ? [{ type: "text" as const, text: decisionNote }] : [])];
   const tools = buildTools();
   const timings: Timings = { total_ms: 0, model_ms: 0, model_calls: 0, tools_ms: 0, tool_calls: 0, setup_ms: Date.now() - turnStart, effort: chatEffort() };
 
@@ -246,7 +254,7 @@ async function runTurnBody(conversation: { id: string; workspace_id: string }, u
         model: modelId(),
         max_tokens: 8000,
         output_config: { effort: chatEffort() },
-        system: [{ type: "text", text: system, cache_control: { type: "ephemeral" } }],
+        system: systemBlocks,
         tools: toolsWithCache,
         tool_choice: { type: "auto" },
         messages,

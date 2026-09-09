@@ -4,7 +4,7 @@ import type { Diff, DiffConfig } from "./diff";
 
 export type AgentRow = {
   id: string; workspace_id: string; user_id: string | null; name: string; skill: string; params: Record<string, unknown>;
-  from_skill_run_id: string | null; schedule_cron: string; schedule_tz: string; schedule_human: string | null;
+  from_skill_run_id: string | null; decision_id?: string | null; decision_name?: string | null; schedule_cron: string; schedule_tz: string; schedule_human: string | null;
   delivery: { channels: string[]; email?: string; whatsapp?: string }; only_if_changed: boolean; diff_config: DiffConfig;
   status: "active" | "paused" | "draft"; last_run_at: string | null; next_run_at: string | null; created_at: string;
 };
@@ -14,7 +14,7 @@ export type AgentRunRow = {
 };
 
 export async function listAgents(workspaceId: string): Promise<AgentRow[]> {
-  return (await sql.query("select * from agents where workspace_id = $1 order by created_at desc", [workspaceId])) as AgentRow[];
+  return (await sql.query("select a.*, d.name as decision_name from agents a left join decisions d on d.id = a.decision_id where a.workspace_id = $1 order by a.created_at desc", [workspaceId])) as AgentRow[];
 }
 export async function getAgent(id: string, workspaceId: string): Promise<AgentRow | null> {
   const r = (await sql.query("select * from agents where id = $1 and workspace_id = $2", [id, workspaceId])) as AgentRow[];
@@ -28,9 +28,9 @@ export async function dueAgents(workspaceId: string | null, now = new Date()): P
 }
 export async function insertAgent(a: Omit<AgentRow, "id" | "created_at" | "last_run_at">): Promise<AgentRow> {
   const r = (await sql.query(
-    `insert into agents (workspace_id, user_id, name, skill, params, from_skill_run_id, schedule_cron, schedule_tz, schedule_human, delivery, only_if_changed, diff_config, status, next_run_at)
-     values ($1, $2, $3, $4, $5::jsonb, $6, $7, $8, $9, $10::jsonb, $11, $12::jsonb, $13, $14) returning *`,
-    [a.workspace_id, a.user_id, a.name, a.skill, JSON.stringify(a.params), a.from_skill_run_id, a.schedule_cron, a.schedule_tz, a.schedule_human, JSON.stringify(a.delivery), a.only_if_changed, JSON.stringify(a.diff_config), a.status, a.next_run_at],
+    `insert into agents (workspace_id, user_id, name, skill, params, from_skill_run_id, schedule_cron, schedule_tz, schedule_human, delivery, only_if_changed, diff_config, status, next_run_at, decision_id)
+     values ($1, $2, $3, $4, $5::jsonb, $6, $7, $8, $9, $10::jsonb, $11, $12::jsonb, $13, $14, $15) returning *`,
+    [a.workspace_id, a.user_id, a.name, a.skill, JSON.stringify(a.params), a.from_skill_run_id, a.schedule_cron, a.schedule_tz, a.schedule_human, JSON.stringify(a.delivery), a.only_if_changed, JSON.stringify(a.diff_config), a.status, a.next_run_at, a.decision_id ?? null],
   )) as AgentRow[];
   return r[0];
 }

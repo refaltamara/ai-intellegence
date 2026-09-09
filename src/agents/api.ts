@@ -11,7 +11,7 @@ import type { AgentRow } from "./store";
 export type AgentBody = {
   name?: string; skill?: string; params?: Record<string, unknown>;
   schedule?: { cron?: string; tz?: string; human?: string }; delivery?: { channels?: string[]; email?: string; whatsapp?: string };
-  only_if_changed?: boolean; diff_config?: DiffConfig; from_skill_run_id?: string; status?: "active" | "paused" | "draft";
+  only_if_changed?: boolean; diff_config?: DiffConfig; from_skill_run_id?: string; status?: "active" | "paused" | "draft"; decision_id?: string | null;
 };
 
 export async function agentFromBody(body: AgentBody, workspaceId = DEFAULT_WORKSPACE_ID): Promise<{ agent: Omit<AgentRow, "id" | "created_at" | "last_run_at">; notes: string[] } | { error: string }> {
@@ -45,10 +45,11 @@ export async function agentFromBody(body: AgentBody, workspaceId = DEFAULT_WORKS
     agent: {
       workspace_id: workspaceId,
       user_id: null,
-      name: String(base.name ?? `Weekly /${skill}`).slice(0, 120),
+      name: String(base.name ?? `Weekly ${def.title.toLowerCase()}`).slice(0, 120),
       skill,
       params,
       from_skill_run_id: base.from_skill_run_id ?? null,
+      decision_id: body.decision_id && /^[0-9a-f-]{36}$/.test(body.decision_id) ? body.decision_id : null,
       schedule_cron: cron,
       schedule_tz: tz,
       schedule_human: base.schedule?.human ?? humanize(cron, tz),

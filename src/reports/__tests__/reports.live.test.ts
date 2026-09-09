@@ -17,7 +17,7 @@ d("reports (live)", () => {
     expect(result.status).toBe("ok");
     const { report, sections, markdown } = await createReport({ workspaceId: WS, result, diff: null, source: "ask" });
     created.push(report.id);
-    expect(report.title).toMatch(/^\/compare · /);
+    expect(report.title).toMatch(/^compare · /);
     expect(sections.headline.length).toBeGreaterThan(20);
     if (!process.env.ANTHROPIC_API_KEY) expect(sections.generated_by).toBe("fallback");
     expect(report.blocks.rows.length).toBeGreaterThan(0);

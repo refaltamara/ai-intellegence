@@ -31,7 +31,7 @@ function cell(k: string, v: unknown): ReactNode {
   return String(v);
 }
 
-export function ResultCard({ tool, evidence, onOpenEvidence }: { tool: ToolCallRecord; evidence: Record<string, Evidence>; onOpenEvidence?: (ids: string[]) => void }) {
+export function ResultCard({ tool, evidence, onOpenEvidence, decisionId = null }: { tool: ToolCallRecord; evidence: Record<string, Evidence>; onOpenEvidence?: (ids: string[]) => void; decisionId?: string | null }) {
   const [showAll, setShowAll] = useState(false);
   const rows = tool.rows ?? [];
   const cols = columns(rows);
@@ -41,7 +41,7 @@ export function ResultCard({ tool, evidence, onOpenEvidence }: { tool: ToolCallR
   const visible = showAll ? rows : rows.slice(0, MAX_ROWS);
   const numeric = (k: string) => rows.some((r) => typeof r[k] === "number");
 
-  if (tool.name === "create_agent_draft") return <DraftCard draft={tool.draft as Record<string, unknown>} />;
+  if (tool.name === "create_agent_draft") return <DraftCard draft={tool.draft as Record<string, unknown>} decisionId={decisionId} />;
   return (
     <div className="card">
       <h4>
@@ -76,20 +76,20 @@ export function ResultCard({ tool, evidence, onOpenEvidence }: { tool: ToolCallR
   );
 }
 
-export function DraftCard({ draft }: { draft: Record<string, unknown> }) {
+export function DraftCard({ draft, decisionId = null }: { draft: Record<string, unknown>; decisionId?: string | null }) {
   const [state, setState] = useState<{ busy: boolean; msg: string; done: boolean }>({ busy: false, msg: "", done: false });
   if (!draft) return null;
   const schedule = (draft.schedule ?? {}) as { human?: string; cron?: string; tz?: string };
   const delivery = (draft.delivery ?? {}) as { channels?: string[]; email?: string };
   async function create() {
     setState({ busy: true, msg: "", done: false });
-    const r = await fetch("/api/agents", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(draft) });
+    const r = await fetch("/api/agents", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...draft, decision_id: decisionId }) });
     const j = await r.json();
     setState({ busy: false, msg: j.error ? j.error : `Created "${j.agent.name}"`, done: !j.error });
   }
   return (
     <div className="draft">
-      <h4>Agent draft — here's how we read that. Create it as is, or edit it on the Agents page after creating.</h4>
+      <h4>Here's how I read that. Start watching as is, or edit it on the Watching page afterwards.</h4>
       <div className="field"><span>Name</span><b>{String(draft.name ?? "")}</b></div>
       <div className="field"><span>Skill</span><b><span className="slash">/</span>{String(draft.skill ?? "")}</b></div>
       <div className="field"><span>Schedule</span><b>{schedule.human ?? schedule.cron} · {schedule.tz}</b></div>
@@ -98,7 +98,7 @@ export function DraftCard({ draft }: { draft: Record<string, unknown> }) {
       <div className="field"><span>Only if changed</span><b>{draft.only_if_changed ? "yes" : "no"}</b></div>
       <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 10, alignItems: "center" }}>
         {state.msg && <span style={{ fontSize: 12, color: state.done ? "var(--green)" : "var(--red)" }}>{state.msg}</span>}
-        {state.done ? <Link className="btn sm" href="/agents">Open Agents</Link> : <button className="btn pri sm" disabled={state.busy} onClick={create}>{state.busy ? "Creating…" : "Create agent"}</button>}
+        {state.done ? <Link className="btn sm" href="/agents">Open Watching</Link> : <button className="btn pri sm" disabled={state.busy} onClick={create}>{state.busy ? "Starting…" : "Start watching"}</button>}
       </div>
     </div>
   );

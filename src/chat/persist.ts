@@ -2,7 +2,7 @@
 import { sql } from "../db/client";
 import type { Evidence } from "../skills/types";
 
-export type ConversationRow = { id: string; workspace_id: string; user_id: string | null; title: string | null; created_at: string; updated_at: string };
+export type ConversationRow = { id: string; workspace_id: string; user_id: string | null; decision_id: string | null; title: string | null; created_at: string; updated_at: string };
 export type MessageRow = {
   id: string;
   conversation_id: string;
@@ -45,8 +45,8 @@ export type ToolCallRecord = {
   draft?: unknown;
 };
 
-export async function createConversation(workspaceId: string, title: string, userId: string | null): Promise<ConversationRow> {
-  const rows = (await sql.query("insert into conversations (workspace_id, user_id, title) values ($1, $2, $3) returning *", [workspaceId, userId, title.slice(0, 120)])) as ConversationRow[];
+export async function createConversation(workspaceId: string, title: string, userId: string | null, decisionId: string | null = null): Promise<ConversationRow> {
+  const rows = (await sql.query("insert into conversations (workspace_id, user_id, title, decision_id) values ($1, $2, $3, $4) returning *", [workspaceId, userId, title.slice(0, 120), decisionId])) as ConversationRow[];
   return rows[0];
 }
 

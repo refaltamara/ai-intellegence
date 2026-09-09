@@ -135,3 +135,12 @@ Followers 0 or null → tier null, excluded from per-1k metrics. Discovery keeps
 - Client brand: `workspaces.client_brand_id`, default none; the owner sets it on the Data page (`PATCH /api/workspace`), which also flips `brands.is_client` and drops the cached prompt. The sidebar shows "On the side of {brand}". With no client, the prompt asks once which brand "us" means.
 - Typography tightened: 14px answers and bullets, 22px hero, quiet grey user bubbles (from the v3 prototype), 28px avatar.
 
+## Partner experience, step 2: Decisions, the brief, Today (9 Sep 2026)
+
+- **Decisions** are the unit work attaches to (`decisions`, `pins`, and `decision_id` on conversations, agents and reports; migration 0005). Every existing conversation was backfilled into its own decision named from its title. A new thread from Today opens a new decision named from the first message; inside a decision, new threads join it. Threads stay private to their author; the decision, its pins and its watchers are shared.
+- **Client on the decision.** `decisions.client_brand_id` overrides the workspace client for that decision's threads; the model is told in an uncached system block appended per turn, together with the decision name, status and pinned summaries.
+- **The brief is keyed to the data**, not the calendar: `briefs.data_key` = newest post + last finished load. `ensureBrief` writes a new one when the key moves, on demand (at most once an hour), or from the daily cron at 06:00 WIB (`/api/cron/brief`). It runs compare (client first, then the week's busiest brands, vs the prior week), waves and breakout over the last seven days of data, gathers what the watchers found, and asks the model for headline, body, one offer and up to two follow-ups through `write_brief`. Deterministic fallback without the model. A brief never carries a number without an evidence chip unless it is quiet.
+- **Today** replaces Ask at `/`: brief hero, "Or ask me something", open decisions, what the watchers noticed this week. Old `/?c=` links redirect into the thread's decision. The thread lives at `/d/[id]?c=`; `?send=` starts a thread with its first message already sent (how the offer and follow-up chips work).
+- Sidebar: Today, Decisions, Watching (formerly Agents), Reports, Data, with open decisions listed below. "Skills" left the navigation; `/skills` and `/skills/discovery` stay reachable from result cards until step 3 folds discovery into the pane.
+- "Pin to decision" sits in the answer's action row; pins are persisted skill runs and appear in the decision header.
+

@@ -1,27 +1,37 @@
-import { Ask } from "@/ui/Ask";
+/** Today (PRD-v2 §7): the brief first. Old /?c= links redirect into the thread's decision. */
+import { redirect } from "next/navigation";
+import { Today } from "@/ui/Today";
 import { DEFAULT_WORKSPACE_ID } from "@/config/thresholds";
-import { sql } from "@/db/client";
-import { getConversation, listMessages } from "@/chat/persist";
-import { workspaceStats } from "@/ui/stats";
 import { currentSession } from "@/auth/current";
+import { getConversation } from "@/chat/persist";
+import { dataKey } from "@/brief/generate";
+import { latestBrief, markSeen, type BriefRow } from "@/brief/store";
+import { listDecisions } from "@/decisions/store";
+import { sql } from "@/db/client";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 120;
 
-export default async function AskPage({ searchParams }: { searchParams: Promise<{ c?: string; skill?: string; q?: string }> }) {
+export default async function TodayPage({ searchParams }: { searchParams: Promise<{ c?: string }> }) {
   const sp = await searchParams;
-  let conversation: string | null = null;
-  let messages: Awaited<ReturnType<typeof listMessages>> = [];
+  const session = await currentSession();
   if (sp.c && /^[0-9a-f-]{36}$/.test(sp.c)) {
-    const session = await currentSession();
     const c = await getConversation(sp.c, DEFAULT_WORKSPACE_ID, session?.uid ?? null);
-    if (c) {
-      conversation = c.id;
-      messages = await listMessages(c.id);
-    }
+    if (c?.decision_id) redirect(`/d/${c.decision_id}?c=${c.id}`);
   }
-  const [s, client] = await Promise.all([workspaceStats(), clientBrandName()]);
-  const prefill = sp.q ?? undefined;
-  return <Ask key={conversation ?? "new"} initialConversation={conversation} initialMessages={messages} prefill={prefill} stats={{ brands: s.brands, platforms: s.platforms, months: s.months, freshness: s.freshness }} clientName={client} />;
+  // Render at once with the brief we have; if the data has moved since it was written,
+  // the page asks for a new one in the background rather than blocking on three analyses.
+  const [latest, key, decisions, client] = await Promise.all([
+    latestBrief(DEFAULT_WORKSPACE_ID).catch(() => null),
+    dataKey(DEFAULT_WORKSPACE_ID).catch(() => ""),
+    listDecisions(DEFAULT_WORKSPACE_ID, "open"),
+    clientBrandName(),
+  ]);
+  const brief: BriefRow | null = latest;
+  const stale = !brief || brief.data_key !== key;
+  if (brief && !brief.seen_at) await markSeen(brief.id).catch(() => undefined);
+  const dateLine = new Date().toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", timeZone: "Asia/Jakarta" });
+  return <Today brief={brief?.content ?? null} evidence={brief?.evidence ?? []} generatedAt={brief?.generated_at ?? null} stale={stale} decisions={decisions.slice(0, 8)} clientName={client} dateLine={dateLine} canRefresh={!!session} />;
 }
 
 async function clientBrandName(): Promise<string | null> {
