@@ -35,7 +35,7 @@ export function ResultCard({ tool, evidence, onOpenEvidence }: { tool: ToolCallR
   const [showAll, setShowAll] = useState(false);
   const rows = tool.rows ?? [];
   const cols = columns(rows);
-  const title = tool.skill ? `/${tool.skill}` : tool.name === "query_metrics" ? "query" : tool.name;
+  const title = tool.title ?? (tool.name === "query_metrics" ? "The numbers" : tool.skill ?? "Analysis");
   const meta = (tool.meta ?? {}) as { matched?: number; returned?: number; caveats?: string[]; data_window?: { from: string; to: string } };
   const isDiscovery = tool.skill === "discovery" && tool.run_id;
   const visible = showAll ? rows : rows.slice(0, MAX_ROWS);
@@ -45,13 +45,13 @@ export function ResultCard({ tool, evidence, onOpenEvidence }: { tool: ToolCallR
   return (
     <div className="card">
       <h4>
-        <span><span className="slash">{title.startsWith("/") ? "/" : ""}</span>{title.replace(/^\//, "")}{meta.data_window ? ` · ${meta.data_window.from} to ${meta.data_window.to}` : ""}</span>
+        <span>{title}{meta.data_window ? ` · ${meta.data_window.from} to ${meta.data_window.to}` : ""}</span>
         <span>{tool.status === "ok" ? `matched ${fmtNum(meta.matched ?? rows.length)} · showing ${rows.length}` : tool.status}</span>
       </h4>
       {tool.status === "unavailable" && <div className="unavail">{tool.message}</div>}
       {tool.status === "error" && <div className="unavail" style={{ background: "var(--red-10)", color: "var(--red)" }}>{tool.message}</div>}
       {isDiscovery && (
-        <div className="body"><Link className="btn sm pri" href={`/skills/discovery?run=${tool.run_id}`}>Open the /discovery screen</Link> <span style={{ fontSize: 12, color: "var(--text-3)", marginLeft: 8 }}>parsed filters, full table, CSV export</span></div>
+        <div className="body"><Link className="btn sm pri" href={`/skills/discovery?run=${tool.run_id}`}>Open the full list</Link> <span style={{ fontSize: 12, color: "var(--text-3)", marginLeft: 8 }}>every row, filters, CSV export</span></div>
       )}
       {tool.chart ? <div className="chart"><Chart spec={tool.chart as ChartSpec} /></div> : null}
       {rows.length > 0 && (

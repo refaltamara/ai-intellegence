@@ -1,27 +1,42 @@
 "use client";
-/** The Ask screen (PRD §5.6): composer with slash menu, thread with streaming text, evidence chips, result cards, action row. */
+/**
+ * The Ask screen (PRD-v2 §2, §4): a conversation with CeMO. Composer docked at the
+ * bottom; thread above it with streaming text, activity lines, the one clarifying
+ * question as tappable options, evidence chips, result cards, counter blocks and
+ * follow-up chips. No slash menu: the person never types a command.
+ */
 import { useRouter } from "next/navigation";
 import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
 import type { ChatEvent } from "@/chat/loop";
 import type { MessageRow, ToolCallRecord } from "@/chat/persist";
+import { splitCounters, type Followup } from "../chat/stream";
 import type { Evidence } from "@/skills/types";
 import { EvidencePanel, ResultCard } from "./ResultCard";
 
-export type SkillMeta = { name: string; layer: string; title: string; description: string; first_release?: boolean; available: boolean };
 export type Attachment = { id: string; filename: string; bytes: number };
-type Msg = { id: string; role: "user" | "assistant"; text: string; tools: ToolCallRecord[]; evidence: Record<string, Evidence>; attachments?: Attachment[]; streaming?: boolean; status?: string; error?: string; miss?: number; timings?: { total_ms: number; model_ms: number; model_calls: number; tools_ms: number; tool_calls: number; setup_ms: number; effort: string } };
+type Ask = { question: string; options: { label: string; value: string }[]; why: string; answered?: string };
+type Msg = {
+  id: string; role: "user" | "assistant"; text: string; tools: ToolCallRecord[]; evidence: Record<string, Evidence>;
+  attachments?: Attachment[]; ask?: Ask; followups?: Followup[]; activity?: { text: string; done: boolean };
+  streaming?: boolean; status?: string; error?: string; miss?: number;
+  timings?: { total_ms: number; model_ms: number; model_calls: number; tools_ms: number; tool_calls: number; setup_ms: number; effort: string };
+};
 
+const SUGGESTED = ["What were competitors doing last week?", "Tell me Skintific's strategy in June", "Which campaigns ran in the last 90 days with 20 or more creators?", "Find 50 nano creators competitors used on TikTok in the last 90 days"];
 const MAX_FILES = 3;
 function fileSize(bytes: number): string {
   return bytes >= 1024 * 1024 ? `${(bytes / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`;
 }
 
-const SUGGESTED = ["What were competitors doing last week?", "Tell me Skintific's strategy in June", "Most performing content with affiliate tags last month", "Is any competitor running a launch wave right now?"];
-
-export function Ask({ skills, layers, initialConversation, initialMessages, prefill, stats }: { skills: SkillMeta[]; layers: Record<string, string>; initialConversation: string | null; initialMessages: MessageRow[]; prefill?: string; stats: { brands: number; platforms: number; months: number; freshness: string } }) {
+export function Ask({ initialConversation, initialMessages, prefill, stats, clientName }: { initialConversation: string | null; initialMessages: MessageRow[]; prefill?: string; stats: { brands: number; platforms: number; months: number; freshness: string }; clientName: string | null }) {
   const router = useRouter();
   const [conversationId, setConversationId] = useState<string | null>(initialConversation);
-  const [thread, setThread] = useState<Msg[]>(() => initialMessages.map((m) => ({ id: m.id, role: m.role, text: m.content_json?.text ?? "", tools: m.content_json?.tools ?? [], evidence: m.evidence_json ?? {}, attachments: m.content_json?.attachments, error: m.content_json?.error })));
+  const [thread, setThread] = useState<Msg[]>(() => {
+    const out: Msg[] = initialMessages.map((m) => ({ id: m.id, role: m.role, text: m.content_json?.text ?? "", tools: m.content_json?.tools ?? [], evidence: m.evidence_json ?? {}, attachments: m.content_json?.attachments, ask: m.content_json?.ask ? { question: m.content_json.ask.question, options: m.content_json.ask.options, why: m.content_json.ask.why } : undefined, followups: m.content_json?.followups, error: m.content_json?.error }));
+    // a question that already has a reply after it is answered
+    for (let i = 0; i < out.length - 1; i++) if (out[i].ask && out[i + 1].role === "user") out[i].ask!.answered = out[i + 1].text;
+    return out;
+  });
   const [text, setText] = useState(prefill ?? "");
   const [busy, setBusy] = useState(false);
   const [open, setOpen] = useState<Record<string, string[]>>({});
@@ -34,9 +49,6 @@ export function Ask({ skills, layers, initialConversation, initialMessages, pref
   const bottomRef = useRef<HTMLDivElement>(null);
   useEffect(() => { if (prefill) taRef.current?.focus(); }, [prefill]);
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" }); }, [thread.length, busy]);
-
-  const slashQuery = text.startsWith("/") && !text.includes(" ") ? text.slice(1).toLowerCase() : null;
-  const slashItems = slashQuery != null ? skills.filter((s) => s.name.startsWith(slashQuery)) : [];
 
   function showToast(m: string) { setToast(m); setTimeout(() => setToast(""), 3200); }
 
@@ -65,7 +77,7 @@ export function Ask({ skills, layers, initialConversation, initialMessages, pref
     void fetch(`/api/uploads?id=${id}`, { method: "DELETE" });
   }
 
-  async function send(message: string) {
+  async function send(message: string, followup?: Followup) {
     const q = message.trim();
     if (!q || busy || uploading > 0) return;
     const sending = files;
@@ -74,15 +86,20 @@ export function Ask({ skills, layers, initialConversation, initialMessages, pref
     setBusy(true);
     const userMsg: Msg = { id: `u${Date.now()}`, role: "user", text: q, tools: [], evidence: {}, attachments: sending.length ? sending : undefined };
     const aid = `a${Date.now()}`;
-    setThread((t) => [...t, userMsg, { id: aid, role: "assistant", text: "", tools: [], evidence: {}, streaming: true, status: "Thinking…" }]);
+    setThread((t) => {
+      // answering the open question closes it
+      const last = t[t.length - 1];
+      const closed = last?.ask && !last.ask.answered ? t.map((m, i) => (i === t.length - 1 ? { ...m, ask: { ...m.ask!, answered: q } } : m)) : t;
+      return [...closed, userMsg, { id: aid, role: "assistant", text: "", tools: [], evidence: {}, streaming: true, status: "Thinking…" }];
+    });
     const update = (fn: (m: Msg) => Msg) => setThread((t) => t.map((m) => (m.id === aid ? fn(m) : m)));
     try {
-      const res = await fetch("/api/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message: q, conversation_id: conversationId, attachment_ids: sending.map((f) => f.id) }) });
+      const body = { message: q, conversation_id: conversationId, attachment_ids: sending.map((f) => f.id), ...(followup ? { followup: { label: followup.label, skill: followup.skill, params: followup.params } } : {}) };
+      const res = await fetch("/api/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
       if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
       const reader = res.body.getReader();
       const dec = new TextDecoder();
       let buf = "";
-      let discoveryRun: string | null = null;
       while (true) {
         const { value, done } = await reader.read();
         if (done) break;
@@ -96,17 +113,18 @@ export function Ask({ skills, layers, initialConversation, initialMessages, pref
           const e = JSON.parse(line.slice(6)) as ChatEvent;
           if (e.type === "conversation") { if (!conversationId) { setConversationId(e.id); window.history.replaceState(null, "", `/?c=${e.id}`); } }
           if (e.type === "text") update((m) => ({ ...m, text: m.text + e.text, status: undefined }));
-          if (e.type === "tool_start") update((m) => ({ ...m, status: `Running ${e.name === "run_skill" ? "/" + String((e.input as any)?.skill ?? "skill") : e.name}…` }));
+          if (e.type === "tool_start") update((m) => ({ ...m, status: undefined }));
+          if (e.type === "activity") update((m) => ({ ...m, activity: { text: e.text, done: e.done }, status: undefined }));
+          if (e.type === "ask") update((m) => ({ ...m, ask: { question: e.question, options: e.options, why: e.why }, status: undefined }));
+          if (e.type === "followups") update((m) => ({ ...m, followups: e.items }));
           if (e.type === "tool_result") {
             const ev = Object.fromEntries(e.evidence.map((x) => [x.id, x]));
             update((m) => ({ ...m, tools: [...m.tools, e.tool], evidence: { ...m.evidence, ...ev }, status: "Writing…" }));
-            if (e.tool.skill === "discovery" && e.tool.run_id && q.toLowerCase().startsWith("/discovery")) discoveryRun = e.tool.run_id;
           }
-          if (e.type === "done") update((m) => ({ ...m, id: e.message_id, evidence: { ...m.evidence, ...e.evidence }, streaming: false, status: undefined, miss: e.evidence_miss, timings: e.timings }));
+          if (e.type === "done") update((m) => ({ ...m, id: e.message_id, evidence: { ...m.evidence, ...e.evidence }, streaming: false, status: undefined, miss: e.evidence_miss, timings: e.timings, activity: m.activity ? { ...m.activity, done: true } : undefined }));
           if (e.type === "error") update((m) => ({ ...m, error: e.message, streaming: false, status: undefined }));
         }
       }
-      if (discoveryRun) router.push(`/skills/discovery?run=${discoveryRun}`);
     } catch (err) {
       update((m) => ({ ...m, error: (err as Error).message, streaming: false, status: undefined }));
     } finally {
@@ -116,13 +134,14 @@ export function Ask({ skills, layers, initialConversation, initialMessages, pref
   }
 
   const empty = thread.length === 0;
+  const lastAssistantId = [...thread].reverse().find((m) => m.role === "assistant")?.id;
   return (
     <section className="screen ask"
       onDragOver={(e) => { if (e.dataTransfer.types.includes("Files")) { e.preventDefault(); setDragging(true); } }}
       onDragLeave={(e) => { if (e.currentTarget === e.target) setDragging(false); }}
       onDrop={(e) => { if (e.dataTransfer.files?.length) { e.preventDefault(); setDragging(false); void upload(e.dataTransfer.files); } }}>
       <div className="topbar">
-        <div><h1>Ask</h1><span className="meta">Beauty · Indonesia</span></div>
+        <div><h1>Ask CeMO</h1><span className="meta">{clientName ? `On the side of ${clientName}` : "Beauty · Indonesia"}</span></div>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           <span className="pill live">Data through {stats.freshness}</span>
           <span className="pill">{stats.brands} brands · {stats.platforms} platforms · {stats.months} months</span>
@@ -134,9 +153,8 @@ export function Ask({ skills, layers, initialConversation, initialMessages, pref
           {empty && (
             <div className="hero">
               <h2>What's happening in Indonesian beauty?</h2>
-              <p>Every answer is built from the posts we collected across {stats.brands} brands on TikTok and Instagram. Nothing is guessed, and every number shows its evidence.</p>
+              <p>I've read every creator post about {stats.brands} brands on TikTok and Instagram. Ask me anything about creators, competitors or campaigns; every number I give you shows its evidence, and I'll tell you when the data disagrees with you.</p>
               <div className="chips">
-                <button className="skill" onClick={() => send("/discovery 50 nano creators competitors used on TikTok in the last 90 days")}>/discovery 50 nano creators competitors used on TikTok</button>
                 {SUGGESTED.map((s) => <button key={s} onClick={() => send(s)}>{s}</button>)}
               </div>
             </div>
@@ -152,20 +170,37 @@ export function Ask({ skills, layers, initialConversation, initialMessages, pref
                 </div>
               ) : (
                 <div className="msg-a" key={m.id}>
-                  <div className="who">F</div>
+                  <div className="who">C</div>
                   <div className="ans">
+                    {m.activity && (m.streaming || m.tools.length === 0) && (
+                      <div className={`activity ${m.activity.done ? "done" : ""}`}><span className="dot" />{m.activity.text}</div>
+                    )}
                     {m.tools.map((t) => (
                       <ResultCard key={t.id} tool={t} evidence={m.evidence} onOpenEvidence={(ids) => setOpen((o) => ({ ...o, [m.id]: ids }))} />
                     ))}
-                    {m.status && <div className="status">{m.status}</div>}
+                    {m.status && !m.activity && <div className="status">{m.status}</div>}
                     {m.text && <RichText text={m.text} onChip={(id) => setOpen((o) => ({ ...o, [m.id]: o[m.id]?.[0] === id && o[m.id].length === 1 ? [] : [id] }))} />}
+                    {m.ask && (
+                      <div className={`ask-card ${m.ask.answered ? "done" : ""}`}>
+                        <div className="q">{m.ask.question}</div>
+                        {m.ask.why && <div className="why">{m.ask.why}</div>}
+                        <div className="opts">
+                          {m.ask.options.map((o) => (
+                            <button key={o.value} className={m.ask!.answered === o.value || m.ask!.answered === o.label ? "picked" : ""} onClick={() => send(o.label)} disabled={busy}>{o.label}</button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                     {open[m.id]?.length ? <EvidencePanel ids={open[m.id]} evidence={m.evidence} title={`Evidence · ${open[m.id].join(", ")}`} /> : null}
                     {m.error && <div className="errbox">{m.error}</div>}
-                    {!m.streaming && !m.error && !m.text && m.tools.length === 0 && <div className="errbox">This answer was cut off before it finished (the server did not save a reply). Ask again in a new conversation.</div>}
-                    {!m.streaming && !m.error && m.text && (
+                    {!m.streaming && !m.error && !m.text && !m.ask && m.tools.length === 0 && <div className="errbox">This answer was cut off before it finished (the server did not save a reply). Ask again in a new conversation.</div>}
+                    {!m.streaming && m.followups?.length && m.id === lastAssistantId && !busy ? (
+                      <div className="follow">{m.followups.map((f) => <button key={f.label} onClick={() => send(f.prompt, f)}>{f.label}</button>)}</div>
+                    ) : null}
+                    {!m.streaming && !m.error && m.text && !m.ask && (
                       <div className="acts">
-                        <button className="btn sm" onClick={() => send("Get this every Monday")}>Get this every Monday</button>
-                        <button className="btn sm" disabled={!m.tools.some((t) => t.run_id)} title={m.tools.some((t) => t.run_id) ? "" : "No skill run in this answer"} onClick={async () => {
+                        <button className="btn sm" onClick={() => send("Watch this every Monday and only tell me when something changes")}>Watch this weekly</button>
+                        <button className="btn sm" disabled={!m.tools.some((t) => t.run_id)} title={m.tools.some((t) => t.run_id) ? "" : "Nothing to report on yet"} onClick={async () => {
                           const run = [...m.tools].reverse().find((t) => t.run_id);
                           if (!run) return;
                           showToast("Writing the report…");
@@ -174,9 +209,9 @@ export function Ask({ skills, layers, initialConversation, initialMessages, pref
                           if (j.error) { showToast(j.error); return; }
                           router.push(`/reports/${j.id}`);
                         }}>Turn into a report</button>
-                        <button className="btn sm" onClick={() => { navigator.clipboard?.writeText(m.text.replace(/<ev id="(ev_\d+)"><\/ev>/g, "[$1]")); showToast("Copied"); }}>Copy</button>
-                        {m.miss ? <span className="pill" title="citations the model made to evidence that does not exist were removed">evidence_miss {m.miss}</span> : null}
-                        {m.timings && <span className="pill" title={`setup ${m.timings.setup_ms} ms · effort ${m.timings.effort}`}>{(m.timings.total_ms / 1000).toFixed(1)}s · model {(m.timings.model_ms / 1000).toFixed(1)}s ×{m.timings.model_calls} · skills {(m.timings.tools_ms / 1000).toFixed(1)}s</span>}
+                        <button className="btn sm" onClick={() => { navigator.clipboard?.writeText(m.text.replace(/<ev id="(ev_\d+)"><\/ev>/g, "[$1]").replace(/<\/?counter>/g, "")); showToast("Copied"); }}>Copy</button>
+                        {m.miss ? <span className="pill" title="citations to evidence that does not exist were removed">evidence_miss {m.miss}</span> : null}
+                        {m.timings && <span className="pill" title={`setup ${m.timings.setup_ms} ms · effort ${m.timings.effort}`}>{(m.timings.total_ms / 1000).toFixed(1)}s</span>}
                       </div>
                     )}
                   </div>
@@ -202,33 +237,16 @@ export function Ask({ skills, layers, initialConversation, initialMessages, pref
                 {uploading > 0 && <span className="file busy">Uploading {uploading} file{uploading > 1 ? "s" : ""}…</span>}
               </div>
             )}
-            <textarea ref={taRef} value={text} placeholder="Ask anything, type / for a skill, or attach a brief…" onChange={(e) => setText(e.target.value)}
+            <textarea ref={taRef} value={text} placeholder="Ask, or tell me what you're deciding…" onChange={(e) => setText(e.target.value)}
               onPaste={(e) => { const fs = Array.from(e.clipboardData.files ?? []); if (fs.length) { e.preventDefault(); void upload(fs); } }}
               onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(text); } if (e.key === "Escape") setText(""); }} />
             <div className="row">
               <span className="tools">
                 <input ref={fileRef} type="file" accept="application/pdf" multiple hidden onChange={(e) => { if (e.target.files?.length) void upload(e.target.files); e.target.value = ""; }} />
                 <button className="attach" onClick={() => fileRef.current?.click()} disabled={files.length >= MAX_FILES} title={files.length >= MAX_FILES ? `Up to ${MAX_FILES} documents` : "Attach a PDF brief or deck"}>Attach PDF</button>
-                <span><kbd>/</kbd> for skills · Enter to send</span>
+                <span>Enter to send · Shift+Enter for a new line</span>
               </span>
               <button className="btn pri sm" disabled={busy || uploading > 0} onClick={() => send(text)}>{busy ? "Working…" : "Ask"}</button>
-            </div>
-            <div className={`slashmenu ${slashQuery != null ? "on" : ""}`}>
-              {slashItems.length === 0 && <div className="g">No skill matches "/{slashQuery}"</div>}
-              {Object.keys(layers).map((layer) => {
-                const items = slashItems.filter((s) => s.layer === layer);
-                if (!items.length) return null;
-                return (
-                  <Fragment key={layer}>
-                    <div className="g">{layers[layer]}</div>
-                    {items.map((s) => (
-                      <button key={s.name} onClick={() => { setText(`/${s.name} `); taRef.current?.focus(); }} className={s.available ? "" : "off"}>
-                        <b>/{s.name}</b><span>{s.description.split(". ")[0].replace(/\.$/, "")}.{s.available ? "" : " (unavailable in v1)"}</span>
-                      </button>
-                    ))}
-                  </Fragment>
-                );
-              })}
             </div>
           </div>
         </div>
@@ -257,15 +275,23 @@ export function textGroups(text: string): { list: boolean; lines: string[] }[] {
   return groups.filter((g) => g.lines.length);
 }
 
-/** Renders assistant text: paragraphs, "- " bullets, **bold**, and <ev id> chips. */
+/** Renders assistant text: paragraphs, "- " bullets, **bold**, <ev id> chips, and <counter> blocks. */
 export function RichText({ text, onChip }: { text: string; onChip?: (id: string) => void }) {
   return (
     <>
-      {textGroups(text).map((g, i) =>
-        g.list ? (
-          <ul key={i}>{g.lines.map((l, j) => <li key={j}>{inline(l, onChip)}</li>)}</ul>
+      {splitCounters(text).map((seg, si) =>
+        seg.kind === "counter" ? (
+          <div className="counter" key={si}>{textGroups(seg.text).map((g, i) => <Fragment key={i}>{g.lines.map((l, j) => <Fragment key={j}>{j > 0 && <br />}{inline(l, onChip)}</Fragment>)}</Fragment>)}</div>
         ) : (
-          <p key={i}>{g.lines.map((l, j) => <Fragment key={j}>{j > 0 && <br />}{inline(l, onChip)}</Fragment>)}</p>
+          <Fragment key={si}>
+            {textGroups(seg.text).map((g, i) =>
+              g.list ? (
+                <ul key={i}>{g.lines.map((l, j) => <li key={j}>{inline(l, onChip)}</li>)}</ul>
+              ) : (
+                <p key={i}>{g.lines.map((l, j) => <Fragment key={j}>{j > 0 && <br />}{inline(l, onChip)}</Fragment>)}</p>
+              ),
+            )}
+          </Fragment>
         ),
       )}
     </>

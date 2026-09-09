@@ -1,6 +1,7 @@
 /**
- * The three tools exposed to the model (PRD §5.2). run_skill's enum and
+ * The four tools exposed to the model (PRD §5.2, PRD-v2 §5.2). run_skill's enum and
  * description are generated from skills.registry.json at boot (CLAUDE.md rule 2).
+ * ask_user asks the one clarifying question; follow-ups ride in the answer text.
  */
 import type Anthropic from "@anthropic-ai/sdk";
 import { describeSkillsForTool, skillNames } from "../skills/registry";
@@ -30,11 +31,34 @@ const FILTER_SCHEMA = {
   additionalProperties: false,
 } as const;
 
+/** The one clarifying question, rendered as tappable options; the answer arrives as the next user turn. */
+export const ASK_USER: Anthropic.Tool = {
+  name: "ask_user",
+  description:
+    "Ask the person exactly one clarifying question before running an analysis, only when the answer would materially change the result and they have not already said. Give 2 to 4 short options. Never more than one question per turn. Never for cosmetic choices. After calling this, stop and wait; their next message is the answer.",
+  input_schema: {
+    type: "object",
+    properties: {
+      question: { type: "string", description: "One sentence, in the person's language" },
+      options: {
+        type: "array",
+        description: "2 to 4 options; label is what they see, value is what you receive",
+        items: { type: "object", properties: { label: { type: "string" }, value: { type: "string" } }, required: ["label", "value"], additionalProperties: false },
+      },
+      why: { type: "string", description: "One short clause shown in grey under the question, e.g. 'competitor overlap changes who ranks first'" },
+    },
+    required: ["question", "options", "why"],
+    additionalProperties: false,
+  },
+  // strict mode rejects minItems/maxItems; the 2–4 range is enforced server-side
+  strict: false,
+} as Anthropic.Tool;
+
 export function buildTools(): Anthropic.Tool[] {
   const runSkill: Anthropic.Tool = {
     name: "run_skill",
     description:
-      "Run one of Fair Intel's named analyses (skills) on the workspace's social listening database. Use this whenever the user's question maps to a skill, and always when they type a /slash command. Skills return real rows computed in the database plus an evidence list; you must cite evidence ids when you use their numbers. Params marked * are required; =value shows the default.\n" +
+      "Run one of CeMO's analyses on the workspace's social listening database. Use this whenever the person's question maps to an analysis. Each returns real rows computed in the database plus an evidence list; you must cite evidence ids when you use their numbers. The person never sees these names: never repeat them. Params marked * are required; =value shows the default.\n" +
       "Available skills and their parameters:\n" +
       describeSkillsForTool() +
       "\nWindows: {last_n_days} or {from,to} ISO dates; relative windows count back from the newest data. Brands accept slugs, handles or display names. If a skill returns status 'unavailable', tell the user which data layer is not loaded yet and offer the nearest available skill.",
@@ -106,5 +130,5 @@ export function buildTools(): Anthropic.Tool[] {
     strict: false, // same reason as run_skill; validated by agentFromBody
   } as Anthropic.Tool;
 
-  return [runSkill, queryMetrics, createAgentDraft];
+  return [runSkill, queryMetrics, createAgentDraft, ASK_USER];
 }

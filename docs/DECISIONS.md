@@ -127,3 +127,11 @@ Followers 0 or null → tier null, excluded from per-1k metrics. Discovery keeps
 - Documents ride on the current user turn with a cache breakpoint on the last one, so follow-up questions about the same brief are not re-charged for it.
 - Not supported: .pptx/.docx (export to PDF), and image-only scans are read as page images rather than text.
 
+## CeMO and the partner experience, step 1 (9 Sep 2026, Refal)
+
+- The product is now **CeMO** ("Your CMO", Creator Intelligence for Market Monitoring). Fair Intel remains the internal codename; repo, package and schema comments keep it.
+- PRD-v2 (docs/PRD_V2_PARTNER.md) is adopted with the v2.1 amendments listed at its top: client brand settable now on the workspace and later on the decision; brief keyed to loads; sounds deferred; no pg-boss; no strict tools; follow-ups as a trailing block; leak filter strips slashed names only; server computes pane deltas; lead-plus-bullets answer shape kept; no decision prompt before the first reply; /discovery folded into the pane in step 3.
+- Step 1 is live: the model never sees or says a skill name; the slash menu is gone; activity lines come from `activity` in skills.registry.json (`{creator_count}`, `{post_count}`, `{matched}`, `{n}`); result cards use the registry `title`; the analyst asks at most one clarifying question per turn via `ask_user` (the turn ends on the question, the next user message is its tool_result); it may push back once per answer in a `<counter>` block rendered amber; it ends substantive answers with 2–3 follow-up chips carrying skill and params; `mechanism_leak` is logged per message.
+- Client brand: `workspaces.client_brand_id`, default none; the owner sets it on the Data page (`PATCH /api/workspace`), which also flips `brands.is_client` and drops the cached prompt. The sidebar shows "On the side of {brand}". With no client, the prompt asks once which brand "us" means.
+- Typography tightened: 14px answers and bullets, 22px hero, quiet grey user bubbles (from the v3 prototype), 28px avatar.
+
