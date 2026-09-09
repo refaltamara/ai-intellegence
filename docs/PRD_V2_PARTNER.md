@@ -16,7 +16,8 @@
 > - **/discovery is folded into the pane**, not deleted: its filter controls become the table object's filter bar (step 3).
 > - **Build order** (agreed): (1) partner behaviours with no layout change — hide the mechanism, activity lines, counter, follow-ups, `ask_user`, the CeMO prompt, client-brand setting, tighter typography; (2) Decisions with client-on-decision, brief keyed to loads, Today; (3) the evidence pane with discovery folded in, two-way actions, export; (4) brand pages minus sounds.
 > - **Step 1 shipped 9 Sep 2026.** The Skills page and the /discovery screen remain reachable until step 3 absorbs them.
-> - **Step 2 shipped 9 Sep 2026:** Decisions with client-on-decision, pins, the load-keyed brief with a daily cron, and Today at `/`. Sidebar is Today · Decisions · Watching · Reports · Data.
+> - **Step 2 shipped 9 Sep 2026:** Decisions with client-on-decision, pins, the load-keyed brief with a daily cron.
+> - **Amended after use (9 Sep):** Chats is the default at `/` and stays free-form and unattached; Decisions at `/decisions` carries the brief, the watchers' findings and the list ("what you want to see, to kick off your thinking"). Today is removed. Skills stays in the sidebar as the library; the no-skill-names rule applies inside conversations only. Result objects collapse behind a strip in the thread (the pane replaces this in step 3), charts need three or more points, caveats sit behind "About this data".
 
 ---
 

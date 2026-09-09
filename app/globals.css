@@ -447,4 +447,10 @@ tr.me .bar i{background:var(--blue)}
 .threads a:hover{color:var(--blue)}
 .brief.writing{padding:28px 26px}
 .brief.stale{opacity:.7}
+/* result cards collapse to a strip; the answer comes first */
+.card.closed>h4{border-bottom:0}
+.card>h4 .tog{margin-left:10px;color:var(--blue);font-weight:600;font-size:12px}
+.card>h4:hover .tog{text-decoration:underline}
+.card .about{padding:8px 16px 12px}
+.card .about .caveats{margin-top:8px}
 

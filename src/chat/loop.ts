@@ -19,7 +19,7 @@ import { anthropicClient, chatEffort, describeModelError } from "./client";
 import { renumberEvidence } from "./evidence";
 import { scrubMechanism } from "./leak";
 import { AnswerStream, usableFollowups, type Followup } from "./stream";
-import { createDecision, decisionContext, decisionNameFrom } from "../decisions/store";
+import { decisionContext } from "../decisions/store";
 import { claimAttachments, conversationAttachments, type AttachmentRow } from "./attachments";
 import { addMessage, createConversation, getConversation, listMessages, type ToolCallRecord } from "./persist";
 import { buildTools } from "./tools";
@@ -127,11 +127,8 @@ export async function runChatTurn(input: ChatTurnInput, emit: (e: ChatEvent) => 
     return;
   }
   let conversation = input.conversationId ? await getConversation(input.conversationId, workspaceId, input.userId ?? null) : null;
-  if (!conversation) {
-    const title = userText.replace(/\s+/g, " ").slice(0, 80);
-    const decisionId = input.decisionId ?? (await createDecision(workspaceId, input.userId ?? null, decisionNameFrom(userText))).id;
-    conversation = await createConversation(workspaceId, title, input.userId ?? null, decisionId);
-  }
+  // Chats are free-form and stay unattached; only a thread started inside a decision joins it.
+  if (!conversation) conversation = await createConversation(workspaceId, userText.replace(/\s+/g, " ").slice(0, 80), input.userId ?? null, input.decisionId ?? null);
   await emit({ type: "conversation", id: conversation.id, title: conversation.title });
   // Bind any freshly uploaded documents to this conversation before the turn runs.
   const claimed = await claimAttachments(input.attachmentIds ?? [], conversation.id, workspaceId, input.userId ?? null).catch(() => [] as AttachmentRow[]);

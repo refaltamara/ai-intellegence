@@ -144,3 +144,11 @@ Followers 0 or null → tier null, excluded from per-1k metrics. Discovery keeps
 - Sidebar: Today, Decisions, Watching (formerly Agents), Reports, Data, with open decisions listed below. "Skills" left the navigation; `/skills` and `/skills/discovery` stay reachable from result cards until step 3 folds discovery into the pane.
 - "Pin to decision" sits in the answer's action row; pins are persisted skill runs and appear in the decision header.
 
+## Chats first; Decisions is the proactive side (9 Sep 2026, Refal's feedback on step 2)
+
+- **Chats is the default screen** at `/`: free-form, unattached to a decision. Decisions and chats have different jobs — a chat is whatever you want to ask; a decision is where CeMO brings you analysis to kick off your thinking. Today is gone; the brief, what the watchers noticed, and the decisions list live at `/decisions`. A thread started inside a decision belongs to it; a chat started from Chats does not, and no decision is created on its behalf.
+- The 49 decisions auto-created from old chats during the step-2 backfill were folded back into plain chats (decisions with one thread, nothing pinned, nothing watching, whose thread predates them).
+- **Skills stays in the sidebar** as the library of what CeMO can do. The rule is narrower than PRD-v2 §3: no analysis names inside a conversation, not no analysis names anywhere.
+- **The answer comes first.** In the thread the text renders above result cards; cards collapse to a one-line strip (title, window, matched) that expands on click; charts render only with three or more points; caveats sit behind "About this data" instead of repeating under every card.
+- Prompt rules 4, 4b, 4c: never narrate defaults or "the system"; when returning a list, one line states the route (platform, window, tiers, exclusions) before the findings; limitations only when one changes the answer.
+

@@ -148,7 +148,7 @@ export function Ask({ initialConversation, initialMessages, prefill, stats, clie
       onDrop={(e) => { if (e.dataTransfer.files?.length) { e.preventDefault(); setDragging(false); void upload(e.dataTransfer.files); } }}>
       {topbar && (
         <div className="topbar">
-          <div><h1>Ask CeMO</h1><span className="meta">{clientName ? `On the side of ${clientName}` : "Beauty · Indonesia"}</span></div>
+          <div><h1>Chats</h1><span className="meta">{clientName ? `On the side of ${clientName}` : "Beauty · Indonesia"}</span></div>
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
             <span className="pill live">Data through {stats.freshness}</span>
             <span className="pill">{stats.brands} brands · {stats.platforms} platforms · {stats.months} months</span>
@@ -183,11 +183,11 @@ export function Ask({ initialConversation, initialMessages, prefill, stats, clie
                     {m.activity && (m.streaming || m.tools.length === 0) && (
                       <div className={`activity ${m.activity.done ? "done" : ""}`}><span className="dot" />{m.activity.text}</div>
                     )}
+                    {m.status && !m.activity && <div className="status">{m.status}</div>}
+                    {m.text && <RichText text={m.text} onChip={(id) => setOpen((o) => ({ ...o, [m.id]: o[m.id]?.[0] === id && o[m.id].length === 1 ? [] : [id] }))} />}
                     {m.tools.map((t) => (
                       <ResultCard key={t.id} tool={t} evidence={m.evidence} decisionId={decisionId} onOpenEvidence={(ids) => setOpen((o) => ({ ...o, [m.id]: ids }))} />
                     ))}
-                    {m.status && !m.activity && <div className="status">{m.status}</div>}
-                    {m.text && <RichText text={m.text} onChip={(id) => setOpen((o) => ({ ...o, [m.id]: o[m.id]?.[0] === id && o[m.id].length === 1 ? [] : [id] }))} />}
                     {m.ask && (
                       <div className={`ask-card ${m.ask.answered ? "done" : ""}`}>
                         <div className="q">{m.ask.question}</div>
