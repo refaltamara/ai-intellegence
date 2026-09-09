@@ -1,6 +1,6 @@
 # Fair Intel
 
-AI marketing intelligence for Indonesian beauty brands, built on Fair's social listening data. Chat asks questions; Claude answers only through skills that query the database, and every number carries evidence.
+**CeMO** ("Your CMO", Creator Intelligence for Market Monitoring; codename Fair Intel) — AI marketing intelligence for Indonesian beauty brands, built on Fair's social listening data. Chat asks questions; Claude answers only through skills that query the database, and every number carries evidence.
 
 Start with `CLAUDE.md`, then `docs/DECISIONS.md`, `docs/DATA_NOTES.md`, `docs/PRD.md`.
 

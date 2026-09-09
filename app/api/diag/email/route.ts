@@ -18,9 +18,9 @@ export async function POST() {
   const from = process.env.EMAIL_FROM ?? null;
   const r = await sendEmail({
     to: session.email,
-    subject: "Fair Intel test email",
-    text: `This is a test message from Fair Intel (${appUrl()}). Agent reports will arrive from this sender.`,
-    html: `<p>This is a test message from <b>Fair Intel</b> (<a href="${appUrl()}">${appUrl()}</a>).</p><p>Agent reports will arrive from this sender.</p>`,
+    subject: "CeMO test email",
+    text: `This is a test message from CeMO (${appUrl()}). Reports from what you are watching will arrive from this sender.`,
+    html: `<p>This is a test message from <b>CeMO</b> (<a href="${appUrl()}">${appUrl()}</a>).</p><p>Reports from what you are watching will arrive from this sender.</p>`,
   });
   return Response.json({ ok: r.ok, to: session.email, from, configured: !!(process.env.RESEND_API_KEY && from), duration_ms: Date.now() - started, ...(r.ok ? { id: r.id } : { error: r.error }) }, { status: r.ok ? 200 : 502 });
 }

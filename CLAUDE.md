@@ -13,3 +13,12 @@ Rules:
 8. Stack: Next.js App Router + TypeScript, Drizzle, Neon Postgres, Vercel (Vercel Cron for agents), Resend email, Python/pandas ETL. Do not add Railway, pg-boss, or Redis.
 9. Use `pnpm skill run <name>` to verify skills before touching UI. Verification: pnpm test, pnpm smoke, pnpm db:stats.
 10. Do not integrate Fair Space or Fair Hub. Never commit secrets; .env is gitignored.
+
+## Partner experience (docs/PRD_V2_PARTNER.md, v2.1 amendments)
+- The product and persona are CeMO ("Your CMO", Creator Intelligence for Market Monitoring). "Fair Intel" is the codename.
+- Skills are internal. Never render a skill name, slash command, tool name, or "Running…" in the UI or in model text. The server strips slashed skill names and logs mechanism_leak for anything else.
+- Activity strings and result-card titles come from skills.registry.json (`activity`, `title`), templated from workspace counts, params_resolved and SkillResult.meta.
+- The model asks at most one clarifying question per turn (ask_user; the turn ends on it and the next user message is its tool_result), may emit one <counter> block per answer (rendered amber), and ends substantive answers with a <followups> block that the server parses, validates against available analyses, and strips. Follow-ups are never a tool call.
+- Client brand is workspaces.client_brand_id (owner sets it on the Data page; default none) until Decisions ship, then decisions.client_brand_id.
+- Coming in order: Decisions and the load-keyed brief (Today), the evidence pane with /discovery folded in, brand pages without sounds. No pg-boss; no strict tools.
+

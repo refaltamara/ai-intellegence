@@ -7,7 +7,18 @@ export type MessageRow = {
   id: string;
   conversation_id: string;
   role: "user" | "assistant";
-  content_json: { text: string; tools?: ToolCallRecord[]; draft?: unknown; error?: string; attachments?: { id: string; filename: string; bytes: number }[] };
+  content_json: {
+    text: string;
+    tools?: ToolCallRecord[];
+    draft?: unknown;
+    error?: string;
+    attachments?: { id: string; filename: string; bytes: number }[];
+    /** the one clarifying question this assistant turn ended on; answered by the next user turn */
+    ask?: { tool_use_id: string; question: string; options: { label: string; value: string }[]; why: string };
+    followups?: { label: string; prompt: string; skill: string; params?: Record<string, unknown> }[];
+    has_counter?: boolean;
+    mechanism_leak?: string[];
+  };
   evidence_json: Record<string, Evidence> | null;
   skill_run_ids: string[] | null;
   tokens_in: number | null;
@@ -19,6 +30,8 @@ export type ToolCallRecord = {
   name: string;
   input: unknown;
   skill?: string;
+  /** plain-language title for the result card; never the skill name */
+  title?: string;
   status: string;
   message?: string;
   run_id?: string;

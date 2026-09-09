@@ -1,6 +1,6 @@
 /**
  * Loads skills.registry.json, the single source of truth for skills (CLAUDE.md rule 2).
- * The Skills page, the slash menu and the run_skill tool definition are all built from here.
+ * The run_skill tool definition, the activity lines and the Skills page are all built from here.
  */
 import registryJson from "../../skills.registry.json";
 
@@ -19,6 +19,8 @@ export type SkillDef = {
   requires: string[];
   platforms?: string[];
   gate?: { platforms_present?: string[] };
+  /** plain-language progress lines shown while the skill runs; templated with {creator_count} {post_count} {brand_count} {matched} {n} */
+  activity?: { start: string; steps: string[]; done: string };
   [k: string]: unknown;
 };
 

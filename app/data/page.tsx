@@ -3,18 +3,20 @@ import { workspaceStats } from "@/ui/stats";
 import { SkillDb } from "@/skills/db";
 import { loadContext } from "@/skills/params";
 import { fmtNum } from "@/ui/format";
+import { ClientBrand } from "@/ui/ClientBrand";
+import { currentSession } from "@/auth/current";
 
 export const dynamic = "force-dynamic";
 
 export default async function DataPage() {
-  const s = await workspaceStats();
-  const ctx = await loadContext(new SkillDb());
+  const [s, ctx, session] = await Promise.all([workspaceStats(), loadContext(new SkillDb()), currentSession()]);
   const pct = (a: number, b: number) => Math.round((a / b) * 100);
   return (
     <section className="screen">
       <div className="topbar"><div><h1>Data</h1><span className="meta">What every answer is built from</span></div><span className="pill live">Last load {s.last_load ?? "–"} WIB · data through {s.freshness}</span></div>
       <div className="wrap wide">
         <div className="cats"><span className="on">Beauty · Indonesia</span></div>
+        <ClientBrand brands={ctx.brands.map((b) => ({ id: b.id, name: b.name }))} current={ctx.clientBrandId} canEdit={session?.role === "owner"} />
         <div className="stats">
           <div className="stat"><b>{s.brands}</b><span>brands tracked · {ctx.brands.filter((b) => b.tiktok_handle && b.instagram_handle).length} on both platforms</span></div>
           <div className="stat"><b>{fmtNum(s.creators)}</b><span>creators with brand history and performance</span></div>
@@ -23,7 +25,7 @@ export default async function DataPage() {
         </div>
         <div className="layers">
           {s.per_platform.map((p) => (
-            <div className="layer" key={p.platform}><h4>{p.platform === "tiktok" ? "TikTok" : "Instagram"}</h4><p>{fmtNum(p.posts)} posts from {fmtNum(p.creators)} creators, {p.first_month} to {p.last_month}. {p.platform === "tiktok" ? "Keyword capture plus owned accounts; shoppable-link flag recorded." : "Tag-based capture; no owned posts, no shares or saves."}</p><small>Powers {registry.skills.filter((k) => !k.platforms || k.platforms.includes(p.platform)).filter((k) => k.phase === 1).map((k) => "/" + k.name).join(", ")}</small></div>
+            <div className="layer" key={p.platform}><h4>{p.platform === "tiktok" ? "TikTok" : "Instagram"}</h4><p>{fmtNum(p.posts)} posts from {fmtNum(p.creators)} creators, {p.first_month} to {p.last_month}. {p.platform === "tiktok" ? "Keyword capture plus owned accounts; shoppable-link flag recorded." : "Tag-based capture; no owned posts, no shares or saves."}</p><small>Powers {registry.skills.filter((k) => !k.platforms || k.platforms.includes(p.platform)).filter((k) => k.phase === 1).length} analyses</small></div>
           ))}
           <div className="layer"><h4>Comments, snapshots, Threads &amp; X</h4><p>Not loaded. Comment-layer, audience, velocity, forecast and narrative skills report themselves as unavailable until these land.</p><small>Phase 1b and Phase 2</small></div>
         </div>

@@ -15,7 +15,7 @@ export type ReportSections = { headline: string; worth_acting_on: string | null;
 
 const TOOL: Anthropic.Tool = {
   name: "write_report",
-  description: "Write the two prose sections of a Fair Intel report from the analysis result provided. headline: the answer in one or two sentences, then a bulleted list of three to six supporting points, one line each, every bullet starting with a bold label and an em dash, e.g. \"- **Share of voice** — Wardah 7.48% vs Skintific 3.38% [ev_01]\". Cite evidence ids inline like [ev_03]. worth_acting_on: optional, 1 to 2 sentences on what a marketer should do, or null when nothing is actionable. Use markdown bold and '-' bullets; no markdown headers, and no numbers that are not in the result.",
+  description: "Write the two prose sections of a CeMO report from the analysis result provided. headline: the answer in one or two sentences, then a bulleted list of three to six supporting points, one line each, every bullet starting with a bold label and an em dash, e.g. \"- **Share of voice** — Wardah 7.48% vs Skintific 3.38% [ev_01]\". Cite evidence ids inline like [ev_03]. worth_acting_on: optional, 1 to 2 sentences on what a marketer should do, or null when nothing is actionable. Use markdown bold and '-' bullets; no markdown headers, and no numbers that are not in the result.",
   input_schema: {
     type: "object",
     properties: {
@@ -60,7 +60,7 @@ export async function generateSections(result: SkillResult, diff: Diff | null, w
       model: modelId(),
       max_tokens: 700,
       output_config: { effort: "medium" },
-      system: [{ type: "text", text: system + "\n\nYou are writing a report, not chatting: call write_report exactly once with the two sections and nothing else.", cache_control: { type: "ephemeral" } }],
+      system: [{ type: "text", text: system + "\n\nYou are writing a report, not chatting: call write_report exactly once with the two sections and nothing else. No <followups> block in a report; a <counter> block is welcome when the data argues against the obvious reading.", cache_control: { type: "ephemeral" } }],
       tools: [TOOL],
       tool_choice: { type: "auto" },
       messages: [{ role: "user", content: `Write the report sections for this result:\n${JSON.stringify(payload)}` }],

@@ -20,7 +20,7 @@
     ]
   },
   {
-    "q": "/discovery 50 nano creators competitors used on TikTok, never used by us",
+    "q": "Find 50 nano creators competitors used on TikTok that have never posted for us",
     "expect_tool": [
       "discovery"
     ]

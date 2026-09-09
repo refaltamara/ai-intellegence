@@ -34,7 +34,7 @@ export async function runAgent(agent: AgentRow, opts: { reason?: "schedule" | "m
     const plainHeadline = sections.headline.replace(/<ev id="(ev_\d+)"><\/ev>/g, "[$1]");
     const html = renderHtml({ title, result, diff, appUrl: appUrl ? `${appUrl}/reports/${report.id}` : undefined, agentName: agent.name, headline: plainHeadline });
     if (should) {
-      delivered = await deliver(agent.delivery, { subject: `[Fair Intel] ${title}`, html, text: markdown });
+      delivered = await deliver(agent.delivery, { subject: `[CeMO] ${title}`, html, text: markdown });
       const failed = delivered.filter((d) => !d.ok && d.channel !== "in_app");
       deliveryError = failed.length ? failed.map((d) => `${d.channel}: ${d.detail}`).join("; ") : null;
       deliveredAt = delivered.some((d) => d.ok && d.channel !== "in_app") ? new Date().toISOString() : null;

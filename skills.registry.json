@@ -178,7 +178,15 @@
       "requires": [
         "posts",
         "creators"
-      ]
+      ],
+      "activity": {
+        "start": "Looking through {creator_count} creators",
+        "steps": [
+          "Checking who has posted for which brands",
+          "Pulling performance for the window"
+        ],
+        "done": "Matched {matched} creators"
+      }
     },
     {
       "name": "mercenaries",
@@ -251,7 +259,14 @@
       "requires": [
         "posts",
         "creators"
-      ]
+      ],
+      "activity": {
+        "start": "Checking who has worked for more than one brand",
+        "steps": [
+          "Counting brands per creator"
+        ],
+        "done": "{n} creators work across several brands"
+      }
     },
     {
       "name": "loyalists",
@@ -334,7 +349,14 @@
       "requires": [
         "posts",
         "creators"
-      ]
+      ],
+      "activity": {
+        "start": "Looking for creators who came back",
+        "steps": [
+          "Following creators month by month"
+        ],
+        "done": "{n} came back"
+      }
     },
     {
       "name": "affiliates",
@@ -437,7 +459,14 @@
       ],
       "platforms": [
         "tiktok"
-      ]
+      ],
+      "activity": {
+        "start": "Separating resellers from creators",
+        "steps": [
+          "Checking cart share per account"
+        ],
+        "done": "{n} look like affiliate accounts"
+      }
     },
     {
       "name": "breakout",
@@ -535,7 +564,14 @@
       "requires": [
         "posts",
         "creators"
-      ]
+      ],
+      "activity": {
+        "start": "Scanning small accounts for outsized reach",
+        "steps": [
+          "Comparing views with followers"
+        ],
+        "done": "{n} breakout posts"
+      }
     },
     {
       "name": "funnel-mix",
@@ -620,7 +656,14 @@
       "requires": [
         "posts",
         "creators"
-      ]
+      ],
+      "activity": {
+        "start": "Working out where reach and carts come from",
+        "steps": [
+          "Splitting posts by funnel stage"
+        ],
+        "done": "Done"
+      }
     },
     {
       "name": "overlap",
@@ -695,7 +738,14 @@
       "requires": [
         "posts",
         "creators"
-      ]
+      ],
+      "activity": {
+        "start": "Comparing creator rosters",
+        "steps": [
+          "Finding creators shared between brands"
+        ],
+        "done": "{n} brand pairs share creators"
+      }
     },
     {
       "name": "velocity",
@@ -773,7 +823,12 @@
       "requires": [
         "posts",
         "post_snapshots"
-      ]
+      ],
+      "activity": {
+        "start": "Checking what data is loaded",
+        "steps": [],
+        "done": "Not loaded yet"
+      }
     },
     {
       "name": "forecast",
@@ -848,7 +903,12 @@
       "requires": [
         "posts",
         "post_snapshots"
-      ]
+      ],
+      "activity": {
+        "start": "Checking what data is loaded",
+        "steps": [],
+        "done": "Not loaded yet"
+      }
     },
     {
       "name": "waves",
@@ -930,7 +990,14 @@
       "requires": [
         "posts",
         "creators"
-      ]
+      ],
+      "activity": {
+        "start": "Looking for sudden creator surges",
+        "steps": [
+          "Comparing this week with the previous eight"
+        ],
+        "done": "{n} surges"
+      }
     },
     {
       "name": "top-content",
@@ -1055,7 +1122,14 @@
       },
       "requires": [
         "posts"
-      ]
+      ],
+      "activity": {
+        "start": "Sorting {post_count} posts by performance",
+        "steps": [
+          "Applying your filters"
+        ],
+        "done": "Top {n} posts"
+      }
     },
     {
       "name": "compare",
@@ -1146,7 +1220,15 @@
         "positive_pct",
         "negative_pct",
         "top_topics"
-      ]
+      ],
+      "activity": {
+        "start": "Lining up the brands week by week",
+        "steps": [
+          "Adding up views, posts and creators",
+          "Comparing with the previous period"
+        ],
+        "done": "Done"
+      }
     },
     {
       "name": "launch",
@@ -1239,7 +1321,14 @@
       "phase2_columns": [
         "top_questions",
         "topics"
-      ]
+      ],
+      "activity": {
+        "start": "Reading the launch window",
+        "steps": [
+          "Following posts week by week"
+        ],
+        "done": "Done"
+      }
     },
     {
       "name": "brand-strategy",
@@ -1323,7 +1412,15 @@
       "requires": [
         "posts",
         "creators"
-      ]
+      ],
+      "activity": {
+        "start": "Reading a month of the brand's activity",
+        "steps": [
+          "Splitting owned from earned",
+          "Looking at formats and tiers"
+        ],
+        "done": "Done"
+      }
     },
     {
       "name": "hashtags",
@@ -1430,7 +1527,14 @@
       },
       "requires": [
         "posts"
-      ]
+      ],
+      "activity": {
+        "start": "Reading hashtags across {post_count} posts",
+        "steps": [
+          "Comparing with the previous period"
+        ],
+        "done": "{n} hashtags"
+      }
     },
     {
       "name": "campaigns",
@@ -1526,7 +1630,15 @@
       "requires": [
         "posts",
         "creators"
-      ]
+      ],
+      "activity": {
+        "start": "Looking for hashtags that cluster on one brand",
+        "steps": [
+          "Counting distinct creators per hashtag",
+          "Finding the peak week"
+        ],
+        "done": "{n} campaigns"
+      }
     },
     {
       "name": "themes",
@@ -1640,7 +1752,14 @@
       },
       "requires": [
         "posts"
-      ]
+      ],
+      "activity": {
+        "start": "Reading captions for what they claim",
+        "steps": [
+          "Matching themes against the category"
+        ],
+        "done": "{n} themes"
+      }
     },
     {
       "name": "products",
@@ -1744,7 +1863,14 @@
       },
       "requires": [
         "posts"
-      ]
+      ],
+      "activity": {
+        "start": "Reading tagged products",
+        "steps": [
+          "Counting posts and carts per product"
+        ],
+        "done": "{n} product lines"
+      }
     },
     {
       "name": "hashtag-overlap",
@@ -1829,7 +1955,14 @@
       },
       "requires": [
         "posts"
-      ]
+      ],
+      "activity": {
+        "start": "Comparing hashtag sets between brands",
+        "steps": [
+          "Finding shared and distinctive tags"
+        ],
+        "done": "{n} brand pairs"
+      }
     },
     {
       "name": "objections",
@@ -1905,7 +2038,12 @@
       "requires": [
         "comments",
         "topics"
-      ]
+      ],
+      "activity": {
+        "start": "Checking what data is loaded",
+        "steps": [],
+        "done": "Not loaded yet"
+      }
     },
     {
       "name": "questions",
@@ -1986,7 +2124,12 @@
       "requires": [
         "comments",
         "topics"
-      ]
+      ],
+      "activity": {
+        "start": "Checking what data is loaded",
+        "steps": [],
+        "done": "Not loaded yet"
+      }
     },
     {
       "name": "dupes",
@@ -2056,7 +2199,12 @@
       },
       "requires": [
         "comments"
-      ]
+      ],
+      "activity": {
+        "start": "Checking what data is loaded",
+        "steps": [],
+        "done": "Not loaded yet"
+      }
     },
     {
       "name": "claims",
@@ -2133,7 +2281,12 @@
       "requires": [
         "comments",
         "topics"
-      ]
+      ],
+      "activity": {
+        "start": "Checking what data is loaded",
+        "steps": [],
+        "done": "Not loaded yet"
+      }
     },
     {
       "name": "whitespace",
@@ -2206,7 +2359,12 @@
         "comments",
         "topics",
         "posts"
-      ]
+      ],
+      "activity": {
+        "start": "Checking what data is loaded",
+        "steps": [],
+        "done": "Not loaded yet"
+      }
     },
     {
       "name": "seeding",
@@ -2281,7 +2439,12 @@
       },
       "requires": [
         "comments"
-      ]
+      ],
+      "activity": {
+        "start": "Checking what data is loaded",
+        "steps": [],
+        "done": "Not loaded yet"
+      }
     },
     {
       "name": "audience",
@@ -2360,7 +2523,12 @@
       },
       "requires": [
         "comments"
-      ]
+      ],
+      "activity": {
+        "start": "Checking what data is loaded",
+        "steps": [],
+        "done": "Not loaded yet"
+      }
     },
     {
       "name": "switchers",
@@ -2442,7 +2610,12 @@
       },
       "requires": [
         "comments"
-      ]
+      ],
+      "activity": {
+        "start": "Checking what data is loaded",
+        "steps": [],
+        "done": "Not loaded yet"
+      }
     },
     {
       "name": "superfans",
@@ -2516,7 +2689,12 @@
       },
       "requires": [
         "comments"
-      ]
+      ],
+      "activity": {
+        "start": "Checking what data is loaded",
+        "steps": [],
+        "done": "Not loaded yet"
+      }
     },
     {
       "name": "narrative",
@@ -2602,6 +2780,11 @@
           "threads",
           "x"
         ]
+      },
+      "activity": {
+        "start": "Checking what data is loaded",
+        "steps": [],
+        "done": "Not loaded yet"
       }
     }
   ]

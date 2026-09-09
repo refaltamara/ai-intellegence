@@ -1,7 +1,6 @@
-import { Ask, type SkillMeta } from "@/ui/Ask";
-import { registry } from "@/skills/registry";
-import { impls } from "@/skills/index";
+import { Ask } from "@/ui/Ask";
 import { DEFAULT_WORKSPACE_ID } from "@/config/thresholds";
+import { sql } from "@/db/client";
 import { getConversation, listMessages } from "@/chat/persist";
 import { workspaceStats } from "@/ui/stats";
 import { currentSession } from "@/auth/current";
@@ -10,8 +9,6 @@ export const dynamic = "force-dynamic";
 
 export default async function AskPage({ searchParams }: { searchParams: Promise<{ c?: string; skill?: string; q?: string }> }) {
   const sp = await searchParams;
-  const skills: SkillMeta[] = registry.skills.map((s) => ({ name: s.name, layer: s.layer, title: s.title, description: s.description, first_release: s.first_release, available: !!impls[s.name] }));
-  const layers = Object.fromEntries(Object.entries(registry.layers).map(([k, v]) => [k, v.title]));
   let conversation: string | null = null;
   let messages: Awaited<ReturnType<typeof listMessages>> = [];
   if (sp.c && /^[0-9a-f-]{36}$/.test(sp.c)) {
@@ -22,7 +19,12 @@ export default async function AskPage({ searchParams }: { searchParams: Promise<
       messages = await listMessages(c.id);
     }
   }
-  const s = await workspaceStats();
-  const prefill = sp.skill ? `/${sp.skill} ` : sp.q ?? undefined;
-  return <Ask key={conversation ?? "new"} skills={skills} layers={layers} initialConversation={conversation} initialMessages={messages} prefill={prefill} stats={{ brands: s.brands, platforms: s.platforms, months: s.months, freshness: s.freshness }} />;
+  const [s, client] = await Promise.all([workspaceStats(), clientBrandName()]);
+  const prefill = sp.q ?? undefined;
+  return <Ask key={conversation ?? "new"} initialConversation={conversation} initialMessages={messages} prefill={prefill} stats={{ brands: s.brands, platforms: s.platforms, months: s.months, freshness: s.freshness }} clientName={client} />;
+}
+
+async function clientBrandName(): Promise<string | null> {
+  const r = (await sql.query("select b.name from workspaces w join brands b on b.id = w.client_brand_id where w.id = $1", [DEFAULT_WORKSPACE_ID])) as { name: string }[];
+  return r[0]?.name ?? null;
 }
