@@ -5,6 +5,7 @@ import { loadContext } from "@/skills/params";
 import { fmtNum } from "@/ui/format";
 import { ClientBrand } from "@/ui/ClientBrand";
 import { currentSession } from "@/auth/current";
+import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 
@@ -43,9 +44,9 @@ export default async function DataPage() {
             <tbody>{s.loads.map((l, i) => <tr key={i} style={{ cursor: "default" }}><td>{l.file}</td><td>{l.platform ?? "–"}</td><td className="num">{fmtNum(l.rows_in)}</td><td className="num">{fmtNum(l.rows_loaded)}</td><td className="num">{fmtNum(l.rows_rejected)}</td><td>{l.finished_at ?? "running"}</td></tr>)}</tbody>
           </table>
         </div>
-        <h4 style={{ fontSize: 13, color: "var(--text-2)", marginBottom: 10, fontWeight: 600 }}>Brands in this workspace</h4>
+        <h4 style={{ fontSize: 13, color: "var(--text-2)", marginBottom: 10, fontWeight: 600 }}>Brands in this workspace <span style={{ fontWeight: 500, color: "var(--text-3)" }}>· open one to see what was collected about it</span></h4>
         <div className="grid-b">
-          {ctx.brands.map((b) => <div className={`bchip ${b.is_client ? "me" : ""}`} key={b.id} title={b.id}>{b.name}<small>{b.tiktok_handle && b.instagram_handle ? "TikTok + IG" : b.tiktok_handle ? "TikTok" : "Instagram"}</small></div>)}
+          {ctx.brands.map((b) => <Link className={`bchip ${b.is_client ? "me" : ""}`} key={b.id} title={b.id} href={`/data/${b.id}`}>{b.name}<small>{b.tiktok_handle && b.instagram_handle ? "TikTok + IG" : b.tiktok_handle ? "TikTok" : "Instagram"}</small></Link>)}
         </div>
       </div>
     </section>
