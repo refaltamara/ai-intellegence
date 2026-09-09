@@ -52,11 +52,11 @@ function changedEntries(diff: Diff | null, diffKey: string): ReportBlocks["chang
   return out;
 }
 
-export async function createReport(opts: { workspaceId: string; result: SkillResult; diff: Diff | null; source: "agent" | "ask"; title?: string; agentName?: string; agentRunId?: string | null }): Promise<{ report: ReportRow; sections: ReportSections; markdown: string }> {
+export async function createReport(opts: { workspaceId: string; result: SkillResult; diff: Diff | null; source: "agent" | "ask"; title?: string; agentName?: string; agentRunId?: string | null; decisionId?: string | null }): Promise<{ report: ReportRow; sections: ReportSections; markdown: string }> {
   const { result, diff } = opts;
   const sections = await generateSections(result, diff, opts.workspaceId);
   const changes = diff && !diff.first_run ? diff.new.length + diff.gone.length + diff.changed.length : 0;
-  const title = opts.title ?? (opts.source === "agent" && opts.agentName ? `${opts.agentName} — ${diff?.first_run ? "first run" : `${changes} change${changes === 1 ? "" : "s"}`}` : `/${result.skill} · ${result.meta.data_window.from} to ${result.meta.data_window.to}`);
+  const title = opts.title ?? (opts.source === "agent" && opts.agentName ? `${opts.agentName} — ${diff?.first_run ? "first run" : `${changes} change${changes === 1 ? "" : "s"}`}` : `${result.skill.replace(/-/g, " ")} · ${result.meta.data_window.from} to ${result.meta.data_window.to}`);
   const markdown = renderMarkdown({ title, result, diff, headline: sections.headline.replace(/<ev id="(ev_\d+)"><\/ev>/g, "[$1]"), appUrl: appUrl() });
   const citedEvidence = result.evidence.filter((e) => sections.evidence_ids.includes(e.id));
   const blocks: ReportBlocks = {
@@ -66,8 +66,8 @@ export async function createReport(opts: { workspaceId: string; result: SkillRes
     params_resolved: result.params_resolved, diff_key: result.diff_key, sections, evidence: citedEvidence.length ? citedEvidence : result.evidence.slice(0, 20), agent_name: opts.agentName,
   };
   const rows = (await sql.query(
-    "insert into reports (workspace_id, title, source, skill_run_id, agent_run_id, body_md, blocks) values ($1, $2, $3, $4, $5, $6, $7::jsonb) returning *",
-    [opts.workspaceId, title, opts.source, result.run_id ?? null, opts.agentRunId ?? null, markdown, JSON.stringify(blocks)],
+    "insert into reports (workspace_id, title, source, skill_run_id, agent_run_id, body_md, blocks, decision_id) values ($1, $2, $3, $4, $5, $6, $7::jsonb, $8) returning *",
+    [opts.workspaceId, title, opts.source, result.run_id ?? null, opts.agentRunId ?? null, markdown, JSON.stringify(blocks), opts.decisionId ?? null],
   )) as ReportRow[];
   return { report: rows[0], sections, markdown };
 }

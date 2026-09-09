@@ -61,7 +61,7 @@ export function Agents({ agents, skills, modelConfigured, emailConfigured }: { a
   return (
     <section className="screen">
       <div className="topbar">
-        <div><h1>Agents</h1><span className="meta">Skills on a schedule</span></div>
+        <div><h1>Watching</h1><span className="meta">Analyses on a schedule</span></div>
         <span className="pill">{running} running{next ? ` · next run ${new Date(next).toLocaleString("en-GB", { timeZone: "Asia/Jakarta", weekday: "short", hour: "2-digit", minute: "2-digit" })} WIB` : ""}</span>
       </div>
       <div className="wrap wide">
@@ -78,7 +78,7 @@ export function Agents({ agents, skills, modelConfigured, emailConfigured }: { a
                     <p><span className="slash">/</span>{a.skill} · {Object.entries(a.params).filter(([k]) => !["limit"].includes(k)).map(([k, v]) => `${k}=${typeof v === "object" ? JSON.stringify(v) : String(v)}`).join(" · ") || "defaults"}{a.only_if_changed ? " · only if changed" : ""}</p>
                     <div className="row">
                       <span>{a.schedule_human ?? a.schedule_cron} <b>{a.schedule_cron}</b></span>
-                      <span>Via <b>{a.delivery.channels.join(" + ")}</b>{a.delivery.email ? ` (${a.delivery.email})` : ""}</span>
+                      {a.decision_name ? <span>For <b>{a.decision_name}</b></span> : null}<span>Via <b>{a.delivery.channels.join(" + ")}</b>{a.delivery.email ? ` (${a.delivery.email})` : ""}</span>
                       <span>Next <b>{a.next_run_at ? new Date(a.next_run_at).toLocaleString("en-GB", { timeZone: a.schedule_tz, day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "–"}</b></span>
                       {last && <span>Last run <b>{fmtDate(last.started_at)}</b>{d ? ` · ${d.first_run ? "baseline" : `${d.new.length} new · ${d.gone.length} gone · ${d.changed.length} changed`}` : ""}{last.delivery_error ? ` · ${last.delivery_error}` : last.delivered_at ? " · delivered" : ""}</span>}
                     </div>
@@ -114,7 +114,7 @@ export function Agents({ agents, skills, modelConfigured, emailConfigured }: { a
             })}
           </div>
           <div className="setup">
-            <h3>New agent</h3>
+            <h3>Watch something new</h3>
             <p>Describe it the way you'd brief a colleague. We turn it into a schedule you can edit.</p>
             <textarea value={text} onChange={(e) => setText(e.target.value)} />
             <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 10, gap: 8 }}>

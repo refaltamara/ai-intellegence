@@ -28,7 +28,7 @@ export async function runAgent(agent: AgentRow, opts: { reason?: "schedule" | "m
     diff = diffResults(previous ? previous.rows : null, result.rows, result.diff_key, agent.diff_config ?? {});
     should = shouldDeliver(diff, agent.only_if_changed, agent.diff_config ?? {});
     const appUrl = publicUrl();
-    const { report, sections, markdown } = await createReport({ workspaceId: agent.workspace_id, result, diff, source: "agent", agentName: agent.name, agentRunId: run.id });
+    const { report, sections, markdown } = await createReport({ workspaceId: agent.workspace_id, result, diff, source: "agent", agentName: agent.name, agentRunId: run.id, decisionId: agent.decision_id ?? null });
     reportId = report.id;
     const title = report.title;
     const plainHeadline = sections.headline.replace(/<ev id="(ev_\d+)"><\/ev>/g, "[$1]");

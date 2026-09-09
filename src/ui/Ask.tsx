@@ -28,7 +28,7 @@ function fileSize(bytes: number): string {
   return bytes >= 1024 * 1024 ? `${(bytes / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`;
 }
 
-export function Ask({ initialConversation, initialMessages, prefill, stats, clientName }: { initialConversation: string | null; initialMessages: MessageRow[]; prefill?: string; stats: { brands: number; platforms: number; months: number; freshness: string }; clientName: string | null }) {
+export function Ask({ initialConversation, initialMessages, prefill, stats, clientName, decisionId = null, basePath = "/", initialSend, topbar = true }: { initialConversation: string | null; initialMessages: MessageRow[]; prefill?: string; stats: { brands: number; platforms: number; months: number; freshness: string }; clientName: string | null; decisionId?: string | null; basePath?: string; initialSend?: { prompt: string; followup?: Followup }; topbar?: boolean }) {
   const router = useRouter();
   const [conversationId, setConversationId] = useState<string | null>(initialConversation);
   const [thread, setThread] = useState<Msg[]>(() => {
@@ -48,6 +48,12 @@ export function Ask({ initialConversation, initialMessages, prefill, stats, clie
   const fileRef = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   useEffect(() => { if (prefill) taRef.current?.focus(); }, [prefill]);
+  // a thread opened from Today or a chip starts with its first message already sent
+  const sentInitial = useRef(false);
+  useEffect(() => {
+    if (initialSend && !sentInitial.current && thread.length === 0) { sentInitial.current = true; void send(initialSend.prompt, initialSend.followup); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" }); }, [thread.length, busy]);
 
   function showToast(m: string) { setToast(m); setTimeout(() => setToast(""), 3200); }
@@ -94,7 +100,7 @@ export function Ask({ initialConversation, initialMessages, prefill, stats, clie
     });
     const update = (fn: (m: Msg) => Msg) => setThread((t) => t.map((m) => (m.id === aid ? fn(m) : m)));
     try {
-      const body = { message: q, conversation_id: conversationId, attachment_ids: sending.map((f) => f.id), ...(followup ? { followup: { label: followup.label, skill: followup.skill, params: followup.params } } : {}) };
+      const body = { message: q, conversation_id: conversationId, decision_id: decisionId, attachment_ids: sending.map((f) => f.id), ...(followup ? { followup: { label: followup.label, skill: followup.skill, params: followup.params } } : {}) };
       const res = await fetch("/api/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
       if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
       const reader = res.body.getReader();
@@ -111,7 +117,7 @@ export function Ask({ initialConversation, initialMessages, prefill, stats, clie
           const line = chunk.split("\n").find((l) => l.startsWith("data: "));
           if (!line) continue;
           const e = JSON.parse(line.slice(6)) as ChatEvent;
-          if (e.type === "conversation") { if (!conversationId) { setConversationId(e.id); window.history.replaceState(null, "", `/?c=${e.id}`); } }
+          if (e.type === "conversation") { if (!conversationId) { setConversationId(e.id); window.history.replaceState(null, "", `${basePath}?c=${e.id}`); } }
           if (e.type === "text") update((m) => ({ ...m, text: m.text + e.text, status: undefined }));
           if (e.type === "tool_start") update((m) => ({ ...m, status: undefined }));
           if (e.type === "activity") update((m) => ({ ...m, activity: { text: e.text, done: e.done }, status: undefined }));
@@ -140,13 +146,15 @@ export function Ask({ initialConversation, initialMessages, prefill, stats, clie
       onDragOver={(e) => { if (e.dataTransfer.types.includes("Files")) { e.preventDefault(); setDragging(true); } }}
       onDragLeave={(e) => { if (e.currentTarget === e.target) setDragging(false); }}
       onDrop={(e) => { if (e.dataTransfer.files?.length) { e.preventDefault(); setDragging(false); void upload(e.dataTransfer.files); } }}>
-      <div className="topbar">
-        <div><h1>Ask CeMO</h1><span className="meta">{clientName ? `On the side of ${clientName}` : "Beauty · Indonesia"}</span></div>
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <span className="pill live">Data through {stats.freshness}</span>
-          <span className="pill">{stats.brands} brands · {stats.platforms} platforms · {stats.months} months</span>
+      {topbar && (
+        <div className="topbar">
+          <div><h1>Ask CeMO</h1><span className="meta">{clientName ? `On the side of ${clientName}` : "Beauty · Indonesia"}</span></div>
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <span className="pill live">Data through {stats.freshness}</span>
+            <span className="pill">{stats.brands} brands · {stats.platforms} platforms · {stats.months} months</span>
+          </div>
         </div>
-      </div>
+      )}
 
       <div className={`feed ${empty ? "start" : ""}`}>
         <div className="wrap">
@@ -176,7 +184,7 @@ export function Ask({ initialConversation, initialMessages, prefill, stats, clie
                       <div className={`activity ${m.activity.done ? "done" : ""}`}><span className="dot" />{m.activity.text}</div>
                     )}
                     {m.tools.map((t) => (
-                      <ResultCard key={t.id} tool={t} evidence={m.evidence} onOpenEvidence={(ids) => setOpen((o) => ({ ...o, [m.id]: ids }))} />
+                      <ResultCard key={t.id} tool={t} evidence={m.evidence} decisionId={decisionId} onOpenEvidence={(ids) => setOpen((o) => ({ ...o, [m.id]: ids }))} />
                     ))}
                     {m.status && !m.activity && <div className="status">{m.status}</div>}
                     {m.text && <RichText text={m.text} onChip={(id) => setOpen((o) => ({ ...o, [m.id]: o[m.id]?.[0] === id && o[m.id].length === 1 ? [] : [id] }))} />}
@@ -200,11 +208,21 @@ export function Ask({ initialConversation, initialMessages, prefill, stats, clie
                     {!m.streaming && !m.error && m.text && !m.ask && (
                       <div className="acts">
                         <button className="btn sm" onClick={() => send("Watch this every Monday and only tell me when something changes")}>Watch this weekly</button>
+                        {decisionId && m.tools.some((t) => t.run_id) && (
+                          <button className="btn sm" onClick={async () => {
+                            const run = [...m.tools].reverse().find((t) => t.run_id);
+                            if (!run) return;
+                            const r = await fetch(`/api/decisions/${decisionId}/pins`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ skill_run_id: run.run_id }) });
+                            const j = await r.json();
+                            showToast(j.error ? j.error : "Pinned to this decision");
+                            router.refresh();
+                          }}>Pin to decision</button>
+                        )}
                         <button className="btn sm" disabled={!m.tools.some((t) => t.run_id)} title={m.tools.some((t) => t.run_id) ? "" : "Nothing to report on yet"} onClick={async () => {
                           const run = [...m.tools].reverse().find((t) => t.run_id);
                           if (!run) return;
                           showToast("Writing the report…");
-                          const r = await fetch("/api/reports", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ skill_run_id: run.run_id }) });
+                          const r = await fetch("/api/reports", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ skill_run_id: run.run_id, decision_id: decisionId }) });
                           const j = await r.json();
                           if (j.error) { showToast(j.error); return; }
                           router.push(`/reports/${j.id}`);
