@@ -5,34 +5,8 @@ import { useEffect, useState } from "react";
 import type { Evidence, SkillResult } from "@/skills/types";
 import { EvidenceList } from "./Evidence";
 import { fmtDate, fmtNum } from "./format";
-import { MultiSelect } from "./MultiSelect";
-
-const TIERS = ["nano", "micro", "mid", "macro", "mega"];
-const TIER_LABEL: Record<string, string> = { nano: "Nano · ≤10K", micro: "Micro · 10K–50K", mid: "Mid · 50K–500K", macro: "Macro · 500K–1M", mega: "Mega · 1M+" };
-const RANK_LABEL: Record<string, string> = { views: "Views (total in window)", avg_views: "Avg views per post", comment_rate: "Comment rate", er_pct: "Engagement rate", views_per_1k: "Views per 1k followers", median_views: "Median views" };
-const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-
-/** "2026-03" -> "Mar 2026" */
-export function monthLabel(m: string): string {
-  const [y, mm] = m.split("-").map(Number);
-  return `${MONTH_NAMES[(mm ?? 1) - 1]} ${y}`;
-}
-/** Selected months (YYYY-MM) -> one contiguous {from,to}; months between the first and last are included. */
-export function monthsToWindow(months: string[]): { from: string; to: string } | null {
-  if (!months.length) return null;
-  const sorted = [...months].sort();
-  const [ly, lm] = sorted[sorted.length - 1].split("-").map(Number);
-  const lastDay = new Date(Date.UTC(ly, lm, 0)).getUTCDate();
-  return { from: `${sorted[0]}-01`, to: `${sorted[sorted.length - 1]}-${String(lastDay).padStart(2, "0")}` };
-}
-function monthsBetween(months: string[]): number {
-  if (months.length < 2) return 0;
-  const sorted = [...months].sort();
-  const idx = (m: string) => { const [y, mm] = m.split("-").map(Number); return y * 12 + mm; };
-  return idx(sorted[sorted.length - 1]) - idx(sorted[0]) + 1 - sorted.length;
-}
-
-type Form = { platform: string; tiers: string[]; used_by: string[]; exclude_used_by: string[]; rank_by: string; months: string[]; min_followers: string; max_followers: string; limit: string };
+import { DiscoveryFilters, RANK_LABEL, TIER_LABEL, defaultForm, followersInvalid, formToParams, monthLabel, monthsToWindow, type DiscoveryForm } from "./DiscoveryFilters";
+export { monthLabel, monthsToWindow };
 
 export function Discovery({ brands, months }: { brands: { id: string; name: string; hint?: string }[]; months: string[] }) {
   const sp = useSearchParams();
@@ -42,12 +16,8 @@ export function Discovery({ brands, months }: { brands: { id: string; name: stri
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [openRow, setOpenRow] = useState<string | null>(null);
-  const [form, setForm] = useState<Form>({ platform: "tiktok", tiers: [], used_by: [], exclude_used_by: [], rank_by: "views", months: months.slice(-3), min_followers: "", max_followers: "", limit: "50" });
-  const set = <K extends keyof Form>(k: K, v: Form[K]) => setForm((f) => ({ ...f, [k]: v }));
-  const toggleIn = (k: "tiers" | "months", v: string) => set(k, form[k].includes(v) ? form[k].filter((x) => x !== v) : [...form[k], v]);
-  const gap = monthsBetween(form.months);
-  const minF = Number(form.min_followers), maxF = Number(form.max_followers);
-  const followersInvalid = form.min_followers !== "" && form.max_followers !== "" && minF > maxF;
+  const [form, setForm] = useState<DiscoveryForm>(() => defaultForm(months));
+  const invalid = followersInvalid(form);
   const [toast, setToast] = useState("");
   const showToast = (m: string) => { setToast(m); setTimeout(() => setToast(""), 2200); };
 
@@ -63,15 +33,9 @@ export function Discovery({ brands, months }: { brands: { id: string; name: stri
   }, [runId]);
 
   async function run() {
-    if (followersInvalid) { setError("Min followers is above max followers."); return; }
+    if (invalid) { setError("Min followers is above max followers."); return; }
     setLoading(true); setError("");
-    const window = monthsToWindow(form.months) ?? { last_n_days: 90 };
-    const params: Record<string, unknown> = { platform: form.platform, rank_by: form.rank_by, limit: Number(form.limit) || 50, window };
-    if (form.tiers.length) params.tiers = form.tiers;
-    if (form.used_by.length) params.used_by = form.used_by;
-    if (form.exclude_used_by.length) params.exclude_used_by = form.exclude_used_by;
-    if (form.min_followers !== "" && Number.isFinite(minF)) params.min_followers = minF;
-    if (form.max_followers !== "" && Number.isFinite(maxF)) params.max_followers = maxF;
+    const params = formToParams(form);
     const r = await fetch("/api/skills/discovery/run", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ params }) });
     const j = (await r.json()) as SkillResult;
     setLoading(false);
@@ -119,26 +83,10 @@ export function Discovery({ brands, months }: { brands: { id: string; name: stri
       </div>
       <div className="wrap wide">
         {!runId && (
-          <div className="form">
-            <label>Platform<select value={form.platform} onChange={(e) => set("platform", e.target.value)}><option value="tiktok">TikTok</option><option value="instagram">Instagram</option><option value="all">All</option></select></label>
-            <label>Rank by<select value={form.rank_by} onChange={(e) => set("rank_by", e.target.value)}>{Object.entries(RANK_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></label>
-            <label>Followers<div className="pair"><input inputMode="numeric" value={form.min_followers} onChange={(e) => set("min_followers", e.target.value.replace(/[^\d]/g, ""))} placeholder="min" /><input inputMode="numeric" value={form.max_followers} onChange={(e) => set("max_followers", e.target.value.replace(/[^\d]/g, ""))} placeholder="max" /></div>{followersInvalid && <span className="hint" style={{ color: "var(--amber)" }}>min is above max</span>}</label>
-            <label>Limit<input inputMode="numeric" value={form.limit} onChange={(e) => set("limit", e.target.value.replace(/[^\d]/g, ""))} /></label>
-            <label className="wide">Tiers <span className="hint">{form.tiers.length ? `${form.tiers.length} selected` : "none selected = any tier"}</span>
-              <div className="tog">{TIERS.map((t) => <button type="button" key={t} className={form.tiers.includes(t) ? "on" : ""} onClick={() => toggleIn("tiers", t)}>{TIER_LABEL[t]}</button>)}</div>
-            </label>
-            <label className="wide">Months <span className="hint">{form.months.length === 0 ? "none selected = last 90 days of data" : gap > 0 ? `${gap} month${gap > 1 ? "s" : ""} in between included too (one continuous window)` : `${form.months.length} selected`}</span>
-              <div className="tog">{months.map((m) => <button type="button" key={m} className={form.months.includes(m) ? "on" : ""} onClick={() => toggleIn("months", m)}>{monthLabel(m)}</button>)}
-                <button type="button" onClick={() => set("months", form.months.length === months.length ? [] : [...months])} style={{ borderStyle: "dashed" }}>{form.months.length === months.length ? "Clear" : "All"}</button></div>
-            </label>
-            <label className="wide">Used by brands <span className="hint">creator must have posted for any of these; empty = any tracked brand</span>
-              <MultiSelect options={brands} value={form.used_by} onChange={(v) => set("used_by", v)} placeholder="Search a brand…" />
-            </label>
-            <label className="wide">Exclude used by <span className="hint">creator must not have posted for these</span>
-              <MultiSelect options={brands} value={form.exclude_used_by} onChange={(v) => set("exclude_used_by", v)} placeholder="Search a brand…" />
-            </label>
-            <div className="actions"><button className="btn pri" onClick={run} disabled={loading || followersInvalid}>{loading ? "Running…" : "Run /discovery"}</button></div>
-          </div>
+          <>
+            <DiscoveryFilters form={form} onChange={setForm} brands={brands} months={months} />
+            <div className="form" style={{ paddingTop: 0, paddingBottom: 12, marginTop: -8, borderTop: 0 }}><div className="actions"><button className="btn pri" onClick={run} disabled={loading || invalid}>{loading ? "Running…" : "Run /discovery"}</button></div></div>
+          </>
         )}
         {error && <div className="errbox" style={{ marginBottom: 16 }}>{error}</div>}
         {loading && runId && <div className="status">Loading run…</div>}

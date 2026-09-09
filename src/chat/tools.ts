@@ -1,7 +1,8 @@
 /**
- * The four tools exposed to the model (PRD §5.2, PRD-v2 §5.2). run_skill's enum and
+ * The five tools exposed to the model (PRD §5.2, PRD-v2 §5.2, §13.2). run_skill's enum and
  * description are generated from skills.registry.json at boot (CLAUDE.md rule 2).
- * ask_user asks the one clarifying question; follow-ups ride in the answer text.
+ * ask_user asks the one clarifying question; export_run hands out a spreadsheet;
+ * follow-ups ride in the answer text.
  */
 import type Anthropic from "@anthropic-ai/sdk";
 import { describeSkillsForTool, skillNames } from "../skills/registry";
@@ -51,6 +52,23 @@ export const ASK_USER: Anthropic.Tool = {
     additionalProperties: false,
   },
   // strict mode rejects minItems/maxItems; the 2–4 range is enforced server-side
+  strict: false,
+} as Anthropic.Tool;
+
+/** The spreadsheet on request (PRD-v2 §13.2): tiny on purpose; the server applies the pane's state. */
+export const EXPORT_RUN: Anthropic.Tool = {
+  name: "export_run",
+  description:
+    "Hand the person a spreadsheet of an analysis in this conversation when they ask for a spreadsheet, CSV, Excel, a download, or 'send me the list'. Defaults to the most recent table in this conversation and to Excel. Returns the file's details; reply with one sentence, the UI renders the download.",
+  input_schema: {
+    type: "object",
+    properties: {
+      skill_run_id: { type: "string", description: "The run_id of the analysis to export; omit for the most recent table" },
+      format: { type: "string", enum: ["csv", "xlsx"], description: "Default xlsx" },
+    },
+    required: [],
+    additionalProperties: false,
+  },
   strict: false,
 } as Anthropic.Tool;
 
@@ -130,5 +148,5 @@ export function buildTools(): Anthropic.Tool[] {
     strict: false, // same reason as run_skill; validated by agentFromBody
   } as Anthropic.Tool;
 
-  return [runSkill, queryMetrics, createAgentDraft, ASK_USER];
+  return [runSkill, queryMetrics, createAgentDraft, ASK_USER, EXPORT_RUN];
 }
