@@ -9,6 +9,7 @@ import { decisionThreads, getDecision, listPins } from "@/decisions/store";
 import { SkillDb } from "@/skills/db";
 import { loadContext } from "@/skills/params";
 import { workspaceStats } from "@/ui/stats";
+import { paneContext } from "@/ui/paneContext";
 
 export const dynamic = "force-dynamic";
 
@@ -26,6 +27,7 @@ export default async function DecisionPage({ params, searchParams }: { params: P
     const c = await getConversation(sp.c, DEFAULT_WORKSPACE_ID, session?.uid ?? null);
     if (c && c.decision_id === id) { conversation = c.id; messages = await listMessages(c.id); }
   }
+  const pane = await paneContext(messages);
   const workspaceClient = ctx.clientBrandId ? ctx.brands.find((b) => b.id === ctx.clientBrandId)?.name ?? null : null;
   let followupParams: Record<string, unknown> | undefined;
   try { followupParams = sp.params ? (JSON.parse(sp.params) as Record<string, unknown>) : undefined; } catch { followupParams = undefined; }
@@ -33,7 +35,7 @@ export default async function DecisionPage({ params, searchParams }: { params: P
   return (
     <div className="dwrap">
       <DecisionHeader decision={decision} pins={pins} threads={threads.map((t) => ({ id: t.id, title: t.title, updated_at: t.updated_at }))} currentThread={conversation} brands={ctx.brands.map((b) => ({ id: b.id, name: b.name }))} />
-      <Ask key={conversation ?? `new-${id}`} topbar={false} decisionId={id} basePath={`/d/${id}`} initialConversation={conversation} initialMessages={messages} initialSend={initialSend} stats={{ brands: stats.brands, platforms: stats.platforms, months: stats.months, freshness: stats.freshness }} clientName={decision.client_name ?? workspaceClient} />
+      <Ask key={conversation ?? `new-${id}`} topbar={false} decisionId={id} basePath={`/d/${id}`} initialConversation={conversation} initialMessages={messages} initialSend={initialSend} stats={{ brands: stats.brands, platforms: stats.platforms, months: stats.months, freshness: stats.freshness }} clientName={decision.client_name ?? workspaceClient} pane={pane} />
     </div>
   );
 }

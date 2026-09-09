@@ -295,9 +295,27 @@ export const skillRuns = pgTable(
     actor: jsonb("actor").notNull().default(sql`'{}'::jsonb`),
     agentRunId: uuid("agent_run_id"),
     durationMs: integer("duration_ms"),
+    /** the evidence pane's view of this run (PRD-v2 §2.3): sort, filter, excluded row keys */
+    paneState: jsonb("pane_state"),
+    paneTitle: text("pane_title"),
     createdAt: createdAt(),
   },
   (t) => [index("skill_runs_workspace_created_idx").on(t.workspaceId, t.createdAt)],
+);
+
+/** Every spreadsheet handed out (PRD-v2 §13.1): which run, who, which format, how many rows. */
+export const exports = pgTable(
+  "exports",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workspaceId: text("workspace_id").notNull().references(() => workspaces.id),
+    skillRunId: uuid("skill_run_id").notNull().references(() => skillRuns.id, { onDelete: "cascade" }),
+    userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
+    format: text("format").notNull(),
+    rows: integer("rows").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [index("exports_run_idx").on(t.skillRunId, t.createdAt)],
 );
 
 /** Work attaches to a decision, not a date (PRD-v2 §6). A decision may override the workspace client. */

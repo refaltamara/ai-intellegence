@@ -41,3 +41,19 @@ describe("userTurn", () => {
     expect(c.map((b) => b.type)).toEqual(["tool_result", "document", "text"]);
   });
 });
+
+describe("historyTurns with notes", () => {
+  it("folds a hidden note into the next user message and reports a trailing one", () => {
+    const { messages, pendingNotes } = historyTurns([
+      { role: "user", content_json: { text: "find creators" } },
+      { role: "assistant", content_json: { text: "41 fit." } },
+      { role: "user", content_json: { text: "You exported 41 rows as CSV", note: "export" } },
+      { role: "user", content_json: { text: "now nano only" } },
+      { role: "assistant", content_json: { text: "12 fit." } },
+      { role: "user", content_json: { text: "You exported 12 rows as Excel", note: "export" } },
+    ]);
+    expect(messages).toHaveLength(4);
+    expect(messages[2].content).toBe("(Earlier: You exported 41 rows as CSV.)\nnow nano only");
+    expect(pendingNotes).toEqual(["You exported 12 rows as Excel"]);
+  });
+});

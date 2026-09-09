@@ -29,7 +29,7 @@ describe("evidence citations", () => {
 describe("tool definitions", () => {
   it("are generated from the registry and none are strict", () => {
     const tools = buildTools();
-    expect(tools.map((t) => t.name)).toEqual(["run_skill", "query_metrics", "create_agent_draft", "ask_user"]);
+    expect(tools.map((t) => t.name)).toEqual(["run_skill", "query_metrics", "create_agent_draft", "ask_user", "export_run"]);
     const run = tools[0] as any;
     for (const t of tools) expect((t as any).strict).toBe(false);
     expect(run.input_schema.properties.skill.enum).toEqual(skillNames());

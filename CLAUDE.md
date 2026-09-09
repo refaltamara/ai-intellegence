@@ -16,9 +16,10 @@ Rules:
 
 ## Partner experience (docs/PRD_V2_PARTNER.md, v2.1 amendments)
 - The product and persona are CeMO ("Your CMO", Creator Intelligence for Market Monitoring). "Fair Intel" is the codename.
-- Skills are internal. Never render a skill name, slash command, tool name, or "Running…" in the UI or in model text. The server strips slashed skill names and logs mechanism_leak for anything else.
+- Inside a conversation, skills are internal: never a skill name, slash command, tool name, or "Running…" in the thread or in model text. The server strips slashed skill names and logs mechanism_leak for anything else. The Skills page stays in the sidebar as the library of what CeMO can do.
 - Activity strings and result-card titles come from skills.registry.json (`activity`, `title`), templated from workspace counts, params_resolved and SkillResult.meta.
 - The model asks at most one clarifying question per turn (ask_user; the turn ends on it and the next user message is its tool_result), may emit one <counter> block per answer (rendered amber), and ends substantive answers with a <followups> block that the server parses, validates against available analyses, and strips. Follow-ups are never a tool call.
 - Client brand is workspaces.client_brand_id (owner sets it on the Data page; default none) until Decisions ship, then decisions.client_brand_id.
-- Coming in order: Decisions and the load-keyed brief (Today), the evidence pane with /discovery folded in, brand pages without sounds. No pg-boss; no strict tools.
+- Chats (`/`) is the default and free-form; Decisions (`/decisions`) carries the brief, watchers' findings and the decisions. No pg-boss; no strict tools.
+- The evidence pane: `src/chat/pane.ts` decides what opens it (rows, a chart with ≥3 points, an agent draft) and computes every number in a pane-action delta; the model only phrases them. Pane actions arrive as hidden user turns (`content_json.hidden`, `pane_action`); sort/filter live in `skill_runs.pane_state`. Exports go through `src/export/run.ts` (About sheet, pane state applied) and are logged in `exports`. Next: brand pages under Data without sounds.
 

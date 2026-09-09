@@ -19,9 +19,12 @@ import { anthropicClient, chatEffort, describeModelError } from "./client";
 import { renumberEvidence } from "./evidence";
 import { scrubMechanism } from "./leak";
 import { AnswerStream, usableFollowups, type Followup } from "./stream";
-import { createDecision, decisionContext, decisionNameFrom } from "../decisions/store";
+import { decisionContext } from "../decisions/store";
+import { validateParams } from "../skills/params";
 import { claimAttachments, conversationAttachments, type AttachmentRow } from "./attachments";
-import { addMessage, createConversation, getConversation, listMessages, type ToolCallRecord } from "./persist";
+import { applyPaneState, describeExclusion, describeRerun, humanAction, nextState, paneOf, rowLabel, type PaneAction } from "./pane";
+import { buildExport } from "../export/run";
+import { addMessage, conversationRunIds, createConversation, getConversation, getSkillRun, listMessages, logExport, setPaneState, type ToolCallRecord } from "./persist";
 import { buildTools } from "./tools";
 
 export const MAX_TOOL_CALLS = 6;
@@ -38,6 +41,8 @@ export type ChatEvent =
   /** the one clarifying question; the turn ends here and the next user message answers it */
   | { type: "ask"; question: string; options: { label: string; value: string }[]; why: string }
   | { type: "followups"; items: Followup[] }
+  /** a tool result became an object for the evidence pane (PRD-v2 §2.2); `replaces` names the tab a re-run supersedes */
+  | { type: "pane_open"; tool_id: string; run_id?: string; kind: "table" | "chart" | "agent_draft" | "file"; title: string; replaces?: string }
   | { type: "done"; message_id: string; evidence: Record<string, Evidence>; evidence_miss: number; tokens_in: number; tokens_out: number; stop_reason: string | null; timings: Timings }
   | { type: "error"; message: string };
 
@@ -51,8 +56,10 @@ export type ChatTurnInput = {
   attachmentIds?: string[];
   /** set when the user tapped a suggested follow-up; the model gets the exact analysis and parameters as a hint */
   followup?: { label: string; skill: string; params?: Record<string, unknown> };
-  /** the decision a new thread belongs to; when absent a new decision is opened, named from the first message */
+  /** the decision a new thread belongs to; a chat without one stays unattached */
   decisionId?: string | null;
+  /** an action taken in the evidence pane instead of a typed message (PRD-v2 §5.5) */
+  paneAction?: PaneAction;
 };
 
 const SYSTEM_TEMPLATE = readFileSync(path.join(process.cwd(), "src/chat/system.md"), "utf8");
@@ -121,22 +128,23 @@ function trimForModel(result: SkillResult, evidence: Evidence[]) {
 
 export async function runChatTurn(input: ChatTurnInput, emit: (e: ChatEvent) => void | Promise<void>): Promise<void> {
   const workspaceId = input.workspaceId || DEFAULT_WORKSPACE_ID;
-  const userText = input.userText.trim();
+  const userText = input.paneAction ? input.paneAction.human : input.userText.trim();
   if (!userText) {
     await emit({ type: "error", message: "Empty message" });
     return;
   }
   let conversation = input.conversationId ? await getConversation(input.conversationId, workspaceId, input.userId ?? null) : null;
-  if (!conversation) {
-    const title = userText.replace(/\s+/g, " ").slice(0, 80);
-    const decisionId = input.decisionId ?? (await createDecision(workspaceId, input.userId ?? null, decisionNameFrom(userText))).id;
-    conversation = await createConversation(workspaceId, title, input.userId ?? null, decisionId);
+  if (input.paneAction && !conversation) {
+    await emit({ type: "error", message: "That list belongs to a conversation that is no longer open." });
+    return;
   }
+  // Chats are free-form and stay unattached; only a thread started inside a decision joins it.
+  if (!conversation) conversation = await createConversation(workspaceId, userText.replace(/\s+/g, " ").slice(0, 80), input.userId ?? null, input.decisionId ?? null);
   await emit({ type: "conversation", id: conversation.id, title: conversation.title });
   // Bind any freshly uploaded documents to this conversation before the turn runs.
   const claimed = await claimAttachments(input.attachmentIds ?? [], conversation.id, workspaceId, input.userId ?? null).catch(() => [] as AttachmentRow[]);
   try {
-    await runTurnBody(conversation, userText, emit, claimed, input.followup);
+    await runTurnBody(conversation, userText, emit, claimed, input.followup, input.paneAction, input.userId ?? null);
   } catch (e) {
     const message = describeModelError(e);
     console.error("chat turn failed:", conversation.id, message, (e as Error).stack?.split("\n").slice(0, 3).join(" | "));
@@ -165,12 +173,17 @@ export function userTurn(userText: string, docs: { filename: string; data: strin
 
 /** Replay persisted history for the model. Plain turns become text; an assistant turn that
  *  ended on ask_user is replayed as its tool_use, and the user turn after it as the tool_result. */
-export function historyTurns(history: { role: "user" | "assistant"; content_json: { text: string; ask?: { tool_use_id: string; question: string; options: unknown; why: string } } }[]): { messages: Anthropic.MessageParam[]; pendingAsk: string | null } {
+export function historyTurns(history: { role: "user" | "assistant"; content_json: { text: string; note?: string; ask?: { tool_use_id: string; question: string; options: unknown; why: string } } }[]): { messages: Anthropic.MessageParam[]; pendingAsk: string | null; pendingNotes: string[] } {
   const messages: Anthropic.MessageParam[] = [];
   let pendingAsk: string | null = null;
+  // notes ("You exported 41 rows") are not turns of their own: they ride in front of the next user message
+  let notes: string[] = [];
   const plain = (t: string) => t.replace(/<ev id="(ev_\d+)"><\/ev>/g, "[$1]");
+  const withNotes = (t: string) => { const out = notes.length ? `(Earlier: ${notes.join("; ")}.)\n${t}` : t; notes = []; return out; };
   for (const m of history) {
-    const text = m.content_json?.text ?? "";
+    let text = m.content_json?.text ?? "";
+    if (m.role === "user" && m.content_json?.note) { if (text) notes.push(text); continue; }
+    if (m.role === "user" && text) text = withNotes(text);
     if (m.role === "assistant" && m.content_json?.ask) {
       const a = m.content_json.ask;
       const blocks: Anthropic.ContentBlockParam[] = [];
@@ -188,16 +201,16 @@ export function historyTurns(history: { role: "user" | "assistant"; content_json
     }
     messages.push({ role: m.role, content: plain(text) });
   }
-  return { messages, pendingAsk };
+  return { messages, pendingAsk, pendingNotes: notes };
 }
 
-async function runTurnBody(conversation: { id: string; workspace_id: string; decision_id?: string | null }, userText: string, emit: (e: ChatEvent) => void | Promise<void>, claimed: AttachmentRow[] = [], followup?: ChatTurnInput["followup"]): Promise<void> {
+async function runTurnBody(conversation: { id: string; workspace_id: string; decision_id?: string | null }, userText: string, emit: (e: ChatEvent) => void | Promise<void>, claimed: AttachmentRow[] = [], followup?: ChatTurnInput["followup"], paneAction?: PaneAction, userId: string | null = null): Promise<void> {
   const workspaceId = conversation.workspace_id;
   const history = await listMessages(conversation.id);
   await addMessage({
     conversationId: conversation.id,
     role: "user",
-    content: { text: userText, ...(claimed.length ? { attachments: claimed.map((a) => ({ id: a.id, filename: a.filename, bytes: a.bytes })) } : {}) },
+    content: { text: userText, ...(claimed.length ? { attachments: claimed.map((a) => ({ id: a.id, filename: a.filename, bytes: a.bytes })) } : {}), ...(paneAction ? { hidden: true, pane_action: paneAction } : {}) },
   });
 
   // Evidence from earlier turns stays citable (ids are per turn, so latest wins on collision).
@@ -205,6 +218,11 @@ async function runTurnBody(conversation: { id: string; workspace_id: string; dec
   for (const m of history) if (m.evidence_json) for (const [id, ev] of Object.entries(m.evidence_json)) known.set(id, ev);
 
   if (!hasModelCredentials()) {
+    // the person's exclusions still stand even when nobody can phrase them
+    if (paneAction && paneAction.action !== "set_params" && /^[0-9a-f-]{36}$/.test(paneAction.run_id)) {
+      const run = await getSkillRun(paneAction.run_id, workspaceId).catch(() => null);
+      if (run) await setPaneState(run.id, workspaceId, nextState(run.pane_state, paneAction)).catch(() => undefined);
+    }
     const msg = "The chat model is not configured (ANTHROPIC_API_KEY is missing). Analyses still run from the Skills page and the CLI.";
     await addMessage({ conversationId: conversation.id, role: "assistant", content: { text: msg, error: "no_credentials" } });
     await emit({ type: "error", message: msg });
@@ -224,16 +242,24 @@ async function runTurnBody(conversation: { id: string; workspace_id: string; dec
   // Documents attached anywhere in this conversation ride on the current user turn,
   // cached so follow-up questions about the same brief do not re-pay for it.
   const docs = await conversationAttachments(conversation.id).catch(() => []);
-  // A tapped follow-up carries the exact analysis; the person only ever sees the label.
-  const modelText = followup?.skill
-    ? `${userText}\n\n(The person tapped the suggestion "${followup.label}". Use the analysis "${followup.skill}"${followup.params ? ` with these parameters unless they changed the request: ${JSON.stringify(followup.params)}` : ""}.)`
-    : userText;
-  messages.push(userTurn(modelText, docs, replay.pendingAsk));
-
   const turnEvidence = new Map<string, Evidence>();
   const counter = { n: 0 };
   const toolRecords: ToolCallRecord[] = [];
   const runIds: string[] = [];
+  const toolCtx: ToolContext = { conversationId: conversation.id, userId };
+
+  // A tapped follow-up carries the exact analysis; the person only ever sees the label.
+  let modelText = followup?.skill
+    ? `${userText}\n\n(The person tapped the suggestion "${followup.label}". Use the analysis "${followup.skill}"${followup.params ? ` with these parameters unless they changed the request: ${JSON.stringify(followup.params)}` : ""}.)`
+    : userText;
+  if (paneAction) {
+    // The server works out what changed; the model only puts it into a sentence (PRD-v2 §2.5).
+    const applied = await applyPaneAction(paneAction, workspaceId, counter, turnEvidence, emit);
+    modelText = applied.text;
+    for (const r of applied.records) { toolRecords.push(r); if (r.run_id) runIds.push(r.run_id); }
+  }
+  if (replay.pendingNotes.length) modelText = `(Earlier: ${replay.pendingNotes.join("; ")}.)\n${modelText}`;
+  messages.push(userTurn(modelText, docs, replay.pendingAsk));
   const answer = new AnswerStream(new Set());
   const knownIds = () => new Set([...known.keys(), ...turnEvidence.keys()]);
   let fullText = "";
@@ -317,7 +343,7 @@ async function runTurnBody(conversation: { id: string; workspace_id: string; dec
         await emit({ type: "tool_start", id: use.id, name: use.name, input: use.input });
         const toolStart = Date.now();
         const stopActivity = use.name === "run_skill" ? startActivity(use, counts, emit) : () => undefined;
-        const record = await executeTool(use, workspaceId, counter, turnEvidence);
+        const record = await executeTool(use, workspaceId, counter, turnEvidence, toolCtx);
         stopActivity();
         if (use.name === "run_skill" && record.result) {
           await emit({ type: "activity", tool_id: use.id, text: activityDone(getSkill(String((use.input as any)?.skill ?? "")), record.result, counts), step: 0, total: 0, done: true });
@@ -328,6 +354,8 @@ async function runTurnBody(conversation: { id: string; workspace_id: string; dec
         if (record.record.run_id) runIds.push(record.record.run_id);
         if (record.record.draft) draft = record.record.draft;
         await emit({ type: "tool_result", tool: record.record, evidence: record.evidence });
+        const pane = paneOf(record.record);
+        if (pane) await emit({ type: "pane_open", tool_id: use.id, run_id: record.record.run_id, kind: pane.kind, title: pane.title });
         results.push({ type: "tool_result", tool_use_id: use.id, content: record.content, is_error: record.isError });
       }
       if (ask) break; // do not continue the loop; the person answers first
@@ -344,7 +372,7 @@ async function runTurnBody(conversation: { id: string; workspace_id: string; dec
   const scrubbed = scrubMechanism(fullText, skillNames());
   fullText = scrubbed.text;
   if (scrubbed.leaks.length) console.warn(`mechanism_leak ${conversation.id}: ${scrubbed.leaks.join(", ")}`);
-  const followups = usableFollowups(answer.followups, new Set(Object.keys(impls)));
+  const followups = paneAction ? [] : usableFollowups(answer.followups, new Set(Object.keys(impls)));
   if (followups.length && !ask) await emit({ type: "followups", items: followups });
 
   const evidenceMap: Record<string, Evidence> = {};
@@ -383,7 +411,18 @@ function startActivity(use: Anthropic.ToolUseBlock, counts: Awaited<ReturnType<t
   return () => clearInterval(timer);
 }
 
-async function executeTool(use: Anthropic.ToolUseBlock, workspaceId: string, counter: { n: number }, turnEvidence: Map<string, Evidence>): Promise<{ record: ToolCallRecord; evidence: Evidence[]; content: string; isError: boolean; result?: SkillResult }> {
+type ToolContext = { conversationId: string; userId: string | null };
+
+/** A skill result as a tool record: evidence renumbered for this turn, rows kept in full for the pane. */
+function skillRecord(base: ToolCallRecord, skill: string, result: SkillResult, counter: { n: number }, turnEvidence: Map<string, Evidence>): { record: ToolCallRecord; evidence: Evidence[]; content: string } {
+  const re = renumberEvidence(result.evidence, result.rows, result.summary, counter);
+  for (const ev of re.evidence) turnEvidence.set(ev.id, ev);
+  const trimmed = trimForModel({ ...result, rows: re.rows, summary: re.summary }, re.evidence);
+  const record: ToolCallRecord = { ...base, skill, title: getSkill(skill)?.title ?? "Analysis", status: result.status, message: result.message, run_id: result.run_id, summary: re.summary, rows: re.rows, chart: result.chart, meta: result.meta, params_resolved: result.params_resolved, diff_key: result.diff_key, evidence_ids: re.evidence.map((e) => e.id) };
+  return { record, evidence: re.evidence, content: JSON.stringify(trimmed) };
+}
+
+async function executeTool(use: Anthropic.ToolUseBlock, workspaceId: string, counter: { n: number }, turnEvidence: Map<string, Evidence>, ctx: ToolContext): Promise<{ record: ToolCallRecord; evidence: Evidence[]; content: string; isError: boolean; result?: SkillResult }> {
   const input = (use.input ?? {}) as Record<string, unknown>;
   const base: ToolCallRecord = { id: use.id, name: use.name, input, status: "ok" };
   try {
@@ -391,11 +430,28 @@ async function executeTool(use: Anthropic.ToolUseBlock, workspaceId: string, cou
       const skill = String(input.skill ?? "");
       const params = (input.params ?? {}) as Record<string, unknown>;
       const result = await runSkill({ skill, workspace_id: workspaceId, params, actor: { user_id: "chat", via: "chat" } });
-      const re = renumberEvidence(result.evidence, result.rows, result.summary, counter);
-      for (const ev of re.evidence) turnEvidence.set(ev.id, ev);
-      const trimmed = trimForModel({ ...result, rows: re.rows, summary: re.summary }, re.evidence);
-      const record: ToolCallRecord = { ...base, skill, title: getSkill(skill)?.title ?? "Analysis", status: result.status, message: result.message, run_id: result.run_id, summary: re.summary, rows: re.rows, chart: result.chart, meta: result.meta, params_resolved: result.params_resolved, diff_key: result.diff_key, evidence_ids: re.evidence.map((e) => e.id) };
-      return { record, evidence: re.evidence, content: JSON.stringify(trimmed), isError: result.status === "error", result };
+      const r = skillRecord(base, skill, result, counter, turnEvidence);
+      return { ...r, isError: result.status === "error", result };
+    }
+    if (use.name === "export_run") {
+      // the most recent table in this conversation unless the model names a run
+      const format = input.format === "csv" ? "csv" : "xlsx";
+      let runId = typeof input.skill_run_id === "string" && /^[0-9a-f-]{36}$/.test(input.skill_run_id) ? input.skill_run_id : null;
+      if (!runId) {
+        for (const id of await conversationRunIds(ctx.conversationId)) {
+          const run = await getSkillRun(id, workspaceId);
+          if (run && ((run.result as SkillResult)?.rows?.length ?? 0) > 0) { runId = id; break; }
+        }
+      }
+      const run = runId ? await getSkillRun(runId, workspaceId) : null;
+      if (!run || !((run.result as SkillResult)?.rows?.length ?? 0)) {
+        return { record: { ...base, status: "error", message: "There is no table in this conversation to export yet." }, evidence: [], content: JSON.stringify({ status: "error", message: "No table in this conversation yet. Offer to build the list first." }), isError: true };
+      }
+      const b = buildExport(run);
+      await logExport({ workspaceId, skillRunId: run.id, userId: ctx.userId, format, rows: b.rows_after }).catch(() => undefined);
+      const file = { url: `/api/runs/${run.id}/export?format=${format}`, filename: `${b.filename}.${format}`, format, rows: b.rows_after, run_id: run.id } as const;
+      const record: ToolCallRecord = { ...base, title: b.title, status: "ok", file: { ...file } };
+      return { record, evidence: [], content: JSON.stringify({ status: "ok", list: b.title, rows: b.rows_after, format: format === "csv" ? "CSV" : "Excel", note: "The download is rendered in the thread; reply in one sentence and do not paste a link." }), isError: false };
     }
     if (use.name === "query_metrics") {
       const result = await queryMetrics(input as unknown as QueryMetricsInput, workspaceId);
@@ -414,4 +470,57 @@ async function executeTool(use: Anthropic.ToolUseBlock, workspaceId: string, cou
     const message = (e as Error).message;
     return { record: { ...base, status: "error", message }, evidence: [], content: JSON.stringify({ status: "error", message }), isError: true };
   }
+}
+
+const WHAT: Record<string, string> = { creator_id: "creators", brand_id: "brands", post_id: "posts", hashtag: "hashtags", theme: "themes", product_id: "products", campaign_id: "campaigns" };
+
+/** Keep only parameters the skill declares, dropping resolved placeholders ("all") and empties, so a re-run validates. */
+function cleanParams(skill: string, params: Record<string, unknown>): Record<string, unknown> {
+  const props = (getSkill(skill)?.input_schema.properties ?? {}) as Record<string, { type?: string }>;
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(params)) {
+    if (!(k in props) || v == null || v === "all" || v === "") continue;
+    if (Array.isArray(v) && !v.length) continue;
+    out[k] = v;
+  }
+  return out;
+}
+
+/**
+ * A pane action becomes the model's user turn with the numbers already worked out here:
+ * exclusions change the stored pane state; new filters re-run the analysis and open a
+ * replacement tab. The model never computes; it phrases (PRD-v2 §2.5, CLAUDE.md rule 1).
+ */
+async function applyPaneAction(action: PaneAction, workspaceId: string, counter: { n: number }, turnEvidence: Map<string, Evidence>, emit: (e: ChatEvent) => void | Promise<void>): Promise<{ text: string; records: ToolCallRecord[] }> {
+  const tail = "Reply in one or two sentences: what changed in the list and whether the conclusion changed. Do not run anything and do not add follow-ups.";
+  const run = /^[0-9a-f-]{36}$/.test(action.run_id) ? await getSkillRun(action.run_id, workspaceId) : null;
+  if (!run) return { text: `Pane action (not typed by the person): ${action.human}. The list could not be found any more; say so in one sentence.`, records: [] };
+  const result = run.result as SkillResult;
+  const what = WHAT[result.diff_key] ?? "rows";
+  if (action.action === "set_params") {
+    const params = cleanParams(run.skill, { ...(result.params_resolved ?? {}), ...(action.params ?? {}) });
+    const def = getSkill(run.skill);
+    try { if (def) validateParams(def, params); } catch (e) {
+      return { text: `Pane action (not typed by the person): ${action.human}. The new filters could not be applied: ${(e as Error).message}. Say so in one sentence and keep the current list.`, records: [] };
+    }
+    const fresh = await runSkill({ skill: run.skill, workspace_id: workspaceId, params, actor: { user_id: "chat", via: "chat" } });
+    const base: ToolCallRecord = { id: `pane_${Date.now().toString(36)}`, name: "run_skill", input: { skill: run.skill, params }, status: "ok" };
+    const r = skillRecord(base, run.skill, fresh, counter, turnEvidence);
+    r.record.replaces = run.id;
+    await emit({ type: "tool_result", tool: r.record, evidence: r.evidence });
+    const pane = paneOf(r.record);
+    if (pane) await emit({ type: "pane_open", tool_id: r.record.id, run_id: r.record.run_id, kind: pane.kind, title: pane.title, replaces: run.id });
+    if (fresh.status !== "ok") return { text: `Pane action (not typed by the person): ${action.human}. The re-run did not work: ${fresh.message ?? fresh.status}. Say so in one sentence.`, records: [r.record] };
+    const lines = describeRerun(applyPaneState(result.rows, run.pane_state, result.diff_key), r.record.rows ?? [], result.meta?.matched, fresh.meta?.matched, result.diff_key);
+    const top = (r.record.rows ?? []).slice(0, 3).map((row) => `${rowLabel(row)}${Array.isArray(row.evidence_ids) && row.evidence_ids.length ? ` [${(row.evidence_ids as string[])[0]}]` : ""}`);
+    if (top.length) lines.push(`Evidence for the top rows: ${top.join(", ")}.`);
+    return { text: `Pane action (not typed by the person): ${action.human}.\n${lines.join("\n")}\n${tail}`, records: [r.record] };
+  }
+  const before = run.pane_state ?? {};
+  const after = nextState(before, action);
+  await setPaneState(run.id, workspaceId, after).catch(() => undefined);
+  const n = action.action === "clear_exclusions" ? (before.excluded?.length ?? 0) : (action.ids ?? []).length;
+  const human = humanAction(action.action, n, what);
+  const lines = describeExclusion(result.rows ?? [], before, after, result.diff_key);
+  return { text: `Pane action (not typed by the person): ${human}.\n${lines.join("\n")}\n${tail}`, records: [] };
 }

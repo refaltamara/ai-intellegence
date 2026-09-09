@@ -43,6 +43,13 @@
       "when": 1788953355907,
       "tag": "0005_daffy_deathbird",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1788957571784,
+      "tag": "0006_round_betty_brant",
+      "breakpoints": true
     }
   ]
 }
