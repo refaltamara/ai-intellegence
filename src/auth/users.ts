@@ -32,6 +32,15 @@ export async function setPassword(email: string, password: string, workspaceId?:
   const r = (await sql.query("update users set password_hash = $2 where id = $1 returning id", [u.id, hashPassword(password)])) as { id: string }[];
   return r.length > 0;
 }
+/** Owners are Fair staff: they see every workspace and get the sidebar switcher. Takes effect at the next login. */
+export async function setRole(email: string, role: "owner" | "member", workspaceId?: string): Promise<boolean> {
+  const rows = (await sql.query(
+    `update users set role = $2 where lower(email) = lower($1) ${workspaceId ? "and workspace_id = $3" : ""} returning id`,
+    workspaceId ? [email, role, workspaceId] : [email, role],
+  )) as { id: string }[];
+  return rows.length > 0;
+}
+
 export async function removeUser(email: string, workspaceId?: string): Promise<boolean> {
   const u = await findUserByEmail(email, workspaceId);
   if (!u) return false;
