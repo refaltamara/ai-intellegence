@@ -25,9 +25,11 @@ export type LabelOutcome = {
   posts_failed: number;
   posts_remaining: number;
   calls: number;
+  calls_failed: number;
   duration_ms: number;
   stopped: "done" | "budget" | "error";
   error?: string;
+  last_error?: string;
 };
 
 export type LabelOptions = { budgetMs?: number; batchSize?: number; parallel?: number; client?: Anthropic };
@@ -36,13 +38,26 @@ const DEFAULT_BUDGET_MS = 240_000;
 const DEFAULT_BATCH = 40;
 const DEFAULT_PARALLEL = 4;
 
+/** One labelling call, retried once after a pause when the API is busy (429, 529, overloaded). Other errors surface. */
+async function callModel(client: Anthropic, req: Anthropic.MessageCreateParamsNonStreaming): Promise<Anthropic.Message> {
+  try {
+    return await client.messages.create(req);
+  } catch (e) {
+    const status = (e as { status?: number }).status;
+    const busy = status === 429 || status === 529 || /overloaded|rate/i.test((e as Error).message ?? "");
+    if (!busy) throw e;
+    await new Promise((r) => setTimeout(r, 15_000));
+    return await client.messages.create(req);
+  }
+}
+
 export async function labelWorkspace(workspaceId: string, opts: LabelOptions = {}): Promise<LabelOutcome> {
   const started = Date.now();
   const budget = opts.budgetMs ?? DEFAULT_BUDGET_MS;
   const batch = opts.batchSize ?? DEFAULT_BATCH;
   const parallel = Math.max(1, opts.parallel ?? DEFAULT_PARALLEL);
   const cfg = await getWorkspace(workspaceId);
-  const out: LabelOutcome = { workspace: workspaceId, subject: cfg?.name ?? workspaceId, comments_labelled: 0, comments_failed: 0, comments_remaining: 0, posts_labelled: 0, posts_failed: 0, posts_remaining: 0, calls: 0, duration_ms: 0, stopped: "done" };
+  const out: LabelOutcome = { workspace: workspaceId, subject: cfg?.name ?? workspaceId, comments_labelled: 0, comments_failed: 0, comments_remaining: 0, posts_labelled: 0, posts_failed: 0, posts_remaining: 0, calls: 0, calls_failed: 0, duration_ms: 0, stopped: "done" };
   if (!cfg || cfg.kind !== "profile") return { ...out, duration_ms: Date.now() - started };
   const subject = (await clientName(workspaceId)) ?? cfg.name;
   out.subject = subject;
@@ -66,19 +81,27 @@ export async function labelWorkspace(workspaceId: string, opts: LabelOptions = {
       const batches: CommentForLabel[][] = [];
       for (let i = 0; i < rows.length; i += batch) batches.push(rows.slice(i, i + batch));
       const results = await Promise.all(batches.map(async (b) => {
-        const res = await client.messages.create({
-          model: modelId(),
-          max_tokens: 4000,
-          output_config: { effort: "low" },
-          system: [{ type: "text", text: commentSystem(subject), cache_control: { type: "ephemeral" } }],
-          tools: [LABEL_COMMENTS_TOOL],
-          tool_choice: { type: "tool", name: LABEL_COMMENTS_TOOL.name },
-          messages: [{ role: "user", content: commentBatchPrompt(subject, b) }],
-        });
-        const use = res.content.find((x): x is Anthropic.ToolUseBlock => x.type === "tool_use");
-        return parseLabels(use?.input, b.map((r) => r.id));
+        try {
+          const res = await callModel(client, {
+            model: modelId(),
+            max_tokens: 4000,
+            output_config: { effort: "low" },
+            system: [{ type: "text", text: commentSystem(subject), cache_control: { type: "ephemeral" } }],
+            tools: [LABEL_COMMENTS_TOOL],
+            tool_choice: { type: "tool", name: LABEL_COMMENTS_TOOL.name },
+            messages: [{ role: "user", content: commentBatchPrompt(subject, b) }],
+          });
+          const use = res.content.find((x): x is Anthropic.ToolUseBlock => x.type === "tool_use");
+          return parseLabels(use?.input, b.map((r) => r.id));
+        } catch (e) {
+          out.calls_failed += 1;
+          out.last_error = (e as Error).message?.slice(0, 300);
+          return { labels: [], missing: [] as string[], failed: true };
+        }
       }));
       out.calls += batches.length;
+      // a round where every call failed is a stalled API, not bad comments: stop and let the next tick retry
+      if (results.every((r) => (r as { failed?: boolean }).failed)) { out.stopped = "error"; out.error = out.last_error; break; }
       const labels = results.flatMap((r) => r.labels);
       const missing = results.flatMap((r) => r.missing);
       if (labels.length) {
@@ -103,15 +126,20 @@ export async function labelWorkspace(workspaceId: string, opts: LabelOptions = {
         [workspaceId, batch],
       )) as PostForLabel[];
       if (!rows.length) break;
-      const res = await client.messages.create({
-        model: modelId(),
-        max_tokens: 4000,
-        output_config: { effort: "low" },
-        system: [{ type: "text", text: stanceSystem(subject), cache_control: { type: "ephemeral" } }],
-        tools: [LABEL_POSTS_TOOL],
-        tool_choice: { type: "tool", name: LABEL_POSTS_TOOL.name },
-        messages: [{ role: "user", content: stanceBatchPrompt(rows) }],
-      });
+      let res: Anthropic.Message;
+      try {
+        res = await callModel(client, {
+          model: modelId(),
+          max_tokens: 4000,
+          output_config: { effort: "low" },
+          system: [{ type: "text", text: stanceSystem(subject), cache_control: { type: "ephemeral" } }],
+          tools: [LABEL_POSTS_TOOL],
+          tool_choice: { type: "tool", name: LABEL_POSTS_TOOL.name },
+          messages: [{ role: "user", content: stanceBatchPrompt(rows) }],
+        });
+      } catch (e) {
+        out.calls += 1; out.calls_failed += 1; out.stopped = "error"; out.error = (e as Error).message?.slice(0, 300); break;
+      }
       out.calls += 1;
       const use = res.content.find((b): b is Anthropic.ToolUseBlock => b.type === "tool_use");
       const { labels, missing } = parseLabels(use?.input, rows.map((r) => r.id));
@@ -140,6 +168,14 @@ export async function labelWorkspace(workspaceId: string, opts: LabelOptions = {
   out.posts_remaining = rem[0]?.p ?? 0;
   if (out.stopped === "done" && (out.comments_remaining || out.posts_remaining)) out.stopped = "budget";
   out.duration_ms = Date.now() - started;
+  // leave a trace on the Data page (data_loads) whenever the run did or tried anything
+  if (out.calls > 0 || out.error) {
+    await sql.query(
+      `insert into data_loads (workspace_id, file, platform, kind, rows_in, rows_loaded, rows_rejected, report, finished_at)
+       values ($1, $2, null, 'labels', $3, $4, $5, $6::jsonb, now())`,
+      [workspaceId, `labelling ${out.stopped === "error" ? "(stopped on error)" : out.stopped === "budget" ? "(more to do)" : "(complete)"}`, out.comments_labelled + out.comments_failed + out.posts_labelled + out.posts_failed, out.comments_labelled + out.posts_labelled, out.comments_failed + out.posts_failed, JSON.stringify(out)],
+    ).catch(() => undefined);
+  }
   return out;
 }
 
