@@ -252,8 +252,15 @@ async function build(ws: string): Promise<PulseData | null> {
     subject, productName: cfg.product_name, tz, asOf,
     totals: totals!, root: root ? { url: root.url, posted_at: root.posted_at, caption: root.caption, views: root.views, likes: root.likes, comments: root.comments, early_comments: root.early_comments } : null,
     reply: reply ? { at: reply.at, likes: reply.likes, text: reply.text } : null,
-    hourly, negative_trend, stance, commenters, reply_effect, daily, events, spread: spread.map(({ first_post_url: _u, ...s }) => s), sentiment, drivers, themes, seeding,
+    hourly, negative_trend: trimLead(negative_trend), stance, commenters: { ...commenters, first_time: trimLead(commenters.first_time) }, reply_effect, daily, events, spread: spread.map(({ first_post_url: _u, ...s }) => s), sentiment, drivers, themes, seeding,
   };
+}
+
+/** Drop the leading hours where a ratio line has nothing to show, so the line starts where the data does. */
+function trimLead<T extends { x: string[]; series: { name: string; data: (number | null)[] }[] }>(t: T): T {
+  const first = t.series[0].data.findIndex((v) => v != null);
+  if (first <= 0) return t;
+  return { ...t, x: t.x.slice(first), series: t.series.map((s) => ({ ...s, data: s.data.slice(first) })) };
 }
 
 function pivot(rows: Row[], key: string): { x: string[]; series: { name: string; data: number[]; stack?: string }[] } {
