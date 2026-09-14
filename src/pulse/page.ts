@@ -14,6 +14,17 @@ export type Platform = (typeof PLATFORMS)[number];
 
 export type PulseEvent = { at: string; platform: string; what: string; detail: string; url?: string; kind: "root" | "first" | "reply" | "takeoff" | "peak" | "top" };
 export type SpreadRow = { platform: string; first_post: string | null; first_post_handle: string | null; first_comment: string | null; takeoff: string | null; peak_hour: string | null; peak_comments: number; posts: number; comments: number; negative: number; labelled: number };
+export type StanceRow = { platform: string; posts: number; against: number; neutral: number; for_: number; unlabelled: number; views_total: number; views_against: number; views_for: number; views_neutral: number; likes_total: number; likes_against: number; likes_for: number; likes_neutral: number };
+export type Commenters = {
+  accounts: number; comments: number;
+  once: number; few: number; many: number;            // accounts with 1, 2-4, 5+ comments
+  comments_from_once: number; comments_from_many: number;
+  cross_post: number; cross_platform: number;
+  top: { platform: string; handle: string; comments: number; posts: number; likes: number; negative: number }[];
+  first_time: { x: string[]; series: { name: string; data: (number | null)[] }[] };
+};
+export type ReplyEffect = { at: string; before: { comments: number; labelled: number; negative: number }; after: { comments: number; labelled: number; negative: number }; same_platform: { platform: string; before: { comments: number; labelled: number; negative: number }; after: { comments: number; labelled: number; negative: number } } } | null;
+
 export type PulseData = {
   subject: string;
   productName: string;
@@ -23,6 +34,10 @@ export type PulseData = {
   root: { url: string; posted_at: string; caption: string; views: number | null; likes: number | null; comments: number; early_comments: number } | null;
   reply: { at: string; likes: number; text: string } | null;
   hourly: { x: string[]; series: { name: string; data: number[]; stack?: string }[] };
+  negative_trend: { x: string[]; series: { name: string; data: (number | null)[] }[] };
+  stance: StanceRow[];
+  commenters: Commenters;
+  reply_effect: ReplyEffect;
   daily: { x: string[]; series: { name: string; data: number[]; stack?: string }[] };
   events: PulseEvent[];
   spread: SpreadRow[];
@@ -78,6 +93,25 @@ async function build(ws: string): Promise<PulseData | null> {
   const replyRow = await db.one<Row>(`select to_char(posted_at at time zone $2, 'YYYY-MM-DD HH24:MI') as at, coalesce(likes, 0)::int as likes, text, platform from comments where workspace_id = $1 and sentiment_source = 'subject' order by likes desc nulls last limit 1`, [ws, tz]);
   const reply = replyRow && (replyRow.likes as number) > 0 ? { at: replyRow.at as string, likes: replyRow.likes as number, text: String(replyRow.text).replace(/\s+/g, " ").slice(0, 240), platform: replyRow.platform as string } : null;
 
+  // before and after the subject's reply: did the mood move?
+  let reply_effect: ReplyEffect = null;
+  if (reply) {
+    const split = async (platform: string | null) => {
+      const r = await db.one<Row>(
+        `select count(*) filter (where c.posted_at < r.at)::int as b_comments, count(*) filter (where c.posted_at < r.at and c.sentiment is not null)::int as b_labelled,
+                count(*) filter (where c.posted_at < r.at and c.sentiment = 'negative')::int as b_negative,
+                count(*) filter (where c.posted_at >= r.at)::int as a_comments, count(*) filter (where c.posted_at >= r.at and c.sentiment is not null)::int as a_labelled,
+                count(*) filter (where c.posted_at >= r.at and c.sentiment = 'negative')::int as a_negative
+         from comments c, (select posted_at as at from comments where workspace_id = $1 and sentiment_source = 'subject' order by likes desc nulls last limit 1) r
+         where c.workspace_id = $1 and c.sentiment_source is distinct from 'subject' and c.posted_at >= r.at - interval '3 days' ${platform ? "and c.platform = $2" : ""}`,
+        platform ? [ws, platform] : [ws],
+      );
+      return { before: { comments: r?.b_comments as number, labelled: r?.b_labelled as number, negative: r?.b_negative as number }, after: { comments: r?.a_comments as number, labelled: r?.a_labelled as number, negative: r?.a_negative as number } };
+    };
+    const [all, same] = await Promise.all([split(null), split(reply.platform)]);
+    reply_effect = { at: reply.at, ...all, same_platform: { platform: reply.platform, ...same } };
+  }
+
   // hourly, last 72 h ending at the newest comment; daily since the root post
   const hours = await db.q<Row>(
     `with bounds as (select date_trunc('hour', max(posted_at) at time zone $2) as last from comments where workspace_id = $1),
@@ -88,6 +122,70 @@ async function build(ws: string): Promise<PulseData | null> {
     [ws, tz],
   );
   const hourly = pivot(hours, "h");
+  // negative share per hour on labelled comments; hours with fewer than 10 labelled stay blank
+  const negHours = await db.q<Row>(
+    `with bounds as (select date_trunc('hour', max(posted_at) at time zone $2) as last from comments where workspace_id = $1),
+     hrs as (select generate_series((select last from bounds) - interval '71 hours', (select last from bounds), interval '1 hour') as h)
+     select to_char(hrs.h, 'YYYY-MM-DD HH24:00') as h, count(c.id) filter (where c.sentiment is not null)::int as labelled, count(c.id) filter (where c.sentiment = 'negative')::int as negative
+     from hrs left join comments c on c.workspace_id = $1 and c.sentiment_source is distinct from 'subject' and date_trunc('hour', c.posted_at at time zone $2) = hrs.h
+     group by 1 order by 1`,
+    [ws, tz],
+  );
+  const negative_trend = { x: negHours.map((r) => r.h as string), series: [{ name: "Negative share of labelled comments (%)", data: negHours.map((r) => ((r.labelled as number) >= 10 ? Math.round(((r.negative as number) / (r.labelled as number)) * 1000) / 10 : null)) }] };
+
+  // stance of the contents about the subject, weighted by reach (views where the platform reports them, likes otherwise)
+  const stance = (await db.q<Row>(
+    `select platform, count(*)::int as posts,
+            count(*) filter (where stance = 'negative')::int as against, count(*) filter (where stance = 'neutral')::int as neutral,
+            count(*) filter (where stance = 'positive')::int as for_, count(*) filter (where stance is null)::int as unlabelled,
+            coalesce(sum(views), 0)::float8 as views_total, coalesce(sum(views) filter (where stance = 'negative'), 0)::float8 as views_against,
+            coalesce(sum(views) filter (where stance = 'positive'), 0)::float8 as views_for, coalesce(sum(views) filter (where stance = 'neutral'), 0)::float8 as views_neutral,
+            coalesce(sum(likes), 0)::int as likes_total, coalesce(sum(likes) filter (where stance = 'negative'), 0)::int as likes_against,
+            coalesce(sum(likes) filter (where stance = 'positive'), 0)::int as likes_for, coalesce(sum(likes) filter (where stance = 'neutral'), 0)::int as likes_neutral
+     from posts where workspace_id = $1 and source = 'earned' and content_type is distinct from 'stub'
+     group by 1 order by posts desc`,
+    [ws],
+  )) as unknown as StanceRow[];
+
+  // who comments: once vs repeatedly, across posts, across platforms (by handle text), first-time share per hour
+  const cm = await db.one<Row>(
+    `with per_account as (
+       select c.platform, c.author_handle, count(*)::int as n, count(distinct c.post_id)::int as posts
+       from comments c where c.workspace_id = $1 and c.sentiment_source is distinct from 'subject' and c.author_handle is not null group by 1, 2),
+     handles as (select author_handle, count(distinct platform)::int as platforms from per_account group by 1)
+     select (select count(*) from per_account)::int as accounts, (select sum(n) from per_account)::int as comments,
+            count(*) filter (where n = 1)::int as once, count(*) filter (where n between 2 and 4)::int as few, count(*) filter (where n >= 5)::int as many,
+            coalesce(sum(n) filter (where n = 1), 0)::int as comments_from_once, coalesce(sum(n) filter (where n >= 5), 0)::int as comments_from_many,
+            count(*) filter (where posts >= 2)::int as cross_post,
+            (select count(*) from handles where platforms >= 2)::int as cross_platform
+     from per_account`,
+    [ws],
+  );
+  const topCommenters = await db.q<Row>(
+    `select c.platform, c.author_handle as handle, count(*)::int as comments, count(distinct c.post_id)::int as posts, coalesce(sum(c.likes), 0)::int as likes,
+            count(*) filter (where c.sentiment = 'negative')::int as negative
+     from comments c where c.workspace_id = $1 and c.sentiment_source is distinct from 'subject' and c.author_handle is not null
+     group by 1, 2 order by comments desc, likes desc limit 8`,
+    [ws],
+  );
+  const firstTime = await db.q<Row>(
+    `with bounds as (select date_trunc('hour', max(posted_at) at time zone $2) as last from comments where workspace_id = $1),
+     hrs as (select generate_series((select last from bounds) - interval '71 hours', (select last from bounds), interval '1 hour') as h),
+     firsts as (select platform, author_handle, min(posted_at) as first_at from comments where workspace_id = $1 and sentiment_source is distinct from 'subject' and author_handle is not null group by 1, 2)
+     select to_char(hrs.h, 'YYYY-MM-DD HH24:00') as h,
+            (select count(*) from comments c where c.workspace_id = $1 and c.sentiment_source is distinct from 'subject' and date_trunc('hour', c.posted_at at time zone $2) = hrs.h)::int as comments,
+            (select count(*) from firsts f where date_trunc('hour', f.first_at at time zone $2) = hrs.h)::int as first_timers
+     from hrs order by 1`,
+    [ws, tz],
+  );
+  const commenters: Commenters = {
+    accounts: (cm?.accounts as number) ?? 0, comments: (cm?.comments as number) ?? 0,
+    once: (cm?.once as number) ?? 0, few: (cm?.few as number) ?? 0, many: (cm?.many as number) ?? 0,
+    comments_from_once: (cm?.comments_from_once as number) ?? 0, comments_from_many: (cm?.comments_from_many as number) ?? 0,
+    cross_post: (cm?.cross_post as number) ?? 0, cross_platform: (cm?.cross_platform as number) ?? 0,
+    top: topCommenters as unknown as Commenters["top"],
+    first_time: { x: firstTime.map((r) => r.h as string), series: [{ name: "Comments from first-time accounts (%)", data: firstTime.map((r) => ((r.comments as number) >= 10 ? Math.round(((r.first_timers as number) / (r.comments as number)) * 1000) / 10 : null)) }] },
+  };
   const sinceIso = root ? root.posted_at.slice(0, 10) : null;
   const days = await db.q<Row>(
     `with bounds as (select coalesce($3::date, (max(posted_at) - interval '30 days')::date) as first, max(posted_at)::date as last from comments where workspace_id = $1),
@@ -154,7 +252,7 @@ async function build(ws: string): Promise<PulseData | null> {
     subject, productName: cfg.product_name, tz, asOf,
     totals: totals!, root: root ? { url: root.url, posted_at: root.posted_at, caption: root.caption, views: root.views, likes: root.likes, comments: root.comments, early_comments: root.early_comments } : null,
     reply: reply ? { at: reply.at, likes: reply.likes, text: reply.text } : null,
-    hourly, daily, events, spread: spread.map(({ first_post_url: _u, ...s }) => s), sentiment, drivers, themes, seeding,
+    hourly, negative_trend, stance, commenters, reply_effect, daily, events, spread: spread.map(({ first_post_url: _u, ...s }) => s), sentiment, drivers, themes, seeding,
   };
 }
 
