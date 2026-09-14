@@ -602,5 +602,5 @@ tr.me .bar i{background:var(--blue)}
 .growth>div small{color:var(--text-3);font-size:11px;margin-top:2px}
 .brandpage .foot{color:var(--text-3);font-size:12px;margin-top:8px}
 .bchip:hover{border-color:var(--blue);color:var(--blue)}
-.ws{gap:8px}
-.ws .wsel{font:inherit;font-size:12px;padding:4px 6px;border:1px solid var(--line-2);border-radius:7px;background:#fff;color:var(--text-2);max-width:120px}
+.ws{gap:8px;flex-direction:column;align-items:stretch}
+.ws .wsel{font:inherit;font-size:12px;padding:5px 8px;border:1px solid var(--line-2);border-radius:7px;background:#fff;color:var(--text-2);width:100%}

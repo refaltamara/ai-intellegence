@@ -243,7 +243,7 @@ export function Ask({ initialConversation, initialMessages, prefill, stats, clie
           <div><h1>Chats</h1><span className="meta">{clientName ? (copy.kind === "profile" ? `About ${clientName}` : `On the side of ${clientName}`) : copy.label}</span></div>
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
             {!split && objects.length > 0 && <button className="btn sm" onClick={() => setPaneOpen(true)}>Open the evidence</button>}
-            <span className="pill live">Data through {stats.freshness}</span>
+            <span className={`pill ${stats.freshness ? "live" : ""}`}>{stats.freshness ? `Data through ${stats.freshness}` : "No data loaded yet"}</span>
             <span className="pill">{copy.kind === "profile" ? `${stats.platforms} platforms · ${stats.months} months` : `${stats.brands} brands · ${stats.platforms} platforms · ${stats.months} months`}</span>
           </div>
         </div>
