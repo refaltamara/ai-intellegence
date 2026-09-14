@@ -4,25 +4,27 @@ import { SkillDb } from "@/skills/db";
 import { loadContext } from "@/skills/params";
 import { fmtNum } from "@/ui/format";
 import { ClientBrand } from "@/ui/ClientBrand";
-import { currentSession } from "@/auth/current";
+import { getWorkspace } from "@/workspace/store";
+import { currentSession, currentWorkspaceId } from "@/auth/current";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 
 export default async function DataPage() {
-  const [s, ctx, session] = await Promise.all([workspaceStats(), loadContext(new SkillDb()), currentSession()]);
+  const ws = await currentWorkspaceId();
+  const [s, ctx, session, cfg] = await Promise.all([workspaceStats(ws), loadContext(new SkillDb(), ws), currentSession(), getWorkspace(ws)]);
   const pct = (a: number, b: number) => Math.round((a / b) * 100);
   return (
     <section className="screen">
       <div className="topbar"><div><h1>Data</h1><span className="meta">What every answer is built from</span></div><span className="pill live">Last load {s.last_load ?? "–"} WIB · data through {s.freshness}</span></div>
       <div className="wrap wide">
-        <div className="cats"><span className="on">Beauty · Indonesia</span></div>
-        <ClientBrand brands={ctx.brands.map((b) => ({ id: b.id, name: b.name }))} current={ctx.clientBrandId} canEdit={session?.role === "owner"} />
+        <div className="cats"><span className="on">{cfg?.category_label ?? ws}</span></div>
+        <ClientBrand brands={ctx.brands.map((b) => ({ id: b.id, name: b.name }))} current={ctx.clientBrandId} canEdit={session?.role === "owner"} productName={cfg?.product_name ?? "CeMO"} kind={cfg?.kind ?? "category"} />
         <div className="stats">
           <div className="stat"><b>{s.brands}</b><span>brands tracked · {ctx.brands.filter((b) => b.tiktok_handle && b.instagram_handle).length} on both platforms</span></div>
           <div className="stat"><b>{fmtNum(s.creators)}</b><span>creators with brand history and performance</span></div>
           <div className="stat"><b>{fmtNum(s.posts)}</b><span>post rows · {fmtNum(s.unique_posts)} unique posts</span></div>
-          <div className="stat"><b>{s.comments}</b><span>comments classified · Phase 2, not loaded</span></div>
+          <div className="stat"><b>{fmtNum(s.comments)}</b><span>{s.comments ? (s.comments_labelled === s.comments ? "comments, all with sentiment" : `comments · ${fmtNum(s.comments_labelled)} with sentiment so far`) : "comments · none loaded"}</span></div>
         </div>
         <div className="layers">
           {s.per_platform.map((p) => (

@@ -30,19 +30,28 @@ import {
 const ts = (name: string) => timestamp(name, { withTimezone: true, mode: "string" });
 const createdAt = () => ts("created_at").notNull().defaultNow();
 
-export const PLATFORMS = ["tiktok", "instagram", "threads", "x"] as const;
+export const PLATFORMS = ["tiktok", "instagram", "threads", "x", "youtube"] as const;
 export const SOURCES = ["owned", "earned"] as const;
 export const TIERS = ["nano", "micro", "mid", "macro", "mega"] as const;
 
 // ---------------------------------------------------------------- workspace
 const tsvector = customType<{ data: string }>({ dataType: () => "tsvector" });
 
+/**
+ * A workspace is a subject (DECISIONS, 14 Sep): a category panel of brands, one
+ * artist, one executive. Same tables underneath; the product name, persona and
+ * on-screen words come from `kind` and `settings` (src/workspace/config.ts).
+ */
 export const workspaces = pgTable("workspaces", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
   category: text("category"),
   clientBrandId: text("client_brand_id"),
   tz: text("tz").notNull().default("Asia/Jakarta"),
+  /** 'category' (brands compete) | 'profile' (one subject, its own voice) */
+  kind: text("kind").notNull().default("category"),
+  /** product_name, tagline, category_label, subject_noun, persona, hero_title, hero_intro, suggested[] — all optional, defaults per kind */
+  settings: jsonb("settings").notNull().default(sql`'{}'::jsonb`),
   createdAt: createdAt(),
 });
 
@@ -102,7 +111,7 @@ export const creators = pgTable(
   },
   (t) => [
     uniqueIndex("creators_workspace_platform_handle_uq").on(t.workspaceId, t.platform, t.handle),
-    check("creators_platform_chk", sql`${t.platform} in ('tiktok','instagram','threads','x')`),
+    check("creators_platform_chk", sql`${t.platform} in ('tiktok','instagram','threads','x','youtube')`),
   ],
 );
 
@@ -171,6 +180,9 @@ export const posts = pgTable(
     /** likes+comments on both platforms; use for cross-platform comparison */
     engagementsLc: integer("engagements_lc"),
     capturedDays: integer("captured_days"),
+    /** profile workspaces only: what an earned post says about the subject ('positive' | 'neutral' | 'negative'); owned posts and category workspaces stay null */
+    stance: text("stance"),
+    stanceSource: text("stance_source"),
     sourceFile: text("source_file"),
     loadId: uuid("load_id"),
     createdAt: createdAt(),
@@ -183,9 +195,10 @@ export const posts = pgTable(
     index("posts_workspace_platform_posted_idx").on(t.workspaceId, t.platform, t.postedAt),
     index("posts_hashtags_gin").using("gin", t.hashtags),
     index("posts_caption_tsv_gin").using("gin", t.captionTsv),
-    check("posts_platform_chk", sql`${t.platform} in ('tiktok','instagram','threads','x')`),
+    check("posts_platform_chk", sql`${t.platform} in ('tiktok','instagram','threads','x','youtube')`),
     check("posts_source_chk", sql`${t.source} in ('owned','earned')`),
     check("posts_tier_chk", sql`${t.tier} is null or ${t.tier} in ('nano','micro','mid','macro','mega')`),
+    check("posts_stance_chk", sql`${t.stance} is null or ${t.stance} in ('positive','neutral','negative')`),
   ],
 );
 
@@ -242,6 +255,8 @@ export const comments = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     workspaceId: text("workspace_id").notNull().references(() => workspaces.id),
     postId: uuid("post_id").notNull().references(() => posts.id, { onDelete: "cascade" }),
+    /** denormalised from the post so sentiment queries never join for it */
+    platform: text("platform"),
     platformCommentId: text("platform_comment_id").notNull(),
     authorHandle: text("author_handle"),
     /** sha256(platform || handle) for graph work */
@@ -249,7 +264,12 @@ export const comments = pgTable(
     text: text("text"),
     postedAt: ts("posted_at"),
     likes: integer("likes"),
+    /** X exposes per-reply views; null elsewhere */
+    views: bigint("views", { mode: "number" }),
     sentiment: text("sentiment"),
+    /** 'model' (labelled by /api/cron/label) | 'listening' (came with the export) | 'subject' (the subject's own reply, never labelled) */
+    sentimentSource: text("sentiment_source"),
+    sentimentConfidence: numeric("sentiment_confidence"),
     topicId: text("topic_id").references(() => topics.id),
     topicConfidence: numeric("topic_confidence"),
     classifiedAt: ts("classified_at"),
@@ -257,6 +277,7 @@ export const comments = pgTable(
   (t) => [
     uniqueIndex("comments_workspace_platform_comment_uq").on(t.workspaceId, t.platformCommentId),
     index("comments_post_idx").on(t.postId),
+    index("comments_workspace_posted_idx").on(t.workspaceId, t.postedAt),
     check("comments_sentiment_chk", sql`${t.sentiment} is null or ${t.sentiment} in ('positive','neutral','negative')`),
   ],
 );

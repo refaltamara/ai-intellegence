@@ -70,5 +70,5 @@ export type SkillOutput = {
   caveats?: string[];
 };
 
-export type Platform = "tiktok" | "instagram" | "threads" | "x";
+export type Platform = "tiktok" | "instagram" | "threads" | "x" | "youtube";
 export type Tier = "nano" | "micro" | "mid" | "macro" | "mega";

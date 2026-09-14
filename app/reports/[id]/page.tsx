@@ -1,5 +1,5 @@
+import { currentWorkspaceId } from "@/auth/current";
 import { notFound } from "next/navigation";
-import { DEFAULT_WORKSPACE_ID } from "@/config/thresholds";
 import { getReport, listReports } from "@/reports/store";
 import { ReportDoc } from "@/ui/ReportDoc";
 import { ReportList } from "@/ui/ReportList";
@@ -7,9 +7,10 @@ import { ReportList } from "@/ui/ReportList";
 export const dynamic = "force-dynamic";
 
 export default async function ReportPage({ params }: { params: Promise<{ id: string }> }) {
+  const ws = await currentWorkspaceId();
   const { id } = await params;
   if (!/^[0-9a-f-]{36}$/.test(id)) notFound();
-  const [report, reports] = await Promise.all([getReport(id, DEFAULT_WORKSPACE_ID), listReports(DEFAULT_WORKSPACE_ID)]);
+  const [report, reports] = await Promise.all([getReport(id, ws), listReports(ws)]);
   if (!report) notFound();
   return (
     <section className="screen">

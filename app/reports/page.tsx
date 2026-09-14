@@ -1,4 +1,4 @@
-import { DEFAULT_WORKSPACE_ID } from "@/config/thresholds";
+import { currentWorkspaceId } from "@/auth/current";
 import { getReport, listReports } from "@/reports/store";
 import { ReportDoc } from "@/ui/ReportDoc";
 import { ReportList } from "@/ui/ReportList";
@@ -6,8 +6,9 @@ import { ReportList } from "@/ui/ReportList";
 export const dynamic = "force-dynamic";
 
 export default async function ReportsPage() {
-  const reports = await listReports(DEFAULT_WORKSPACE_ID);
-  const latest = reports[0] ? await getReport(reports[0].id, DEFAULT_WORKSPACE_ID) : null;
+  const ws = await currentWorkspaceId();
+  const reports = await listReports(ws);
+  const latest = reports[0] ? await getReport(reports[0].id, ws) : null;
   return (
     <section className="screen">
       <div className="topbar">

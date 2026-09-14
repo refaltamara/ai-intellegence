@@ -2,8 +2,8 @@
  * Model diagnostics (login-protected): one small request with the same client,
  * system prompt and tools as Ask. Shows the exact API error when the chat fails.
  */
+import { currentWorkspaceId } from "@/auth/current";
 import Anthropic from "@anthropic-ai/sdk";
-import { DEFAULT_WORKSPACE_ID } from "@/config/thresholds";
 import { anthropicClient, chatEffort, describeModelError } from "@/chat/client";
 import { buildSystem, hasModelCredentials, modelId } from "@/chat/loop";
 import { buildTools } from "@/chat/tools";
@@ -13,12 +13,13 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 export async function GET(req: Request) {
+  const ws = await currentWorkspaceId();
   const started = Date.now();
   const withTools = new URL(req.url).searchParams.get("tools") !== "0";
   const steps: Record<string, unknown> = { model: modelId(), effort: chatEffort(), credentials: hasModelCredentials(), workspace_header: !!process.env.ANTHROPIC_WORKSPACE_ID, with_tools: withTools };
   try {
     const t0 = Date.now();
-    const system = await buildSystem(DEFAULT_WORKSPACE_ID);
+    const system = await buildSystem(ws);
     steps.system = { ok: true, chars: system.length, ms: Date.now() - t0 };
     const tools = buildTools();
     steps.tools = tools.map((t: any) => ({ name: t.name, strict: !!t.strict, schema_chars: JSON.stringify(t.input_schema).length }));

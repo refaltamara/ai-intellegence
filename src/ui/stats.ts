@@ -1,7 +1,7 @@
 import { sql } from "@/db/client";
 import { DEFAULT_WORKSPACE_ID } from "@/config/thresholds";
 
-export type WorkspaceStats = { brands: number; creators: number; posts: number; unique_posts: number; comments: number; platforms: number; months: number; freshness: string; last_load: string | null; per_platform: { platform: string; posts: number; creators: number; first_month: string; last_month: string }[]; per_month: { platform: string; month: string; posts: number; days_captured: number; days_in_month: number }[]; loads: { file: string; platform: string | null; rows_in: number; rows_loaded: number; rows_rejected: number; finished_at: string | null }[] };
+export type WorkspaceStats = { brands: number; creators: number; posts: number; unique_posts: number; comments: number; comments_labelled: number; platforms: number; months: number; freshness: string; last_load: string | null; per_platform: { platform: string; posts: number; creators: number; first_month: string; last_month: string }[]; per_month: { platform: string; month: string; posts: number; days_captured: number; days_in_month: number }[]; loads: { file: string; platform: string | null; rows_in: number; rows_loaded: number; rows_rejected: number; finished_at: string | null }[] };
 
 export async function workspaceStats(ws = DEFAULT_WORKSPACE_ID): Promise<WorkspaceStats> {
   const [t] = (await sql.query(
@@ -10,6 +10,7 @@ export async function workspaceStats(ws = DEFAULT_WORKSPACE_ID): Promise<Workspa
             (select count(*) from posts where workspace_id = $1)::int as posts,
             (select count(distinct (platform, url)) from posts where workspace_id = $1)::int as unique_posts,
             (select count(*) from comments where workspace_id = $1)::int as comments,
+            (select count(*) from comments where workspace_id = $1 and sentiment is not null)::int as comments_labelled,
             (select count(distinct platform) from posts where workspace_id = $1)::int as platforms,
             (select count(distinct month) from posts where workspace_id = $1)::int as months,
             (select to_char(max(posted_at at time zone 'Asia/Jakarta'), 'DD Mon YYYY') from posts where workspace_id = $1) as freshness,
@@ -30,7 +31,7 @@ export async function workspaceStats(ws = DEFAULT_WORKSPACE_ID): Promise<Workspa
   )) as any[];
   const loads = (await sql.query(
     `select file, platform, rows_in, rows_loaded, rows_rejected, to_char(finished_at at time zone 'Asia/Jakarta', 'DD Mon YYYY HH24:MI') as finished_at
-     from data_loads where workspace_id = $1 order by started_at desc limit 6`,
+     from data_loads where workspace_id = $1 order by started_at desc limit 12`,
     [ws],
   )) as any[];
   return { ...t, per_platform, per_month, loads };

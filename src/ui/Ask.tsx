@@ -28,7 +28,6 @@ type Msg = {
   timings?: { total_ms: number; model_ms: number; model_calls: number; tools_ms: number; tool_calls: number; setup_ms: number; effort: string };
 };
 
-const SUGGESTED = ["What were competitors doing last week?", "Tell me Skintific's strategy in June", "Which campaigns ran in the last 90 days with 20 or more creators?", "Find 50 nano creators competitors used on TikTok in the last 90 days"];
 const MAX_FILES = 3;
 const MAX_TABS = 6;
 function fileSize(bytes: number): string {
@@ -40,9 +39,13 @@ type Props = {
   stats: { brands: number; platforms: number; months: number; freshness: string }; clientName: string | null;
   decisionId?: string | null; basePath?: string; initialSend?: { prompt: string; followup?: Followup }; topbar?: boolean;
   pane?: PaneContext;
+  /** words from the workspace: what the empty screen says and offers */
+  copy?: { hero_title: string; hero_intro: string; suggested: string[]; label: string; kind: string };
 };
 
-export function Ask({ initialConversation, initialMessages, prefill, stats, clientName, decisionId = null, basePath = "/", initialSend, topbar = true, pane }: Props) {
+const DEFAULT_COPY = { hero_title: "What's happening in Indonesian beauty?", hero_intro: "", suggested: ["What were competitors doing last week?", "Which brand grew fastest this month?", "Which campaigns ran in the last 90 days with 20 or more creators?", "Find 50 nano creators competitors used on TikTok in the last 90 days"], label: "Beauty · Indonesia", kind: "category" };
+
+export function Ask({ initialConversation, initialMessages, prefill, stats, clientName, decisionId = null, basePath = "/", initialSend, topbar = true, pane, copy = DEFAULT_COPY }: Props) {
   const router = useRouter();
   const [conversationId, setConversationId] = useState<string | null>(initialConversation);
   const [thread, setThread] = useState<Msg[]>(() => {
@@ -237,11 +240,11 @@ export function Ask({ initialConversation, initialMessages, prefill, stats, clie
       onDrop={(e) => { if (e.dataTransfer.files?.length) { e.preventDefault(); setDragging(false); void upload(e.dataTransfer.files); } }}>
       {topbar && (
         <div className="topbar">
-          <div><h1>Chats</h1><span className="meta">{clientName ? `On the side of ${clientName}` : "Beauty · Indonesia"}</span></div>
+          <div><h1>Chats</h1><span className="meta">{clientName ? (copy.kind === "profile" ? `About ${clientName}` : `On the side of ${clientName}`) : copy.label}</span></div>
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
             {!split && objects.length > 0 && <button className="btn sm" onClick={() => setPaneOpen(true)}>Open the evidence</button>}
-            <span className="pill live">Data through {stats.freshness}</span>
-            <span className="pill">{stats.brands} brands · {stats.platforms} platforms · {stats.months} months</span>
+            <span className={`pill ${stats.freshness ? "live" : ""}`}>{stats.freshness ? `Data through ${stats.freshness}` : "No data loaded yet"}</span>
+            <span className="pill">{copy.kind === "profile" ? `${stats.platforms} platforms · ${stats.months} months` : `${stats.brands} brands · ${stats.platforms} platforms · ${stats.months} months`}</span>
           </div>
         </div>
       )}
@@ -252,10 +255,10 @@ export function Ask({ initialConversation, initialMessages, prefill, stats, clie
             <div className="wrap">
               {empty && (
                 <div className="hero">
-                  <h2>What's happening in Indonesian beauty?</h2>
-                  <p>I've read every creator post about {stats.brands} brands on TikTok and Instagram. Ask me anything about creators, competitors or campaigns; every number I give you shows its evidence, and I'll tell you when the data disagrees with you.</p>
+                  <h2>{copy.hero_title}</h2>
+                  <p>{copy.hero_intro || `I've read every creator post about ${stats.brands} brands on TikTok and Instagram. Ask me anything about creators, competitors or campaigns; every number I give you shows its evidence, and I'll tell you when the data disagrees with you.`}</p>
                   <div className="chips">
-                    {SUGGESTED.map((s) => <button key={s} onClick={() => send(s)}>{s}</button>)}
+                    {copy.suggested.map((s) => <button key={s} onClick={() => send(s)}>{s}</button>)}
                   </div>
                 </div>
               )}

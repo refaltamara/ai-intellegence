@@ -11,7 +11,9 @@ const NAV = [
   { href: "/data", label: "Data", icon: <><ellipse cx="12" cy="6" rx="8" ry="3" /><path d="M4 6v12c0 1.7 3.6 3 8 3s8-1.3 8-3V6" /><path d="M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3" /></> },
 ];
 
-export function Sidebar({ recent, user, client }: { recent: { id: string; title: string; href: string }[]; user: { email: string; role: string }; client: string | null }) {
+type Product = { name: string; tagline: string; label: string; kind: string };
+
+export function Sidebar({ recent, user, client, product, workspaces, currentWorkspace }: { recent: { id: string; title: string; href: string }[]; user: { email: string; role: string }; client: string | null; product: Product; workspaces: { id: string; name: string; kind: string }[]; currentWorkspace: string }) {
   const path = usePathname();
   const router = useRouter();
   const initials = user.email.slice(0, 2).toUpperCase();
@@ -20,10 +22,15 @@ export function Sidebar({ recent, user, client }: { recent: { id: string; title:
     router.push("/login");
     router.refresh();
   }
+  async function switchTo(id: string) {
+    await fetch("/api/workspace/switch", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ workspace_id: id }) });
+    router.push("/");
+    router.refresh();
+  }
   const active = (href: string) => (href === "/" ? path === "/" : href === "/decisions" ? path.startsWith("/decisions") || path.startsWith("/d/") : path.startsWith(href));
   return (
     <aside className="side">
-      <div className="brand"><div className="mark">C</div><div><b>CeMO</b><small>Your CMO</small></div></div>
+      <div className="brand"><div className="mark">{product.name.charAt(0)}</div><div><b>{product.name}</b><small>{product.tagline}</small></div></div>
       <nav className="nav">
         {NAV.map((n) => (
           <Link key={n.href} href={n.href} className={active(n.href) ? "on" : ""}>
@@ -42,7 +49,17 @@ export function Sidebar({ recent, user, client }: { recent: { id: string; title:
         </div>
       </div>
       <div className="bottom">
-        <div className="ws"><div><span>Beauty · Indonesia</span><b>{client ? `On the side of ${client}` : "No client brand yet"}</b></div></div>
+        <div className="ws">
+          <div style={{ minWidth: 0 }}>
+            <span>{product.label}</span>
+            <b>{client ? (product.kind === "profile" ? `About ${client}` : `On the side of ${client}`) : product.kind === "profile" ? "No subject set yet" : "No client brand yet"}</b>
+          </div>
+          {user.role === "owner" && workspaces.length > 1 && (
+            <select className="wsel" value={currentWorkspace} onChange={(e) => switchTo(e.target.value)} title="Switch workspace">
+              {workspaces.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
+            </select>
+          )}
+        </div>
         <div className="user" style={{ justifyContent: "space-between" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}><div className="avatar">{initials}</div><div style={{ minWidth: 0 }}><b style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 120 }}>{user.email}</b><span>{user.role}</span></div></div>
           <button className="btn sm ghost" onClick={logout} title="Sign out">Out</button>

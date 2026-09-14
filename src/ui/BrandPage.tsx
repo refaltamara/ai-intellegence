@@ -66,7 +66,7 @@ function WeeklyBars({ points }: { points: WeekPoint[] }) {
   );
 }
 
-export function BrandPage({ d, q }: { d: BrandPageData; q: Query }) {
+export function BrandPage({ d, q, productName = "CeMO" }: { d: BrandPageData; q: Query; productName?: string }) {
   const base = `/data/${d.brand.id}`;
   const b = d.brand;
   const period = periodWords[d.period];
@@ -97,7 +97,7 @@ export function BrandPage({ d, q }: { d: BrandPageData; q: Query }) {
         <div className="seg">{PERIODS.map((p) => <Link key={p.key} href={href(base, q, { period: p.key })} className={d.period === p.key ? "on" : ""}>{p.label}</Link>)}</div>
       </div>
       <div className="wrap wide">
-        <p className="intro">What CeMO has collected about {b.name}: every number below is an inventory of the loaded posts, {period} ({d.window.from} to {d.window.to}). Ask about any section to take it into a chat.</p>
+        <p className="intro">What {productName} has collected about {b.name}: every number below is an inventory of the loaded posts, {period} ({d.window.from} to {d.window.to}). Ask about any section to take it into a chat.</p>
 
         {/* 1. Coverage */}
         <div className="bsec">

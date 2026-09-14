@@ -8,6 +8,10 @@
     {
       "path": "/api/cron/brief",
       "schedule": "0 23 * * *"
+    },
+    {
+      "path": "/api/cron/label",
+      "schedule": "*/10 * * * *"
     }
   ]
 }

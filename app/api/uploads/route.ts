@@ -3,8 +3,7 @@
  * stores it against the signed-in user, and returns its id and metadata. The id
  * is passed with the next chat message, which binds it to the conversation.
  */
-import { DEFAULT_WORKSPACE_ID } from "@/config/thresholds";
-import { currentSession } from "@/auth/current";
+import { currentSession, currentWorkspaceId } from "@/auth/current";
 import { attachmentError, deleteAttachment, saveAttachment, MAX_ATTACHMENT_BYTES } from "@/chat/attachments";
 
 export const runtime = "nodejs";
@@ -12,6 +11,7 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 export async function POST(req: Request) {
+  const ws = await currentWorkspaceId();
   const session = await currentSession();
   if (!session) return Response.json({ error: "unauthorised" }, { status: 401 });
 
@@ -29,7 +29,7 @@ export async function POST(req: Request) {
 
   try {
     const row = await saveAttachment({
-      workspaceId: DEFAULT_WORKSPACE_ID,
+      workspaceId: ws,
       userId: session.uid,
       filename: file.name,
       mediaType: "application/pdf",
@@ -43,6 +43,7 @@ export async function POST(req: Request) {
 }
 
 export async function DELETE(req: Request) {
+  const ws = await currentWorkspaceId();
   const session = await currentSession();
   if (!session) return Response.json({ error: "unauthorised" }, { status: 401 });
   const id = new URL(req.url).searchParams.get("id") ?? "";

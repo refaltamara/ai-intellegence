@@ -2,6 +2,7 @@
  * Runs one agent (PRD §6.3): skill with frozen params -> new skill_run, diff
  * against the previous successful run, report row, delivery, next_run_at.
  */
+import { getWorkspace } from "../workspace/store";
 import { appUrl as publicUrl } from "../config/app";
 import { runSkill } from "../skills/runner";
 import { renderHtml } from "../reports/render";
@@ -34,7 +35,8 @@ export async function runAgent(agent: AgentRow, opts: { reason?: "schedule" | "m
     const plainHeadline = sections.headline.replace(/<ev id="(ev_\d+)"><\/ev>/g, "[$1]");
     const html = renderHtml({ title, result, diff, appUrl: appUrl ? `${appUrl}/reports/${report.id}` : undefined, agentName: agent.name, headline: plainHeadline });
     if (should) {
-      delivered = await deliver(agent.delivery, { subject: `[CeMO] ${title}`, html, text: markdown });
+      const product = (await getWorkspace(agent.workspace_id).catch(() => null))?.product_name ?? "Fair Intelligence";
+      delivered = await deliver(agent.delivery, { subject: `[${product}] ${title}`, html, text: markdown });
       const failed = delivered.filter((d) => !d.ok && d.channel !== "in_app");
       deliveryError = failed.length ? failed.map((d) => `${d.channel}: ${d.detail}`).join("; ") : null;
       deliveredAt = delivered.some((d) => d.ok && d.channel !== "in_app") ? new Date().toISOString() : null;
