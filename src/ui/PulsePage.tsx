@@ -50,6 +50,33 @@ export function PulsePage({ d }: { d: PulseData }) {
           </div>
         </div>
 
+        <div className="pulse-grid">
+          <div className="card">
+            <h4>Is the mood moving? <span>negative share of labelled comments per hour · blank under 10 labelled</span></h4>
+            <div className="body">{d.negative_trend.series[0].data.some((v) => v != null) ? <Chart spec={{ type: "line", x: d.negative_trend.x.map((h) => h.slice(5)), series: d.negative_trend.series, y_label: "% negative" }} /> : <p className="quiet">Not enough labelled comments per hour yet.</p>}</div>
+            {t.labelled < t.comments && <div className="caveats">Labelling is still running and works post by post, so some hours are labelled unevenly until it finishes.</div>}
+          </div>
+          <div className="card">
+            <h4>Before and after {d.subject}&apos;s reply <span>{d.reply_effect ? `${when(d.reply_effect.at)} WIB · three days either side` : "no reply from the subject in the data"}</span></h4>
+            <div className="body">
+              {d.reply_effect ? (
+                <div className="tablewrap still" style={{ border: 0 }}>
+                  <table>
+                    <thead><tr><th></th><th className="num">Comments</th><th className="num">Labelled</th><th className="num">Negative</th></tr></thead>
+                    <tbody>
+                      <SplitRow label="Before, all platforms" s={d.reply_effect.before} />
+                      <SplitRow label="After, all platforms" s={d.reply_effect.after} />
+                      <SplitRow label={`Before, ${label(d.reply_effect.same_platform.platform)} only`} s={d.reply_effect.same_platform.before} />
+                      <SplitRow label={`After, ${label(d.reply_effect.same_platform.platform)} only`} s={d.reply_effect.same_platform.after} />
+                    </tbody>
+                  </table>
+                  <p className="quiet" style={{ padding: "10px 12px 0" }}>Compare the negative share, not the counts: volume after a reply says how loud, the share says whether it helped.</p>
+                </div>
+              ) : <p className="quiet">When the subject replies under their own post, this card compares the comments before and after.</p>}
+            </div>
+          </div>
+        </div>
+
         <div className="card" style={{ marginBottom: 12 }}>
           <h4>How it spread <span>every platform on one clock, WIB</span></h4>
           <div className="tablewrap still" style={{ border: 0 }}>
@@ -90,6 +117,44 @@ export function PulsePage({ d }: { d: PulseData }) {
           </div>
         </div>
 
+        <div className="pulse-grid">
+          <div className="card">
+            <h4>Where the contents stand <span>posts by other accounts, for or against {d.subject}, weighted by reach</span></h4>
+            <div className="tablewrap still" style={{ border: 0 }}>
+              <table>
+                <thead><tr><th>Platform</th><th className="num">Posts</th><th className="num">Against</th><th className="num">Neutral</th><th className="num">For</th><th>Hostile share of reach</th></tr></thead>
+                <tbody>{d.stance.map((r) => {
+                  const labelled = r.posts - r.unlabelled;
+                  const useViews = r.views_total > 0;
+                  const tot = useViews ? r.views_against + r.views_for + r.views_neutral : r.likes_against + r.likes_for + r.likes_neutral;
+                  const hostile = tot > 0 ? Math.round(((useViews ? r.views_against : r.likes_against) / tot) * 100) : null;
+                  return (
+                    <tr key={r.platform}>
+                      <td>{label(r.platform)}</td><td className="num">{fmtNum(r.posts)}</td>
+                      <td className="num">{labelled ? fmtNum(r.against) : "–"}</td><td className="num">{labelled ? fmtNum(r.neutral) : "–"}</td><td className="num">{labelled ? fmtNum(r.for_) : "–"}</td>
+                      <td>{hostile == null ? (r.unlabelled ? <span className="quiet">stance labels pending</span> : "–") : <><div className="bar" style={{ width: 90, display: "inline-block", verticalAlign: "middle", marginRight: 8 }}><i style={{ width: `${hostile}%`, background: "var(--red, #c0392b)" }} /></div>{hostile}% <small style={{ color: "var(--text-3)" }}>of {useViews ? "views" : "likes"}{r.unlabelled ? `, ${r.unlabelled} posts unlabelled` : ""}</small></>}</td>
+                    </tr>
+                  );
+                })}</tbody>
+              </table>
+            </div>
+            <div className="caveats">Stance is labelled after the comments; Threads reports no views, so its reach is likes. Her own posts carry no stance.</div>
+          </div>
+          <div className="card">
+            <h4>Who is commenting <span>{fmtNum(d.commenters.accounts)} accounts · {fmtNum(d.commenters.comments)} comments</span></h4>
+            <div className="body">
+              <div className="stats" style={{ gridTemplateColumns: "repeat(3, 1fr)", marginBottom: 12 }}>
+                <div className="stat" style={{ padding: 12 }}><b style={{ fontSize: 20 }}>{pct(d.commenters.once, d.commenters.accounts) ?? 0}%</b><span>commented once ({fmtNum(d.commenters.once)} accounts, {pct(d.commenters.comments_from_once, d.commenters.comments) ?? 0}% of comments)</span></div>
+                <div className="stat" style={{ padding: 12 }}><b style={{ fontSize: 20 }}>{fmtNum(d.commenters.many)}</b><span>accounts with 5+ comments, carrying {pct(d.commenters.comments_from_many, d.commenters.comments) ?? 0}% of comments</span></div>
+                <div className="stat" style={{ padding: 12 }}><b style={{ fontSize: 20 }}>{fmtNum(d.commenters.cross_post)}</b><span>accounts on 2+ posts · {fmtNum(d.commenters.cross_platform)} handles seen on 2+ platforms</span></div>
+              </div>
+              {d.commenters.first_time.series[0].data.some((v) => v != null) && <Chart spec={{ type: "line", x: d.commenters.first_time.x.map((h) => h.slice(5)), series: d.commenters.first_time.series, y_label: "% first-time" }} />}
+              <p className="quiet" style={{ marginTop: 8 }}>A pile-on is mostly first-time accounts; a mobilised one shows repeat accounts across posts and the same handles on several platforms. Handles are matched as text, not as people.</p>
+              <ul className="themes" style={{ marginTop: 10 }}>{d.commenters.top.slice(0, 5).map((c) => <li key={c.platform + c.handle}><b>@{c.handle}</b> <span>{label(c.platform)} · {fmtNum(c.comments)} comments on {fmtNum(c.posts)} posts · {fmtNum(c.likes)} likes{c.negative ? ` · ${fmtNum(c.negative)} negative` : ""}</span></li>)}</ul>
+            </div>
+          </div>
+        </div>
+
         <div className="pulse-grid three">
           <div className="card">
             <h4>What they are saying <span>{(d.themes.summary as { sentiment?: string }).sentiment === "negative" ? "in negative comments" : "all comments, labels still landing"}</span></h4>
@@ -121,6 +186,11 @@ export function PulsePage({ d }: { d: PulseData }) {
       </div>
     </section>
   );
+}
+
+function SplitRow({ label: l, s }: { label: string; s: { comments: number; labelled: number; negative: number } }) {
+  const p = pct(s.negative, s.labelled);
+  return <tr><td>{l}</td><td className="num">{fmtNum(s.comments)}</td><td className="num">{fmtNum(s.labelled)}</td><td className="num" style={{ fontWeight: 600, color: p != null && p >= 50 ? "var(--red, #c0392b)" : undefined }}>{p == null ? "–" : `${p}%`}</td></tr>;
 }
 
 function EventRow({ e }: { e: PulseEvent }) {
