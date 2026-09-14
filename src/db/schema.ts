@@ -37,12 +37,21 @@ export const TIERS = ["nano", "micro", "mid", "macro", "mega"] as const;
 // ---------------------------------------------------------------- workspace
 const tsvector = customType<{ data: string }>({ dataType: () => "tsvector" });
 
+/**
+ * A workspace is a subject (DECISIONS, 14 Sep): a category panel of brands, one
+ * artist, one executive. Same tables underneath; the product name, persona and
+ * on-screen words come from `kind` and `settings` (src/workspace/config.ts).
+ */
 export const workspaces = pgTable("workspaces", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
   category: text("category"),
   clientBrandId: text("client_brand_id"),
   tz: text("tz").notNull().default("Asia/Jakarta"),
+  /** 'category' (brands compete) | 'profile' (one subject, its own voice) */
+  kind: text("kind").notNull().default("category"),
+  /** product_name, tagline, category_label, subject_noun, persona, hero_title, hero_intro, suggested[] — all optional, defaults per kind */
+  settings: jsonb("settings").notNull().default(sql`'{}'::jsonb`),
   createdAt: createdAt(),
 });
 

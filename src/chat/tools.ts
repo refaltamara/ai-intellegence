@@ -76,7 +76,7 @@ export function buildTools(): Anthropic.Tool[] {
   const runSkill: Anthropic.Tool = {
     name: "run_skill",
     description:
-      "Run one of CeMO's analyses on the workspace's social listening database. Use this whenever the person's question maps to an analysis. Each returns real rows computed in the database plus an evidence list; you must cite evidence ids when you use their numbers. The person never sees these names: never repeat them. Params marked * are required; =value shows the default.\n" +
+      "Run one of the analyses on this workspace's social listening database. Use this whenever the person's question maps to an analysis. Each returns real rows computed in the database plus an evidence list; you must cite evidence ids when you use their numbers. The person never sees these names: never repeat them. Params marked * are required; =value shows the default.\n" +
       "Available skills and their parameters:\n" +
       describeSkillsForTool() +
       "\nWindows: {last_n_days} or {from,to} ISO dates; relative windows count back from the newest data. Brands accept slugs, handles or display names. If a skill returns status 'unavailable', tell the user which data layer is not loaded yet and offer the nearest available skill.",

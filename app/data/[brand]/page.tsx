@@ -2,6 +2,8 @@
 import { notFound } from "next/navigation";
 import { brandPage, type Period } from "@/brand/page";
 import { BrandPage } from "@/ui/BrandPage";
+import { currentWorkspaceId } from "@/auth/current";
+import { getWorkspace } from "@/workspace/store";
 
 export const dynamic = "force-dynamic";
 
@@ -10,7 +12,8 @@ export default async function BrandDataPage({ params, searchParams }: { params: 
   const sp = await searchParams;
   if (!/^[a-z0-9_.-]{1,80}$/i.test(brand)) notFound();
   const period: Period = sp.period === "90d" || sp.period === "all" ? sp.period : "30d";
-  const d = await brandPage(brand, period);
+  const ws = await currentWorkspaceId();
+  const [d, cfg] = await Promise.all([brandPage(brand, period, ws), getWorkspace(ws)]);
   if (!d) notFound();
-  return <BrandPage d={d} q={{ period, platform: sp.platform, tags: sp.tags, creators: sp.creators, hashtags: sp.hashtags }} />;
+  return <BrandPage d={d} productName={cfg?.product_name ?? "CeMO"} q={{ period, platform: sp.platform, tags: sp.tags, creators: sp.creators, hashtags: sp.hashtags }} />;
 }

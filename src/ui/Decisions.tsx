@@ -13,9 +13,9 @@ import { RichText } from "./Ask";
 import { EvidenceList } from "./Evidence";
 import { fmtDate } from "./format";
 
-type Props = { decisions: DecisionSummary[]; brief: BriefContent | null; evidence: Evidence[]; generatedAt: string | null; stale: boolean; clientName: string | null; dateLine: string; canRefresh: boolean };
+type Props = { decisions: DecisionSummary[]; brief: BriefContent | null; evidence: Evidence[]; generatedAt: string | null; stale: boolean; clientName: string | null; dateLine: string; canRefresh: boolean; label?: string; kind?: string };
 
-export function Decisions({ decisions, brief: initialBrief, evidence: initialEvidence, generatedAt: initialGeneratedAt, stale, clientName, dateLine, canRefresh }: Props) {
+export function Decisions({ decisions, brief: initialBrief, evidence: initialEvidence, generatedAt: initialGeneratedAt, stale, clientName, dateLine, canRefresh, label = "Beauty · Indonesia", kind = "category" }: Props) {
   const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);
   const [name, setName] = useState("");
@@ -78,7 +78,7 @@ export function Decisions({ decisions, brief: initialBrief, evidence: initialEvi
   return (
     <section className="screen">
       <div className="topbar">
-        <div><h1>Decisions</h1><span className="meta">{dateLine} · {clientName ? `On the side of ${clientName}` : "Beauty · Indonesia"}</span></div>
+        <div><h1>Decisions</h1><span className="meta">{dateLine} · {clientName ? (kind === "profile" ? `About ${clientName}` : `On the side of ${clientName}`) : label}</span></div>
         <div className="newdec">
           <input value={name} placeholder="New decision, e.g. Ramadan launch" onChange={(e) => setName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") create(); }} />
           <button className="btn pri sm" onClick={create} disabled={busy === "new" || !name.trim()}>Start</button>

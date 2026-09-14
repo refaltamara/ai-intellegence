@@ -1,4 +1,4 @@
-import { DEFAULT_WORKSPACE_ID } from "@/config/thresholds";
+import { currentWorkspaceId } from "@/auth/current";
 import { nextRunAt, humanize, validateCron } from "@/agents/schedule";
 import { deleteAgent, getAgent, listRuns, updateAgent } from "@/agents/store";
 import { getSkill } from "@/skills/registry";
@@ -10,18 +10,20 @@ export const dynamic = "force-dynamic";
 const UUID = /^[0-9a-f-]{36}$/;
 
 export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> }) {
+  const ws = await currentWorkspaceId();
   const { id } = await ctx.params;
   if (!UUID.test(id)) return Response.json({ error: "bad id" }, { status: 400 });
-  const agent = await getAgent(id, DEFAULT_WORKSPACE_ID);
+  const agent = await getAgent(id, ws);
   if (!agent) return Response.json({ error: "not found" }, { status: 404 });
   return Response.json({ ...agent, runs: await listRuns(id, 20) });
 }
 
 /** PATCH { status?, name?, params?, schedule?, delivery?, only_if_changed?, diff_config? } */
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
+  const ws = await currentWorkspaceId();
   const { id } = await ctx.params;
   if (!UUID.test(id)) return Response.json({ error: "bad id" }, { status: 400 });
-  const agent = await getAgent(id, DEFAULT_WORKSPACE_ID);
+  const agent = await getAgent(id, ws);
   if (!agent) return Response.json({ error: "not found" }, { status: 404 });
   const b = (await req.json().catch(() => ({}))) as Record<string, any>;
   const patch: Parameters<typeof updateAgent>[2] = {};
@@ -48,13 +50,14 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   if (b.status && ["active", "paused", "draft"].includes(b.status)) patch.status = b.status;
   const status = patch.status ?? agent.status;
   if (b.schedule || b.status) patch.next_run_at = status === "active" ? nextRunAt(cron, tz).toISOString() : null;
-  const updated = await updateAgent(id, DEFAULT_WORKSPACE_ID, patch);
+  const updated = await updateAgent(id, ws, patch);
   return Response.json(updated);
 }
 
 export async function DELETE(_req: Request, ctx: { params: Promise<{ id: string }> }) {
+  const ws = await currentWorkspaceId();
   const { id } = await ctx.params;
   if (!UUID.test(id)) return Response.json({ error: "bad id" }, { status: 400 });
-  const ok = await deleteAgent(id, DEFAULT_WORKSPACE_ID);
+  const ok = await deleteAgent(id, ws);
   return Response.json({ ok }, { status: ok ? 200 : 404 });
 }

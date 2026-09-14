@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-export function ClientBrand({ brands, current, canEdit }: { brands: { id: string; name: string }[]; current: string | null; canEdit: boolean }) {
+export function ClientBrand({ brands, current, canEdit, productName = "CeMO", kind = "category" }: { brands: { id: string; name: string }[]; current: string | null; canEdit: boolean; productName?: string; kind?: string }) {
   const router = useRouter();
   const [value, setValue] = useState(current ?? "");
   const [busy, setBusy] = useState(false);
@@ -16,15 +16,15 @@ export function ClientBrand({ brands, current, canEdit }: { brands: { id: string
     const j = await r.json();
     setBusy(false);
     if (j.error) { setMsg(j.error); return; }
-    setMsg(j.client_name ? `CeMO is now on the side of ${j.client_name}.` : "No client brand: every brand is a competitor.");
+    setMsg(j.client_name ? `${productName} is now on the side of ${j.client_name}.` : "No client brand: every brand is a competitor.");
     router.refresh();
   }
 
   return (
     <div className="client">
       <div>
-        <h4>Client brand</h4>
-        <p>{currentName ? <>CeMO is on the side of <b>{currentName}</b>. Other brands are competitors; new creator searches exclude anyone who posted for a competitor by default.</> : <>No client brand set. Every tracked brand is a competitor and there is no "our brand" yet. Set one to make CeMO take a side.</>}</p>
+        <h4>{kind === "profile" ? "Subject" : "Client brand"}</h4>
+        <p>{kind === "profile" ? (currentName ? <>This workspace is about <b>{currentName}</b>. Every post and comment loaded here is about them.</> : <>No subject set. Pick the profile this workspace is about.</>) : currentName ? <>{productName} is on the side of <b>{currentName}</b>. Other brands are competitors; new creator searches exclude anyone who posted for a competitor by default.</> : <>No client brand set. Every tracked brand is a competitor and there is no "our brand" yet. Set one to make {productName} take a side.</>}</p>
       </div>
       {canEdit ? (
         <div className="pick">

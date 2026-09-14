@@ -1,6 +1,5 @@
 /** PATCH /api/runs/[id]/pane { state } stores the pane's cosmetic state (sort, filter, exclusions) for a run. */
-import { DEFAULT_WORKSPACE_ID } from "@/config/thresholds";
-import { currentSession } from "@/auth/current";
+import { currentSession, currentWorkspaceId } from "@/auth/current";
 import { getSkillRun, setPaneState } from "@/chat/persist";
 import type { PaneState } from "@/chat/pane";
 
@@ -19,20 +18,22 @@ function clean(raw: unknown): PaneState {
 }
 
 export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> }) {
+  const ws = await currentWorkspaceId();
   const { id } = await ctx.params;
   if (!(await currentSession())) return Response.json({ error: "unauthorised" }, { status: 401 });
   if (!UUID.test(id)) return Response.json({ error: "bad id" }, { status: 400 });
-  const run = await getSkillRun(id, DEFAULT_WORKSPACE_ID);
+  const run = await getSkillRun(id, ws);
   if (!run) return Response.json({ error: "not found" }, { status: 404 });
   return Response.json({ state: run.pane_state ?? {} });
 }
 
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
+  const ws = await currentWorkspaceId();
   const { id } = await ctx.params;
   if (!(await currentSession())) return Response.json({ error: "unauthorised" }, { status: 401 });
   if (!UUID.test(id)) return Response.json({ error: "bad id" }, { status: 400 });
   const body = (await req.json().catch(() => ({}))) as { state?: unknown };
   const state = clean(body.state);
-  const ok = await setPaneState(id, DEFAULT_WORKSPACE_ID, state);
+  const ok = await setPaneState(id, ws, state);
   return ok ? Response.json({ state }) : Response.json({ error: "not found" }, { status: 404 });
 }

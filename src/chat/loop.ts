@@ -26,6 +26,7 @@ import { applyPaneState, describeExclusion, describeRerun, humanAction, nextStat
 import { buildExport } from "../export/run";
 import { addMessage, conversationRunIds, createConversation, getConversation, getSkillRun, listMessages, logExport, setPaneState, type ToolCallRecord } from "./persist";
 import { buildTools } from "./tools";
+import { getWorkspace } from "../workspace/store";
 
 export const MAX_TOOL_CALLS = 6;
 const MAX_ROWS_IN_CONTEXT = 60;
@@ -99,13 +100,19 @@ async function buildSystemUncached(workspaceId: string): Promise<string> {
     [workspaceId, ctx.tz],
   );
   const client = ctx.clientBrandId ? ctx.brands.find((b) => b.id === ctx.clientBrandId) : null;
-  const counts = await workspaceCounts(workspaceId, db);
+  const [counts, cfg, comments] = await Promise.all([workspaceCounts(workspaceId, db), getWorkspace(workspaceId), db.one<{ n: number }>("select count(*)::int as n from comments where workspace_id = $1", [workspaceId])]);
   const available = Object.keys(impls);
-  return SYSTEM_TEMPLATE.replace("{{workspace_name}}", ws?.name ?? workspaceId)
-    .replace("{{client_line}}", client ? `You work for the ${client.name} team (${client.id}): "we", "us" and "our brand" mean ${client.name}, and every other tracked brand is a competitor. Take ${client.name}'s side — a good result for a competitor is a warning for us, not good news.` : "No client brand is set yet, so every tracked brand is a competitor and there is no \"our brand\". If the person says \"my brand\" or \"us\", ask which brand they mean (once), then continue.")
+  const profile = cfg?.kind === "profile";
+  const clientLine = profile
+    ? (client ? `Every post and comment in this workspace is about ${client.name} (${client.id}); "we" and "us" mean ${client.name}'s team. Read the numbers from their side: what people say about them, how it moves, who drives it.` : "No subject is set yet for this workspace; treat the tracked name as the subject.")
+    : client
+      ? `You work for the ${client.name} team (${client.id}): "we", "us" and "our brand" mean ${client.name}, and every other tracked brand is a competitor. Take ${client.name}'s side — a good result for a competitor is a warning for us, not good news.`
+      : "No client brand is set yet, so every tracked brand is a competitor and there is no \"our brand\". If the person says \"my brand\" or \"us\", ask which brand they mean (once), then continue.";
+  return SYSTEM_TEMPLATE.replace("{{persona}}", cfg?.persona ?? `You are the analyst behind Fair Intelligence for ${ws?.name ?? workspaceId}.`)
+    .replace("{{client_line}}", clientLine)
     .replace("{{creator_count}}", counts.creator_count.toLocaleString("en-US"))
     .replace("{{available_skills}}", available.join(", "))
-    .replace("{{data_line}}", platforms.map((p) => `${p.platform} ${p.posts.toLocaleString("en-US")} posts from ${p.from} to ${p.to}`).join("; ") + ". No comment text, no day-by-day snapshots, no Threads/X.")
+    .replace("{{data_line}}", platforms.map((p) => `${p.platform} ${p.posts.toLocaleString("en-US")} posts from ${p.from} to ${p.to}`).join("; ") + (comments?.n ? `; ${comments.n.toLocaleString("en-US")} comments with sentiment labels.` : ". No comment text.") + " No day-by-day snapshots.")
     .replace("{{as_of}}", ctx.asOf)
     .replace("{{brands}}", ctx.brands.map((b) => `${b.id} (${b.name})`).join(", "));
 }
