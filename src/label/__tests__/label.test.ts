@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { commentBatchPrompt, commentSystem, parseLabels, stanceBatchPrompt, type CommentForLabel } from "../prompt";
+import { clip, commentBatchPrompt, commentSystem, parseLabels, stanceBatchPrompt, type CommentForLabel } from "../prompt";
 
 const c = (id: string, text: string, extra: Partial<CommentForLabel> = {}): CommentForLabel => ({
   id, text, platform: "youtube", likes: null, post_url: "https://www.youtube.com/watch?v=abc", post_caption: "Curious People, how are you?", post_source: "owned", post_handle: "modmedia", ...extra,
@@ -13,6 +13,15 @@ describe("labelling prompts", () => {
     expect(p).toContain("[b] (12 likes) semangat kak");
     expect(p).toContain("Label all 3 comments");
     expect(commentSystem("Maudy Ayunda")).toContain("negative: criticises");
+  });
+
+  it("never cuts an emoji in half and drops stray half surrogates", () => {
+    const long = "a".repeat(598) + "🫶🏼🫶🏼🫶🏼";
+    const c1 = clip(long, 600);
+    expect(JSON.stringify(c1)).not.toMatch(/\\ud83e"|\\ud83e…/i);
+    expect(() => JSON.parse(JSON.stringify({ t: c1 }))).not.toThrow();
+    expect(Array.from(c1).length).toBe(600);
+    expect(clip("x\uD83Ey", 10)).toBe("xy");
   });
 
   it("clips long captions", () => {

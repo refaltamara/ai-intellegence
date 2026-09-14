@@ -69,9 +69,11 @@ export function commentSystem(subject: string): string {
   ].join("\n");
 }
 
-function clip(s: string | null | undefined, n: number): string {
-  const t = (s ?? "").replace(/\s+/g, " ").trim();
-  return t.length > n ? t.slice(0, n - 1) + "…" : t;
+/** Clip by code point, never inside an emoji: a half surrogate pair makes the request body invalid JSON. */
+export function clip(s: string | null | undefined, n: number): string {
+  const t = (s ?? "").replace(/\s+/g, " ").trim().replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, "");
+  const cps = Array.from(t);
+  return cps.length > n ? cps.slice(0, n - 1).join("") + "…" : t;
 }
 
 /** One user turn for a batch: post context blocks, each followed by its comments. */
