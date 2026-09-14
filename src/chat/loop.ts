@@ -100,7 +100,7 @@ async function buildSystemUncached(workspaceId: string): Promise<string> {
     [workspaceId, ctx.tz],
   );
   const client = ctx.clientBrandId ? ctx.brands.find((b) => b.id === ctx.clientBrandId) : null;
-  const [counts, cfg, comments] = await Promise.all([workspaceCounts(workspaceId, db), getWorkspace(workspaceId), db.one<{ n: number }>("select count(*)::int as n from comments where workspace_id = $1", [workspaceId])]);
+  const [counts, cfg, comments] = await Promise.all([workspaceCounts(workspaceId, db), getWorkspace(workspaceId), db.one<{ n: number; labelled: number }>("select count(*)::int as n, count(*) filter (where sentiment is not null)::int as labelled from comments where workspace_id = $1", [workspaceId])]);
   const available = Object.keys(impls);
   const profile = cfg?.kind === "profile";
   const clientLine = profile
@@ -112,7 +112,7 @@ async function buildSystemUncached(workspaceId: string): Promise<string> {
     .replace("{{client_line}}", clientLine)
     .replace("{{creator_count}}", counts.creator_count.toLocaleString("en-US"))
     .replace("{{available_skills}}", available.join(", "))
-    .replace("{{data_line}}", platforms.map((p) => `${p.platform} ${p.posts.toLocaleString("en-US")} posts from ${p.from} to ${p.to}`).join("; ") + (comments?.n ? `; ${comments.n.toLocaleString("en-US")} comments with sentiment labels.` : ". No comment text.") + " No day-by-day snapshots.")
+    .replace("{{data_line}}", platforms.map((p) => `${p.platform} ${p.posts.toLocaleString("en-US")} posts from ${p.from} to ${p.to}`).join("; ") + (comments?.n ? `; ${comments.n.toLocaleString("en-US")} comments, ${comments.labelled === comments.n ? "all" : comments.labelled.toLocaleString("en-US")} with a sentiment label${comments.labelled < comments.n ? " so far (the rest are unlabelled, not neutral)" : ""}.` : ". No comment text.") + " No day-by-day snapshots.")
     .replace("{{as_of}}", ctx.asOf)
     .replace("{{brands}}", ctx.brands.map((b) => `${b.id} (${b.name})`).join(", "));
 }

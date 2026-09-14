@@ -24,7 +24,7 @@ export default async function DataPage() {
           <div className="stat"><b>{s.brands}</b><span>brands tracked · {ctx.brands.filter((b) => b.tiktok_handle && b.instagram_handle).length} on both platforms</span></div>
           <div className="stat"><b>{fmtNum(s.creators)}</b><span>creators with brand history and performance</span></div>
           <div className="stat"><b>{fmtNum(s.posts)}</b><span>post rows · {fmtNum(s.unique_posts)} unique posts</span></div>
-          <div className="stat"><b>{s.comments}</b><span>comments classified · Phase 2, not loaded</span></div>
+          <div className="stat"><b>{fmtNum(s.comments)}</b><span>{s.comments ? (s.comments_labelled === s.comments ? "comments, all with sentiment" : `comments · ${fmtNum(s.comments_labelled)} with sentiment so far`) : "comments · none loaded"}</span></div>
         </div>
         <div className="layers">
           {s.per_platform.map((p) => (
