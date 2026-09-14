@@ -35,6 +35,9 @@ export type PulseData = {
   reply: { at: string; likes: number; text: string } | null;
   hourly: { x: string[]; series: { name: string; data: number[]; stack?: string }[] };
   negative_trend: { x: string[]; series: { name: string; data: (number | null)[] }[] };
+  posts_hourly: { x: string[]; series: { name: string; data: number[]; stack?: string }[] };
+  posts_hourly_stance: { x: string[]; series: { name: string; data: number[]; stack?: string }[] };
+  posts_daily: { x: string[]; series: { name: string; data: number[]; stack?: string }[] };
   stance: StanceRow[];
   commenters: Commenters;
   reply_effect: ReplyEffect;
@@ -122,6 +125,23 @@ async function build(ws: string): Promise<PulseData | null> {
     [ws, tz],
   );
   const hourly = pivot(hours, "h");
+  // posts by other accounts per hour and per day: the density of the conversation, not only its replies
+  const postHours = await db.q<Row>(
+    `with bounds as (select date_trunc('hour', max(posted_at) at time zone $2) as last from comments where workspace_id = $1),
+     hrs as (select generate_series((select last from bounds) - interval '71 hours', (select last from bounds), interval '1 hour') as h)
+     select to_char(hrs.h, 'YYYY-MM-DD HH24:00') as h, p.platform, coalesce(p.stance, 'unlabelled') as stance, count(p.id)::int as n
+     from hrs left join posts p on p.workspace_id = $1 and p.source = 'earned' and p.content_type is distinct from 'stub' and date_trunc('hour', p.posted_at at time zone $2) = hrs.h
+     group by 1, 2, 3 order by 1`,
+    [ws, tz],
+  );
+  const posts_hourly = pivot(postHours, "h");
+  const stanceX = [...new Set(postHours.map((r) => r.h as string))];
+  const stanceNames: Record<string, string> = { negative: "Against", neutral: "Neutral", positive: "For", unlabelled: "Unlabelled" };
+  const posts_hourly_stance = {
+    x: stanceX,
+    series: ["negative", "neutral", "positive", "unlabelled"].filter((k) => postHours.some((r) => r.stance === k && (r.n as number) > 0)).map((k) => ({ name: stanceNames[k], stack: "s", data: stanceX.map((h) => postHours.filter((r) => r.h === h && r.stance === k).reduce((a, r) => a + (r.n as number), 0)) })),
+  };
+
   // negative share per hour on labelled comments; hours with fewer than 10 labelled stay blank
   const negHours = await db.q<Row>(
     `with bounds as (select date_trunc('hour', max(posted_at) at time zone $2) as last from comments where workspace_id = $1),
@@ -196,6 +216,15 @@ async function build(ws: string): Promise<PulseData | null> {
     [ws, tz, sinceIso],
   );
   const daily = pivot(days, "h");
+  const postDays = await db.q<Row>(
+    `with bounds as (select coalesce($3::date, (max(posted_at) - interval '30 days')::date) as first, max(posted_at)::date as last from comments where workspace_id = $1),
+     ds as (select generate_series((select first from bounds), (select last from bounds), interval '1 day')::date as d)
+     select to_char(ds.d, 'YYYY-MM-DD') as h, p.platform, count(p.id)::int as n
+     from ds left join posts p on p.workspace_id = $1 and p.source = 'earned' and p.content_type is distinct from 'stub' and (p.posted_at at time zone $2)::date = ds.d
+     group by 1, 2 order by 1`,
+    [ws, tz, sinceIso],
+  );
+  const posts_daily = pivot(postDays, "h");
 
   // spread: per platform, first earned post, first comment, take-off hour (first hour with 20+), peak hour
   const spreadRows = await db.q<Row>(
@@ -252,7 +281,7 @@ async function build(ws: string): Promise<PulseData | null> {
     subject, productName: cfg.product_name, tz, asOf,
     totals: totals!, root: root ? { url: root.url, posted_at: root.posted_at, caption: root.caption, views: root.views, likes: root.likes, comments: root.comments, early_comments: root.early_comments } : null,
     reply: reply ? { at: reply.at, likes: reply.likes, text: reply.text } : null,
-    hourly, negative_trend: trimLead(negative_trend), stance, commenters: { ...commenters, first_time: trimLead(commenters.first_time) }, reply_effect, daily, events, spread: spread.map(({ first_post_url: _u, ...s }) => s), sentiment, drivers, themes, seeding,
+    hourly, posts_hourly, posts_hourly_stance, posts_daily, negative_trend: trimLead(negative_trend), stance, commenters: { ...commenters, first_time: trimLead(commenters.first_time) }, reply_effect, daily, events, spread: spread.map(({ first_post_url: _u, ...s }) => s), sentiment, drivers, themes, seeding,
   };
 }
 

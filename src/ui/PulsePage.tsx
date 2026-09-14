@@ -45,8 +45,23 @@ export function PulsePage({ d }: { d: PulseData }) {
           </div>
           <div className="card">
             <h4>Since the video went up, comments per day <span>by platform</span></h4>
-            <div className="body">{d.daily.x.length >= 3 ? <Chart spec={{ type: "stacked_bar", x: d.daily.x.map((h) => h.slice(5)), series: d.daily.series, y_label: "comments" }} /> : <p className="quiet">Not enough days of data yet.</p>}</div>
+            <div className="body">{d.daily.x.length >= 3 ? <Chart spec={{ type: "stacked_bar", x: d.daily.x.map((h) => h.slice(5)), series: d.daily.series, y_label: "comments" }} /> : <p className="quiet">Not enough days of data yet.</p>}
+              {d.posts_daily.series.length > 0 && <><p className="quiet" style={{ margin: "10px 0 4px", fontWeight: 600 }}>Posts by other accounts per day</p><Chart spec={{ type: "stacked_bar", x: d.posts_daily.x.map((h) => h.slice(5)), series: d.posts_daily.series, y_label: "posts" }} /></>}
+            </div>
             {d.root && <div className="caveats">YouTube comment times older than a day come rounded from the export (“3 weeks ago”), so early days are approximate.</div>}
+          </div>
+        </div>
+
+        <div className="pulse-grid">
+          <div className="card">
+            <h4>Posts about {d.subject} per hour <span>by other accounts · last 72 hours · by platform</span></h4>
+            <div className="body">{d.posts_hourly.series.length ? <Chart spec={{ type: "stacked_bar", x: d.posts_hourly.x.map((h) => h.slice(5)), series: d.posts_hourly.series, y_label: "posts" }} /> : <p className="quiet">No posts by other accounts in the last 72 hours.</p>}</div>
+            <div className="caveats">Density of the conversation itself: new Threads, tweets and videos about {d.subject}, separate from the replies under them. Instagram and YouTube capture her own posts only.</div>
+          </div>
+          <div className="card">
+            <h4>Posts per hour by stance <span>against, neutral, for</span></h4>
+            <div className="body">{d.posts_hourly_stance.series.length ? <Chart spec={{ type: "stacked_bar", x: d.posts_hourly_stance.x.map((h) => h.slice(5)), series: d.posts_hourly_stance.series, y_label: "posts" }} /> : <p className="quiet">No posts by other accounts in the last 72 hours.</p>}</div>
+            <div className="caveats">Stance is what the post itself says about {d.subject}; the comments under it are counted in the charts above.</div>
           </div>
         </div>
 
