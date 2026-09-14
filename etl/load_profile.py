@@ -146,10 +146,10 @@ LOCAL_TZ = dttz.gettz(SOURCE_TZ)
 RELATIVE = re.compile(r"^(\d+)\s+(second|minute|hour|day|week|month|year)s?\s+ago", re.I)
 UNIT_SECONDS = {"second": 1, "minute": 60, "hour": 3600, "day": 86400, "week": 604800, "month": 2592000, "year": 31536000}
 
-def parse_when(raw, anchor):
+def parse_when(raw, anchor, naive_tz=None):
     """Returns (aware UTC datetime or None, how). Numeric >= 12 digits: epoch ms.
     'N units ago': anchor minus N units (YouTube exports relative times).
-    Anything else: dateutil; naive values are read as SOURCE_TZ local."""
+    Anything else: dateutil; naive values are read as naive_tz (default SOURCE_TZ local)."""
     s = to_str(raw)
     if not s:
         return None, "empty"
@@ -167,8 +167,8 @@ def parse_when(raw, anchor):
     except (ValueError, OverflowError):
         return None, "unparseable"
     if d.tzinfo is None:
-        d = d.replace(tzinfo=LOCAL_TZ)
-        return d.astimezone(timezone.utc), "naive_local"
+        d = d.replace(tzinfo=naive_tz or LOCAL_TZ)
+        return d.astimezone(timezone.utc), "naive_local" if (naive_tz or LOCAL_TZ) is LOCAL_TZ else f"naive_{naive_tz.tzname(d) or 'tz'}"
     return d.astimezone(timezone.utc), "aware"
 
 def month_of(d_utc):
@@ -208,6 +208,7 @@ class Profile:
         self.anchor = dtparse.parse(c["export_time"])
         if self.anchor.tzinfo is None:
             self.anchor = self.anchor.replace(tzinfo=LOCAL_TZ)
+        self.naive_tz = {p: dttz.gettz(z) for p, z in c.get("naive_dates_tz", {}).items()}
         self.keyword_re = re.compile("|".join(c.get("keywords", [])), re.I) if c.get("keywords") else None
         self.keyword_platforms = set(c.get("keyword_platforms", []))
         self.spam_min_links = int(c.get("spam_min_links", 0) or 0)
@@ -275,7 +276,7 @@ def normalise_contents(df, platform, prof, source_file):
             drops.add("missing url", accounts.iloc[i]); continue
         handle = norm_handle(accounts.iloc[i]) or handle_from_url(url)
         caption = to_str(descs.iloc[i])
-        when, how = parse_when(dates.iloc[i], prof.anchor)
+        when, how = parse_when(dates.iloc[i], prof.anchor, prof.naive_tz.get(platform))
         if when is None:
             drops.add(f"unparseable date_posted ({how})", f"{url} {dates.iloc[i]!r}"); continue
         why = prof.why_drop(platform, url, handle, caption)
@@ -387,7 +388,7 @@ def load_contents(db, ws, prof, platform, path, dry):
     report = {"file": path.name, "platform": platform, "kind": "posts", "rows_in": len(df), "rows_loaded": len(rows),
               "rows_upserted": n_posts, "rows_dropped": drops.total(), "drops": drops.d, "owned_posts": owned,
               "creators_upserted": n_creators, "date_formats": hows, "posted_span": span,
-              "source_tz_assumed_for_naive_dates": SOURCE_TZ, "duration_s": round(time.time() - t0, 1)}
+              "tz_assumed_for_naive_dates": str(prof.raw.get("naive_dates_tz", {}).get(platform, SOURCE_TZ)), "duration_s": round(time.time() - t0, 1)}
     if not dry:
         db.query("""update data_loads set rows_loaded = $2, rows_rejected = $3, report = $4::jsonb, finished_at = now()
                     where id = $1""", [load_id, len(rows), drops.total(), json.dumps(report)])
@@ -412,7 +413,7 @@ def normalise_comments(df, platform, prof, known_urls, dropped_urls, source_file
         if url in dropped_urls:
             drops.add("comment on a dropped post", f"{url} {text[:50]!r}"); continue
         handle = norm_handle(authors.iloc[i])
-        when, how = parse_when(dates.iloc[i], prof.anchor)
+        when, how = parse_when(dates.iloc[i], prof.anchor, prof.naive_tz.get(platform))
         if when is None and to_str(dates.iloc[i]):
             drops.add(f"unparseable date ({how})", f"{url} {dates.iloc[i]!r}"); continue
         raw_id = to_str(ids.iloc[i])

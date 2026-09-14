@@ -13,6 +13,8 @@
     "followers": { "instagram": 18700000 }
   },
   "export_time": "2026-09-14T12:15:00+07:00",
+  "naive_dates_tz": { "threads": "UTC" },
+  "naive_dates_note": "Threads contents carry a time with no zone; the first reply on every post lands exactly 7 h after it when read as WIB, so the export is UTC. Instagram and YouTube contents are date-only and stay WIB midnight.",
   "root_url": "https://www.youtube.com/watch?v=r1DSH9AQXLU",
   "keywords": ["maudy", "ayunda", "tone ?deaf", "lpdp", "mindful", "jesse ?choi", "from ?this ?island", "maudysthoughts", "modmedia"],
   "keyword_platforms": ["youtube", "tiktok", "instagram", "x"],
