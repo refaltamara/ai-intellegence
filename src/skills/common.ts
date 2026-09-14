@@ -59,7 +59,7 @@ export class Where {
   }
 }
 
-export const PLATFORM_LABEL: Record<string, string> = { tiktok: "TikTok", instagram: "Instagram", threads: "Threads", x: "X" };
+export const PLATFORM_LABEL: Record<string, string> = { tiktok: "TikTok", instagram: "Instagram", threads: "Threads", x: "X", youtube: "YouTube" };
 
 export function shortDate(iso: string | null | undefined): string {
   if (!iso) return "";
@@ -103,6 +103,20 @@ export function creatorEvidence(id: string, c: Row, metrics: Record<string, numb
   };
 }
 
+/** Evidence for one comment row (needs id, author_handle, platform, posted_at, likes, text, post_url). */
+export function commentEvidence(id: string, c: Row, extra?: Record<string, number | string | null>): Evidence {
+  const handle = c.author_handle ? `@${c.author_handle}` : "(unknown account)";
+  return {
+    id,
+    type: "comment",
+    ref: `comments.id=${c.id}`,
+    label: `${handle} · ${shortDate(c.posted_at as string)} · ${PLATFORM_LABEL[c.platform as string] ?? c.platform}${c.sentiment ? ` · ${c.sentiment}` : ""}`,
+    url: (c.post_url as string) ?? undefined,
+    metrics: { likes: (c.likes as number) ?? null, ...(extra ?? {}) },
+    sample_text: c.text ? String(c.text).replace(/\s+/g, " ").slice(0, 200) : undefined,
+  };
+}
+
 export function aggregateEvidence(id: string, ref: string, label: string, metrics: Record<string, number | string | null>): Evidence {
   return { id, type: "aggregate", ref, label, metrics };
 }
@@ -111,6 +125,9 @@ export function profileUrl(platform: string, handle: string): string | undefined
   if (!handle) return undefined;
   if (platform === "tiktok") return `https://www.tiktok.com/@${handle}`;
   if (platform === "instagram") return `https://www.instagram.com/${handle}/`;
+  if (platform === "threads") return `https://www.threads.com/@${handle}`;
+  if (platform === "x") return `https://x.com/${handle}`;
+  if (platform === "youtube") return `https://www.youtube.com/@${handle}`;
   return undefined;
 }
 

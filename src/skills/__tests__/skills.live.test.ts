@@ -30,8 +30,15 @@ const CASES: Record<string, Record<string, unknown>> = {
   "hashtag-overlap": { brand: "somethincofficial", limit: 5 },
 };
 
-function run(skill: string, params: Record<string, unknown>): Promise<SkillResult> {
-  return runSkill({ skill, workspace_id: "beauty-id", params, actor: { user_id: "test", via: "api" }, persist: false });
+const PROFILE_CASES: Record<string, Record<string, unknown>> = {
+  sentiment: { window: { last_n_days: 30 } },
+  "comment-themes": { sentiment: "all", limit: 10 },
+  drivers: { limit: 5 },
+  seeding: { limit: 10 },
+};
+
+function run(skill: string, params: Record<string, unknown>, workspace = "beauty-id"): Promise<SkillResult> {
+  return runSkill({ skill, workspace_id: workspace, params, actor: { user_id: "test", via: "api" }, persist: false });
 }
 
 function assertContract(r: SkillResult) {
@@ -87,4 +94,24 @@ d("phase 1 skills (live database)", () => {
     expect((await run("compare", { brands: ["skintific", "nope"] })).status).toBe("error");
     expect((await run("discovery", { tiers: ["sub"] })).message).toMatch(/allowed values/);
   }, 60_000);
+});
+
+d("comment skills (live database, maudy-ayunda)", () => {
+  for (const [skill, params] of Object.entries(PROFILE_CASES)) {
+    it(`${skill} returns ok with rows and evidence on the profile workspace`, async () => {
+      const r = await run(skill, params, "maudy-ayunda");
+      assertContract(r);
+      expect(r.meta.caveats.some((c) => /subject's own replies/.test(c))).toBe(true);
+    }, 60000);
+  }
+  it("sentiment reports a labelled count and never treats unlabelled as neutral", async () => {
+    const r = await run("sentiment", {}, "maudy-ayunda");
+    const s = r.summary as { comments: number; labelled: number; unlabelled: number; neutral: number };
+    expect(s.labelled + s.unlabelled).toBe(s.comments);
+    expect(s.neutral).toBeLessThanOrEqual(s.labelled);
+  }, 60000);
+  it("comment skills are unavailable on the beauty panel, which has no comments", async () => {
+    const r = await run("sentiment", {}, "beauty-id");
+    expect(r.status).toBe("unavailable");
+  }, 60000);
 });
