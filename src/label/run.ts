@@ -30,15 +30,17 @@ export type LabelOutcome = {
   error?: string;
 };
 
-export type LabelOptions = { budgetMs?: number; batchSize?: number; client?: Anthropic };
+export type LabelOptions = { budgetMs?: number; batchSize?: number; parallel?: number; client?: Anthropic };
 
 const DEFAULT_BUDGET_MS = 240_000;
 const DEFAULT_BATCH = 40;
+const DEFAULT_PARALLEL = 4;
 
 export async function labelWorkspace(workspaceId: string, opts: LabelOptions = {}): Promise<LabelOutcome> {
   const started = Date.now();
   const budget = opts.budgetMs ?? DEFAULT_BUDGET_MS;
   const batch = opts.batchSize ?? DEFAULT_BATCH;
+  const parallel = Math.max(1, opts.parallel ?? DEFAULT_PARALLEL);
   const cfg = await getWorkspace(workspaceId);
   const out: LabelOutcome = { workspace: workspaceId, subject: cfg?.name ?? workspaceId, comments_labelled: 0, comments_failed: 0, comments_remaining: 0, posts_labelled: 0, posts_failed: 0, posts_remaining: 0, calls: 0, duration_ms: 0, stopped: "done" };
   if (!cfg || cfg.kind !== "profile") return { ...out, duration_ms: Date.now() - started };
@@ -48,7 +50,9 @@ export async function labelWorkspace(workspaceId: string, opts: LabelOptions = {
   const inBudget = () => Date.now() - started < budget;
 
   try {
-    // comments first: they are the headline number
+    // comments first: they are the headline number. Several batches per round, in
+    // parallel: one call of 40 comments takes about 40 s of output, so a serial
+    // loop only clears ~200 comments per cron tick.
     while (inBudget()) {
       const rows = (await sql.query(
         `select c.id, c.text, c.platform, c.likes, p.url as post_url, p.caption as post_caption, p.source as post_source, p.creator_handle as post_handle
@@ -56,21 +60,27 @@ export async function labelWorkspace(workspaceId: string, opts: LabelOptions = {
          where c.workspace_id = $1 and c.sentiment is null and c.sentiment_source is null and c.text is not null
          order by p.id, c.likes desc nulls last, c.posted_at
          limit $2`,
-        [workspaceId, batch],
+        [workspaceId, batch * parallel],
       )) as CommentForLabel[];
       if (!rows.length) break;
-      const res = await client.messages.create({
-        model: modelId(),
-        max_tokens: 4000,
-        output_config: { effort: "low" },
-        system: [{ type: "text", text: commentSystem(subject), cache_control: { type: "ephemeral" } }],
-        tools: [LABEL_COMMENTS_TOOL],
-        tool_choice: { type: "tool", name: LABEL_COMMENTS_TOOL.name },
-        messages: [{ role: "user", content: commentBatchPrompt(subject, rows) }],
-      });
-      out.calls += 1;
-      const use = res.content.find((b): b is Anthropic.ToolUseBlock => b.type === "tool_use");
-      const { labels, missing } = parseLabels(use?.input, rows.map((r) => r.id));
+      const batches: CommentForLabel[][] = [];
+      for (let i = 0; i < rows.length; i += batch) batches.push(rows.slice(i, i + batch));
+      const results = await Promise.all(batches.map(async (b) => {
+        const res = await client.messages.create({
+          model: modelId(),
+          max_tokens: 4000,
+          output_config: { effort: "low" },
+          system: [{ type: "text", text: commentSystem(subject), cache_control: { type: "ephemeral" } }],
+          tools: [LABEL_COMMENTS_TOOL],
+          tool_choice: { type: "tool", name: LABEL_COMMENTS_TOOL.name },
+          messages: [{ role: "user", content: commentBatchPrompt(subject, b) }],
+        });
+        const use = res.content.find((x): x is Anthropic.ToolUseBlock => x.type === "tool_use");
+        return parseLabels(use?.input, b.map((r) => r.id));
+      }));
+      out.calls += batches.length;
+      const labels = results.flatMap((r) => r.labels);
+      const missing = results.flatMap((r) => r.missing);
       if (labels.length) {
         await sql.query(
           `update comments c set sentiment = l.sentiment, sentiment_confidence = l.confidence, sentiment_source = 'model', classified_at = now()
