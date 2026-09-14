@@ -4,13 +4,13 @@ import { describeSkillsForTool, getSkill, listSkills, registry } from "../regist
 import { validateParams } from "../params";
 import { TIER_BANDS } from "../../config/thresholds";
 
-const PHASE1 = ["discovery", "mercenaries", "loyalists", "affiliates", "breakout", "funnel-mix", "overlap", "waves", "top-content", "compare", "launch", "brand-strategy", "hashtags", "campaigns", "themes", "products", "hashtag-overlap"];
+const PHASE1 = ["discovery", "mercenaries", "loyalists", "affiliates", "breakout", "funnel-mix", "overlap", "waves", "top-content", "compare", "launch", "brand-strategy", "hashtags", "campaigns", "themes", "products", "hashtag-overlap", "sentiment", "comment-themes", "drivers", "seeding"];
 
 describe("skills.registry.json", () => {
-  it("has 29 skills with unique names and the DECISIONS changes applied", () => {
+  it("has 32 skills with unique names and the DECISIONS changes applied", () => {
     const names = listSkills().map((s) => s.name);
-    expect(names.length).toBe(29);
-    expect(new Set(names).size).toBe(29);
+    expect(names.length).toBe(32);
+    expect(new Set(names).size).toBe(32);
     expect(names).not.toContain("spend-estimate");
     expect(names).toContain("brand-strategy");
     expect(names).toContain("top-content");
@@ -30,7 +30,7 @@ describe("skills.registry.json", () => {
     for (const b of TIER_BANDS) expect(registry.tiers[b.tier]).toEqual([b.min, b.max]);
   });
 
-  it("every Phase 1 skill has an implementation; the rest resolve to unavailable", () => {
+  it("every implemented skill is listed here; the rest resolve to unavailable", () => {
     for (const n of PHASE1) expect(impls[n], n).toBeTypeOf("function");
     for (const s of listSkills()) if (!PHASE1.includes(s.name)) expect(impls[s.name], s.name).toBeUndefined();
   });

@@ -17,6 +17,10 @@ import { campaigns } from "./campaigns";
 import { themes } from "./themes";
 import { products } from "./products";
 import { hashtagOverlap } from "./hashtag-overlap";
+import { sentiment } from "./sentiment";
+import { commentThemes } from "./comment-themes";
+import { drivers } from "./drivers";
+import { seeding } from "./seeding";
 
 export const impls: Record<string, SkillImpl> = {
   discovery,
@@ -36,4 +40,8 @@ export const impls: Record<string, SkillImpl> = {
   themes,
   products,
   "hashtag-overlap": hashtagOverlap,
+  sentiment,
+  "comment-themes": commentThemes,
+  drivers,
+  seeding,
 };

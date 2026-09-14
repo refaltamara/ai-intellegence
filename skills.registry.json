@@ -1,6 +1,6 @@
 {
   "version": "1.1",
-  "generated": "2026-09-02",
+  "generated": "2026-09-14",
   "layers": {
     "creators": {
       "title": "Creators",
@@ -16,7 +16,7 @@
     },
     "comments": {
       "title": "Comments",
-      "blurb": "Every comment fetched and classified into topics"
+      "blurb": "Every comment under every post, with a sentiment label (positive, neutral, negative); topics come later"
     },
     "audience": {
       "title": "Audience",
@@ -68,6 +68,7 @@
               "instagram",
               "threads",
               "x",
+              "youtube",
               "all"
             ],
             "default": "all",
@@ -205,6 +206,7 @@
               "instagram",
               "threads",
               "x",
+              "youtube",
               "all"
             ],
             "default": "all",
@@ -285,6 +287,7 @@
               "instagram",
               "threads",
               "x",
+              "youtube",
               "all"
             ],
             "default": "all",
@@ -376,6 +379,7 @@
               "instagram",
               "threads",
               "x",
+              "youtube",
               "all"
             ],
             "default": "all",
@@ -485,6 +489,7 @@
               "instagram",
               "threads",
               "x",
+              "youtube",
               "all"
             ],
             "default": "all",
@@ -590,6 +595,7 @@
               "instagram",
               "threads",
               "x",
+              "youtube",
               "all"
             ],
             "default": "all",
@@ -682,6 +688,7 @@
               "instagram",
               "threads",
               "x",
+              "youtube",
               "all"
             ],
             "default": "all",
@@ -764,6 +771,7 @@
               "instagram",
               "threads",
               "x",
+              "youtube",
               "all"
             ],
             "default": "all",
@@ -847,6 +855,7 @@
               "instagram",
               "threads",
               "x",
+              "youtube",
               "all"
             ],
             "default": "all",
@@ -928,6 +937,7 @@
               "instagram",
               "threads",
               "x",
+              "youtube",
               "all"
             ],
             "default": "all",
@@ -1017,6 +1027,7 @@
               "instagram",
               "threads",
               "x",
+              "youtube",
               "all"
             ],
             "default": "all",
@@ -1148,6 +1159,7 @@
               "instagram",
               "threads",
               "x",
+              "youtube",
               "all"
             ],
             "default": "all",
@@ -1247,6 +1259,7 @@
               "instagram",
               "threads",
               "x",
+              "youtube",
               "all"
             ],
             "default": "all",
@@ -1348,6 +1361,7 @@
               "instagram",
               "threads",
               "x",
+              "youtube",
               "all"
             ],
             "default": "all",
@@ -1440,6 +1454,7 @@
               "instagram",
               "threads",
               "x",
+              "youtube",
               "all"
             ],
             "default": "all",
@@ -1554,6 +1569,7 @@
               "instagram",
               "threads",
               "x",
+              "youtube",
               "all"
             ],
             "default": "all",
@@ -1658,6 +1674,7 @@
               "instagram",
               "threads",
               "x",
+              "youtube",
               "all"
             ],
             "default": "all",
@@ -1779,6 +1796,7 @@
               "instagram",
               "threads",
               "x",
+              "youtube",
               "all"
             ],
             "default": "all",
@@ -1890,6 +1908,7 @@
               "instagram",
               "threads",
               "x",
+              "youtube",
               "all"
             ],
             "default": "all",
@@ -1965,6 +1984,266 @@
       }
     },
     {
+      "name": "sentiment",
+      "layer": "comments",
+      "phase": 1,
+      "first_release": true,
+      "title": "Sentiment over time",
+      "description": "How comments split into positive, neutral and negative over time, across every platform, with the moment the negative volume spiked. The headline number for a crisis.",
+      "example": "How has sentiment moved since the video went up?",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "platform": {
+            "type": "string",
+            "enum": [
+              "tiktok",
+              "instagram",
+              "threads",
+              "x",
+              "youtube",
+              "all"
+            ],
+            "default": "all",
+            "description": "Platform to query"
+          },
+          "window": {
+            "type": "object",
+            "description": "Time window over comment time. Either {last_n_days} or {from,to} (ISO dates); relative windows count back from the newest comment",
+            "properties": {
+              "last_n_days": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 400
+              },
+              "from": {
+                "type": "string",
+                "format": "date"
+              },
+              "to": {
+                "type": "string",
+                "format": "date"
+              }
+            },
+            "additionalProperties": false
+          },
+          "bucket": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "hour",
+              "day"
+            ],
+            "default": "auto",
+            "description": "auto = hourly for windows of three days or less, daily otherwise"
+          },
+          "min_negative": {
+            "type": "integer",
+            "default": 20,
+            "description": "A bucket counts as a spike only with at least this many negative comments"
+          },
+          "multiple_of_baseline": {
+            "type": "number",
+            "default": 3,
+            "description": "...and at least this many times the median bucket"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "default": 200
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "output": {
+        "kind": "table+chart",
+        "chart": "stacked_bar_sentiment",
+        "diff_key": "bucket",
+        "watch": {
+          "negative_pct_pts": 5
+        }
+      },
+      "requires": [
+        "comments"
+      ],
+      "activity": {
+        "start": "Reading every comment in the window",
+        "steps": [
+          "Counting positive, neutral and negative over time",
+          "Looking for the moment it turned"
+        ],
+        "done": "{matched} comments"
+      }
+    },
+    {
+      "name": "comment-themes",
+      "layer": "comments",
+      "phase": 1,
+      "first_release": true,
+      "title": "What people are saying",
+      "description": "The words and phrases that recur in comments of one sentiment, ranked by how many comments carry them, each with example comments. Negative by default: the complaints, in the commenters' own words.",
+      "example": "What are the main complaints in the negative comments?",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "platform": {
+            "type": "string",
+            "enum": [
+              "tiktok",
+              "instagram",
+              "threads",
+              "x",
+              "youtube",
+              "all"
+            ],
+            "default": "all",
+            "description": "Platform to query"
+          },
+          "window": {
+            "type": "object",
+            "description": "Time window over comment time. Either {last_n_days} or {from,to} (ISO dates); relative windows count back from the newest comment",
+            "properties": {
+              "last_n_days": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 400
+              },
+              "from": {
+                "type": "string",
+                "format": "date"
+              },
+              "to": {
+                "type": "string",
+                "format": "date"
+              }
+            },
+            "additionalProperties": false
+          },
+          "sentiment": {
+            "type": "string",
+            "enum": [
+              "negative",
+              "positive",
+              "neutral",
+              "all"
+            ],
+            "default": "negative"
+          },
+          "min_comments": {
+            "type": "integer",
+            "minimum": 2,
+            "default": 5,
+            "description": "Ignore words carried by fewer comments than this"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "default": 40
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "output": {
+        "kind": "table",
+        "diff_key": "term"
+      },
+      "requires": [
+        "comments"
+      ],
+      "activity": {
+        "start": "Reading the comments word by word",
+        "steps": [
+          "Counting which words and phrases recur",
+          "Pulling the comments that carry them"
+        ],
+        "done": "{n} recurring themes"
+      }
+    },
+    {
+      "name": "drivers",
+      "layer": "comments",
+      "phase": 1,
+      "first_release": true,
+      "title": "Who is driving it",
+      "description": "The posts and accounts carrying the conversation: every post ranked by the comments it drew and how negative they were, the accounts behind those posts with their reach and stance, and the commenters who show up most.",
+      "example": "Which posts and accounts are driving the negative comments?",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "platform": {
+            "type": "string",
+            "enum": [
+              "tiktok",
+              "instagram",
+              "threads",
+              "x",
+              "youtube",
+              "all"
+            ],
+            "default": "all",
+            "description": "Platform to query"
+          },
+          "window": {
+            "type": "object",
+            "description": "Time window over comment time. Either {last_n_days} or {from,to} (ISO dates); relative windows count back from the newest comment",
+            "properties": {
+              "last_n_days": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 400
+              },
+              "from": {
+                "type": "string",
+                "format": "date"
+              },
+              "to": {
+                "type": "string",
+                "format": "date"
+              }
+            },
+            "additionalProperties": false
+          },
+          "sort": {
+            "type": "string",
+            "enum": [
+              "negative",
+              "comments",
+              "views"
+            ],
+            "default": "negative"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "default": 20
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "output": {
+        "kind": "table",
+        "diff_key": "post_id"
+      },
+      "requires": [
+        "comments",
+        "posts"
+      ],
+      "activity": {
+        "start": "Lining up every post by the comments it drew",
+        "steps": [
+          "Adding up reach and stance per account",
+          "Counting who comments most"
+        ],
+        "done": "{n} posts"
+      }
+    },
+    {
       "name": "objections",
       "layer": "comments",
       "phase": 2,
@@ -1982,6 +2261,7 @@
               "instagram",
               "threads",
               "x",
+              "youtube",
               "all"
             ],
             "default": "all",
@@ -2062,6 +2342,7 @@
               "instagram",
               "threads",
               "x",
+              "youtube",
               "all"
             ],
             "default": "all",
@@ -2148,6 +2429,7 @@
               "instagram",
               "threads",
               "x",
+              "youtube",
               "all"
             ],
             "default": "all",
@@ -2223,6 +2505,7 @@
               "instagram",
               "threads",
               "x",
+              "youtube",
               "all"
             ],
             "default": "all",
@@ -2305,6 +2588,7 @@
               "instagram",
               "threads",
               "x",
+              "youtube",
               "all"
             ],
             "default": "all",
@@ -2369,10 +2653,10 @@
     {
       "name": "seeding",
       "layer": "comments",
-      "phase": 2,
+      "phase": 1,
       "title": "Seeding detection",
-      "description": "Coordinated comment activity: repeated phrasing, timing clusters, and account patterns on any brand's posts. Flags the incident and estimates its size.",
-      "example": "Is anyone seeding comments on Wardah right now?",
+      "description": "Coordinated comment activity: the same wording from several accounts, one account repeating itself across posts, and bursts of first-time commenters on one post. Flags each pattern and estimates its size; says plainly when there is no signal.",
+      "example": "Is anyone seeding the comments right now?",
       "input_schema": {
         "type": "object",
         "properties": {
@@ -2383,6 +2667,7 @@
               "instagram",
               "threads",
               "x",
+              "youtube",
               "all"
             ],
             "default": "all",
@@ -2390,7 +2675,7 @@
           },
           "window": {
             "type": "object",
-            "description": "Time window. Either {last_n_days} or {from,to} (ISO dates)",
+            "description": "Time window over comment time. Either {last_n_days} or {from,to} (ISO dates); relative windows count back from the newest comment",
             "properties": {
               "last_n_days": {
                 "type": "integer",
@@ -2408,25 +2693,34 @@
             },
             "additionalProperties": false
           },
-          "brands": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            },
-            "description": "Brand slugs; default = all tracked brands in the workspace"
+          "min_authors": {
+            "type": "integer",
+            "minimum": 2,
+            "default": 3,
+            "description": "Identical wording from at least this many accounts counts as a pattern"
+          },
+          "min_repeats": {
+            "type": "integer",
+            "minimum": 2,
+            "default": 5,
+            "description": "One account posting at least this many comments across posts counts as a pattern"
+          },
+          "burst_minutes": {
+            "type": "integer",
+            "minimum": 1,
+            "default": 10
+          },
+          "burst_min_authors": {
+            "type": "integer",
+            "minimum": 3,
+            "default": 15,
+            "description": "This many distinct first-time commenters on one post within burst_minutes counts as a burst"
           },
           "limit": {
             "type": "integer",
             "minimum": 1,
             "maximum": 200,
             "default": 50
-          },
-          "brand": {
-            "type": "string"
-          },
-          "lookback_hours": {
-            "type": "integer",
-            "default": 48
           }
         },
         "required": [],
@@ -2441,10 +2735,14 @@
         "comments"
       ],
       "activity": {
-        "start": "Checking what data is loaded",
-        "steps": [],
-        "done": "Not loaded yet"
-      }
+        "start": "Checking the comments for coordinated patterns",
+        "steps": [
+          "Matching identical wording across accounts",
+          "Looking for bursts of new commenters"
+        ],
+        "done": "{n} patterns"
+      },
+      "first_release": true
     },
     {
       "name": "audience",
@@ -2464,6 +2762,7 @@
               "instagram",
               "threads",
               "x",
+              "youtube",
               "all"
             ],
             "default": "all",
@@ -2547,6 +2846,7 @@
               "instagram",
               "threads",
               "x",
+              "youtube",
               "all"
             ],
             "default": "all",
@@ -2634,6 +2934,7 @@
               "instagram",
               "threads",
               "x",
+              "youtube",
               "all"
             ],
             "default": "all",
@@ -2713,6 +3014,7 @@
               "instagram",
               "threads",
               "x",
+              "youtube",
               "all"
             ],
             "default": "all",

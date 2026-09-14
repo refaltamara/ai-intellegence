@@ -7,6 +7,7 @@ import { ClientBrand } from "@/ui/ClientBrand";
 import { getWorkspace } from "@/workspace/store";
 import { currentSession, currentWorkspaceId } from "@/auth/current";
 import Link from "next/link";
+import { PLATFORM_LABEL } from "@/skills/common";
 
 export const dynamic = "force-dynamic";
 
@@ -28,9 +29,13 @@ export default async function DataPage() {
         </div>
         <div className="layers">
           {s.per_platform.map((p) => (
-            <div className="layer" key={p.platform}><h4>{p.platform === "tiktok" ? "TikTok" : "Instagram"}</h4><p>{fmtNum(p.posts)} posts from {fmtNum(p.creators)} creators, {p.first_month} to {p.last_month}. {p.platform === "tiktok" ? "Keyword capture plus owned accounts; shoppable-link flag recorded." : "Tag-based capture; no owned posts, no shares or saves."}</p><small>Powers {registry.skills.filter((k) => !k.platforms || k.platforms.includes(p.platform)).filter((k) => k.phase === 1).length} analyses</small></div>
+            <div className="layer" key={p.platform}><h4>{PLATFORM_LABEL[p.platform] ?? p.platform}</h4><p>{fmtNum(p.posts)} posts from {fmtNum(p.creators)} {cfg?.subject_noun ?? "creators"}, {p.first_month} to {p.last_month}. {cfg?.kind === "profile" ? "Keyword capture around the subject plus the subject's own posts." : p.platform === "tiktok" ? "Keyword capture plus owned accounts; shoppable-link flag recorded." : "Tag-based capture; no owned posts, no shares or saves."}</p><small>Powers {registry.skills.filter((k) => !k.platforms || k.platforms.includes(p.platform)).filter((k) => k.phase === 1).length} analyses</small></div>
           ))}
-          <div className="layer"><h4>Comments, snapshots, Threads &amp; X</h4><p>Not loaded. Comment-layer, audience, velocity, forecast and narrative skills report themselves as unavailable until these land.</p><small>Phase 1b and Phase 2</small></div>
+          {s.comments ? (
+            <div className="layer"><h4>Comments</h4><p>{fmtNum(s.comments)} comments under every post, {s.comments_labelled === s.comments ? "all with a sentiment label" : `${fmtNum(s.comments_labelled)} with a sentiment label so far (labelling runs in the background)`}. Powers sentiment over time, what people are saying, who is driving it and seeding detection.</p><small>Sentiment: positive, neutral, negative</small></div>
+          ) : (
+            <div className="layer"><h4>Comments, snapshots, Threads &amp; X</h4><p>Not loaded. Comment-layer, audience, velocity, forecast and narrative skills report themselves as unavailable until these land.</p><small>Phase 1b and Phase 2</small></div>
+          )}
         </div>
         <h4 style={{ fontSize: 13, color: "var(--text-2)", marginBottom: 10, fontWeight: 600 }}>Capture coverage per month</h4>
         <div className="tablewrap" style={{ marginBottom: 24 }}>
