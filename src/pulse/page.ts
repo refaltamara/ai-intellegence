@@ -31,7 +31,8 @@ export type PulseData = {
   tz: string;
   asOf: string;
   postsAsOf: string;
-  totals: { posts: number; earned_posts: number; comments: number; labelled: number; negative: number; neutral: number; positive: number; accounts: number; platforms: number };
+  totals: { posts: number; earned_posts: number; posts_with_comments: number; comments: number; labelled: number; negative: number; neutral: number; positive: number; accounts: number; platforms: number;
+            posts_stance_labelled: number; posts_against: number; posts_neutral: number; posts_for: number; posts_no_caption: number };
   root: { url: string; posted_at: string; caption: string; views: number | null; likes: number | null; comments: number; early_comments: number } | null;
   reply: { at: string; likes: number; text: string } | null;
   hourly: { x: string[]; series: { name: string; data: number[]; stack?: string }[] };
@@ -80,7 +81,13 @@ async function build(ws: string): Promise<PulseData | null> {
             (select count(*) from comments where workspace_id = $1 and sentiment = 'neutral')::int as neutral,
             (select count(*) from comments where workspace_id = $1 and sentiment = 'positive')::int as positive,
             (select count(distinct (platform, author_handle)) from comments where workspace_id = $1 and sentiment_source is distinct from 'subject')::int as accounts,
-            (select count(distinct platform) from comments where workspace_id = $1)::int as platforms`,
+            (select count(distinct platform) from comments where workspace_id = $1)::int as platforms,
+            (select count(distinct post_id) from comments where workspace_id = $1)::int as posts_with_comments,
+            (select count(*) from posts where workspace_id = $1 and source = 'earned' and content_type is distinct from 'stub' and stance is not null)::int as posts_stance_labelled,
+            (select count(*) from posts where workspace_id = $1 and source = 'earned' and content_type is distinct from 'stub' and stance = 'negative')::int as posts_against,
+            (select count(*) from posts where workspace_id = $1 and source = 'earned' and content_type is distinct from 'stub' and stance = 'neutral')::int as posts_neutral,
+            (select count(*) from posts where workspace_id = $1 and source = 'earned' and content_type is distinct from 'stub' and stance = 'positive')::int as posts_for,
+            (select count(*) from posts where workspace_id = $1 and source = 'earned' and content_type is distinct from 'stub' and caption is null)::int as posts_no_caption`,
     [ws],
   );
   const asOfRow = await db.one<{ c: string; p: string }>(`select to_char((select max(posted_at) from comments where workspace_id = $1) at time zone $2, 'YYYY-MM-DD HH24:MI') as c, to_char((select max(posted_at) from posts where workspace_id = $1 and source = 'earned') at time zone $2, 'YYYY-MM-DD HH24:MI') as p`, [ws, tz]);
