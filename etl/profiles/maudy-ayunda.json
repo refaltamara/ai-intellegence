@@ -127,6 +127,12 @@
       "note": "second export, 15 Sep 06:00 WIB; date column broken, times from the status id"
     },
     {
+      "kind": "text",
+      "platform": "threads",
+      "file": "urltext_threads_0915.csv",
+      "note": "url -> text for the Threads posts whose text the contents export dropped"
+    },
+    {
       "kind": "comments",
       "platform": "youtube",
       "file": "comments_youtube.csv"

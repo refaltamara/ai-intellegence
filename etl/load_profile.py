@@ -13,6 +13,7 @@ workspace named in the contract. Sentiment is not computed here: comments land
 with sentiment null and /api/cron/label fills them in.
 
 What gets dropped, and reported per file:
+  text      - a url -> text export: fills captions that arrived empty (never overwrites)
   contents  - listed in drop_urls (captured wrong, e.g. a different singer)
             - link spam (spam_min_links or more links in the caption, spam_platforms only)
             - no subject keyword in the caption, on keyword_platforms only
@@ -528,6 +529,57 @@ def load_comments(db, ws, prof, platform, path, known_urls, dropped_urls, dry):
                     where id = $1""", [load_id, len(rows), drops.total(), json.dumps(report)])
     return report
 
+# ------------------------------------------------------- caption backfill
+def load_text(db, ws, prof, platform, path, dry):
+    """A url -> text export: fills the caption on posts that arrived without one.
+
+    Fair Listening's Threads contents export drops the text on some rows; a second
+    export of the same posts carries it. Only empty captions are filled, so a
+    backfill never overwrites what the contents file already said. Hashtags are
+    recomputed, and the post becomes labellable (stance) on the next cron tick.
+    """
+    t0 = time.time()
+    log(f"\n== {path.name} ({platform} caption backfill)")
+    df = read_csv(path)
+    urls = col(df, "posturl", "url", "post_url")
+    texts = col(df, "captiontext", "description", "caption", "text")
+    rows, drops, seen = [], Tally(), set()
+    for i in range(len(df)):
+        url = canon_url(urls.iloc[i], platform)
+        text = to_str(texts.iloc[i])
+        if not url:
+            drops.add("missing url", text or ""); continue
+        if not text:
+            drops.add("no text in the row", url); continue
+        if url in seen:
+            continue      # the same post repeated; the first row carries the text
+        seen.add(url)
+        rows.append({"url": url, "caption": text, "hashtags": hashtags(text)})
+    load_id = None
+    if not dry:
+        load_id = db.scalar("""insert into data_loads (workspace_id, file, platform, kind, rows_in)
+                               values ($1, $2, $3, 'captions', $4) returning id""", [ws, path.name, platform, len(df)])
+    n = 0
+    if not dry:
+        for i in range(0, len(rows), CHUNK):
+            res = db.query("""
+              update posts p set caption = r.caption, hashtags = r.hashtags
+              from jsonb_to_recordset($1::jsonb) as r(url text, caption text, hashtags text[])
+              where p.workspace_id = $2 and p.platform = $3 and p.url = r.url and p.caption is null
+            """, [json.dumps(rows[i:i + CHUNK]), ws, platform])
+            n += res.get("rowCount") or 0
+    still = 0 if dry else (db.scalar("""select count(*) from posts where workspace_id = $1 and platform = $2
+                                        and source = 'earned' and content_type is distinct from 'stub' and caption is null""", [ws, platform]) or 0)
+    report = {"file": path.name, "platform": platform, "kind": "captions", "rows_in": len(df), "rows_loaded": len(rows),
+              "rows_upserted": n, "rows_dropped": drops.total(), "drops": drops.d, "captions_filled": n,
+              "posts_still_without_text": int(still), "date_formats": {}, "posted_span": None,
+              "duration_s": round(time.time() - t0, 1)}
+    if not dry:
+        db.query("""update data_loads set rows_loaded = $2, rows_rejected = $3, report = $4::jsonb, finished_at = now()
+                    where id = $1""", [load_id, len(rows), drops.total(), json.dumps(report)])
+    return report
+
+
 # ------------------------------------------------------------------- setup
 def ensure_subject(db, ws, prof, dry):
     row = db.rows("select id, kind from workspaces where id = $1", [ws])
@@ -560,7 +612,9 @@ def print_report(reports):
     for r in reports:
         print(f"\n{r['file']} [{r['platform']} {r['kind']}]  in={r['rows_in']:,}  loaded={r['rows_loaded']:,}  "
               f"dropped={r['rows_dropped']:,}  {r['duration_s']}s  span={r['posted_span']}  dates={r['date_formats']}")
-        if r["kind"] == "posts":
+        if r["kind"] == "captions":
+            print(f"  captions filled: {r['captions_filled']}, posts still without text: {r['posts_still_without_text']}")
+        elif r["kind"] == "posts":
             print(f"  owned posts: {r['owned_posts']}, creators: {r['creators_upserted']}")
         else:
             print(f"  posts with comments: {r['posts_with_comments']}, stub posts: {len(r['stub_posts_created'])}, "
@@ -593,6 +647,10 @@ def main():
         if only and p not in only:
             continue
         path = prof.data_dir / f["file"]
+        if f["kind"] == "text":
+            rep = load_text(db, ws, prof, p, path, a.dry_run)
+            reports.append(rep)
+            continue
         if f["kind"] == "contents":
             rep, urls, drop = load_contents(db, ws, prof, p, path, a.dry_run)
             known.setdefault(p, set()).update(urls); dropped.setdefault(p, set()).update(drop)
