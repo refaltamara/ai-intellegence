@@ -30,6 +30,7 @@ export type PulseData = {
   productName: string;
   tz: string;
   asOf: string;
+  postsAsOf: string;
   totals: { posts: number; earned_posts: number; comments: number; labelled: number; negative: number; neutral: number; positive: number; accounts: number; platforms: number };
   root: { url: string; posted_at: string; caption: string; views: number | null; likes: number | null; comments: number; early_comments: number } | null;
   reply: { at: string; likes: number; text: string } | null;
@@ -82,7 +83,9 @@ async function build(ws: string): Promise<PulseData | null> {
             (select count(distinct platform) from comments where workspace_id = $1)::int as platforms`,
     [ws],
   );
-  const asOf = (await db.one<{ t: string }>(`select to_char(max(posted_at) at time zone $2, 'YYYY-MM-DD HH24:MI') as t from comments where workspace_id = $1`, [ws, tz]))?.t ?? "";
+  const asOfRow = await db.one<{ c: string; p: string }>(`select to_char((select max(posted_at) from comments where workspace_id = $1) at time zone $2, 'YYYY-MM-DD HH24:MI') as c, to_char((select max(posted_at) from posts where workspace_id = $1 and source = 'earned') at time zone $2, 'YYYY-MM-DD HH24:MI') as p`, [ws, tz]);
+  const asOf = asOfRow?.c ?? "";
+  const postsAsOf = asOfRow?.p ?? "";
 
   // the root: the owned post with the most comments
   const rootRow = await db.one<Row>(
@@ -117,7 +120,7 @@ async function build(ws: string): Promise<PulseData | null> {
 
   // hourly, last 72 h ending at the newest comment; daily since the root post
   const hours = await db.q<Row>(
-    `with bounds as (select date_trunc('hour', max(posted_at) at time zone $2) as last from comments where workspace_id = $1),
+    `with bounds as (select date_trunc('hour', greatest((select max(posted_at) from comments where workspace_id = $1), (select max(posted_at) from posts where workspace_id = $1 and source = 'earned')) at time zone $2) as last),
      hrs as (select generate_series((select last from bounds) - interval '71 hours', (select last from bounds), interval '1 hour') as h)
      select to_char(hrs.h, 'YYYY-MM-DD HH24:00') as h, c.platform, count(c.id)::int as n
      from hrs left join comments c on c.workspace_id = $1 and c.sentiment_source is distinct from 'subject' and date_trunc('hour', c.posted_at at time zone $2) = hrs.h
@@ -127,7 +130,7 @@ async function build(ws: string): Promise<PulseData | null> {
   const hourly = pivot(hours, "h");
   // posts by other accounts per hour and per day: the density of the conversation, not only its replies
   const postHours = await db.q<Row>(
-    `with bounds as (select date_trunc('hour', max(posted_at) at time zone $2) as last from comments where workspace_id = $1),
+    `with bounds as (select date_trunc('hour', greatest((select max(posted_at) from comments where workspace_id = $1), (select max(posted_at) from posts where workspace_id = $1 and source = 'earned')) at time zone $2) as last),
      hrs as (select generate_series((select last from bounds) - interval '71 hours', (select last from bounds), interval '1 hour') as h)
      select to_char(hrs.h, 'YYYY-MM-DD HH24:00') as h, p.platform, coalesce(p.stance, 'unlabelled') as stance, count(p.id)::int as n
      from hrs left join posts p on p.workspace_id = $1 and p.source = 'earned' and p.content_type is distinct from 'stub' and date_trunc('hour', p.posted_at at time zone $2) = hrs.h
@@ -144,7 +147,7 @@ async function build(ws: string): Promise<PulseData | null> {
 
   // negative share per hour on labelled comments; hours with fewer than 10 labelled stay blank
   const negHours = await db.q<Row>(
-    `with bounds as (select date_trunc('hour', max(posted_at) at time zone $2) as last from comments where workspace_id = $1),
+    `with bounds as (select date_trunc('hour', greatest((select max(posted_at) from comments where workspace_id = $1), (select max(posted_at) from posts where workspace_id = $1 and source = 'earned')) at time zone $2) as last),
      hrs as (select generate_series((select last from bounds) - interval '71 hours', (select last from bounds), interval '1 hour') as h)
      select to_char(hrs.h, 'YYYY-MM-DD HH24:00') as h, count(c.id) filter (where c.sentiment is not null)::int as labelled, count(c.id) filter (where c.sentiment = 'negative')::int as negative
      from hrs left join comments c on c.workspace_id = $1 and c.sentiment_source is distinct from 'subject' and date_trunc('hour', c.posted_at at time zone $2) = hrs.h
@@ -189,7 +192,7 @@ async function build(ws: string): Promise<PulseData | null> {
     [ws],
   );
   const firstTime = await db.q<Row>(
-    `with bounds as (select date_trunc('hour', max(posted_at) at time zone $2) as last from comments where workspace_id = $1),
+    `with bounds as (select date_trunc('hour', greatest((select max(posted_at) from comments where workspace_id = $1), (select max(posted_at) from posts where workspace_id = $1 and source = 'earned')) at time zone $2) as last),
      hrs as (select generate_series((select last from bounds) - interval '71 hours', (select last from bounds), interval '1 hour') as h),
      firsts as (select platform, author_handle, min(posted_at) as first_at from comments where workspace_id = $1 and sentiment_source is distinct from 'subject' and author_handle is not null group by 1, 2)
      select to_char(hrs.h, 'YYYY-MM-DD HH24:00') as h,
@@ -208,7 +211,7 @@ async function build(ws: string): Promise<PulseData | null> {
   };
   const sinceIso = root ? root.posted_at.slice(0, 10) : null;
   const days = await db.q<Row>(
-    `with bounds as (select coalesce($3::date, (max(posted_at) - interval '30 days')::date) as first, max(posted_at)::date as last from comments where workspace_id = $1),
+    `with bounds as (select coalesce($3::date, (max(posted_at) - interval '30 days')::date) as first, greatest(max(posted_at), (select max(posted_at) from posts where workspace_id = $1 and source = 'earned'))::date as last from comments where workspace_id = $1),
      ds as (select generate_series((select first from bounds), (select last from bounds), interval '1 day')::date as d)
      select to_char(ds.d, 'YYYY-MM-DD') as h, c.platform, count(c.id)::int as n
      from ds left join comments c on c.workspace_id = $1 and c.sentiment_source is distinct from 'subject' and (c.posted_at at time zone $2)::date = ds.d
@@ -217,7 +220,7 @@ async function build(ws: string): Promise<PulseData | null> {
   );
   const daily = pivot(days, "h");
   const postDays = await db.q<Row>(
-    `with bounds as (select coalesce($3::date, (max(posted_at) - interval '30 days')::date) as first, max(posted_at)::date as last from comments where workspace_id = $1),
+    `with bounds as (select coalesce($3::date, (max(posted_at) - interval '30 days')::date) as first, greatest(max(posted_at), (select max(posted_at) from posts where workspace_id = $1 and source = 'earned'))::date as last from comments where workspace_id = $1),
      ds as (select generate_series((select first from bounds), (select last from bounds), interval '1 day')::date as d)
      select to_char(ds.d, 'YYYY-MM-DD') as h, p.platform, count(p.id)::int as n
      from ds left join posts p on p.workspace_id = $1 and p.source = 'earned' and p.content_type is distinct from 'stub' and (p.posted_at at time zone $2)::date = ds.d
@@ -278,7 +281,7 @@ async function build(ws: string): Promise<PulseData | null> {
   events.sort((a, b) => a.at.localeCompare(b.at));
 
   return {
-    subject, productName: cfg.product_name, tz, asOf,
+    subject, productName: cfg.product_name, tz, asOf, postsAsOf,
     totals: totals!, root: root ? { url: root.url, posted_at: root.posted_at, caption: root.caption, views: root.views, likes: root.likes, comments: root.comments, early_comments: root.early_comments } : null,
     reply: reply ? { at: reply.at, likes: reply.likes, text: reply.text } : null,
     hourly, posts_hourly, posts_hourly_stance, posts_daily, negative_trend: trimLead(negative_trend), stance, commenters: { ...commenters, first_time: trimLead(commenters.first_time) }, reply_effect, daily, events, spread: spread.map(({ first_post_url: _u, ...s }) => s), sentiment, drivers, themes, seeding,
