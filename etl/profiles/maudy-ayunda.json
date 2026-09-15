@@ -4,45 +4,153 @@
     "brand_id": "maudyayunda",
     "name": "Maudy Ayunda",
     "owned_handles": {
-      "youtube": ["modmedia", "maudyayunda"],
-      "instagram": ["maudyayunda"],
-      "tiktok": ["maudyayunda"],
-      "threads": ["maudyayunda"],
-      "x": ["maudyayunda"]
+      "youtube": [
+        "modmedia",
+        "maudyayunda"
+      ],
+      "instagram": [
+        "maudyayunda"
+      ],
+      "tiktok": [
+        "maudyayunda"
+      ],
+      "threads": [
+        "maudyayunda"
+      ],
+      "x": [
+        "maudyayunda"
+      ]
     },
-    "followers": { "instagram": 18700000 }
+    "followers": {
+      "instagram": 18700000
+    }
   },
   "export_time": "2026-09-14T12:15:00+07:00",
-  "naive_dates_tz": { "threads": "UTC" },
+  "naive_dates_tz": {
+    "threads": "UTC"
+  },
   "naive_dates_note": "Threads contents carry a time with no zone; the first reply on every post lands exactly 7 h after it when read as WIB, so the export is UTC. Instagram and YouTube contents are date-only and stay WIB midnight.",
   "root_url": "https://www.youtube.com/watch?v=r1DSH9AQXLU",
-  "keywords": ["maudy", "ayunda", "tone ?deaf", "lpdp", "mindful", "jesse ?choi", "from ?this ?island", "maudysthoughts", "modmedia"],
-  "keyword_platforms": ["youtube", "tiktok", "instagram", "x"],
+  "keywords": [
+    "maudy",
+    "ayunda",
+    "tone ?deaf",
+    "lpdp",
+    "mindful",
+    "jesse ?choi",
+    "from ?this ?island",
+    "maudysthoughts",
+    "modmedia"
+  ],
+  "keyword_platforms": [
+    "youtube",
+    "tiktok",
+    "instagram",
+    "x"
+  ],
   "keyword_platforms_note": "Threads is exempt: replies inside a thread about the subject rarely repeat her name. Threads posts are dropped only by the explicit list.",
   "spam_min_links": 3,
-  "spam_platforms": ["x"],
+  "spam_platforms": [
+    "x"
+  ],
   "spam_note": "X captures link-farm accounts that append her name as a hashtag; a caption with spam_min_links or more links is dropped on those platforms only.",
   "drop_urls": [
-    { "url": "https://www.tiktok.com/@orange97_/video/7684896690360536340", "reason": "Vietnamese singer, captured by mistake" },
-    { "url": "https://www.tiktok.com/@selvi_lovers_suramadu/video/7684062159793376533", "reason": "Selvi Ayunda, a different person" },
-    { "url": "https://www.tiktok.com/@d1h20/video/7683044205299600660", "reason": "medical student intro that quotes her; not about her" },
-    { "url": "https://www.tiktok.com/@cctvnetizen1/video/7682642686754426120", "reason": "mask prices after the eruption; not about her" },
-    { "url": "https://www.threads.com/@josephinefifin/post/DdILqXNkpzw", "reason": "unrelated kitchen thread" },
-    { "url": "https://www.threads.com/@findbyfii/post/DdOZd0jEkVL", "reason": "unrelated grief thread" },
-    { "url": "https://www.threads.com/@putri_rs17/post/DdQIpP4FJmb", "reason": "unrelated personal story" },
-    { "url": "https://x.com/To_Evermore/status/2099177792521048443", "reason": "unrelated reply" }
+    {
+      "url": "https://www.tiktok.com/@orange97_/video/7684896690360536340",
+      "reason": "Vietnamese singer, captured by mistake"
+    },
+    {
+      "url": "https://www.tiktok.com/@selvi_lovers_suramadu/video/7684062159793376533",
+      "reason": "Selvi Ayunda, a different person"
+    },
+    {
+      "url": "https://www.tiktok.com/@d1h20/video/7683044205299600660",
+      "reason": "medical student intro that quotes her; not about her"
+    },
+    {
+      "url": "https://www.tiktok.com/@cctvnetizen1/video/7682642686754426120",
+      "reason": "mask prices after the eruption; not about her"
+    },
+    {
+      "url": "https://www.threads.com/@josephinefifin/post/DdILqXNkpzw",
+      "reason": "unrelated kitchen thread"
+    },
+    {
+      "url": "https://www.threads.com/@findbyfii/post/DdOZd0jEkVL",
+      "reason": "unrelated grief thread"
+    },
+    {
+      "url": "https://www.threads.com/@putri_rs17/post/DdQIpP4FJmb",
+      "reason": "unrelated personal story"
+    },
+    {
+      "url": "https://x.com/To_Evermore/status/2099177792521048443",
+      "reason": "unrelated reply"
+    }
   ],
   "files": [
-    { "kind": "contents", "platform": "youtube", "file": "contents_youtube.csv" },
-    { "kind": "contents", "platform": "tiktok", "file": "contents_tiktok.csv" },
-    { "kind": "contents", "platform": "instagram", "file": "contents_instagram.csv" },
-    { "kind": "contents", "platform": "threads", "file": "contents_threads.csv" },
-    { "kind": "contents", "platform": "x", "file": "contents_x.csv" },
-    { "kind": "comments", "platform": "youtube", "file": "comments_youtube.csv" },
-    { "kind": "comments", "platform": "tiktok", "file": "comments_tiktok.csv" },
-    { "kind": "comments", "platform": "instagram", "file": "comments_instagram.csv" },
-    { "kind": "comments", "platform": "threads", "file": "comments_threads.csv" },
-    { "kind": "comments", "platform": "x", "file": "comments_x.csv" }
+    {
+      "kind": "contents",
+      "platform": "youtube",
+      "file": "contents_youtube.csv"
+    },
+    {
+      "kind": "contents",
+      "platform": "tiktok",
+      "file": "contents_tiktok.csv"
+    },
+    {
+      "kind": "contents",
+      "platform": "instagram",
+      "file": "contents_instagram.csv"
+    },
+    {
+      "kind": "contents",
+      "platform": "threads",
+      "file": "contents_threads.csv"
+    },
+    {
+      "kind": "contents",
+      "platform": "x",
+      "file": "contents_x.csv"
+    },
+    {
+      "kind": "contents",
+      "platform": "threads",
+      "file": "contents_threads_0915.csv",
+      "note": "second export, 15 Sep 06:00 WIB"
+    },
+    {
+      "kind": "contents",
+      "platform": "x",
+      "file": "contents_x_0915.csv",
+      "note": "second export, 15 Sep 06:00 WIB; date column broken, times from the status id"
+    },
+    {
+      "kind": "comments",
+      "platform": "youtube",
+      "file": "comments_youtube.csv"
+    },
+    {
+      "kind": "comments",
+      "platform": "tiktok",
+      "file": "comments_tiktok.csv"
+    },
+    {
+      "kind": "comments",
+      "platform": "instagram",
+      "file": "comments_instagram.csv"
+    },
+    {
+      "kind": "comments",
+      "platform": "threads",
+      "file": "comments_threads.csv"
+    },
+    {
+      "kind": "comments",
+      "platform": "x",
+      "file": "comments_x.csv"
+    }
   ],
   "data_dir": "data/raw/maudy"
 }

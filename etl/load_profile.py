@@ -171,6 +171,15 @@ def parse_when(raw, anchor, naive_tz=None):
         return d.astimezone(timezone.utc), "naive_local" if (naive_tz or LOCAL_TZ) is LOCAL_TZ else f"naive_{naive_tz.tzname(d) or 'tz'}"
     return d.astimezone(timezone.utc), "aware"
 
+TWITTER_EPOCH_MS = 1288834974657
+
+def snowflake_time(url):
+    """X status ids are snowflakes: the tweet time is in the id. Used when an export has no usable date."""
+    m = re.search(r"/status/(\d{15,})", url or "")
+    if not m:
+        return None
+    return datetime.fromtimestamp(((int(m.group(1)) >> 22) + TWITTER_EPOCH_MS) / 1000, tz=timezone.utc)
+
 def month_of(d_utc):
     return d_utc.astimezone(LOCAL_TZ).strftime("%Y-%m-01")
 
@@ -270,13 +279,25 @@ def normalise_contents(df, platform, prof, source_file):
     ctypes = col(df, "content_type"); views = col(df, "views"); likes = col(df, "likes", "like")
     replies = col(df, "replies/comments", "replies", "comments", "reply"); reposts = col(df, "retweet/repost", "reposts")
     shares = col(df, "share", "shares"); followers = col(df, "followers")
+    canon = [canon_url(u, platform) for u in urls]
+    last_index = {}
+    for i, u in enumerate(canon):
+        if u:
+            last_index[u] = i
     for i in range(len(df)):
-        url = canon_url(urls.iloc[i], platform)
+        url = canon[i]
         if not url:
             drops.add("missing url", accounts.iloc[i]); continue
+        if last_index.get(url) != i:
+            drops.add("same url repeated in the file (kept the last row)", url); continue
         handle = norm_handle(accounts.iloc[i]) or handle_from_url(url)
         caption = to_str(descs.iloc[i])
         when, how = parse_when(dates.iloc[i], prof.anchor, prof.naive_tz.get(platform))
+        if platform == "x" and (when is None or how in ("epoch_s",) or (how == "naive_local" and not re.search(r"[A-Za-z:]", str(dates.iloc[i])))):
+            # an export with a broken date column (a bare number) still carries the time inside the status id
+            sf = snowflake_time(url)
+            if sf is not None:
+                when, how = sf, "snowflake_id"
         if when is None:
             drops.add(f"unparseable date_posted ({how})", f"{url} {dates.iloc[i]!r}"); continue
         why = prof.why_drop(platform, url, handle, caption)

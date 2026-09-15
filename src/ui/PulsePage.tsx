@@ -28,7 +28,7 @@ export function PulsePage({ d }: { d: PulseData }) {
     <section className="screen">
       <div className="topbar">
         <div><h1>Pulse</h1><span className="meta">What is being said about {d.subject}, across {t.platforms} platforms</span></div>
-        <span className="pill live">Comments through {d.asOf} WIB</span>
+        <span className="pill live">Posts through {d.postsAsOf} · comments through {d.asOf} WIB</span>
       </div>
       <div className="wrap wide">
         <div className="stats">
