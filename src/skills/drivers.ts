@@ -85,7 +85,7 @@ export const drivers: SkillImpl = async (db, ctx, _def, params) => {
   return {
     params_resolved: { ...params, window: { from: w.from, to: w.to }, platform: params.platform ?? "all", sort, limit },
     summary: {
-      window: w.label, posts_with_comments: totals?.posts ?? 0, comments: totals?.comments ?? 0, unlabelled: totals?.unlabelled ?? 0, off_topic_set_aside: offTopic,
+      window: w.label, posts_with_comments: totals?.posts ?? 0, comments: totals?.comments ?? 0, unlabelled: totals?.unlabelled ?? 0, off_topic_counted_as_neutral: offTopic,
       sorted_by: sort, top_accounts: accountRows, top_commenters: commenterRows,
       rule: "one row per post that drew comments in the window; accounts are the posts' authors, ranked by negative comments drawn; commenters by comment count",
     },
