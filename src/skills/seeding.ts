@@ -44,26 +44,34 @@ export const seeding: SkillImpl = async (db, ctx, _def, params) => {
        from c group by author_handle having count(*) >= ${pMinR} and count(distinct post_id) >= 2
      ),
      firsts as (
-       select post_id, author_handle, min(posted_at) as first_here from c group by 1, 2
+       select post_id, author_handle, min(posted_at) as first_here, count(*) over (partition by author_handle) as author_total
+       from c group by post_id, author_handle
      ),
      only_once as (
-       select f.post_id, f.author_handle, f.first_here from firsts f
-       where (select count(*) from c x where x.author_handle = f.author_handle) = 1
-         and (select x.platform from c x where x.post_id = f.post_id limit 1) <> 'youtube'
+       select post_id, author_handle, first_here from firsts f
+       where author_total = 1 and (select x.platform from c x where x.post_id = f.post_id limit 1) <> 'youtube'
      ),
      burst as (
-       select 'burst' as kind, o.post_id::text as key,
-              (select count(*) from only_once y where y.post_id = o.post_id and y.first_here >= o.first_here and y.first_here < o.first_here + (${pBurstMin} || ' minutes')::interval)::int as authors,
-              o.first_here as first_at
-       from only_once o
+       -- how many first-time commenters land on this post within the window, counted with a
+       -- range frame instead of a correlated subquery: one pass per post, not one per row
+       select post_id, first_here,
+              count(*) over (partition by post_id order by first_here
+                             range between current row and (${pBurstMin} || ' minutes')::interval following)::int as authors
+       from only_once
      ),
      burst_best as (
-       select b.kind, b.key, b.authors as comments, b.authors, 1 as posts, b.first_at, b.first_at + (${pBurstMin} || ' minutes')::interval as last_at,
-              (select (array_agg(x.id order by x.likes desc))[1:3] from c x where x.post_id = b.key::uuid and x.posted_at >= b.first_at and x.posted_at < b.first_at + (${pBurstMin} || ' minutes')::interval) as sample_ids,
-              (select count(*) from c x where x.post_id = b.key::uuid and x.posted_at >= b.first_at and x.posted_at < b.first_at + (${pBurstMin} || ' minutes')::interval and x.sentiment = 'negative')::int as negative,
-              (select x.platform from c x where x.post_id = b.key::uuid limit 1) as platform,
-              row_number() over (partition by b.key order by b.authors desc, b.first_at) as rn
-       from burst b where b.authors >= ${pBurstA}
+       select 'burst' as kind, b.post_id::text as key, b.authors as comments, b.authors, 1 as posts, b.first_at as first_at,
+              b.first_at + (${pBurstMin} || ' minutes')::interval as last_at, b.sample_ids, b.negative, b.platform,
+              row_number() over (partition by b.post_id order by b.authors desc, b.first_at) as rn
+       from (
+         select bb.post_id, bb.first_here as first_at, bb.authors,
+                (select (array_agg(x.id order by x.likes desc))[1:3] from c x
+                  where x.post_id = bb.post_id and x.posted_at >= bb.first_here and x.posted_at < bb.first_here + (${pBurstMin} || ' minutes')::interval) as sample_ids,
+                (select count(*) from c x
+                  where x.post_id = bb.post_id and x.posted_at >= bb.first_here and x.posted_at < bb.first_here + (${pBurstMin} || ' minutes')::interval and x.sentiment = 'negative')::int as negative,
+                (select x.platform from c x where x.post_id = bb.post_id limit 1) as platform
+         from (select distinct on (post_id) post_id, first_here, authors from burst where authors >= ${pBurstA} order by post_id, authors desc, first_here) bb
+       ) b
      )
      select kind, key, comments, authors, posts, to_char(first_at at time zone ${pTz}, 'YYYY-MM-DD HH24:MI') as first_at,
             to_char(last_at at time zone ${pTz}, 'YYYY-MM-DD HH24:MI') as last_at, sample_ids, negative, platform, count(*) over() as matched
