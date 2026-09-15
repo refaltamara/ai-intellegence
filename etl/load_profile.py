@@ -231,6 +231,15 @@ class Profile:
         self.data_dir = ROOT / c.get("data_dir", "data/raw")
         self.root_url = c.get("root_url")
 
+    def anchor_for(self, f):
+        """A file may carry its own export_time; YouTube's relative dates ("1 minute ago")
+        are anchored to the export that produced them, not to the newest export."""
+        t = f.get("export_time")
+        if not t:
+            return self.anchor
+        d = dtparse.parse(t)
+        return d if d.tzinfo else d.replace(tzinfo=LOCAL_TZ)
+
     def is_owned(self, platform, handle):
         return bool(handle) and norm_handle(handle) in self.owned.get(platform, set())
 
@@ -272,7 +281,7 @@ def col(df, *names):
     return pd.Series([""] * len(df), index=df.index, dtype=str)
 
 # ---------------------------------------------------------------- contents
-def normalise_contents(df, platform, prof, source_file):
+def normalise_contents(df, platform, prof, source_file, anchor=None):
     """-> rows (post dicts), drops (Tally), dropped_urls (set)."""
     drops, rows, dropped = Tally(), [], set()
     urls = col(df, "url"); accounts = col(df, "account_name", "account", "author")
@@ -293,7 +302,7 @@ def normalise_contents(df, platform, prof, source_file):
             drops.add("same url repeated in the file (kept the last row)", url); continue
         handle = norm_handle(accounts.iloc[i]) or handle_from_url(url)
         caption = to_str(descs.iloc[i])
-        when, how = parse_when(dates.iloc[i], prof.anchor, prof.naive_tz.get(platform))
+        when, how = parse_when(dates.iloc[i], anchor or prof.anchor, prof.naive_tz.get(platform))
         if platform == "x" and (when is None or how in ("epoch_s",) or (how == "naive_local" and not re.search(r"[A-Za-z:]", str(dates.iloc[i])))):
             # an export with a broken date column (a bare number) still carries the time inside the status id
             sf = snowflake_time(url)
@@ -391,11 +400,11 @@ def upsert_posts(db, ws, load_id, rows, dry, stub=False):
         n += res.get("rowCount") or 0
     return n
 
-def load_contents(db, ws, prof, platform, path, dry):
+def load_contents(db, ws, prof, platform, path, dry, anchor=None):
     t0 = time.time()
     log(f"\n== {path.name} ({platform} contents)")
     df = read_csv(path)
-    rows, drops, dropped = normalise_contents(df, platform, prof, path.name)
+    rows, drops, dropped = normalise_contents(df, platform, prof, path.name, anchor)
     load_id = None
     if not dry:
         load_id = db.scalar("""insert into data_loads (workspace_id, file, platform, kind, rows_in)
@@ -417,7 +426,7 @@ def load_contents(db, ws, prof, platform, path, dry):
     return report, {r["url"] for r in rows}, dropped
 
 # ---------------------------------------------------------------- comments
-def normalise_comments(df, platform, prof, known_urls, dropped_urls, source_file):
+def normalise_comments(df, platform, prof, known_urls, dropped_urls, source_file, anchor=None):
     """-> rows (comment dicts), drops (Tally), stubs (url -> stub post dict)."""
     drops, rows, stubs, seen_ids = Tally(), [], {}, set()
     urls = col(df, "post_url", "url"); ids = col(df, "comment_id", "id"); authors = col(df, "author", "account_name")
@@ -435,7 +444,7 @@ def normalise_comments(df, platform, prof, known_urls, dropped_urls, source_file
         if url in dropped_urls:
             drops.add("comment on a dropped post", f"{url} {text[:50]!r}"); continue
         handle = norm_handle(authors.iloc[i])
-        when, how = parse_when(dates.iloc[i], prof.anchor, prof.naive_tz.get(platform))
+        when, how = parse_when(dates.iloc[i], anchor or prof.anchor, prof.naive_tz.get(platform))
         if when is None and to_str(dates.iloc[i]):
             drops.add(f"unparseable date ({how})", f"{url} {dates.iloc[i]!r}"); continue
         raw_id = to_str(ids.iloc[i])
@@ -456,8 +465,8 @@ def normalise_comments(df, platform, prof, known_urls, dropped_urls, source_file
             stubs[url] = {"platform": platform, "platform_post_id": post_id_from_url(url, platform),
                           "creator_handle": handle_from_url(url), "creator_key": handle_from_url(url),
                           "brand_id": prof.brand_id, "source": "earned", "collection": "keyword",
-                          "posted_at": when.isoformat() if when else prof.anchor.astimezone(timezone.utc).isoformat(),
-                          "month": month_of(when or prof.anchor), "url": url, "caption": None, "hashtags": None,
+                          "posted_at": when.isoformat() if when else (anchor or prof.anchor).astimezone(timezone.utc).isoformat(),
+                          "month": month_of(when or anchor or prof.anchor), "url": url, "caption": None, "hashtags": None,
                           "followers_at_post": None, "tier": None, "content_type": "stub", "views": None, "likes": None,
                           "comments_count": None, "shares": None, "engagements": None, "engagements_lc": None,
                           "source_file": source_file, "date_how": "stub"}
@@ -490,11 +499,11 @@ COMMENT_SQL = """
                             then comments.sentiment_source else excluded.sentiment_source end
 """
 
-def load_comments(db, ws, prof, platform, path, known_urls, dropped_urls, dry):
+def load_comments(db, ws, prof, platform, path, known_urls, dropped_urls, dry, anchor=None):
     t0 = time.time()
     log(f"\n== {path.name} ({platform} comments)")
     df = read_csv(path)
-    rows, drops, stubs = normalise_comments(df, platform, prof, known_urls, dropped_urls, path.name)
+    rows, drops, stubs = normalise_comments(df, platform, prof, known_urls, dropped_urls, path.name, anchor)
     load_id = None
     if not dry:
         load_id = db.scalar("""insert into data_loads (workspace_id, file, platform, kind, rows_in)
@@ -652,12 +661,12 @@ def main():
             reports.append(rep)
             continue
         if f["kind"] == "contents":
-            rep, urls, drop = load_contents(db, ws, prof, p, path, a.dry_run)
+            rep, urls, drop = load_contents(db, ws, prof, p, path, a.dry_run, prof.anchor_for(f))
             known.setdefault(p, set()).update(urls); dropped.setdefault(p, set()).update(drop)
         else:
             if p not in known and not a.dry_run:
                 known[p] = {r["url"] for r in db.rows("select url from posts where workspace_id = $1 and platform = $2", [ws, p])}
-            rep = load_comments(db, ws, prof, p, path, known.get(p, set()), dropped.get(p, set()), a.dry_run)
+            rep = load_comments(db, ws, prof, p, path, known.get(p, set()), dropped.get(p, set()), a.dry_run, prof.anchor_for(f))
         reports.append(rep)
     print_report(reports)
     if not a.dry_run and not a.no_refresh:
