@@ -156,6 +156,25 @@
       "kind": "comments",
       "platform": "x",
       "file": "comments_x.csv"
+    },
+    {
+      "kind": "comments",
+      "platform": "youtube",
+      "file": "comments_youtube_0915.csv",
+      "export_time": "2026-09-15T06:00:00+07:00",
+      "note": "second export; relative dates anchored to its own export time"
+    },
+    {
+      "kind": "comments",
+      "platform": "threads",
+      "file": "comments_threads_0915.csv",
+      "export_time": "2026-09-15T06:00:00+07:00"
+    },
+    {
+      "kind": "comments",
+      "platform": "x",
+      "file": "comments_x_0915.csv",
+      "export_time": "2026-09-15T06:00:00+07:00"
     }
   ],
   "data_dir": "data/raw/maudy"
