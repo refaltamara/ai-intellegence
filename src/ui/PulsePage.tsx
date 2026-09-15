@@ -23,6 +23,8 @@ export function PulsePage({ d }: { d: PulseData }) {
   const seedRows = d.seeding.rows as { kind: string; platform: string; what: string; accounts: number; comments: number; first_at: string; post_url: string | null }[];
   const themeRows = d.themes.rows as { term: string; comments: number; share_pct: number; examples: string[] }[];
   const driverRows = d.drivers.rows as { url: string; platform: string; account: string; source: string; stance: string | null; views: number | null; comments: number; negative: number; positive: number; unlabelled: number; caption: string | null; posted_at: string }[];
+  const againstPct = pct(t.posts_against, t.posts_stance_labelled);
+  const lag = d.postsAsOf && d.asOf && d.postsAsOf > d.asOf;
   const ask = (q: string) => `/?q=${encodeURIComponent(q)}`;
   return (
     <section className="screen">
@@ -32,36 +34,38 @@ export function PulsePage({ d }: { d: PulseData }) {
       </div>
       <div className="wrap wide">
         <div className="stats">
-          <div className="stat"><b>{fmtNum(t.comments)}</b><span>comments from {fmtNum(t.accounts)} accounts on {fmtNum(t.posts)} posts</span></div>
+          <div className="stat"><b>{fmtNum(t.comments)}</b><span>comments from {fmtNum(t.accounts)} accounts, on {fmtNum(t.posts_with_comments)} posts</span></div>
           <div className="stat"><b style={{ color: negPct != null && negPct >= 50 ? "var(--red, #c0392b)" : undefined }}>{negPct != null ? `${negPct}%` : "–"}</b><span>{t.labelled ? `negative, of ${fmtNum(t.labelled)} labelled${t.labelled < t.comments ? ` · ${fmtNum(t.comments - t.labelled)} still unlabelled` : ""}` : "negative · labelling has not started"}</span></div>
-          <div className="stat"><b>{sum.spike_started ? when(sum.spike_started, sum.bucket === "day") : "–"}</b><span>{sum.spike_started ? `negative comments spiked${sum.bucket === "day" ? "" : " (hourly)"}; peak ${when(sum.peak_bucket ?? null, sum.bucket === "day")} with ${fmtNum(sum.peak_negative)}` : "no spike yet by the rule"}</span></div>
-          <div className="stat"><b>{fmtNum(t.earned_posts)}</b><span>posts by other accounts about {d.subject}</span></div>
+          <div className="stat"><b style={{ color: againstPct != null && againstPct >= 50 ? "var(--red, #c0392b)" : undefined }}>{againstPct != null ? `${againstPct}%` : "–"}</b><span>{t.posts_stance_labelled ? `of posts are against ${d.subject}, of ${fmtNum(t.posts_stance_labelled)} with a stance${t.earned_posts > t.posts_stance_labelled ? ` · ${fmtNum(t.earned_posts - t.posts_stance_labelled - t.posts_no_caption)} waiting, ${fmtNum(t.posts_no_caption)} have no text in the export` : ""}` : `posts by other accounts · ${fmtNum(t.earned_posts)} waiting for a stance`}</span></div>
+          <div className="stat"><b>{fmtNum(t.earned_posts)}</b><span>posts by other accounts about {d.subject}{sum.spike_started ? ` · comments spiked ${when(sum.spike_started, sum.bucket === "day")}` : ""}</span></div>
         </div>
 
         <div className="pulse-grid">
           <div className="card">
-            <h4>Last 72 hours, comments per hour <span>by platform · WIB</span></h4>
-            <div className="body">{d.hourly.x.length >= 3 ? <Chart spec={{ type: "stacked_bar", x: d.hourly.x.map((h) => h.slice(5)), series: d.hourly.series, y_label: "comments" }} /> : <p className="quiet">Not enough hours of data yet.</p>}</div>
-          </div>
-          <div className="card">
-            <h4>Since the video went up, comments per day <span>by platform</span></h4>
-            <div className="body">{d.daily.x.length >= 3 ? <Chart spec={{ type: "stacked_bar", x: d.daily.x.map((h) => h.slice(5)), series: d.daily.series, y_label: "comments" }} /> : <p className="quiet">Not enough days of data yet.</p>}
-              {d.posts_daily.series.length > 0 && <><p className="quiet" style={{ margin: "10px 0 4px", fontWeight: 600 }}>Posts by other accounts per day</p><Chart spec={{ type: "stacked_bar", x: d.posts_daily.x.map((h) => h.slice(5)), series: d.posts_daily.series, y_label: "posts" }} /></>}
+            <h4>Posts about {d.subject} per hour <span>by other accounts · last 72 hours · WIB</span></h4>
+            <div className="body">{d.posts_hourly.series.length ? <Chart spec={{ type: "stacked_bar", x: d.posts_hourly.x.map((h) => h.slice(5)), series: d.posts_hourly.series, y_label: "posts" }} /> : <p className="quiet">No posts by other accounts in the last 72 hours.</p>}
+              {d.posts_daily.series.length > 0 && <><p className="quiet" style={{ margin: "10px 0 4px", fontWeight: 600 }}>Posts by other accounts per day, since the video went up</p><Chart spec={{ type: "stacked_bar", x: d.posts_daily.x.map((h) => h.slice(5)), series: d.posts_daily.series, y_label: "posts" }} /></>}
             </div>
-            {d.root && <div className="caveats">YouTube comment times older than a day come rounded from the export (“3 weeks ago”), so early days are approximate.</div>}
-          </div>
-        </div>
-
-        <div className="pulse-grid">
-          <div className="card">
-            <h4>Posts about {d.subject} per hour <span>by other accounts · last 72 hours · by platform</span></h4>
-            <div className="body">{d.posts_hourly.series.length ? <Chart spec={{ type: "stacked_bar", x: d.posts_hourly.x.map((h) => h.slice(5)), series: d.posts_hourly.series, y_label: "posts" }} /> : <p className="quiet">No posts by other accounts in the last 72 hours.</p>}</div>
-            <div className="caveats">Density of the conversation itself: new Threads, tweets and videos about {d.subject}, separate from the replies under them. Instagram and YouTube capture her own posts only.</div>
+            <div className="caveats">The density of the conversation itself: new Threads, tweets and videos about {d.subject}, separate from the replies under them. Instagram and YouTube capture {d.subject}&apos;s own posts only.</div>
           </div>
           <div className="card">
             <h4>Posts per hour by stance <span>against, neutral, for</span></h4>
             <div className="body">{d.posts_hourly_stance.series.length ? <Chart spec={{ type: "stacked_bar", x: d.posts_hourly_stance.x.map((h) => h.slice(5)), series: d.posts_hourly_stance.series, y_label: "posts" }} /> : <p className="quiet">No posts by other accounts in the last 72 hours.</p>}</div>
-            <div className="caveats">Stance is what the post itself says about {d.subject}; the comments under it are counted in the charts above.</div>
+            <div className="caveats">Stance is what the post itself says about {d.subject}. The replies under it are counted as comment sentiment, below.</div>
+          </div>
+        </div>
+
+        {lag && <p className="lag">Comments are loaded through {when(d.asOf)} WIB; the post charts above run to {when(d.postsAsOf)}. The comment sections below cover the earlier window.</p>}
+
+        <div className="pulse-grid">
+          <div className="card">
+            <h4>Comments per hour <span>last 72 hours of comment data · by platform · WIB</span></h4>
+            <div className="body">{d.hourly.x.length >= 3 ? <Chart spec={{ type: "stacked_bar", x: d.hourly.x.map((h) => h.slice(5)), series: d.hourly.series, y_label: "comments" }} /> : <p className="quiet">Not enough hours of data yet.</p>}</div>
+          </div>
+          <div className="card">
+            <h4>Since the video went up, comments per day <span>by platform</span></h4>
+            <div className="body">{d.daily.x.length >= 3 ? <Chart spec={{ type: "stacked_bar", x: d.daily.x.map((h) => h.slice(5)), series: d.daily.series, y_label: "comments" }} /> : <p className="quiet">Not enough days of data yet.</p>}</div>
+            {d.root && <div className="caveats">YouTube comment times older than a day come rounded from the export (“3 weeks ago”), so early days are approximate.</div>}
           </div>
         </div>
 
@@ -153,7 +157,7 @@ export function PulsePage({ d }: { d: PulseData }) {
                 })}</tbody>
               </table>
             </div>
-            <div className="caveats">Stance is labelled after the comments; Threads reports no views, so its reach is likes. Her own posts carry no stance.</div>
+            <div className="caveats">Stance is labelled after the comments; Threads reports no views, so its reach is likes. {d.subject}&apos;s own posts carry no stance, and {fmtNum(t.posts_no_caption)} posts arrived with no text in the export, so they count for density only.</div>
           </div>
           <div className="card">
             <h4>Who is commenting <span>{fmtNum(d.commenters.accounts)} accounts · {fmtNum(d.commenters.comments)} comments</span></h4>

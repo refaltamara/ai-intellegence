@@ -617,3 +617,4 @@ tr.me .bar i{background:var(--blue)}
 .askit{display:inline-block;margin-top:12px;font-size:12px;font-weight:600;color:var(--blue)}
 .quiet{font-size:13px;color:var(--text-3)}
 @media (max-width:1100px){.pulse-grid,.pulse-grid.three{grid-template-columns:1fr}}
+.lag{font-size:12px;color:var(--amber);background:var(--amber-10);border:1px solid var(--amber-10);border-radius:var(--r);padding:8px 12px;margin-bottom:12px}
