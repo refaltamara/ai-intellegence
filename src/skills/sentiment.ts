@@ -105,7 +105,7 @@ export const sentiment: SkillImpl = async (db, ctx, _def, params) => {
   return {
     params_resolved: { ...params, window: { from: w.from, to: w.to }, platform: params.platform ?? "all", bucket, min_negative: minNeg, multiple_of_baseline: multiple, limit },
     summary: {
-      window: w.label, bucket, comments: total, labelled, unlabelled: unl, off_topic_set_aside: offTopic,
+      window: w.label, bucket, comments: total, labelled, unlabelled: unl, off_topic_counted_as_neutral: offTopic,
       negative: neg, neutral: neu, positive: pos,
       negative_pct: pct(neg, labelled), neutral_pct: pct(neu, labelled), positive_pct: pct(pos, labelled),
       spike_started: spikeStart, peak_bucket: peak?.bucket ?? null, peak_negative: peak?.negative ?? 0, spike_threshold: Math.round(threshold * 10) / 10, buckets_in_spike: spikes.length,

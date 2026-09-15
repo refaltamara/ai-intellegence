@@ -106,7 +106,8 @@ export async function labelWorkspace(workspaceId: string, opts: LabelOptions = {
       const missing = results.flatMap((r) => r.missing);
       if (labels.length) {
         await sql.query(
-          `update comments c set sentiment = nullif(l.sentiment, 'off_topic'), off_topic = (l.sentiment = 'off_topic'),
+          `update comments c set sentiment = case when l.sentiment = 'off_topic' then 'neutral' else l.sentiment end,
+                  off_topic = (l.sentiment = 'off_topic'),
                   sentiment_confidence = l.confidence, sentiment_source = 'model', classified_at = now()
            from jsonb_to_recordset($1::jsonb) as l(id uuid, sentiment text, confidence numeric) where c.id = l.id and c.workspace_id = $2`,
           [JSON.stringify(labels), workspaceId],

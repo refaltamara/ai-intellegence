@@ -77,7 +77,7 @@ export const commentThemes: SkillImpl = async (db, ctx, _def, params) => {
   }
   return {
     params_resolved: { ...params, window: { from: w.from, to: w.to }, platform: params.platform ?? "all", sentiment, min_comments: minComments, limit },
-    summary: { window: w.label, sentiment, comments_read: total, unlabelled: unl, off_topic_set_aside: offTopic, terms: out.length, words_folded_into_phrases: raw.length - rows.length, top_terms: out.slice(0, 8).map((r) => `${r.term} (${r.comments})`), rule: `words and two-word phrases carried by at least ${minComments} ${sentiment === "all" ? "" : sentiment + " "}comments; stopwords removed; share is of all ${sentiment === "all" ? "" : sentiment + " "}comments in the window` },
+    summary: { window: w.label, sentiment, comments_read: total, unlabelled: unl, off_topic_counted_as_neutral: offTopic, terms: out.length, words_folded_into_phrases: raw.length - rows.length, top_terms: out.slice(0, 8).map((r) => `${r.term} (${r.comments})`), rule: `words and two-word phrases carried by at least ${minComments} ${sentiment === "all" ? "" : sentiment + " "}comments; stopwords removed; share is of all ${sentiment === "all" ? "" : sentiment + " "}comments in the window` },
     rows: out,
     evidence: ev.list,
     matched: total,
