@@ -211,6 +211,36 @@
       "platform": "x",
       "file": "comments_x_0915b.csv",
       "export_time": "2026-09-15T18:00:00+07:00"
+    },
+    {
+      "kind": "contents",
+      "platform": "threads",
+      "file": "contents_threads_0916.csv",
+      "note": "fourth export, 16 Sep 06:00 WIB"
+    },
+    {
+      "kind": "contents",
+      "platform": "x",
+      "file": "contents_x_0916.csv",
+      "note": "fourth export, 16 Sep 06:00 WIB"
+    },
+    {
+      "kind": "comments",
+      "platform": "youtube",
+      "file": "comments_youtube_0916.csv",
+      "export_time": "2026-09-16T06:00:00+07:00"
+    },
+    {
+      "kind": "comments",
+      "platform": "threads",
+      "file": "comments_threads_0916.csv",
+      "export_time": "2026-09-16T06:00:00+07:00"
+    },
+    {
+      "kind": "comments",
+      "platform": "x",
+      "file": "comments_x_0916.csv",
+      "export_time": "2026-09-16T06:00:00+07:00"
     }
   ],
   "data_dir": "data/raw/maudy"
