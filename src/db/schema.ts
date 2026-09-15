@@ -267,6 +267,9 @@ export const comments = pgTable(
     /** X exposes per-reply views; null elsewhere */
     views: bigint("views", { mode: "number" }),
     sentiment: text("sentiment"),
+    /** true when the comment is not about the subject at all (promo spam, unrelated chatter under a viral post);
+     *  such comments carry no sentiment and are excluded from every share. */
+    offTopic: boolean("off_topic"),
     /** 'model' (labelled by /api/cron/label) | 'listening' (came with the export) | 'subject' (the subject's own reply, never labelled) */
     sentimentSource: text("sentiment_source"),
     sentimentConfidence: numeric("sentiment_confidence"),

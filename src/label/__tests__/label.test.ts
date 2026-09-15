@@ -51,3 +51,26 @@ describe("parseLabels", () => {
     expect(parseLabels({ labels: "no" }, ["a"]).missing).toEqual(["a"]);
   });
 });
+
+describe("off-topic class", () => {
+  it("accepts off_topic for comments and rejects it for posts", () => {
+    const input = { labels: [{ id: "a", sentiment: "off_topic" }, { id: "b", sentiment: "negative" }] };
+    expect(parseLabels(input, ["a", "b"]).labels).toEqual([
+      { id: "a", sentiment: "off_topic", confidence: 0.5 },
+      { id: "b", sentiment: "negative", confidence: 0.5 },
+    ]);
+    const posts = parseLabels(input, ["a", "b"], ["positive", "neutral", "negative"]);
+    expect(posts.labels).toEqual([{ id: "b", sentiment: "negative", confidence: 0.5 }]);
+    expect(posts.missing).toEqual(["a"]);
+  });
+
+  it("tolerates 'off topic' and 'Off-Topic'", () => {
+    expect(parseLabels({ labels: [{ id: "a", sentiment: "Off-Topic" }] }, ["a"]).labels[0].sentiment).toBe("off_topic");
+    expect(parseLabels({ labels: [{ id: "a", sentiment: "off topic" }] }, ["a"]).labels[0].sentiment).toBe("off_topic");
+  });
+
+  it("the comment system prompt names the class and the post prompt does not", () => {
+    expect(commentSystem("S")).toContain("off_topic");
+    expect(stanceBatchPrompt([{ id: "p", platform: "x", handle: "h", caption: "c", url: "u" }])).not.toContain("off_topic");
+  });
+});
