@@ -1,5 +1,5 @@
 import { EvidenceList, aggregateEvidence, commentEvidence } from "./common";
-import { SUBJECT_REPLIES_CAVEAT, commentWhere, commentWindow, labelCaveat, pct } from "./comments-common";
+import { SUBJECT_REPLIES_CAVEAT, commentWhere, commentWindow, labelCaveat, offTopicCaveat, offTopicCount, pct } from "./comments-common";
 import { limitOf, resolvePlatforms } from "./params";
 import type { SkillImpl } from "./runner";
 import type { Row } from "./types";
@@ -89,6 +89,7 @@ export const sentiment: SkillImpl = async (db, ctx, _def, params) => {
     const id = ev.push((eid) => commentEvidence(eid, s));
     if (id) sampleIds[s.sentiment as string].push(id);
   }
+  const offTopic = await offTopicCount(db, ctx, w, platforms);
   const chart = buckets.length >= 3 ? {
     type: "stacked_bar" as const,
     x: buckets.map((b) => (bucket === "hour" ? b.bucket.replace("T", " ") : b.bucket.slice(0, 10))),
@@ -104,7 +105,7 @@ export const sentiment: SkillImpl = async (db, ctx, _def, params) => {
   return {
     params_resolved: { ...params, window: { from: w.from, to: w.to }, platform: params.platform ?? "all", bucket, min_negative: minNeg, multiple_of_baseline: multiple, limit },
     summary: {
-      window: w.label, bucket, comments: total, labelled, unlabelled: unl,
+      window: w.label, bucket, comments: total, labelled, unlabelled: unl, off_topic_set_aside: offTopic,
       negative: neg, neutral: neu, positive: pos,
       negative_pct: pct(neg, labelled), neutral_pct: pct(neu, labelled), positive_pct: pct(pos, labelled),
       spike_started: spikeStart, peak_bucket: peak?.bucket ?? null, peak_negative: peak?.negative ?? 0, spike_threshold: Math.round(threshold * 10) / 10, buckets_in_spike: spikes.length,
@@ -117,6 +118,6 @@ export const sentiment: SkillImpl = async (db, ctx, _def, params) => {
     evidence: ev.list,
     matched: total,
     data_window: { from: w.from, to: w.to },
-    caveats: [...labelCaveat(total, unl), SUBJECT_REPLIES_CAVEAT, "Comment times are when the comment was posted; the export captured each post once, so comments posted after the export are not here."],
+    caveats: [...labelCaveat(total, unl), ...offTopicCaveat(offTopic), SUBJECT_REPLIES_CAVEAT, "Comment times are when the comment was posted; the export captured each post once, so comments posted after the export are not here."],
   };
 };

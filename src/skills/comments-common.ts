@@ -50,6 +50,9 @@ export function commentWhere(ctx: Context, w: CommentWindow, platforms: Platform
     `c.posted_at >= (${p(w.from_ts)}::date::timestamp at time zone ${p(ctx.tz)})`,
     `c.posted_at < (${p(w.to_ts)}::date::timestamp at time zone ${p(ctx.tz)})`,
     `c.sentiment_source is distinct from 'subject'`,
+    // a comment that is not about the subject at all (promo spam, unrelated chatter under a
+    // viral post) carries no sentiment and never enters a share; the skills report the count
+    `c.off_topic is not true`,
   ];
   if (platforms) parts.push(`c.platform = any(${p(platforms)}::text[])`);
   return parts.join(" and ");
@@ -61,6 +64,18 @@ export function labelCaveat(total: number, unlabelled: number): string[] {
 }
 
 export const SUBJECT_REPLIES_CAVEAT = "The subject's own replies are excluded from every count.";
+
+/** How many comments in the same window were set aside as not about the subject. */
+export async function offTopicCount(db: SkillDb, ctx: Context, w: CommentWindow, platforms: Platform[] | null): Promise<number> {
+  const p: unknown[] = [];
+  const where = commentWhere(ctx, w, platforms, p).replace("c.off_topic is not true", "c.off_topic");
+  const r = await db.one<{ n: number }>(`select count(*)::int as n from comments c where ${where}`, p);
+  return r?.n ?? 0;
+}
+
+export function offTopicCaveat(n: number): string[] {
+  return n ? [`${n.toLocaleString("en-US")} comments in this window were set aside as not about the subject (advertising, unrelated chatter under a viral post); they are in no percentage here.`] : [];
+}
 
 export function pct(n: number, d: number): number | null {
   return d > 0 ? Math.round((n / d) * 1000) / 10 : null;

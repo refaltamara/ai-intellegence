@@ -1,5 +1,5 @@
 import { EvidenceList, PLATFORM_LABEL, aggregateEvidence, postEvidence, profileUrl } from "./common";
-import { SUBJECT_REPLIES_CAVEAT, commentWhere, commentWindow, labelCaveat, pct } from "./comments-common";
+import { SUBJECT_REPLIES_CAVEAT, commentWhere, commentWindow, labelCaveat, offTopicCaveat, offTopicCount, pct } from "./comments-common";
 import { limitOf, resolvePlatforms } from "./params";
 import type { SkillImpl } from "./runner";
 import type { Row } from "./types";
@@ -63,6 +63,7 @@ export const drivers: SkillImpl = async (db, ctx, _def, params) => {
     p.slice(0, p.length - 1),
   );
 
+  const offTopic = await offTopicCount(db, ctx, w, platforms);
   const ev = new EvidenceList(160);
   const rows = posts.map((r) => {
     const id = ev.push((eid) => postEvidence(eid, r, { comments_in_window: r.comments as number, negative: r.negative as number, positive: r.positive as number, stance: (r.stance as string) ?? null }));
@@ -84,7 +85,7 @@ export const drivers: SkillImpl = async (db, ctx, _def, params) => {
   return {
     params_resolved: { ...params, window: { from: w.from, to: w.to }, platform: params.platform ?? "all", sort, limit },
     summary: {
-      window: w.label, posts_with_comments: totals?.posts ?? 0, comments: totals?.comments ?? 0, unlabelled: totals?.unlabelled ?? 0,
+      window: w.label, posts_with_comments: totals?.posts ?? 0, comments: totals?.comments ?? 0, unlabelled: totals?.unlabelled ?? 0, off_topic_set_aside: offTopic,
       sorted_by: sort, top_accounts: accountRows, top_commenters: commenterRows,
       rule: "one row per post that drew comments in the window; accounts are the posts' authors, ranked by negative comments drawn; commenters by comment count",
     },
@@ -92,6 +93,6 @@ export const drivers: SkillImpl = async (db, ctx, _def, params) => {
     evidence: ev.list,
     matched,
     data_window: { from: w.from, to: w.to },
-    caveats: [...labelCaveat(totals?.comments ?? 0, totals?.unlabelled ?? 0), SUBJECT_REPLIES_CAVEAT, "Stance is the post's own position toward the subject (earned posts only); views are the export's single capture."],
+    caveats: [...labelCaveat(totals?.comments ?? 0, totals?.unlabelled ?? 0), ...offTopicCaveat(offTopic), SUBJECT_REPLIES_CAVEAT, "Stance is the post's own position toward the subject (earned posts only); views are the export's single capture."],
   };
 };

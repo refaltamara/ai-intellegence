@@ -13,7 +13,7 @@ import { anthropicClient } from "../chat/client";
 import { modelId } from "../chat/loop";
 import { sql } from "../db/client";
 import { getWorkspace } from "../workspace/store";
-import { LABEL_COMMENTS_TOOL, LABEL_POSTS_TOOL, commentBatchPrompt, commentSystem, parseLabels, stanceBatchPrompt, stanceSystem, type CommentForLabel, type PostForLabel } from "./prompt";
+import { LABEL_COMMENTS_TOOL, LABEL_POSTS_TOOL, SENTIMENTS, commentBatchPrompt, commentSystem, parseLabels, stanceBatchPrompt, stanceSystem, type CommentForLabel, type PostForLabel } from "./prompt";
 
 export type LabelOutcome = {
   workspace: string;
@@ -106,7 +106,8 @@ export async function labelWorkspace(workspaceId: string, opts: LabelOptions = {
       const missing = results.flatMap((r) => r.missing);
       if (labels.length) {
         await sql.query(
-          `update comments c set sentiment = l.sentiment, sentiment_confidence = l.confidence, sentiment_source = 'model', classified_at = now()
+          `update comments c set sentiment = nullif(l.sentiment, 'off_topic'), off_topic = (l.sentiment = 'off_topic'),
+                  sentiment_confidence = l.confidence, sentiment_source = 'model', classified_at = now()
            from jsonb_to_recordset($1::jsonb) as l(id uuid, sentiment text, confidence numeric) where c.id = l.id and c.workspace_id = $2`,
           [JSON.stringify(labels), workspaceId],
         );
@@ -142,7 +143,7 @@ export async function labelWorkspace(workspaceId: string, opts: LabelOptions = {
       }
       out.calls += 1;
       const use = res.content.find((b): b is Anthropic.ToolUseBlock => b.type === "tool_use");
-      const { labels, missing } = parseLabels(use?.input, rows.map((r) => r.id));
+      const { labels, missing } = parseLabels(use?.input, rows.map((r) => r.id), SENTIMENTS);
       if (labels.length) {
         await sql.query(
           `update posts p set stance = l.sentiment, stance_source = 'model' from jsonb_to_recordset($1::jsonb) as l(id uuid, sentiment text) where p.id = l.id and p.workspace_id = $2`,
@@ -185,15 +186,16 @@ async function clientName(workspaceId: string): Promise<string | null> {
 }
 
 /** Label counts per workspace for the Data page and the cron response. */
-export async function labelStatus(workspaceId: string): Promise<{ comments: number; labelled: number; failed: number; subject_replies: number; posts_earned: number; stances: number }> {
+export async function labelStatus(workspaceId: string): Promise<{ comments: number; labelled: number; off_topic: number; failed: number; subject_replies: number; posts_earned: number; stances: number }> {
   const rows = (await sql.query(
     `select (select count(*) from comments where workspace_id = $1)::int as comments,
             (select count(*) from comments where workspace_id = $1 and sentiment is not null)::int as labelled,
+            (select count(*) from comments where workspace_id = $1 and off_topic)::int as off_topic,
             (select count(*) from comments where workspace_id = $1 and sentiment_source = 'model_failed')::int as failed,
             (select count(*) from comments where workspace_id = $1 and sentiment_source = 'subject')::int as subject_replies,
             (select count(*) from posts where workspace_id = $1 and source = 'earned' and content_type is distinct from 'stub')::int as posts_earned,
             (select count(*) from posts where workspace_id = $1 and stance is not null)::int as stances`,
     [workspaceId],
-  )) as { comments: number; labelled: number; failed: number; subject_replies: number; posts_earned: number; stances: number }[];
+  )) as { comments: number; labelled: number; off_topic: number; failed: number; subject_replies: number; posts_earned: number; stances: number }[];
   return rows[0];
 }

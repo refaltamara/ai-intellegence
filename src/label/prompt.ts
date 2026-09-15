@@ -10,7 +10,10 @@
 import type Anthropic from "@anthropic-ai/sdk";
 
 export const SENTIMENTS = ["positive", "neutral", "negative"] as const;
+/** what the model may answer for a comment: the three classes plus "not about the subject at all" */
+export const COMMENT_CLASSES = [...SENTIMENTS, "off_topic"] as const;
 export type Sentiment = (typeof SENTIMENTS)[number];
+export type CommentClass = (typeof COMMENT_CLASSES)[number];
 
 export type CommentForLabel = {
   id: string;
@@ -25,7 +28,7 @@ export type CommentForLabel = {
 
 export type PostForLabel = { id: string; platform: string; handle: string | null; caption: string; url: string };
 
-export type Label = { id: string; sentiment: Sentiment; confidence: number };
+export type Label = { id: string; sentiment: CommentClass; confidence: number };
 
 const CAPTION_MAX = 700;
 const TEXT_MAX = 600;
@@ -42,7 +45,7 @@ export const LABEL_COMMENTS_TOOL: Anthropic.Tool = {
           type: "object",
           properties: {
             id: { type: "string" },
-            sentiment: { type: "string", enum: [...SENTIMENTS] },
+            sentiment: { type: "string", enum: [...COMMENT_CLASSES] },
             confidence: { type: "number", description: "0 to 1" },
           },
           required: ["id", "sentiment"],
@@ -53,7 +56,24 @@ export const LABEL_COMMENTS_TOOL: Anthropic.Tool = {
   },
 };
 
-export const LABEL_POSTS_TOOL: Anthropic.Tool = { ...LABEL_COMMENTS_TOOL, name: "label_posts", description: "Return one stance label per post id." };
+export const LABEL_POSTS_TOOL: Anthropic.Tool = {
+  name: "label_posts",
+  description: "Return one stance label per post id.",
+  input_schema: {
+    type: "object",
+    properties: {
+      labels: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: { id: { type: "string" }, sentiment: { type: "string", enum: [...SENTIMENTS] }, confidence: { type: "number", description: "0 to 1" } },
+          required: ["id", "sentiment"],
+        },
+      },
+    },
+    required: ["labels"],
+  },
+};
 
 export function commentSystem(subject: string): string {
   return [
@@ -62,7 +82,8 @@ export function commentSystem(subject: string): string {
     "Label what each comment says about the subject, not the commenter's mood:",
     `- positive: supports, defends, praises, thanks, or expresses warmth toward ${subject}; pushes back on people attacking them.`,
     `- negative: criticises, mocks, attacks, or expresses disappointment or anger at ${subject}; agrees with a post that attacks them; sarcasm aimed at them.`,
-    "- neutral: questions, factual remarks, off-topic chatter, spam, tags, or comments whose target is unclear. Anger at the government, the news, or the platform is neutral unless it blames the subject.",
+    `- neutral: questions, factual remarks, tags, or comments that are about ${subject} or the controversy but take no side. Anger at the government, the news, or the platform is neutral unless it blames ${subject}.`,
+    `- off_topic: the comment is not about ${subject} or the controversy at all. A viral post collects unrelated replies: advertising and selling, links to someone's own content, greetings, chatter between two other people, comments about a different subject entirely. These are set aside and counted separately, so use this class rather than forcing a sentiment.`,
     "",
     `Under posts by other accounts about ${subject}, judge the comment by its view of ${subject}, not of the post's author.`,
     "Label every comment listed; use the exact ids given. Confidence is 0 to 1 for how sure you are.",
@@ -117,7 +138,7 @@ export function stanceBatchPrompt(posts: PostForLabel[]): string {
 }
 
 /** Keep only well-formed labels for ids we asked about; one per id. */
-export function parseLabels(input: unknown, wanted: Iterable<string>): { labels: Label[]; missing: string[] } {
+export function parseLabels(input: unknown, wanted: Iterable<string>, allow: readonly string[] = COMMENT_CLASSES): { labels: Label[]; missing: string[] } {
   const ids = new Set(wanted);
   const out = new Map<string, Label>();
   const raw = (input as { labels?: unknown })?.labels;
@@ -126,8 +147,8 @@ export function parseLabels(input: unknown, wanted: Iterable<string>): { labels:
       if (!item || typeof item !== "object") continue;
       const { id, sentiment, confidence } = item as { id?: unknown; sentiment?: unknown; confidence?: unknown };
       const sid = String(id ?? "");
-      const s = String(sentiment ?? "").toLowerCase() as Sentiment;
-      if (!ids.has(sid) || !SENTIMENTS.includes(s) || out.has(sid)) continue;
+      const s = String(sentiment ?? "").toLowerCase().replace(/[\s-]/g, "_") as Sentiment;
+      if (!ids.has(sid) || !allow.includes(s) || out.has(sid)) continue;
       const c = typeof confidence === "number" && Number.isFinite(confidence) ? Math.min(1, Math.max(0, confidence)) : 0.5;
       out.set(sid, { id: sid, sentiment: s, confidence: Math.round(c * 100) / 100 });
     }
