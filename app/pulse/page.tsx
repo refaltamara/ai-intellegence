@@ -5,6 +5,9 @@ import { PulsePage } from "@/ui/PulsePage";
 import { currentWorkspaceId } from "@/auth/current";
 
 export const dynamic = "force-dynamic";
+// Pulse runs four analyses plus a dozen queries; well under this now, but a slow
+// database should show a late page rather than a platform timeout.
+export const maxDuration = 60;
 
 export default async function Pulse() {
   const ws = await currentWorkspaceId();

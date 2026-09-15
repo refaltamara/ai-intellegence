@@ -429,9 +429,11 @@ def load_contents(db, ws, prof, platform, path, dry, anchor=None):
 def normalise_comments(df, platform, prof, known_urls, dropped_urls, source_file, anchor=None):
     """-> rows (comment dicts), drops (Tally), stubs (url -> stub post dict)."""
     drops, rows, stubs, seen_ids = Tally(), [], {}, set()
-    urls = col(df, "post_url", "url"); ids = col(df, "comment_id", "id"); authors = col(df, "author", "account_name")
-    texts = col(df, "comment_text", "text"); dates = col(df, "date", "date_posted"); views = col(df, "views")
-    likes = col(df, "like", "likes"); replies = col(df, "reply", "replies"); sents = col(df, "sentiment")
+    # exports differ in their column names; accept every shape Fair Listening has sent
+    urls = col(df, "post_url", "source_url", "url"); ids = col(df, "comment_id", "id")
+    authors = col(df, "author", "author_username", "account_name")
+    texts = col(df, "comment_text", "text"); dates = col(df, "date", "timestamp", "date_posted"); views = col(df, "views")
+    likes = col(df, "like", "like_count", "likes"); replies = col(df, "reply", "reply_count", "replies"); sents = col(df, "sentiment")
     for i in range(len(df)):
         url = canon_url(urls.iloc[i], platform)
         if not url:
