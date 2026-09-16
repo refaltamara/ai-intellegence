@@ -2,6 +2,7 @@
  * Workspaces are subjects: a category panel of brands, one artist, one executive.
  *   pnpm workspace add <id> --name "Maudy Ayunda" --kind profile [--category music] [--tz Asia/Jakarta] [--product "Fair Intelligence"] [--tagline ".."] [--label "Maudy Ayunda · Music"]
  *   pnpm workspace set <id> [--name ..] [--kind ..] [--product ..] [--tagline ..] [--label ..] [--noun accounts] [--persona ".."] [--hero-title ".."] [--hero-intro ".."] [--suggested "q1|q2|q3"]
+ *   pnpm workspace set <id> --partners "From This Island:fromthisisland,fti|Oatside" [--boycott-terms "boikot|boycott"]
  *   pnpm workspace list
  */
 import { createWorkspace, listWorkspaces, updateWorkspaceSettings } from "../src/workspace/store";
@@ -21,6 +22,18 @@ function settingsFromArgs(): WorkspaceSettings {
   if (arg("--hero-title")) s.hero_title = arg("--hero-title");
   if (arg("--hero-intro")) s.hero_intro = arg("--hero-intro");
   if (arg("--suggested")) s.suggested = String(arg("--suggested")).split("|").map((x) => x.trim()).filter(Boolean);
+  // --partners "From This Island:fromthisisland,fti|Oatside|Le Minerale"
+  // Each entry is a display name and, after the colon, the words to match it by.
+  if (arg("--partners") !== undefined) {
+    const partners = String(arg("--partners")).split("|").map((x) => x.trim()).filter(Boolean).map((entry) => {
+      const [name, terms] = entry.split(":");
+      return { name: name.trim(), terms: (terms ?? "").split(",").map((t) => t.trim()).filter(Boolean) };
+    });
+    s.commercial = { ...(s.commercial ?? {}), partners };
+  }
+  if (arg("--boycott-terms") !== undefined) {
+    s.commercial = { ...(s.commercial ?? {}), boycott_terms: String(arg("--boycott-terms")).split("|").map((x) => x.trim()).filter(Boolean) };
+  }
   return s;
 }
 

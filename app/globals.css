@@ -647,3 +647,9 @@ table.watch .tag.positive{background:var(--green-10);color:var(--green)}
 .srow b{font-size:18px;font-weight:700;text-align:right}
 .srow b small{display:block;font-size:11px;font-weight:400;color:var(--text-3)}
 @media (max-width:1100px){.now .steps{grid-template-columns:repeat(2,1fr)}}
+.expo-days{display:flex;gap:8px;align-items:flex-end}
+.expo-days .day{flex:1;text-align:center;min-width:0}
+.expo-days .col{height:54px;display:flex;align-items:flex-end;justify-content:center}
+.expo-days .col i{display:block;width:100%;max-width:34px;background:var(--red);border-radius:3px 3px 0 0;min-height:2px}
+.expo-days b{display:block;font-size:13px;font-weight:700;margin-top:4px}
+.expo-days .lbl{display:block;font-size:11px;color:var(--text-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}

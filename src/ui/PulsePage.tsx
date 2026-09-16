@@ -89,6 +89,8 @@ export function PulsePage({ d }: { d: PulseData }) {
 
         <Watchlist d={d} />
 
+        <Exposure d={d} />
+
         {lag && <p className="lag">Comments are loaded through {when(d.asOf)} WIB; the post charts above run to {when(d.postsAsOf)}. The comment sections below cover the earlier window.</p>}
 
         <div className="pulse-grid">
@@ -360,6 +362,92 @@ function WatchRow({ w, subject }: { w: WatchPost; subject: string }) {
       </td>
       <td style={{ color: "var(--text-3)", fontSize: 12 }}>{w.views ? `${fmtNum(w.views)} views` : w.likes ? `${fmtNum(w.likes)} likes` : "–"}</td>
     </tr>
+  );
+}
+
+/**
+ * Commercial exposure: the line where a reputation problem starts costing money.
+ * Boycott calls and the partner brands named beside the subject, counted only
+ * against the words the workspace was given — so a quiet number here means quiet,
+ * not "we did not look".
+ */
+function Exposure({ d }: { d: PulseData }) {
+  const c = d.commercial;
+  const step = c.posts_prev_24h > 0 ? Math.round(((c.posts_24h - c.posts_prev_24h) / c.posts_prev_24h) * 100) : null;
+  const max = Math.max(1, ...c.daily.map((x) => x.posts + x.comments));
+  const quiet = c.posts === 0 && c.comments === 0;
+  return (
+    <div className="card" style={{ marginBottom: 12 }}>
+      <h4>Commercial exposure <span>calls to boycott, and the partner brands named beside {d.subject}</span></h4>
+      <div className="body">
+        {quiet ? (
+          <p className="quiet">Nobody is calling for a boycott yet, and no partner brand has been named. This card counts only the words this workspace was given — the boycott vocabulary and the partner brands on its watchlist.</p>
+        ) : (
+          <>
+            <div className="stats" style={{ gridTemplateColumns: "repeat(3, 1fr)", marginBottom: 14 }}>
+              <div className="stat" style={{ padding: 12 }}>
+                <b style={{ fontSize: 20 }}>{fmtNum(c.posts)}</b>
+                <span>posts calling for a boycott · {fmtNum(c.posts_24h)} in the last 24 hours{step != null ? `, ${step >= 0 ? "up" : "down"} ${Math.abs(step)}% on the day before` : ""}</span>
+              </div>
+              <div className="stat" style={{ padding: 12 }}>
+                <b style={{ fontSize: 20 }}>{fmtNum(c.comments)}</b>
+                <span>comments saying the same · {fmtNum(c.comments_24h)} in the last 24 hours, against {fmtNum(c.comments_prev_24h)} the day before</span>
+              </div>
+              <div className="stat" style={{ padding: 12 }}>
+                <b style={{ fontSize: 20 }}>{fmtNum(Math.max(0, ...c.daily.map((x) => x.reach ?? 0)))}</b>
+                <span>views on the largest of them</span>
+              </div>
+            </div>
+            <p className="quiet" style={{ margin: "0 0 6px", fontWeight: 600 }}>Boycott calls per day, posts and comments together</p>
+            <div className="expo-days">
+              {c.daily.map((x) => (
+                <div key={x.d} className="day" title={`${x.posts} posts · ${x.comments} comments`}>
+                  <span className="col"><i style={{ height: `${Math.round(((x.posts + x.comments) / max) * 100)}%` }} /></span>
+                  <b>{x.posts + x.comments}</b>
+                  <span className="lbl">{when(x.d, true)}</span>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+
+        {c.partners.length > 0 && (
+          <div className="tablewrap still" style={{ border: 0, marginTop: 8 }}>
+            <table>
+              <thead><tr><th>Partner brand</th><th className="num">Posts</th><th className="num">Comments</th><th className="num">Last 24h</th><th>First named</th><th>Last named</th></tr></thead>
+              <tbody>
+                {c.partners.map((p) => {
+                  const live = p.posts_24h + p.comments_24h;
+                  return (
+                    <tr key={p.name}>
+                      <td style={{ fontWeight: 600 }}>{p.name}</td>
+                      <td className="num">{fmtNum(p.posts)}</td>
+                      <td className="num">{fmtNum(p.comments)}</td>
+                      <td className="num" style={{ fontWeight: live ? 700 : 400, color: live ? "var(--red)" : undefined }}>{fmtNum(live)}</td>
+                      <td style={{ color: "var(--text-3)", fontSize: 12 }}>{when(p.first_at)}</td>
+                      <td style={{ color: "var(--text-3)", fontSize: 12 }}>{when(p.last_at)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+        {!c.configured && !quiet && <p className="quiet" style={{ marginTop: 10 }}>No partner brands are on this workspace's watchlist yet, so only the boycott calls above are counted. Once they are added they are counted across the whole history, not just from that day.</p>}
+
+        {c.top.length > 0 && (
+          <ul className="themes" style={{ marginTop: 14 }}>
+            {c.top.map((p) => (
+              <li key={p.url}>
+                <b>@{p.handle}</b> <span>{label(p.platform)} · {when(p.posted_at)} · {p.views ? `${fmtNum(p.views)} views` : p.likes ? `${fmtNum(p.likes)} likes` : "reach not reported"}</span>
+                <small><a href={p.url} target="_blank" rel="noreferrer">“{p.caption}”</a></small>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+      <div className="caveats">A boycott call is a post or comment using one of the workspace&apos;s boycott words; a partner is named when one of its words appears. Both are matched on text, so a mention is not the same as a threat — read the posts before you brief anyone.</div>
+    </div>
   );
 }
 

@@ -4,6 +4,7 @@
  * or by the comment-layer skills; the page only lays it out.
  */
 import { PLATFORM_LABEL } from "../skills/common";
+import { toJson } from "../db/json";
 import { SkillDb } from "../skills/db";
 import { runSkill } from "../skills/runner";
 import type { Row, SkillResult } from "../skills/types";
@@ -24,6 +25,21 @@ export type WatchPost = {
   url: string; platform: string; source: string; handle: string | null; caption: string; posted_at: string;
   comments: number; on_topic: number; negative: number; positive: number; last6h: number; last24h: number;
   negative_pct: number | null; stance: string | null; views: number | null; likes: number | null; latest: string | null;
+};
+/**
+ * What the reputation problem is doing to the money: calls to boycott, and the
+ * partner brands named beside the subject. Both are counted only against the
+ * words an owner configured, never guessed from the text.
+ */
+export type BoycottPost = { url: string; platform: string; handle: string | null; caption: string; posted_at: string; views: number | null; likes: number | null; stance: string | null };
+export type PartnerRow = { name: string; posts: number; comments: number; posts_24h: number; comments_24h: number; top_views: number | null; first_at: string | null; last_at: string | null };
+export type Commercial = {
+  configured: boolean;
+  posts: number; comments: number;
+  posts_24h: number; posts_prev_24h: number; comments_24h: number; comments_prev_24h: number;
+  daily: { d: string; posts: number; comments: number; reach: number | null }[];
+  top: BoycottPost[];
+  partners: PartnerRow[];
 };
 export type SpreadRow = { platform: string; first_post: string | null; first_post_handle: string | null; first_comment: string | null; takeoff: string | null; peak_hour: string | null; peak_comments: number; posts: number; comments: number; on_topic: number; negative: number; positive: number; labelled: number };
 export type StanceRow = { platform: string; posts: number; against: number; neutral: number; for_: number; unlabelled: number; views_total: number; views_against: number; views_for: number; views_neutral: number; likes_total: number; likes_against: number; likes_for: number; likes_neutral: number };
@@ -52,6 +68,7 @@ export type PulseData = {
   trend: Trend;
   status: Status;
   watch: WatchPost[];
+  commercial: Commercial;
   hourly: { x: string[]; series: { name: string; data: number[]; stack?: string }[] };
   negative_trend: { x: string[]; series: { name: string; data: (number | null)[] }[] };
   posts_hourly: { x: string[]; series: { name: string; data: number[]; stack?: string }[] };
@@ -384,6 +401,12 @@ async function build(ws: string): Promise<PulseData | null> {
   );
   const spread = spreadRows as unknown as (SpreadRow & { first_post_url: string | null })[];
 
+  // Commercial exposure: the point where a reputation problem starts costing money.
+  // Only the words the owner configured are counted — a brand Pulse was not told
+  // about is not silently matched, and a term list that is empty means the card
+  // says so rather than showing a confident zero.
+  const commercial = await commercialExposure(db, ws, tz, cfg.commercial, sinceIso);
+
   // the skills, unpersisted
   const actor = { user_id: "pulse", via: "api" as const };
   const [sentiment, drivers, themesNeg, seeding] = await Promise.all([
@@ -418,8 +441,74 @@ async function build(ws: string): Promise<PulseData | null> {
     subject, productName: cfg.product_name, tz, asOf, postsAsOf,
     totals: totals!, root: root ? { url: root.url, posted_at: root.posted_at, caption: root.caption, views: root.views, likes: root.likes, comments: root.comments, early_comments: root.early_comments } : null,
     reply: reply ? { at: reply.at, likes: reply.likes, text: reply.text } : null,
-    trend, status, watch,
+    trend, status, watch, commercial,
     hourly, posts_hourly, posts_hourly_stance, posts_daily, negative_trend: trimLead(negative_trend), stance, commenters: { ...commenters, first_time: trimLead(commenters.first_time) }, reply_effect, daily, events, spread: spread.map(({ first_post_url: _u, ...s }) => s), sentiment, drivers, themes, seeding,
+  };
+}
+
+/**
+ * Boycott calls and partner brands, from the workspace's own watchlist. Counts are
+ * relative to the newest comment rather than the wall clock, so "the last 24 hours"
+ * means the last 24 hours of data and does not quietly empty out when a load is late.
+ */
+async function commercialExposure(db: SkillDb, ws: string, tz: string, cfg: { partners: { name: string; terms: string[] }[]; boycott_terms: string[] }, sinceIso: string | null): Promise<Commercial> {
+  const like = (terms: string[]) => terms.map((t) => `%${t}%`);
+  const boycott = like(cfg.boycott_terms);
+  const configured = cfg.partners.length > 0;
+  const totals = await db.one<Row>(
+    `with last as (select greatest((select max(posted_at) from comments where workspace_id = $1), (select max(posted_at) from posts where workspace_id = $1)) as at)
+     select (select count(*) from posts where workspace_id = $1 and source = 'earned' and content_type is distinct from 'stub' and caption ilike any($2::text[]))::int as posts,
+            (select count(*) from comments where workspace_id = $1 and text ilike any($2::text[]))::int as comments,
+            (select count(*) from posts where workspace_id = $1 and source = 'earned' and content_type is distinct from 'stub' and caption ilike any($2::text[]) and posted_at > (select at from last) - interval '24 hours')::int as posts_24h,
+            (select count(*) from posts where workspace_id = $1 and source = 'earned' and content_type is distinct from 'stub' and caption ilike any($2::text[]) and posted_at between (select at from last) - interval '48 hours' and (select at from last) - interval '24 hours')::int as posts_prev_24h,
+            (select count(*) from comments where workspace_id = $1 and text ilike any($2::text[]) and posted_at > (select at from last) - interval '24 hours')::int as comments_24h,
+            (select count(*) from comments where workspace_id = $1 and text ilike any($2::text[]) and posted_at between (select at from last) - interval '48 hours' and (select at from last) - interval '24 hours')::int as comments_prev_24h`,
+    [ws, boycott],
+  );
+  const daily = await db.q<Row>(
+    `with ds as (select generate_series(coalesce($3::date, (now() - interval '6 days')::date), (select max(posted_at at time zone $2)::date from comments where workspace_id = $1), interval '1 day')::date as d)
+     select to_char(ds.d, 'YYYY-MM-DD') as d,
+            (select count(*) from posts p where p.workspace_id = $1 and p.source = 'earned' and p.content_type is distinct from 'stub' and p.caption ilike any($4::text[]) and (p.posted_at at time zone $2)::date = ds.d)::int as posts,
+            (select count(*) from comments c where c.workspace_id = $1 and c.text ilike any($4::text[]) and (c.posted_at at time zone $2)::date = ds.d)::int as comments,
+            (select max(p.views) from posts p where p.workspace_id = $1 and p.source = 'earned' and p.caption ilike any($4::text[]) and (p.posted_at at time zone $2)::date = ds.d)::float8 as reach
+     from ds order by 1`,
+    [ws, tz, sinceIso, boycott],
+  );
+  const top = await db.q<Row>(
+    `select url, platform, creator_handle as handle, caption, to_char(posted_at at time zone $2, 'YYYY-MM-DD HH24:MI') as posted_at,
+            views::float8 as views, likes, stance
+     from posts where workspace_id = $1 and source = 'earned' and content_type is distinct from 'stub' and caption ilike any($3::text[])
+     order by coalesce(views, 0) + coalesce(likes, 0) * 20 desc limit 5`,
+    [ws, tz, boycott],
+  );
+  const partners = configured
+    ? await db.q<Row>(
+        `with last as (select greatest((select max(posted_at) from comments where workspace_id = $1), (select max(posted_at) from posts where workspace_id = $1)) as at),
+         pat as (select name, terms from jsonb_to_recordset($2::jsonb) as p(name text, terms text[])),
+         per_partner as (
+         select pat.name,
+                (select count(*) from posts p where p.workspace_id = $1 and p.source = 'earned' and p.content_type is distinct from 'stub' and p.caption ilike any(pat.terms))::int as posts,
+                (select count(*) from comments c where c.workspace_id = $1 and c.text ilike any(pat.terms))::int as comments,
+                (select count(*) from posts p where p.workspace_id = $1 and p.source = 'earned' and p.content_type is distinct from 'stub' and p.caption ilike any(pat.terms) and p.posted_at > (select at from last) - interval '24 hours')::int as posts_24h,
+                (select count(*) from comments c where c.workspace_id = $1 and c.text ilike any(pat.terms) and c.posted_at > (select at from last) - interval '24 hours')::int as comments_24h,
+                (select max(p.views) from posts p where p.workspace_id = $1 and p.source = 'earned' and p.caption ilike any(pat.terms))::float8 as top_views,
+                to_char((select min(t) from (select min(p.posted_at) t from posts p where p.workspace_id = $1 and p.source = 'earned' and p.caption ilike any(pat.terms)
+                         union all select min(c.posted_at) from comments c where c.workspace_id = $1 and c.text ilike any(pat.terms)) s) at time zone $3, 'YYYY-MM-DD HH24:MI') as first_at,
+                to_char((select max(t) from (select max(p.posted_at) t from posts p where p.workspace_id = $1 and p.source = 'earned' and p.caption ilike any(pat.terms)
+                         union all select max(c.posted_at) from comments c where c.workspace_id = $1 and c.text ilike any(pat.terms)) s) at time zone $3, 'YYYY-MM-DD HH24:MI') as last_at
+         from pat)
+         select * from per_partner order by comments + posts desc, name`,
+        [ws, toJson(cfg.partners.map((p) => ({ name: p.name, terms: like(p.terms) }))), tz],
+      )
+    : [];
+  return {
+    configured,
+    posts: (totals?.posts as number) ?? 0, comments: (totals?.comments as number) ?? 0,
+    posts_24h: (totals?.posts_24h as number) ?? 0, posts_prev_24h: (totals?.posts_prev_24h as number) ?? 0,
+    comments_24h: (totals?.comments_24h as number) ?? 0, comments_prev_24h: (totals?.comments_prev_24h as number) ?? 0,
+    daily: daily.map((r) => ({ d: r.d as string, posts: r.posts as number, comments: r.comments as number, reach: r.reach as number | null })),
+    top: top.map((r) => ({ url: r.url as string, platform: r.platform as string, handle: r.handle as string | null, caption: String(r.caption ?? "").replace(/\s+/g, " ").slice(0, 170), posted_at: r.posted_at as string, views: r.views as number | null, likes: r.likes as number | null, stance: r.stance as string | null })),
+    partners: partners as unknown as PartnerRow[],
   };
 }
 
