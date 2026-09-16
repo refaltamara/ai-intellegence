@@ -247,6 +247,12 @@
       "platform": "instagram",
       "file": "comments_instagram_0916.csv",
       "export_time": "2026-09-16T06:00:00+07:00"
+    },
+    {
+      "kind": "comments",
+      "platform": "threads",
+      "file": "comments_threads_batch3.csv",
+      "export_time": "2026-09-16T06:00:00+07:00"
     }
   ],
   "data_dir": "data/raw/maudy"
