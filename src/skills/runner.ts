@@ -10,6 +10,7 @@ import { getSkill, type SkillDef } from "./registry";
 import { loadContext, ParamError, validateParams, type Context } from "./params";
 import type { SkillOutput, SkillRequest, SkillResult } from "./types";
 import { unavailable } from "./unavailable";
+import { toJson } from "../db/json";
 
 export type SkillImpl = (db: SkillDb, ctx: Context, def: SkillDef, params: Record<string, unknown>) => Promise<SkillOutput>;
 
@@ -139,7 +140,7 @@ export async function runSkill(req: SkillRequest): Promise<SkillResult> {
       const row = await db.one<{ id: string }>(
         `insert into skill_runs (workspace_id, skill, params, params_resolved, result, status, actor, duration_ms)
          values ($1, $2, $3::jsonb, $4::jsonb, $5::jsonb, $6, $7::jsonb, $8) returning id`,
-        [workspaceId, req.skill, JSON.stringify(req.params ?? {}), JSON.stringify(result.params_resolved), JSON.stringify(result), result.status, JSON.stringify(req.actor), result.meta.duration_ms],
+        [workspaceId, req.skill, toJson(req.params ?? {}), toJson(result.params_resolved), toJson(result), result.status, toJson(req.actor), result.meta.duration_ms],
       );
       result.run_id = row?.id;
     } catch (e) {

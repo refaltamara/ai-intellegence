@@ -1,6 +1,7 @@
 /** agents / agent_runs persistence over the Neon HTTP client. */
 import { sql } from "../db/client";
 import type { Diff, DiffConfig } from "./diff";
+import { toJson } from "../db/json";
 
 export type AgentRow = {
   id: string; workspace_id: string; user_id: string | null; name: string; skill: string; params: Record<string, unknown>;
@@ -30,7 +31,7 @@ export async function insertAgent(a: Omit<AgentRow, "id" | "created_at" | "last_
   const r = (await sql.query(
     `insert into agents (workspace_id, user_id, name, skill, params, from_skill_run_id, schedule_cron, schedule_tz, schedule_human, delivery, only_if_changed, diff_config, status, next_run_at, decision_id)
      values ($1, $2, $3, $4, $5::jsonb, $6, $7, $8, $9, $10::jsonb, $11, $12::jsonb, $13, $14, $15) returning *`,
-    [a.workspace_id, a.user_id, a.name, a.skill, JSON.stringify(a.params), a.from_skill_run_id, a.schedule_cron, a.schedule_tz, a.schedule_human, JSON.stringify(a.delivery), a.only_if_changed, JSON.stringify(a.diff_config), a.status, a.next_run_at, a.decision_id ?? null],
+    [a.workspace_id, a.user_id, a.name, a.skill, toJson(a.params), a.from_skill_run_id, a.schedule_cron, a.schedule_tz, a.schedule_human, toJson(a.delivery), a.only_if_changed, toJson(a.diff_config), a.status, a.next_run_at, a.decision_id ?? null],
   )) as AgentRow[];
   return r[0];
 }
@@ -39,13 +40,13 @@ export async function updateAgent(id: string, workspaceId: string, patch: Partia
   const vals: unknown[] = [id, workspaceId];
   const push = (col: string, v: unknown, cast = "") => { vals.push(v); sets.push(`${col} = $${vals.length}${cast}`); };
   if (patch.name !== undefined) push("name", patch.name);
-  if (patch.params !== undefined) push("params", JSON.stringify(patch.params), "::jsonb");
+  if (patch.params !== undefined) push("params", toJson(patch.params), "::jsonb");
   if (patch.schedule_cron !== undefined) push("schedule_cron", patch.schedule_cron);
   if (patch.schedule_tz !== undefined) push("schedule_tz", patch.schedule_tz);
   if (patch.schedule_human !== undefined) push("schedule_human", patch.schedule_human);
-  if (patch.delivery !== undefined) push("delivery", JSON.stringify(patch.delivery), "::jsonb");
+  if (patch.delivery !== undefined) push("delivery", toJson(patch.delivery), "::jsonb");
   if (patch.only_if_changed !== undefined) push("only_if_changed", patch.only_if_changed);
-  if (patch.diff_config !== undefined) push("diff_config", JSON.stringify(patch.diff_config), "::jsonb");
+  if (patch.diff_config !== undefined) push("diff_config", toJson(patch.diff_config), "::jsonb");
   if (patch.status !== undefined) push("status", patch.status);
   if (patch.next_run_at !== undefined) push("next_run_at", patch.next_run_at);
   if (patch.last_run_at !== undefined) push("last_run_at", patch.last_run_at);
@@ -76,14 +77,14 @@ export async function insertRun(agentId: string): Promise<AgentRunRow> {
 export async function finishRun(id: string, patch: { skill_run_id?: string | null; diff?: Diff | null; should_deliver?: boolean; delivered_at?: string | null; delivery_error?: string | null; report_id?: string | null }): Promise<AgentRunRow> {
   const r = (await sql.query(
     `update agent_runs set finished_at = now(), skill_run_id = $2, diff = $3::jsonb, should_deliver = $4, delivered_at = $5, delivery_error = $6, report_id = $7 where id = $1 returning *`,
-    [id, patch.skill_run_id ?? null, patch.diff ? JSON.stringify(patch.diff) : null, patch.should_deliver ?? null, patch.delivered_at ?? null, patch.delivery_error ?? null, patch.report_id ?? null],
+    [id, patch.skill_run_id ?? null, patch.diff ? toJson(patch.diff) : null, patch.should_deliver ?? null, patch.delivered_at ?? null, patch.delivery_error ?? null, patch.report_id ?? null],
   )) as AgentRunRow[];
   return r[0];
 }
 export async function insertReport(r: { workspace_id: string; title: string; source: "agent" | "ask"; skill_run_id: string | null; agent_run_id: string | null; body_md: string; blocks: unknown }): Promise<{ id: string }> {
   const rows = (await sql.query(
     "insert into reports (workspace_id, title, source, skill_run_id, agent_run_id, body_md, blocks) values ($1, $2, $3, $4, $5, $6, $7::jsonb) returning id",
-    [r.workspace_id, r.title, r.source, r.skill_run_id, r.agent_run_id, r.body_md, JSON.stringify(r.blocks)],
+    [r.workspace_id, r.title, r.source, r.skill_run_id, r.agent_run_id, r.body_md, toJson(r.blocks)],
   )) as { id: string }[];
   return rows[0];
 }

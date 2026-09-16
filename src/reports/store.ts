@@ -5,6 +5,7 @@ import type { Diff } from "../agents/diff";
 import type { SkillResult } from "../skills/types";
 import { generateSections, type ReportSections } from "./headline";
 import { renderMarkdown, whatChangedLines } from "./render";
+import { toJson } from "../db/json";
 
 export type ReportBlocks = {
   skill: string;
@@ -67,7 +68,7 @@ export async function createReport(opts: { workspaceId: string; result: SkillRes
   };
   const rows = (await sql.query(
     "insert into reports (workspace_id, title, source, skill_run_id, agent_run_id, body_md, blocks, decision_id) values ($1, $2, $3, $4, $5, $6, $7::jsonb, $8) returning *",
-    [opts.workspaceId, title, opts.source, result.run_id ?? null, opts.agentRunId ?? null, markdown, JSON.stringify(blocks), opts.decisionId ?? null],
+    [opts.workspaceId, title, opts.source, result.run_id ?? null, opts.agentRunId ?? null, markdown, toJson(blocks), opts.decisionId ?? null],
   )) as ReportRow[];
   return { report: rows[0], sections, markdown };
 }

@@ -1,6 +1,7 @@
 /** Workspaces over the Neon HTTP client, cached for five minutes; settings change rarely. */
 import { sql } from "../db/client";
 import { workspaceConfig, type WorkspaceConfig, type WorkspaceKind, type WorkspaceRow, type WorkspaceSettings } from "./config";
+import { toJson } from "../db/json";
 
 const TTL_MS = 5 * 60 * 1000;
 const cache = new Map<string, { at: number; cfg: WorkspaceConfig }>();
@@ -31,7 +32,7 @@ export async function listWorkspaces(): Promise<{ id: string; name: string; kind
 export async function createWorkspace(w: { id: string; name: string; kind: WorkspaceKind; category?: string | null; tz?: string; settings?: WorkspaceSettings }): Promise<void> {
   await sql.query(
     "insert into workspaces (id, name, category, tz, kind, settings) values ($1, $2, $3, $4, $5, $6::jsonb) on conflict (id) do update set name = excluded.name, category = excluded.category, tz = excluded.tz, kind = excluded.kind, settings = workspaces.settings || excluded.settings",
-    [w.id, w.name, w.category ?? null, w.tz ?? "Asia/Jakarta", w.kind, JSON.stringify(w.settings ?? {})],
+    [w.id, w.name, w.category ?? null, w.tz ?? "Asia/Jakarta", w.kind, toJson(w.settings ?? {})],
   );
   invalidateWorkspace(w.id);
 }
@@ -40,7 +41,7 @@ export async function updateWorkspaceSettings(id: string, patch: WorkspaceSettin
   const { kind, name, ...settings } = patch;
   const rows = (await sql.query(
     "update workspaces set settings = settings || $2::jsonb, kind = coalesce($3, kind), name = coalesce($4, name) where id = $1 returning id",
-    [id, JSON.stringify(settings), kind ?? null, name ?? null],
+    [id, toJson(settings), kind ?? null, name ?? null],
   )) as { id: string }[];
   invalidateWorkspace(id);
   return rows.length > 0;

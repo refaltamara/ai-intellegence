@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { strictify, unionSkillParamsSchema } from "../schema";
 import { buildTools } from "../tools";
-import { skillNames } from "../../skills/registry";
+import { registry, skillNames } from "../../skills/registry";
 
 const BANNED = ["minimum", "maximum", "multipleOf", "minLength", "maxLength", "maxItems", "pattern", "uniqueItems"];
 
@@ -54,7 +54,8 @@ describe("strict tool schemas", () => {
     expect(p.rule.additionalProperties).toBe(false);
     expect(p.limit).not.toHaveProperty("maximum");
     expect(p.brand.description).toMatch(/used by/);
-    expect(skillNames().length).toBe(29);
+    // the registry is the source of truth; this catches a skill that fails to load, not a skill that was added
+    expect(skillNames().length).toBe(registry.skills.length);
   });
   it("strictify drops unsupported keywords and closes objects", () => {
     const s = strictify({ type: "object", properties: { n: { type: "integer", minimum: 1, maximum: 5 }, list: { type: "array", items: { type: "string" }, minItems: 2, maxItems: 9 }, o: { properties: { x: { type: "string" } } } } });

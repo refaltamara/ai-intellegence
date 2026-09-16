@@ -1,6 +1,7 @@
 /** briefs persistence over the Neon HTTP client. */
 import { sql } from "../db/client";
 import type { Evidence } from "../skills/types";
+import { toJson } from "../db/json";
 
 export type BriefItem = { label: string; prompt: string; skill?: string; params?: Record<string, unknown> };
 export type NoticedItem = { agent_id: string; agent_name: string; decision_id: string | null; decision_name: string | null; when: string; changes: number; lines: string[] };
@@ -27,7 +28,7 @@ export async function latestBrief(workspaceId: string): Promise<BriefRow | null>
 export async function insertBrief(b: { workspaceId: string; dataKey: string; content: BriefContent; evidence: Evidence[]; quiet: boolean }): Promise<BriefRow> {
   const r = (await sql.query(
     "insert into briefs (workspace_id, data_key, content, evidence, quiet) values ($1, $2, $3::jsonb, $4::jsonb, $5) returning *",
-    [b.workspaceId, b.dataKey, JSON.stringify(b.content), JSON.stringify(b.evidence), b.quiet],
+    [b.workspaceId, b.dataKey, toJson(b.content), toJson(b.evidence), b.quiet],
   )) as BriefRow[];
   return r[0];
 }

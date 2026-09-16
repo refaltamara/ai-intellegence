@@ -2,6 +2,7 @@
 import { sql } from "../db/client";
 import type { Evidence } from "../skills/types";
 import type { PaneAction, PaneState } from "./pane";
+import { toJson } from "../db/json";
 
 export type ConversationRow = { id: string; workspace_id: string; user_id: string | null; decision_id: string | null; title: string | null; created_at: string; updated_at: string };
 export type MessageRow = {
@@ -79,7 +80,7 @@ export async function addMessage(m: { conversationId: string; role: "user" | "as
   const rows = (await sql.query(
     `insert into messages (conversation_id, role, content_json, evidence_json, skill_run_ids, tokens_in, tokens_out)
      values ($1, $2, $3::jsonb, $4::jsonb, $5::uuid[], $6, $7) returning *`,
-    [m.conversationId, m.role, JSON.stringify(m.content), m.evidence ? JSON.stringify(m.evidence) : null, m.skillRunIds ?? null, m.tokensIn ?? null, m.tokensOut ?? null],
+    [m.conversationId, m.role, toJson(m.content), m.evidence ? toJson(m.evidence) : null, m.skillRunIds ?? null, m.tokensIn ?? null, m.tokensOut ?? null],
   )) as MessageRow[];
   await sql.query("update conversations set updated_at = now() where id = $1", [m.conversationId]);
   return rows[0];
@@ -101,7 +102,7 @@ export async function paneStates(runIds: string[], workspaceId: string): Promise
 }
 
 export async function setPaneState(id: string, workspaceId: string, state: PaneState): Promise<boolean> {
-  const rows = (await sql.query("update skill_runs set pane_state = $3::jsonb where id = $1 and workspace_id = $2 returning id", [id, workspaceId, JSON.stringify(state)])) as { id: string }[];
+  const rows = (await sql.query("update skill_runs set pane_state = $3::jsonb where id = $1 and workspace_id = $2 returning id", [id, workspaceId, toJson(state)])) as { id: string }[];
   return rows.length > 0;
 }
 
