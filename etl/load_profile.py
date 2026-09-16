@@ -19,7 +19,7 @@ What gets dropped, and reported per file:
             - no subject keyword in the caption, on keyword_platforms only
               (Threads replies rarely repeat the name, so Threads is exempt)
   comments  - empty text, emoji or symbol only text
-            - duplicate comment id inside the file
+            - a row that repeats another row in the same file
             - comments on a dropped post
 The subject's own posts are never dropped and never labelled. The subject's own
 replies are kept with sentiment_source 'subject' so the labeller skips them.
@@ -452,13 +452,14 @@ def normalise_comments(df, platform, prof, known_urls, dropped_urls, source_file
         raw_id = to_str(ids.iloc[i])
         if raw_id and re.fullmatch(r"[\d.]+E\+\d+", raw_id, re.I):
             raw_id = None   # the spreadsheet rounded the id to scientific notation; fall back to the hash
-        if raw_id:
-            cid = f"{platform}:{raw_id}"
-        else:
-            digest = hashlib.sha1(f"{url}|{handle}|{dates.iloc[i]}|{text}".encode()).hexdigest()[:24]
-            cid = f"{platform}:h:{digest}"
+        if raw_id and norm_handle(raw_id) == handle:
+            raw_id = None   # the export repeats the username in the id column; it names the author, not the comment
+        digest = hashlib.sha1(f"{url}|{handle}|{dates.iloc[i]}|{text}".encode()).hexdigest()[:24]
+        cid = f"{platform}:{raw_id}" if raw_id else f"{platform}:h:{digest}"
         if cid in seen_ids:
-            drops.add("duplicate comment id in file", cid); continue
+            cid = f"{platform}:h:{digest}"   # an id that repeats with different content is not a comment id
+        if cid in seen_ids:
+            drops.add("duplicate comment in file", cid); continue
         seen_ids.add(cid)
         owned = prof.is_owned(platform, handle)
         sent = (to_str(sents.iloc[i]) or "").lower()
