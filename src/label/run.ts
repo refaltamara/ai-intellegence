@@ -14,6 +14,7 @@ import { modelId } from "../chat/loop";
 import { sql } from "../db/client";
 import { getWorkspace } from "../workspace/store";
 import { LABEL_COMMENTS_TOOL, LABEL_POSTS_TOOL, SENTIMENTS, commentBatchPrompt, commentSystem, parseLabels, stanceBatchPrompt, stanceSystem, type CommentForLabel, type PostForLabel } from "./prompt";
+import { toJson } from "../db/json";
 
 export type LabelOutcome = {
   workspace: string;
@@ -110,7 +111,7 @@ export async function labelWorkspace(workspaceId: string, opts: LabelOptions = {
                   off_topic = (l.sentiment = 'off_topic'),
                   sentiment_confidence = l.confidence, sentiment_source = 'model', classified_at = now()
            from jsonb_to_recordset($1::jsonb) as l(id uuid, sentiment text, confidence numeric) where c.id = l.id and c.workspace_id = $2`,
-          [JSON.stringify(labels), workspaceId],
+          [toJson(labels), workspaceId],
         );
         out.comments_labelled += labels.length;
       }
@@ -148,7 +149,7 @@ export async function labelWorkspace(workspaceId: string, opts: LabelOptions = {
       if (labels.length) {
         await sql.query(
           `update posts p set stance = l.sentiment, stance_source = 'model' from jsonb_to_recordset($1::jsonb) as l(id uuid, sentiment text) where p.id = l.id and p.workspace_id = $2`,
-          [JSON.stringify(labels), workspaceId],
+          [toJson(labels), workspaceId],
         );
         out.posts_labelled += labels.length;
       }
@@ -175,7 +176,7 @@ export async function labelWorkspace(workspaceId: string, opts: LabelOptions = {
     await sql.query(
       `insert into data_loads (workspace_id, file, platform, kind, rows_in, rows_loaded, rows_rejected, report, finished_at)
        values ($1, $2, null, 'labels', $3, $4, $5, $6::jsonb, now())`,
-      [workspaceId, `labelling ${out.stopped === "error" ? "(stopped on error)" : out.stopped === "budget" ? "(more to do)" : "(complete)"}`, out.comments_labelled + out.comments_failed + out.posts_labelled + out.posts_failed, out.comments_labelled + out.posts_labelled, out.comments_failed + out.posts_failed, JSON.stringify(out)],
+      [workspaceId, `labelling ${out.stopped === "error" ? "(stopped on error)" : out.stopped === "budget" ? "(more to do)" : "(complete)"}`, out.comments_labelled + out.comments_failed + out.posts_labelled + out.posts_failed, out.comments_labelled + out.posts_labelled, out.comments_failed + out.posts_failed, toJson(out)],
     ).catch(() => undefined);
   }
   return out;
