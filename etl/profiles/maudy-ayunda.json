@@ -253,6 +253,39 @@
       "platform": "threads",
       "file": "comments_threads_batch3.csv",
       "export_time": "2026-09-16T06:00:00+07:00"
+    },
+    {
+      "kind": "contents",
+      "platform": "threads",
+      "file": "contents_threads_0918.csv",
+      "note": "fifth export, 18 Sep 12:00 WIB"
+    },
+    {
+      "kind": "contents",
+      "platform": "x",
+      "file": "contents_x_0918.csv",
+      "note": "fifth export, 18 Sep 12:00 WIB"
+    },
+    {
+      "kind": "comments",
+      "platform": "x",
+      "file": "comments_x_0918.csv",
+      "export_time": "2026-09-18T12:00:00+07:00",
+      "note": "sixth export, 18 Sep 12:00 WIB; the export leaves comment_id empty, so ids are hashed from post+author+text"
+    },
+    {
+      "kind": "comments",
+      "platform": "youtube",
+      "file": "comments_youtube_0918.csv",
+      "export_time": "2026-09-18T12:00:00+07:00",
+      "note": "sixth export, 18 Sep 12:00 WIB; relative dates anchored to its own export time"
+    },
+    {
+      "kind": "comments",
+      "platform": "threads",
+      "file": "comments_threads_batch2_mechanical.csv",
+      "export_time": "2026-09-18T12:00:00+07:00",
+      "note": "mechanical deep crawl of 10 Threads posts, scraped 18 Sep 08:06-08:26 UTC; upstream 'excluded' flags are unconfirmed and ignored, our own off-topic labelling decides"
     }
   ],
   "data_dir": "data/raw/maudy"
