@@ -253,6 +253,18 @@
       "platform": "threads",
       "file": "comments_threads_batch3.csv",
       "export_time": "2026-09-16T06:00:00+07:00"
+    },
+    {
+      "kind": "contents",
+      "platform": "threads",
+      "file": "contents_threads_0918.csv",
+      "note": "fifth export, 18 Sep 12:00 WIB"
+    },
+    {
+      "kind": "contents",
+      "platform": "x",
+      "file": "contents_x_0918.csv",
+      "note": "fifth export, 18 Sep 12:00 WIB"
     }
   ],
   "data_dir": "data/raw/maudy"
