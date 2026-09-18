@@ -23,7 +23,7 @@ export function PulsePage({ d }: { d: PulseData }) {
   // Shares are taken on the comments that are about the subject. Folding in the thread
   // noise — sellers, memes, strangers arguing with each other — halves the number and
   // measures the crawl instead of the crisis.
-  const negPct = pct(t.on_topic_negative, t.on_topic);
+  const negPct = pct(t.on_topic_negative, t.on_topic_labelled);
   const sum = d.sentiment.summary as { spike_started?: string | null; peak_bucket?: string | null; peak_negative?: number; bucket?: string };
   const seedRows = d.seeding.rows as { kind: string; platform: string; what: string; accounts: number; comments: number; first_at: string; post_url: string | null }[];
   const themeRows = d.themes.rows as { term: string; comments: number; share_pct: number; examples: string[] }[];
@@ -40,7 +40,7 @@ export function PulsePage({ d }: { d: PulseData }) {
       <div className="wrap wide">
         <div className="stats">
           <div className="stat"><b>{fmtNum(t.on_topic)}</b><span>comments about {d.subject}, from {fmtNum(t.accounts)} accounts on {fmtNum(t.posts_with_comments)} posts{t.off_topic ? ` · ${fmtNum(t.off_topic)} more in these threads are about something else` : ""}</span></div>
-          <div className="stat"><b style={{ color: negPct != null && negPct >= 50 ? "var(--red)" : undefined }}>{negPct != null ? `${negPct}%` : "–"}</b><span>{t.on_topic_labelled ? `negative, of the ${fmtNum(t.on_topic)} about her${t.on_topic_labelled < t.on_topic ? ` · ${fmtNum(t.on_topic - t.on_topic_labelled)} still unlabelled` : ""} · ${pct(t.on_topic_positive, t.on_topic) ?? 0}% defend her` : "negative · labelling has not started"}</span></div>
+          <div className="stat"><b style={{ color: negPct != null && negPct >= 50 ? "var(--red)" : undefined }}>{negPct != null ? `${negPct}%` : "–"}</b><span>{t.on_topic_labelled ? `negative, of the ${fmtNum(t.on_topic_labelled)} read so far${t.on_topic_labelled < t.on_topic ? ` · ${fmtNum(t.on_topic - t.on_topic_labelled)} still unlabelled` : ""} · ${pct(t.on_topic_positive, t.on_topic_labelled) ?? 0}% defend her` : "negative · labelling has not started"}</span></div>
           <div className="stat"><b style={{ color: againstPct != null && againstPct >= 50 ? "var(--red, #c0392b)" : undefined }}>{againstPct != null ? `${againstPct}%` : "–"}</b><span>{t.posts_stance_labelled ? `of posts are against ${d.subject}, of ${fmtNum(t.posts_stance_labelled)} with a stance${t.earned_posts > t.posts_stance_labelled ? ` · ${fmtNum(t.earned_posts - t.posts_stance_labelled - t.posts_no_caption)} waiting, ${fmtNum(t.posts_no_caption)} have no text in the export` : ""}` : `posts by other accounts · ${fmtNum(t.earned_posts)} waiting for a stance`}</span></div>
           <div className="stat"><b>{fmtNum(t.earned_posts)}</b><span>posts by other accounts about {d.subject}{sum.spike_started ? ` · comments spiked ${when(sum.spike_started, sum.bucket === "day")}` : ""}</span></div>
         </div>
@@ -48,23 +48,25 @@ export function PulsePage({ d }: { d: PulseData }) {
         <Now d={d} />
 
         <div className="card" style={{ marginBottom: 12 }}>
-          <h4>Comments per hour, and which way they lean <span>{trendSpan(d)} · WIB · bars are volume, lines are share of the comments about {d.subject}</span></h4>
+          <h4>Comments per hour, and which way they lean <span>{trendSpan(d)} · WIB · bars are volume, the three lines are shares of the blue bar</span></h4>
           <div className="body">
             <TrendChart
               x={d.trend.points.map((p) => p.h)}
               bars={[
-                { name: `About ${d.subject}`, data: d.trend.points.map((p) => p.on_topic), color: "var(--blue)" },
+                { name: `About ${d.subject}`, data: d.trend.points.map((p) => p.labelled), color: "var(--blue)" },
+                { name: "Waiting to be read", data: d.trend.points.map((p) => Math.max(0, p.on_topic - p.labelled)), color: "var(--blue-20)" },
                 { name: "Other talk in the same threads", data: d.trend.points.map((p) => p.off_topic), color: "#D5DDE8" },
               ]}
               lines={[
-                { name: "Negative", data: d.trend.points.map((p) => share(p.negative, p.on_topic)), color: "var(--red)" },
-                { name: `Defending ${d.subject}`, data: d.trend.points.map((p) => share(p.positive, p.on_topic)), color: "var(--green)" },
+                { name: "Negative", data: d.trend.points.map((p) => share(p.negative, p.labelled)), color: "var(--red)" },
+                { name: "Neutral", data: d.trend.points.map((p) => share(p.neutral, p.labelled)), color: "#8593A8" },
+                { name: `Defending ${d.subject}`, data: d.trend.points.map((p) => share(p.positive, p.labelled)), color: "var(--green)" },
               ]}
-              barLabel="Comments" lineLabel="share of comments about her"
+              barLabel="Comments" lineLabel="share of the comments read that hour"
               peakNote={d.trend.peak ? `${fmtNum(d.trend.peak.comments)} in one hour` : undefined}
             />
           </div>
-          <div className="caveats">Share lines are blank in hours with fewer than ten comments about {d.subject}, where a percentage would be noise. The last hour is partial — it is still filling.</div>
+          <div className="caveats">The three lines are shares of the same blue bar and add up to 100%: every comment about {d.subject} is negative, neutral or defending her. Neutral means it is about her or the controversy but takes no side — anger at the government or the news, unless it blames her. Pale blue is comments the labeller has not reached yet, which is why an hour can be tall and its lines short. Lines are blank under ten comments read, where a percentage would be noise, and the last hour is still filling.</div>
         </div>
 
         <div className="card" style={{ marginBottom: 12 }}>

@@ -44,13 +44,19 @@ export function TrendChart({ x, bars, lines, barLabel, lineLabel, peakNote, heig
 
   return (
     <div className="viz trend" onMouseLeave={() => setAt(null)}>
-      {at != null && hovered && (
-        <div className="tip" style={{ left: `${((cx(at) - padL) / (W - padL - padR)) * 100}%`, top: 8 }}>
+      {at != null && hovered && (() => {
+        // Keep the card from clipping it: near the right edge the tooltip hangs to the
+        // left of the cursor instead of straddling it, and vice versa on the left.
+        const f = (cx(at) - padL) / (W - padL - padR);
+        const shift = f > 0.72 ? "translateX(-100%)" : f < 0.16 ? "translateX(0)" : "translateX(-50%)";
+        return (
+        <div className="tip" style={{ left: `${f * 100}%`, top: 8, transform: shift }}>
           <b>{hovered.day} {hovered.hour}:00</b>
           {bars.map((s) => <div key={s.name}><i style={{ background: s.color }} />{s.name}: {fmt(s.data[at])}</div>)}
           {lines.map((s) => <div key={s.name}><i style={{ background: s.color }} />{s.name}: {s.data[at] == null ? "–" : `${fmt(s.data[at])}%`}</div>)}
         </div>
-      )}
+        );
+      })()}
       <svg viewBox={`0 0 ${W} ${H}`} role="img" style={{ width: "100%", height: "auto", display: "block" }}
         aria-label={`${barLabel} per hour with ${lines.map((l) => l.name).join(" and ")}`}>
         <g stroke="var(--line)" strokeWidth="1">{ticks.map((t) => <line key={t} x1={padL} x2={W - padR} y1={yOf(t)} y2={yOf(t)} />)}</g>
