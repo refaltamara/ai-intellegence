@@ -627,7 +627,7 @@ tr.me .bar i{background:var(--blue)}
 .now .step b{display:block;font-size:22px;font-weight:700;margin:2px 0 1px;letter-spacing:-.02em}
 .now .step b i{font-style:normal;font-size:12px;font-weight:700;margin-left:6px;vertical-align:2px}
 .now .step .s{display:block;font-size:11px;color:var(--text-3)}
-.viz.trend .tip{transform:translate(-50%,0);max-width:260px;white-space:normal}
+.viz.trend .tip{max-width:none;white-space:nowrap;line-height:1.45}
 .viz.trend .tip div{display:flex;align-items:center;gap:6px;font-weight:500;margin-top:3px}
 .viz.trend .tip i{width:8px;height:8px;border-radius:2px;display:inline-block;flex:none}
 table.watch tr.group td{background:var(--surface);font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-3);padding:6px 12px}

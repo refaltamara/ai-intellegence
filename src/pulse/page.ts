@@ -15,10 +15,10 @@ export type Platform = (typeof PLATFORMS)[number];
 
 export type PulseEvent = { at: string; platform: string; what: string; detail: string; url?: string; kind: "root" | "first" | "reply" | "takeoff" | "peak" | "top" };
 /** One hour of the arc: how much arrived, and which way it leaned. Counts are comments about the subject unless named otherwise. */
-export type TrendPoint = { h: string; comments: number; off_topic: number; on_topic: number; negative: number; positive: number; posts: number; against: number; for_: number; neutral_posts: number };
+export type TrendPoint = { h: string; comments: number; off_topic: number; on_topic: number; labelled: number; negative: number; neutral: number; positive: number; posts: number; against: number; for_: number; neutral_posts: number };
 export type Trend = { points: TrendPoint[]; peak: TrendPoint | null; peak_posts: TrendPoint | null };
 /** A window of the trend, summed. Shares are of on-topic comments, so they answer "how do they feel", not "how much noise". */
-export type Span = { comments: number; posts: number; on_topic: number; negative: number; positive: number; negative_pct: number | null; positive_pct: number | null; against: number; posts_against_pct: number | null };
+export type Span = { comments: number; posts: number; on_topic: number; labelled: number; negative: number; neutral: number; positive: number; negative_pct: number | null; neutral_pct: number | null; positive_pct: number | null; against: number; posts_against_pct: number | null };
 export type Status = { now6: Span; prev6: Span; day: Span; prev_day: Span; hours_since_peak: number | null; partial_hour: boolean };
 /** A post worth watching: still collecting comments, and hostile. */
 export type WatchPost = {
@@ -196,7 +196,9 @@ async function build(ws: string): Promise<PulseData | null> {
        select to_char(hrs.h, 'YYYY-MM-DD HH24:00') as h, count(c.id)::int as comments,
               count(c.id) filter (where c.off_topic)::int as off_topic,
               count(c.id) filter (where not coalesce(c.off_topic, false))::int as on_topic,
+              count(c.id) filter (where not coalesce(c.off_topic, false) and c.sentiment is not null)::int as labelled,
               count(c.id) filter (where not coalesce(c.off_topic, false) and c.sentiment = 'negative')::int as negative,
+              count(c.id) filter (where not coalesce(c.off_topic, false) and c.sentiment = 'neutral')::int as neutral,
               count(c.id) filter (where not coalesce(c.off_topic, false) and c.sentiment = 'positive')::int as positive
        from hrs left join comments c on c.workspace_id = $1 and c.sentiment_source is distinct from 'subject'
             and date_trunc('hour', c.posted_at at time zone $2) = hrs.h
@@ -220,7 +222,7 @@ async function build(ws: string): Promise<PulseData | null> {
     const p = postsByHour.get(r.h as string);
     return {
       h: r.h as string, comments: r.comments as number, off_topic: r.off_topic as number, on_topic: r.on_topic as number,
-      negative: r.negative as number, positive: r.positive as number,
+      labelled: r.labelled as number, negative: r.negative as number, neutral: r.neutral as number, positive: r.positive as number,
       posts: (p?.posts as number) ?? 0, against: (p?.against as number) ?? 0, for_: (p?.for_ as number) ?? 0, neutral_posts: (p?.neutral_posts as number) ?? 0,
     };
   });
@@ -529,14 +531,18 @@ function ignition(n: number[]): number {
   return 0;
 }
 
-/** Sum a run of hours. Shares are taken on the comments that are about the subject, so noise in the thread cannot flatter them. */
+/**
+ * Sum a run of hours. Shares are taken on the comments about the subject that
+ * carry a label — noise in the thread cannot flatter them, and an hour the
+ * labeller has not finished reads as incomplete rather than as calm.
+ */
 function span(points: TrendPoint[]): Span {
   const s = points.reduce(
-    (a, p) => ({ comments: a.comments + p.comments, posts: a.posts + p.posts, on_topic: a.on_topic + p.on_topic, negative: a.negative + p.negative, positive: a.positive + p.positive, against: a.against + p.against }),
-    { comments: 0, posts: 0, on_topic: 0, negative: 0, positive: 0, against: 0 },
+    (a, p) => ({ comments: a.comments + p.comments, posts: a.posts + p.posts, on_topic: a.on_topic + p.on_topic, labelled: a.labelled + p.labelled, negative: a.negative + p.negative, neutral: a.neutral + p.neutral, positive: a.positive + p.positive, against: a.against + p.against }),
+    { comments: 0, posts: 0, on_topic: 0, labelled: 0, negative: 0, neutral: 0, positive: 0, against: 0 },
   );
   const share = (n: number, d: number) => (d >= 10 ? Math.round((n / d) * 1000) / 10 : null);
-  return { ...s, negative_pct: share(s.negative, s.on_topic), positive_pct: share(s.positive, s.on_topic), posts_against_pct: share(s.against, s.posts) };
+  return { ...s, negative_pct: share(s.negative, s.labelled), neutral_pct: share(s.neutral, s.labelled), positive_pct: share(s.positive, s.labelled), posts_against_pct: share(s.against, s.posts) };
 }
 
 /** Drop the leading hours where a ratio line has nothing to show, so the line starts where the data does. */
