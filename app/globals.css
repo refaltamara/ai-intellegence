@@ -1,9 +1,17 @@
 :root{
-  --bg:#FFFFFF; --side:#F7F9FC; --surface:#F7F9FC; --line:#E6EBF2; --line-2:#D5DDE8;
+  --bg:#FFFFFF; --side:#F6F8FE; --surface:#F6F8FC; --line:#E7ECF4; --line-2:#D7DFEB;
   --text:#0F1B2D; --text-2:#526278; --text-3:#8593A8;
   --blue:#1E5EFF; --blue-2:#1749D6; --blue-10:#EDF2FF; --blue-20:#D6E1FF;
   --green:#0E9F6E; --green-10:#E6F6F0; --red:#E5484D; --red-10:#FDECEC; --amber:#D98E04; --amber-10:#FFF4DE; --violet:#7C5CFF;
-  --r:12px; --r-sm:8px;
+  /* playful accents for the interface only (never data): a few, used sparingly */
+  --violet-10:#F1EEFF; --mint:#0FA897; --mint-10:#E3F6F3; --coral:#F26B4B; --coral-10:#FFEEE8; --sun:#E9A20C; --sun-10:#FFF5DB;
+  --grad:linear-gradient(135deg,#1E5EFF 0%,#5B5CFF 55%,#7C5CFF 100%);
+  --shadow-xs:0 1px 2px rgba(15,27,45,.04);
+  --shadow-sm:0 1px 2px rgba(15,27,45,.04),0 4px 12px -6px rgba(15,27,45,.08);
+  --shadow-md:0 2px 4px rgba(15,27,45,.04),0 14px 32px -16px rgba(15,27,45,.22);
+  --shadow-blue:0 8px 20px -8px rgba(30,94,255,.55);
+  --ease:cubic-bezier(.22,1,.36,1);
+  --r:14px; --r-sm:10px;
 }
 *{margin:0;padding:0;box-sizing:border-box}
 html,body{height:100%}
@@ -653,3 +661,167 @@ table.watch .tag.positive{background:var(--green-10);color:var(--green)}
 .expo-days .col i{display:block;width:100%;max-width:34px;background:var(--red);border-radius:3px 3px 0 0;min-height:2px}
 .expo-days b{display:block;font-size:13px;font-weight:700;margin-top:4px}
 .expo-days .lbl{display:block;font-size:11px;color:var(--text-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+
+/* ================================================================
+   Design refresh (Sep 2026): smoother, softer, a little playful.
+   White and blue stay the base; violet, mint, coral and sun appear
+   only as small accents in the chrome, never as data colours.
+   ================================================================ */
+::selection{background:var(--violet-10);color:var(--text)}
+:focus-visible{outline:none;box-shadow:0 0 0 3px var(--blue-20);border-radius:8px}
+*{scrollbar-width:thin;scrollbar-color:var(--line-2) transparent}
+*::-webkit-scrollbar{width:10px;height:10px}
+*::-webkit-scrollbar-thumb{background:var(--line-2);border-radius:999px;border:3px solid transparent;background-clip:padding-box}
+*::-webkit-scrollbar-thumb:hover{background-color:#C3CEDD}
+
+@keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@keyframes fadein{from{opacity:0}to{opacity:1}}
+@keyframes breathe{0%,100%{box-shadow:0 0 0 0 rgba(14,159,110,.35)}50%{box-shadow:0 0 0 5px rgba(14,159,110,0)}}
+@keyframes drift{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(18px,-12px) scale(1.06)}}
+
+/* smooth everything a person can touch */
+.btn,.nav a,.nav button,.recent a,.chips button,.follow button,.ask-card .opts button,.offer .chip,.tog button,.sk-filters button,.seg a,
+.sk,.agent,.stat,.cov,.layer,.bchip,.card,.card.strip,.rep-list a,.filechip,.post,.ev,.slashmenu button,.ms-opt,.pchart .series button,
+.composer,.today-composer,.dec,.alert,.pin,.threads a,.linkbtn,.askthis,.ptabs .tabs button,.pctl .ic,.cats span,.query,.rec,.why div{
+  transition:background-color .2s var(--ease),border-color .2s var(--ease),color .2s var(--ease),box-shadow .25s var(--ease),transform .25s var(--ease),opacity .2s var(--ease)}
+td{transition:background-color .18s var(--ease)}
+
+/* shell: a soft wash of colour at the top of every page that scrolls away with it */
+.side{background:linear-gradient(180deg,#F5F7FF 0%,#F8F7FF 55%,#F7F9FC 100%);border-right-color:var(--line);padding:20px 12px}
+.main{background:
+  radial-gradient(900px 340px at 12% -120px,rgba(124,92,255,.07),transparent 70%),
+  radial-gradient(760px 320px at 88% -140px,rgba(30,94,255,.08),transparent 70%),
+  radial-gradient(520px 260px at 55% -160px,rgba(15,168,151,.05),transparent 70%),#fff;
+  background-attachment:local}
+.brand .mark{background:var(--grad);border-radius:11px;box-shadow:var(--shadow-blue);font-size:16px;width:34px;height:34px}
+.brand b{letter-spacing:-.01em}
+
+/* navigation: each item has a colour of its own, shown as a small tinted badge */
+.nav{gap:3px}
+.nav a{--tone:var(--blue);--tone-10:var(--blue-10);padding:7px 8px;border-radius:12px;gap:11px}
+.nav a[data-tone=violet]{--tone:var(--violet);--tone-10:var(--violet-10)}
+.nav a[data-tone=mint]{--tone:var(--mint);--tone-10:var(--mint-10)}
+.nav a[data-tone=coral]{--tone:var(--coral);--tone-10:var(--coral-10)}
+.nav a[data-tone=sun]{--tone:var(--sun);--tone-10:var(--sun-10)}
+.nav a .ic{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;background:var(--tone-10);color:var(--tone);flex:none;transition:background .25s var(--ease),color .25s var(--ease),transform .25s var(--ease)}
+.nav a .ic svg{width:16px;height:16px}
+.nav a:hover{background:rgba(255,255,255,.75);color:var(--text)}
+.nav a:hover .ic{transform:scale(1.06)}
+.nav a.on{background:#fff;color:var(--text);box-shadow:var(--shadow-sm);font-weight:600}
+.nav a.on .ic{background:var(--tone);color:#fff;box-shadow:0 6px 14px -6px var(--tone)}
+.recent a{border-radius:9px}
+.recent a:hover{background:rgba(255,255,255,.8)}
+.ws{border-radius:14px;box-shadow:var(--shadow-xs);border-color:var(--line)}
+.avatar{background:linear-gradient(135deg,var(--blue-10),var(--violet-10));color:var(--blue-2)}
+
+/* page entrances: content rises in, a beat apart */
+.wrap>*{animation:rise .5s var(--ease) both}
+.wrap>*:nth-child(2){animation-delay:.04s}.wrap>*:nth-child(3){animation-delay:.08s}.wrap>*:nth-child(4){animation-delay:.12s}
+.wrap>*:nth-child(5){animation-delay:.16s}.wrap>*:nth-child(n+6){animation-delay:.2s}
+.dock>.wrap>*,.screen.ask .feed>.wrap>*{animation:none}
+.thread>*{animation:rise .42s var(--ease) both}
+.topbar{background:rgba(255,255,255,.72);backdrop-filter:saturate(1.6) blur(14px);-webkit-backdrop-filter:saturate(1.6) blur(14px);border-bottom-color:rgba(231,236,244,.9)}
+.topbar h1{font-size:16px;letter-spacing:-.01em}
+
+/* buttons and chips */
+.btn{border-radius:11px;box-shadow:var(--shadow-xs)}
+.btn:hover{transform:translateY(-1px);box-shadow:var(--shadow-sm)}
+.btn:active{transform:translateY(0) scale(.98)}
+.btn.pri,.offer .go{background:var(--grad);border-color:transparent;box-shadow:var(--shadow-blue)}
+.btn.pri:hover,.offer .go:hover:not(:disabled){background:var(--grad);filter:brightness(1.06);box-shadow:0 12px 24px -10px rgba(30,94,255,.6)}
+.btn.ghost{box-shadow:none}
+.btn.ghost:hover{transform:none;box-shadow:none}
+.btn:disabled{opacity:.55;transform:none;box-shadow:none;cursor:default}
+.chips button,.follow button,.offer .chip,.ask-card .opts button{box-shadow:var(--shadow-xs)}
+.chips button:hover,.follow button:hover,.offer .chip:hover:not(:disabled),.ask-card .opts button:hover:not(:disabled){transform:translateY(-1px);box-shadow:var(--shadow-sm)}
+.pill{border-radius:999px}
+.pill.live::before{animation:breathe 2.4s ease-in-out infinite}
+.sk-filters button.on,.seg a.on{background:var(--grad);border-color:transparent}
+
+/* chat: a welcoming start, rounder bubbles, a composer that glows */
+.screen.ask:has(.feed.start){position:relative;overflow:hidden}
+.screen.ask:has(.feed.start)::before,.screen.ask:has(.feed.start)::after{content:"";position:absolute;border-radius:50%;filter:blur(70px);pointer-events:none;animation:drift 18s ease-in-out infinite;z-index:0}
+.screen.ask:has(.feed.start)::before{width:440px;height:440px;left:6%;top:10%;background:rgba(124,92,255,.14)}
+.screen.ask:has(.feed.start)::after{width:400px;height:400px;right:4%;top:38%;background:rgba(15,168,151,.11);animation-delay:-9s}
+.screen.ask:has(.feed.start)>*{position:relative;z-index:1}
+.screen.ask:has(.feed.start) .dock{background:transparent}
+.hero{animation:rise .6s var(--ease) both}
+.hero h2{font-size:30px;font-weight:800;letter-spacing:-.03em;line-height:1.15;max-width:22ch;background:linear-gradient(120deg,var(--text) 0%,var(--text) 45%,var(--blue) 80%,var(--violet) 100%);-webkit-background-clip:text;background-clip:text;color:transparent}
+.hero p{font-size:15px}
+.chips button:nth-child(4n+1):hover{border-color:var(--blue);color:var(--blue);background:var(--blue-10)}
+.chips button:nth-child(4n+2):hover{border-color:var(--violet);color:var(--violet);background:var(--violet-10)}
+.chips button:nth-child(4n+3):hover{border-color:var(--mint);color:var(--mint);background:var(--mint-10)}
+.chips button:nth-child(4n+4):hover{border-color:var(--coral);color:var(--coral);background:var(--coral-10)}
+.composer{border-radius:20px;border-color:var(--line-2);box-shadow:var(--shadow-md);padding:16px 18px 12px}
+.composer:focus-within{border-color:rgba(30,94,255,.55);box-shadow:0 0 0 4px rgba(30,94,255,.09),0 18px 40px -18px rgba(91,92,255,.45)}
+.dock{background:linear-gradient(180deg,rgba(255,255,255,0),#fff 30%);border-top-color:transparent}
+.msg-u{background:linear-gradient(135deg,var(--blue-10),var(--violet-10));border-color:transparent;border-radius:18px 18px 6px 18px;padding:11px 16px}
+.msg-a .who{background:var(--grad);color:#fff;border-radius:10px;box-shadow:var(--shadow-blue)}
+.ev{border-radius:6px}
+.ev:hover,.ev.open{transform:translateY(-1px)}
+.slashmenu,.ms-list,.pfoot .menu{border-radius:14px;box-shadow:0 20px 50px -20px rgba(15,27,45,.35);animation:rise .22s var(--ease) both}
+.counter{border-left:0;border-radius:12px;background:var(--amber-10);box-shadow:inset 3px 0 0 var(--amber)}
+.ask-card{border-radius:16px;box-shadow:var(--shadow-sm)}
+.activity .dot{background:var(--grad)}
+
+/* cards lift a little when they can be opened */
+.card,.rec,.agent,.cov,.layer,.doc,.brief,.chartbox,.tablewrap,.query,.setup,.client,.stat,.sk,.bchip{border-radius:var(--r);box-shadow:var(--shadow-xs)}
+.card.strip:hover,.sk:hover,.agent:hover,.bchip:hover,.filechip:hover,.rep-list a:hover{transform:translateY(-2px);box-shadow:var(--shadow-md)}
+.card>h4{border-radius:var(--r) var(--r) 0 0}
+.tablewrap{overflow:auto}
+th{background:linear-gradient(180deg,#F8FAFE,#F4F7FC)}
+.tablewrap tbody tr:hover td{background:#F4F7FF}
+
+/* numbers get a quiet colour note each, in a fixed order */
+.stats .stat,.now .step,.layers .layer{position:relative;overflow:hidden}
+.stats .stat::after,.now .step::after{content:"";position:absolute;right:-22px;top:-22px;width:58px;height:58px;border-radius:50%;background:var(--tone-10,var(--blue-10));pointer-events:none}
+.stats .stat::before,.now .step::before{content:"";position:absolute;right:14px;top:14px;width:7px;height:7px;border-radius:50%;background:var(--tone,var(--blue));opacity:.8;z-index:2}
+.stats .stat>*,.now .step>*{position:relative;z-index:1}
+.stats .stat:nth-child(4n+1),.now .step:nth-child(4n+1){--tone:var(--blue);--tone-10:var(--blue-10)}
+.stats .stat:nth-child(4n+2),.now .step:nth-child(4n+2){--tone:var(--violet);--tone-10:var(--violet-10)}
+.stats .stat:nth-child(4n+3),.now .step:nth-child(4n+3){--tone:var(--mint);--tone-10:var(--mint-10)}
+.stats .stat:nth-child(4n+4),.now .step:nth-child(4n+4){--tone:var(--sun);--tone-10:var(--sun-10)}
+.stats .stat>span,.now .step .s{padding-right:18px}
+.stat b{font-size:27px;letter-spacing:-.03em}
+.now .step{background:#fff;box-shadow:var(--shadow-xs)}
+
+/* skills: each group carries its own accent */
+.sk-group{--tone:var(--blue);--tone-10:var(--blue-10)}
+.sk-group:nth-of-type(4n+2){--tone:var(--violet);--tone-10:var(--violet-10)}
+.sk-group:nth-of-type(4n+3){--tone:var(--mint);--tone-10:var(--mint-10)}
+.sk-group:nth-of-type(4n+4){--tone:var(--coral);--tone-10:var(--coral-10)}
+.sk-group>header h3{display:flex;align-items:center;gap:9px}
+.sk-group>header h3::before{content:"";width:10px;height:10px;border-radius:4px;background:var(--tone);box-shadow:0 0 0 4px var(--tone-10)}
+.sk:hover{border-color:var(--tone,var(--blue))}
+.sk .p1{color:var(--tone,var(--blue));background:var(--tone-10,var(--blue-10))}
+.sk .name .slash{color:var(--tone,var(--blue))}
+
+/* agents, reports, decisions */
+.state{padding:4px 11px}
+.state.run::before{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;background:currentColor;margin-right:6px;vertical-align:1px;animation:breathe 2.4s ease-in-out infinite}
+.rep-list a.on{background:linear-gradient(135deg,var(--blue-10),var(--violet-10));border-color:transparent}
+.doc header{background:linear-gradient(180deg,#FAFBFF,#fff)}
+.brief{box-shadow:var(--shadow-sm);border-radius:18px}
+.dec{border-radius:10px;padding-left:10px;padding-right:10px}
+.dec:hover{background:var(--surface)}
+.threads a.on{border-bottom-color:transparent;box-shadow:inset 0 -2px 0 var(--blue)}
+.pane{box-shadow:-14px 0 40px -24px rgba(15,27,45,.35)}
+.ptabs .tabs button.on{box-shadow:inset 0 -2px 0 var(--violet)}
+.toast{border-radius:14px;background:#111C33}
+.sample{border-radius:999px;box-shadow:var(--shadow-sm)}
+
+/* sign-in */
+.login{min-height:100vh;display:grid;place-items:center;padding:24px;position:relative;overflow:hidden;background:#F7F9FE}
+.login::before,.login::after{content:"";position:absolute;border-radius:50%;filter:blur(70px);pointer-events:none;animation:drift 20s ease-in-out infinite}
+.login::before{width:520px;height:520px;left:-120px;top:-140px;background:rgba(124,92,255,.22)}
+.login::after{width:480px;height:480px;right:-120px;bottom:-160px;background:rgba(30,94,255,.2);animation-delay:-10s}
+.login .box{width:100%;max-width:400px;position:relative;z-index:1;animation:rise .6s var(--ease) both}
+.login .brand{margin-bottom:20px}
+.login form{padding:26px;display:grid;gap:14px;border-radius:20px;box-shadow:0 24px 60px -30px rgba(15,27,45,.35);border-color:rgba(231,236,244,.9);background:rgba(255,255,255,.88);backdrop-filter:blur(10px)}
+.login h2{font-size:20px;font-weight:800;letter-spacing:-.02em}
+.login label{display:grid;gap:5px;font-size:12px;color:var(--text-3);font-weight:600}
+.login input{font:inherit;font-size:14px;padding:11px 13px;border:1px solid var(--line-2);border-radius:11px;background:#fff;width:100%;transition:border-color .2s var(--ease),box-shadow .2s var(--ease)}
+.login input:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 4px var(--blue-10)}
+.login .btn.pri{padding:11px 14px;font-size:14px}
+.login p{font-size:12px;color:var(--text-3)}
