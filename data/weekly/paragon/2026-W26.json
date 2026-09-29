@@ -1,0 +1,32 @@
+{
+  "week": "2026-W26",
+  "summary": [
+    { "label": "New", "stat": "0", "stat_label": "watchlist moves beyond normal", "text": "A quiet week: no watchlist brand moved outside its own 8-week range on TikTok or Instagram." },
+    { "label": "Working", "stat": "54%", "stat_label": "Glad2Glow's share of Instagram views", "text": "Glad2Glow still takes over half of Instagram panel views, at 0.2% engagement: reach that looks paid." },
+    { "label": "Worth testing", "stat": "20.8%", "stat_label": "Paragon's share of TikTok posts", "text": "Use the quiet week to test a TikTok push: Paragon's share of posts fell from 26.0% to 20.8%." }
+  ],
+  "scoreboard_title": "A quiet week on the watchlist",
+  "movers_title": "Nothing moved beyond normal; here is what came closest",
+  "drivers": [],
+  "actions": [
+    {
+      "title": "Win back TikTok share while rivals are flat",
+      "detail": "Paragon's TikTok share fell from 26.0% to 20.8% of posts and 28.1% to 12.7% of views while rivals held still. Push a seeding wave now.",
+      "brands": ["Wardah", "Make Over", "Emina"],
+      "based_on": "Appendix · Paragon TikTok share of posts"
+    },
+    {
+      "title": "Don't chase Glad2Glow's Instagram views",
+      "detail": "Glad2Glow holds 54% of Instagram panel views at 0.2% engagement, the pattern of paid reach. Compete on engagement and TikTok carts instead.",
+      "brands": ["Emina", "Wardah"],
+      "based_on": "Glad2Glow · Instagram views"
+    },
+    {
+      "title": "Find out who took TikTok's extra views",
+      "detail": "Panel TikTok views rose 55%, but Paragon, Hanasui, Timephoria and ESQA all lost share of views. A brand outside the watchlist may be surging; check before it compounds.",
+      "brands": ["All brands"],
+      "based_on": "Panel · TikTok views"
+    }
+  ],
+  "portfolio_note": "Paragon's share of TikTok posts fell from 26.0% to 20.8%; Instaperfect's TikTok views rose from 53K to 2.8M."
+}

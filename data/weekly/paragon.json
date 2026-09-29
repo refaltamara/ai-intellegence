@@ -1,0 +1,31 @@
+{
+  "title": "Weekly Competitor Pulse",
+  "workspace": "beauty-id",
+  "client": {
+    "name": "Paragon",
+    "brands": [
+      { "name": "Wardah", "brand_ids": ["wardahofficial"] },
+      { "name": "Make Over", "brand_ids": ["makeoverid"] },
+      { "name": "Emina", "brand_ids": ["eminacosmeticsid"] },
+      { "name": "Kahf", "brand_ids": ["kahfeveryday"] },
+      { "name": "OMG", "brand_ids": ["itsomgbeauty"] },
+      { "name": "Tavi", "brand_ids": ["worldoftavi"] },
+      { "name": "Labore", "brand_ids": ["laboreskinexpert"] },
+      { "name": "Instaperfect", "brand_ids": ["instaperfect_id"] },
+      { "name": "Crystallure", "brand_ids": ["crystallurebeauty"] },
+      { "name": "Putri", "brand_ids": ["putri.hairchoice"] },
+      { "name": "Biodef", "brand_ids": ["biodef.id"] }
+    ]
+  },
+  "watchlist": [
+    { "name": "Glad2Glow", "short": "G2G", "group": "core", "brand_ids": ["glad2glow_id"] },
+    { "name": "La Roche-Posay", "short": "LRP", "group": "core", "brand_ids": ["larocheposay.indonesia"] },
+    { "name": "Hanasui", "group": "core", "brand_ids": ["officialhanasui"] },
+    { "name": "Skintific", "group": "core", "brand_ids": ["skintific_official"] },
+    { "name": "Maybelline / L'Oréal", "group": "core", "brand_ids": ["lorealindonesia"], "untracked": ["Maybelline"] },
+    { "name": "Timephoria", "group": "when_relevant", "brand_ids": ["timephoriaid"] },
+    { "name": "Scora", "group": "when_relevant", "brand_ids": ["scoraofficial"] },
+    { "name": "ESQA", "group": "when_relevant", "brand_ids": ["esqacosmeticsofficial"] }
+  ],
+  "platforms": ["tiktok", "instagram"]
+}

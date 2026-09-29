@@ -1,0 +1,51 @@
+{
+  "week": "2026-W23",
+  "summary": [
+    { "label": "New", "stat": "11.2%", "stat_label": "Timephoria's share of Instagram views", "text": "Timephoria pushed a new skintint stick through mid-tier reviewers; the top two reviews drew 5.2M and 4.7M views." },
+    { "label": "Working", "stat": "3.8%", "stat_label": "Glad2Glow TikTok engagement rate", "text": "Glad2Glow's cushion tutorials by one mid-tier creator lifted engagement from 0.9%; the top post drew 4.0M views." },
+    { "label": "Worth testing", "stat": "15", "stat_label": "creators on #skintificcushion", "text": "Skintific ran one cushion hashtag across 15 creators, and every post on the tag was theirs." }
+  ],
+  "scoreboard_title": "Timephoria's skintint push leads; Glad2Glow and Skintific also moved",
+  "movers_title": "Three brands moved outside their normal range",
+  "drivers": [
+    {
+      "key": "timephoria",
+      "title": "Timephoria's skintint stick: big reach, thin engagement",
+      "why": "Mid-tier reviewers carried a new skintint stick: 125 creators posted, double last week's 62, and Instagram views rose from 81K to 34.5M. Engagement stayed at 0.2%, so the reach looks paid rather than earned.",
+      "attention_to_action": "Reviews built awareness, but Instagram has no cart and engagement is thin. Watch whether the stick reaches TikTok Shop next."
+    },
+    {
+      "key": "g2g",
+      "title": "Glad2Glow's cushion tutorials lifted engagement",
+      "why": "One mid-tier creator, @chika_adelia16, posted two cushion tutorials worth 5.9M views; the bigger one alone was 35% of the brand's week. Nano creators rose to 58% of creator posts while brand accounts fell to 19% of views.",
+      "attention_to_action": "Tutorials drove engagement, but cart share fell from 66% to 49%: the cushion won attention without a matching push to buy."
+    },
+    {
+      "key": "skintific",
+      "title": "Skintific seeded a cushion hashtag through new creators",
+      "why": "Skintific's posts fell 25% while the TikTok panel fell 49%, lifting its share of posts to 5.5%. 82% of its creators were first-time in 8 weeks, and 15 used #skintificcushion, a tag no other brand used.",
+      "attention_to_action": "Volume without reach: 1.2M views in the week and cart share down from 42% to 26%. The tag makes the seeding easy to track, not yet to sell."
+    }
+  ],
+  "actions": [
+    {
+      "title": "Meet the skintint stick where people buy",
+      "detail": "Timephoria's stick lives in Instagram reviews with no cart. A base-product review series on TikTok with cart links meets the same shopper closer to checkout.",
+      "brands": ["Make Over", "OMG"],
+      "based_on": "Timephoria · Instagram views"
+    },
+    {
+      "title": "Brief tutorials, not showcases, for cushion pushes",
+      "detail": "Glad2Glow's engagement came from application tutorials, while product showcases were 35% of its posts. Test tutorial briefs on the next cushion wave.",
+      "brands": ["Make Over", "Emina"],
+      "based_on": "Glad2Glow · TikTok engagement rate"
+    },
+    {
+      "title": "Give every seeding wave its own hashtag",
+      "detail": "Skintific's #skintificcushion made 15 creators readable as one number. One tag per wave shows each wave's reach and cart share, week by week.",
+      "brands": ["All brands"],
+      "based_on": "Skintific · TikTok share of posts"
+    }
+  ],
+  "portfolio_note": "Kahf's Instagram views rose from 909K to 19.1M, lifting Paragon's Instagram engagement rate from 2.0% to 8.4%."
+}

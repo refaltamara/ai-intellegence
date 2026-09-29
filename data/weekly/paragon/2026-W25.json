@@ -1,0 +1,51 @@
+{
+  "week": "2026-W25",
+  "summary": [
+    { "label": "New", "stat": "67", "stat_label": "creators on #timephorialipstain", "text": "Timephoria scaled its lip stain on TikTok: 356 creators, and cart posts rose from 48% to 64%." },
+    { "label": "Working", "stat": "2.6M", "stat_label": "views on one ESQA story post", "text": "One mid-tier creator's wedding-prep story drew half of ESQA's TikTok views, at 7.2% engagement." },
+    { "label": "Worth testing", "stat": "15%", "stat_label": "ESQA views from its own accounts", "text": "ESQA's own accounts fell from 84% of its TikTok views to 15% as creator stories took over." }
+  ],
+  "scoreboard_title": "Timephoria and ESQA took TikTok reach; Hanasui's Instagram volume slipped",
+  "movers_title": "Two TikTok gains and one Instagram drop",
+  "drivers": [
+    {
+      "key": "esqa",
+      "title": "A wedding-prep story made ESQA's reach earned",
+      "why": "@dyahcoppen's wedding-prep post drew 2.6M views, 50% of ESQA's TikTok week, at 7.2% engagement. Brand accounts fell from 84% of views to 15%, and engagement rose from 0.7% to 6.4%.",
+      "attention_to_action": "The story post carried a cart, but overall cart share fell from 77% to 61%: one earned story, not a sales wave."
+    },
+    {
+      "key": "timephoria",
+      "title": "Timephoria turned its lip stain into a creator wave",
+      "why": "356 creators posted, up from 263, and 67 of them used #timephorialipstain, a tag no other brand used. The biggest post was a 5.4M-view concealer showcase, 51% of the week's views.",
+      "attention_to_action": "This wave sold: cart posts rose from 48% to 64%, and the top cart product was the lip and cheek tint."
+    },
+    {
+      "key": "hanasui",
+      "title": "Hanasui's Instagram volume slipped; its Next Level line held on",
+      "why": "Posts fell from 111 to 78 and creators from 95 to 62, below Hanasui's 8-week range. Reviews rose to 22% of posts, led by the @nextlevelmakeup.id account's 583K-view tint post.",
+      "attention_to_action": "Instagram carries no cart signal here, so the drop is awareness lost. Watch whether TikTok, where Hanasui's posts held, picks up the slack."
+    }
+  ],
+  "actions": [
+    {
+      "title": "Give the next lip launch one creator tag",
+      "detail": "Timephoria put 67 creators on one lip stain tag and lifted cart posts to 64%. One tag per launch makes the wave and its sales readable.",
+      "brands": ["Wardah", "Make Over", "OMG"],
+      "based_on": "Timephoria · TikTok views"
+    },
+    {
+      "title": "Brief life-moment stories, not product demos",
+      "detail": "ESQA's best post was a personal wedding-prep story at 7.2% engagement; its brand-account post drew 0.1%. Test life-moment briefs with mid-tier creators.",
+      "brands": ["Wardah", "Emina"],
+      "based_on": "ESQA · TikTok views"
+    },
+    {
+      "title": "Hold Instagram volume while Hanasui retreats",
+      "detail": "Hanasui's Instagram posts fell to 78, below its 8-week range, while Paragon's rose to 1,384. Keep that share while Hanasui is quiet.",
+      "brands": ["OMG", "Emina", "Make Over"],
+      "based_on": "Hanasui · Instagram posts"
+    }
+  ],
+  "portfolio_note": "Putri's Instagram posts rose from 11 to 79, and Paragon's Instagram posts rose to 1,384."
+}
