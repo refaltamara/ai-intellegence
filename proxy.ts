@@ -1,6 +1,6 @@
 /**
  * Request gate (Next 16 proxy): every page and API route needs a valid session
- * cookie except /login, /api/auth/*, /api/cron/* (CRON_SECRET) and static assets.
+ * cookie except /login, /api/auth/*, /api/cron/* (CRON_SECRET) and static assets (incl. /fonts).
  */
 import { NextResponse, type NextRequest } from "next/server";
 import { isPublicPath, readCookie, verifySession } from "@/auth/session";
