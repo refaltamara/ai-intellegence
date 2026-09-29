@@ -20,15 +20,14 @@ export function LoginForm() {
     router.push(next && next.startsWith("/") && !next.startsWith("//") ? next : "/");
     router.refresh();
   }
-  const inp: React.CSSProperties = { font: "inherit", fontSize: 14, padding: "10px 12px", border: "1px solid var(--line-2)", borderRadius: 9, background: "#fff", width: "100%" };
   return (
-    <form onSubmit={submit} className="card" style={{ padding: 22, display: "grid", gap: 12 }}>
-      <h2 style={{ fontSize: 18, fontWeight: 700 }}>Sign in</h2>
-      <label style={{ display: "grid", gap: 4, fontSize: 12, color: "var(--text-3)", fontWeight: 600 }}>Email<input style={inp} type="email" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} required autoFocus /></label>
-      <label style={{ display: "grid", gap: 4, fontSize: 12, color: "var(--text-3)", fontWeight: 600 }}>Password<input style={inp} type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required /></label>
+    <form onSubmit={submit} className="card">
+      <h2>Sign in</h2>
+      <label>Email<input type="email" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} required autoFocus /></label>
+      <label>Password<input type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required /></label>
       {error && <div className="errbox">{error}</div>}
       <button className="btn pri" type="submit" disabled={busy}>{busy ? "Signing in…" : "Sign in"}</button>
-      <p style={{ fontSize: 12, color: "var(--text-3)" }}>Accounts are created by the workspace owner.</p>
+      <p>Accounts are created by the workspace owner.</p>
     </form>
   );
 }
