@@ -11,7 +11,9 @@ function routes(dir: string): string[] {
 
 // Routes that touch workspace data must scope by the session's (or the owner's switched) workspace.
 // The chat route once forgot, and every question asked from the Maudy workspace was answered from the beauty panel.
-const EXEMPT = ["api/auth/", "api/cron/", "api/diag/", "api/health/", "api/workspace/switch/"];
+// The connector is exempt from the cookie's workspace on purpose: a token carries its own
+// workspace (the team chosen on the consent screen), checked below.
+const EXEMPT = ["api/auth/", "api/cron/", "api/diag/", "api/health/", "api/workspace/switch/", "api/oauth/", "api/mcp/"];
 
 describe("API routes scope by the current workspace", () => {
   for (const file of routes(path.join(process.cwd(), "app/api"))) {
@@ -21,4 +23,15 @@ describe("API routes scope by the current workspace", () => {
       expect(readFileSync(file, "utf8")).toMatch(/currentWorkspaceId\(\)/);
     });
   }
+});
+
+describe("the connector scopes by its token, never by the browser cookie", () => {
+  it("app/api/mcp/route.ts", () => {
+    const src = readFileSync(path.join(process.cwd(), "app/api/mcp/route.ts"), "utf8");
+    expect(src).toMatch(/grant\.workspace_id/);
+    expect(src).not.toMatch(/currentWorkspaceId\(\)/);
+  });
+  it("app/api/oauth/authorize/route.ts only issues codes for a team the person can reach", () => {
+    expect(readFileSync(path.join(process.cwd(), "app/api/oauth/authorize/route.ts"), "utf8")).toMatch(/teamsFor\(session\)/);
+  });
 });

@@ -16,8 +16,10 @@ export function LoginForm() {
     const j = await r.json().catch(() => ({}));
     setBusy(false);
     if (!r.ok) { setError(j.error ?? `Login failed (${r.status})`); return; }
+    // every sign-in asks which team you are working as (skipped when there is only one)
     const next = sp.get("next");
-    router.push(next && next.startsWith("/") && !next.startsWith("//") ? next : "/");
+    const keep = next && next.startsWith("/") && !next.startsWith("//") && next !== "/" ? `?next=${encodeURIComponent(next)}` : "";
+    router.push(`/persona${keep}`);
     router.refresh();
   }
   return (

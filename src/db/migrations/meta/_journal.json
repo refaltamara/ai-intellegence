@@ -71,6 +71,13 @@
       "when": 1789452650364,
       "tag": "0009_fantastic_mach_iv",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1790691289381,
+      "tag": "0010_mysterious_brother_voodoo",
+      "breakpoints": true
     }
   ]
 }

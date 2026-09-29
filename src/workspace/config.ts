@@ -22,6 +22,16 @@ export type WorkspaceSettings = {
   suggested?: string[];
   /** what a reputation problem costs: the subject's commercial partners, and the words a boycott uses */
   commercial?: CommercialSettings;
+  /** the team this workspace serves, as people pick it when they sign in */
+  team?: Partial<Team>;
+};
+
+/** Who a workspace is for: people choose a team when they sign in, and the team decides the data and the first screen. */
+export type Team = { label: string; short: string; description: string; home: string; tone: "blue" | "violet" | "mint" | "coral" | "sun" };
+
+const TEAM_DEFAULTS: Record<WorkspaceKind, Team> = {
+  profile: { label: "PR team", short: "PR", description: "What people say about the person or brand you protect, how fast it is moving, and when it turns into a crisis.", home: "/pulse", tone: "coral" },
+  category: { label: "Brand & KOL team", short: "Brand & KOL", description: "Competitors, creators and campaigns across the category: who is winning, with whom, and what to do next.", home: "/", tone: "blue" },
 };
 
 /** Partner brands are per subject and never guessed: an owner sets them, and Pulse counts only what is listed. */
@@ -46,6 +56,7 @@ export type WorkspaceConfig = {
   hero_intro: string;
   suggested: string[];
   commercial: Commercial;
+  team: Team;
 };
 
 const CATEGORY_DEFAULTS = {
@@ -103,6 +114,7 @@ export function workspaceConfig(row: WorkspaceRow, clientName: string | null = n
     hero_title: fillCopy(s.hero_title ?? d.hero_title, vars),
     hero_intro: s.hero_intro ?? d.hero_intro, // filled by the caller, which knows the counts
     suggested: (s.suggested?.length ? s.suggested : d.suggested).map((q) => fillCopy(q, vars)),
+    team: { ...TEAM_DEFAULTS[kind], ...(s.team ?? {}) },
     commercial: {
       // A partner with no terms of its own is matched on its name, which is what an
       // owner typing "Oatside" into the Data page expects.

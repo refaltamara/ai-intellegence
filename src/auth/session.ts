@@ -63,5 +63,7 @@ export function readCookie(cookieHeaderValue: string | null | undefined, name = 
 
 /** Paths that never require a session. The cron route has its own secret. */
 export function isPublicPath(pathname: string): boolean {
-  return pathname === "/login" || pathname === "/api/health" || pathname.startsWith("/api/auth/") || pathname.startsWith("/api/cron/") || pathname.startsWith("/_next/") || pathname.startsWith("/fonts/") || pathname === "/favicon.ico" || pathname.startsWith("/icon");
+  return pathname === "/login" || pathname === "/api/health" || pathname.startsWith("/api/auth/") || pathname.startsWith("/api/cron/") || pathname.startsWith("/_next/") || pathname.startsWith("/fonts/") || pathname === "/favicon.ico" || pathname.startsWith("/icon") ||
+    // the connector: discovery, client registration, tokens and the MCP endpoint authenticate with OAuth, not the cookie
+    pathname.startsWith("/.well-known/") || pathname === "/api/oauth/register" || pathname === "/api/oauth/token" || pathname === "/api/mcp";
 }
