@@ -1,14 +1,6 @@
-import { currentWorkspaceId } from "@/auth/current";
-import { Agents } from "@/ui/Agents";
-import { listAgents, listRuns } from "@/agents/store";
-import { hasModelCredentials } from "@/chat/loop";
-import { impls } from "@/skills/index";
+/** Watching became the Scheduled half of Reports on 30 Sep 2026. */
+import { redirect } from "next/navigation";
 
-export const dynamic = "force-dynamic";
-
-export default async function AgentsPage() {
-  const ws = await currentWorkspaceId();
-  const agents = await listAgents(ws);
-  const withRuns = await Promise.all(agents.map(async (a) => ({ ...a, runs: await listRuns(a.id, 8) })));
-  return <Agents agents={withRuns} skills={Object.keys(impls)} modelConfigured={hasModelCredentials()} emailConfigured={!!(process.env.RESEND_API_KEY && process.env.EMAIL_FROM)} />;
+export default function AgentsPage() {
+  redirect("/reports?tab=scheduled");
 }

@@ -4,7 +4,8 @@ import { fillCopy, workspaceConfig } from "../config";
 describe("workspaceConfig", () => {
   it("a category workspace keeps CeMO and the beauty copy", () => {
     const c = workspaceConfig({ id: "beauty-id", name: "Fair Beauty", category: "beauty", client_brand_id: "wardahofficial", tz: "Asia/Jakarta", kind: "category", settings: {} }, "Wardah");
-    expect(c.product_name).toBe("CeMO");
+    expect(c.product_name).toBe("Fair Intelligence");
+    expect(c.assistant_name).toBe("CeMO");
     expect(c.category_label).toBe("Beauty · Indonesia");
     expect(c.hero_title).toBe("What's happening in Indonesian beauty?");
     expect(c.persona.startsWith("You are CeMO — the CMO in the room for Fair Beauty.")).toBe(true);

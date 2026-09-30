@@ -17,6 +17,7 @@ import type { Evidence } from "@/skills/types";
 import { FileChip, Pane, usePaneRatio, type PaneObject } from "./Pane";
 import type { PaneContext } from "./paneContext";
 import { EvidencePanel, ResultCard } from "./ResultCard";
+import { matchSkills, SlashMenu, type SkillOption } from "./SlashMenu";
 
 export type Attachment = { id: string; filename: string; bytes: number };
 type Ask = { question: string; options: { label: string; value: string }[]; why: string; answered?: string };
@@ -41,11 +42,13 @@ type Props = {
   pane?: PaneContext;
   /** words from the workspace: what the empty screen says and offers */
   copy?: { hero_title: string; hero_intro: string; suggested: string[]; label: string; kind: string };
+  /** what the "/" menu offers: the team's analyses, in plain words */
+  skills?: SkillOption[];
 };
 
 const DEFAULT_COPY = { hero_title: "What's happening in Indonesian beauty?", hero_intro: "", suggested: ["What were competitors doing last week?", "Which brand grew fastest this month?", "Which campaigns ran in the last 90 days with 20 or more creators?", "Find 50 nano creators competitors used on TikTok in the last 90 days"], label: "Beauty · Indonesia", kind: "category" };
 
-export function Ask({ initialConversation, initialMessages, prefill, stats, clientName, decisionId = null, basePath = "/", initialSend, topbar = true, pane, copy = DEFAULT_COPY }: Props) {
+export function Ask({ initialConversation, initialMessages, prefill, stats, clientName, decisionId = null, basePath = "/", initialSend, topbar = true, pane, copy = DEFAULT_COPY, skills = [] }: Props) {
   const router = useRouter();
   const [conversationId, setConversationId] = useState<string | null>(initialConversation);
   const [thread, setThread] = useState<Msg[]>(() => {
@@ -66,6 +69,34 @@ export function Ask({ initialConversation, initialMessages, prefill, stats, clie
   const bottomRef = useRef<HTMLDivElement>(null);
   const colsRef = useRef<HTMLDivElement>(null);
   useEffect(() => { if (prefill) taRef.current?.focus(); }, [prefill]);
+
+  // ---- the "/" menu: typed "/" at the start of an empty box, or the + button
+  const [plusOpen, setPlusOpen] = useState(false);
+  const [focused, setFocused] = useState(false);
+  const [menuIndex, setMenuIndex] = useState(0);
+  const slashTyped = text.startsWith("/") && !text.includes("\n");
+  const menuOpen = skills.length > 0 && focused && (slashTyped || plusOpen);
+  const menuOptions = useMemo(() => (menuOpen ? matchSkills(skills, slashTyped ? text.slice(1) : "") : []), [menuOpen, skills, slashTyped, text]);
+  useEffect(() => { setMenuIndex(0); }, [text, plusOpen]);
+  function closeMenu() { setPlusOpen(false); if (slashTyped) setText(""); }
+  function pickSkill(o: SkillOption) {
+    setPlusOpen(false);
+    setText(o.example);
+    requestAnimationFrame(() => { const ta = taRef.current; if (ta) { ta.focus(); ta.setSelectionRange(o.example.length, o.example.length); } });
+  }
+  function toggleMenu() {
+    if (menuOpen) { closeMenu(); return; }
+    if (!text.trim()) setText("/"); else setPlusOpen(true);
+    taRef.current?.focus();
+  }
+  function menuKeys(e: React.KeyboardEvent): boolean {
+    if (!menuOpen) return false;
+    if (e.key === "ArrowDown") { e.preventDefault(); setMenuIndex((i) => Math.min(i + 1, Math.max(0, menuOptions.length - 1))); return true; }
+    if (e.key === "ArrowUp") { e.preventDefault(); setMenuIndex((i) => Math.max(i - 1, 0)); return true; }
+    if ((e.key === "Enter" && !e.shiftKey) || e.key === "Tab") { e.preventDefault(); const o = menuOptions[menuIndex]; if (o) pickSkill(o); return true; }
+    if (e.key === "Escape") { e.preventDefault(); closeMenu(); return true; }
+    return false;
+  }
 
   // ---- the evidence pane: objects come from tool results; the newest opens on arrival
   const [closedTabs, setClosedTabs] = useState<Set<string>>(new Set());
@@ -348,14 +379,16 @@ export function Ask({ initialConversation, initialMessages, prefill, stats, clie
                     {uploading > 0 && <span className="file busy">Uploading {uploading} file{uploading > 1 ? "s" : ""}…</span>}
                   </div>
                 )}
-                <textarea ref={taRef} value={text} placeholder="Ask, or tell me what you're deciding…" onChange={(e) => setText(e.target.value)}
+                {menuOpen && <SlashMenu options={menuOptions} index={menuIndex} onPick={pickSkill} onHover={setMenuIndex} />}
+                <textarea ref={taRef} value={text} placeholder="Ask CeMO anything, or type / to see what it can do" onChange={(e) => setText(e.target.value)} onFocus={() => setFocused(true)} onBlur={() => { setFocused(false); setPlusOpen(false); }}
                   onPaste={(e) => { const fs = Array.from(e.clipboardData.files ?? []); if (fs.length) { e.preventDefault(); void upload(fs); } }}
-                  onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(text); } if (e.key === "Escape") setText(""); }} />
+                  onKeyDown={(e) => { if (menuKeys(e)) return; if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(text); } if (e.key === "Escape") setText(""); }} />
                 <div className="row">
                   <span className="tools">
+                    {skills.length > 0 && <button type="button" className={`plus ${menuOpen ? "on" : ""}`} onMouseDown={(e) => e.preventDefault()} onClick={toggleMenu} title="What CeMO can do" aria-label="What CeMO can do" aria-expanded={menuOpen}>+</button>}
                     <input ref={fileRef} type="file" accept="application/pdf" multiple hidden onChange={(e) => { if (e.target.files?.length) void upload(e.target.files); e.target.value = ""; }} />
                     <button className="attach" onClick={() => fileRef.current?.click()} disabled={files.length >= MAX_FILES} title={files.length >= MAX_FILES ? `Up to ${MAX_FILES} documents` : "Attach a PDF brief or deck"}>Attach PDF</button>
-                    <span>Enter to send · Shift+Enter for a new line</span>
+                    <span>Enter to send · / for what CeMO can do</span>
                   </span>
                   <button className="btn pri sm" disabled={busy || uploading > 0} onClick={() => send(text)}>{busy ? "Working…" : "Ask"}</button>
                 </div>
