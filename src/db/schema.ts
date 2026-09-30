@@ -453,6 +453,8 @@ export const agents = pgTable(
     workspaceId: text("workspace_id").notNull().references(() => workspaces.id),
     userId: uuid("user_id").references(() => users.id),
     name: text("name").notNull(),
+    /** 'analysis' (a skill on a schedule, diffed run to run) | 'weekly_report' (the Weekly Competitor Pulse deck; params hold its contract) */
+    kind: text("kind").notNull().default("analysis"),
     skill: text("skill").notNull(),
     /** frozen params_resolved from the source run */
     params: jsonb("params").notNull().default(sql`'{}'::jsonb`),
@@ -472,6 +474,7 @@ export const agents = pgTable(
   (t) => [
     index("agents_workspace_status_idx").on(t.workspaceId, t.status),
     check("agents_status_chk", sql`${t.status} in ('active','paused','draft')`),
+    check("agents_kind_chk", sql`${t.kind} in ('analysis','weekly_report')`),
   ],
 );
 
@@ -509,6 +512,25 @@ export const reports = pgTable(
   (t) => [
     index("reports_workspace_created_idx").on(t.workspaceId, t.createdAt),
     check("reports_source_chk", sql`${t.source} in ('agent','ask')`),
+  ],
+);
+
+/** Files a report ships as (the weekly deck as .pptx and .pdf), base64 like attachments; downloads are scoped by workspace. */
+export const reportFiles = pgTable(
+  "report_files",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workspaceId: text("workspace_id").notNull().references(() => workspaces.id),
+    reportId: uuid("report_id").notNull().references(() => reports.id, { onDelete: "cascade" }),
+    format: text("format").notNull(),
+    filename: text("filename").notNull(),
+    bytes: integer("bytes").notNull(),
+    data: text("data").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index("report_files_report_idx").on(t.reportId),
+    check("report_files_format_chk", sql`${t.format} in ('pptx','pdf')`),
   ],
 );
 

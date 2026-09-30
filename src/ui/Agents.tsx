@@ -5,12 +5,16 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { AgentRow, AgentRunRow } from "@/agents/store";
 import type { AgentDraft } from "@/agents/promote";
+import type { WeeklyContract } from "@/competitor/contract";
 import { fmtDate } from "./format";
+import { WeeklyForm } from "./WeeklyForm";
 
 type AgentWithRuns = AgentRow & { runs: AgentRunRow[] };
 type Draft = Omit<AgentDraft, "from_skill_run_id" | "notes"> & { from_skill_run_id?: string; notes?: string[] };
 
-export function Agents({ agents, skills, modelConfigured, emailConfigured }: { agents: AgentWithRuns[]; skills: { name: string; title: string }[]; modelConfigured: boolean; emailConfigured: boolean }) {
+type WeeklyParams = { contract?: WeeklyContract; formats?: string[]; last_week?: string };
+
+export function Agents({ agents, skills, modelConfigured, emailConfigured, brands = [], template = null, weeks = [] }: { agents: AgentWithRuns[]; skills: { name: string; title: string }[]; modelConfigured: boolean; emailConfigured: boolean; brands?: { id: string; name: string }[]; template?: WeeklyContract | null; weeks?: { key: string; label: string }[] }) {
   const titleOf = (name: string) => skills.find((s) => s.name === name)?.title ?? name;
   const router = useRouter();
   const [text, setText] = useState("Every Monday, compare Skintific, Somethinc and Emina on TikTok and email me. Only if something changed.");
@@ -21,6 +25,9 @@ export function Agents({ agents, skills, modelConfigured, emailConfigured }: { a
   const [open, setOpen] = useState<string | null>(null);
   const [error, setError] = useState("");
   const showToast = (m: string) => { setToast(m); setTimeout(() => setToast(""), 2600); };
+  const [mode, setMode] = useState<"weekly" | "analysis">("weekly");
+  const [editing, setEditing] = useState<AgentWithRuns | null>(null);
+  const [runWeek, setRunWeek] = useState<Record<string, string>>({});
 
   async function parse() {
     setBusy("draft"); setError("");
@@ -44,14 +51,14 @@ export function Agents({ agents, skills, modelConfigured, emailConfigured }: { a
   async function act(id: string, action: "run" | "pause" | "resume" | "delete") {
     setBusy(id + action);
     let r: Response;
-    if (action === "run") r = await fetch(`/api/agents/${id}/run`, { method: "POST" });
+    if (action === "run") r = await fetch(`/api/agents/${id}/run`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(runWeek[id] ? { week: runWeek[id] } : {}) });
     else if (action === "delete") r = await fetch(`/api/agents/${id}`, { method: "DELETE" });
     else r = await fetch(`/api/agents/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status: action === "pause" ? "paused" : "active" }) });
     const j = await r.json().catch(() => ({}));
     setBusy(null);
     if (action === "run") {
       const d = j.diff; const del = (j.delivered ?? []).map((x: any) => `${x.channel}: ${x.ok ? "ok" : x.detail}`).join(" · ");
-      showToast(j.error ? j.error : d ? `Ran: ${d.first_run ? `${d.new.length} rows (baseline)` : `${d.new.length} new, ${d.gone.length} gone, ${d.changed.length} changed`} · ${del}` : `Run finished: ${j.result_status}`);
+      showToast(j.error ? j.error : j.message ? `${j.result_status === "ok" ? "Done" : j.result_status === "skipped" ? "Skipped" : "Failed"}: ${j.message}${del ? ` · ${del}` : ""}` : d ? `Ran: ${d.first_run ? `${d.new.length} rows (baseline)` : `${d.new.length} new, ${d.gone.length} gone, ${d.changed.length} changed`} · ${del}` : `Run finished: ${j.result_status}`);
       setOpen(id);
     } else showToast(j.error ?? (action === "delete" ? "Schedule deleted" : `Schedule ${action}d`));
     router.refresh();
@@ -64,6 +71,7 @@ export function Agents({ agents, skills, modelConfigured, emailConfigured }: { a
           <div className="list">
             {agents.length === 0 && <div className="empty">Nothing scheduled yet. Describe one on the right, or press "Get this every Monday" under an answer in Chats.</div>}
             {agents.map((a) => {
+              if (a.kind === "weekly_report") return <WeeklyRow key={a.id} a={a} busy={busy} weeks={weeks} week={runWeek[a.id] ?? ""} onWeek={(w) => setRunWeek((x) => ({ ...x, [a.id]: w }))} onAct={(action) => act(a.id, action)} onEdit={() => { setEditing(a); setMode("weekly"); }} open={open === a.id} onToggle={() => setOpen(open === a.id ? null : a.id)} />;
               const last = a.runs[0];
               const d = last?.diff;
               return (
@@ -109,6 +117,20 @@ export function Agents({ agents, skills, modelConfigured, emailConfigured }: { a
             })}
           </div>
           <div className="setup">
+            <div className="seg sm setup-tabs" role="tablist">
+              <a role="tab" href="#" className={mode === "weekly" ? "on" : ""} onClick={(e) => { e.preventDefault(); setMode("weekly"); }}>Weekly Competitor Pulse</a>
+              <a role="tab" href="#" className={mode === "analysis" ? "on" : ""} onClick={(e) => { e.preventDefault(); setMode("analysis"); setEditing(null); }}>Any analysis</a>
+            </div>
+            {mode === "weekly" ? (
+              <>
+                <h3>{editing ? `Edit “${editing.name}”` : "Weekly Competitor Pulse"}</h3>
+                <p>A short deck on what competitors did last week and what to do about it, as PowerPoint and PDF, in the Library and in your inbox.</p>
+                <WeeklyForm key={editing?.id ?? "new"} brands={brands} initial={editing ? { id: editing.id, name: editing.name, contract: (editing.params as WeeklyParams).contract ?? null, formats: (editing.params as WeeklyParams).formats, email: editing.delivery.email, cron: editing.schedule_cron } : { contract: template }} onDone={(m) => { showToast(m); setEditing(null); }} />
+                {editing && <button className="btn sm ghost" style={{ marginTop: 8 }} onClick={() => setEditing(null)}>Cancel editing</button>}
+                {!emailConfigured && <p style={{ marginTop: 8, fontSize: 12, color: "var(--text-3)" }}>Email delivery needs RESEND_API_KEY and EMAIL_FROM; until then reports land in the Library only.</p>}
+              </>
+            ) : (
+            <>
             <h3>Schedule something new</h3>
             <p>Describe it the way you'd brief a colleague. We turn it into a schedule you can edit.</p>
             <textarea value={text} onChange={(e) => setText(e.target.value)} />
@@ -148,6 +170,8 @@ export function Agents({ agents, skills, modelConfigured, emailConfigured }: { a
                 </div>
               </div>
             )}
+            </>
+            )}
           </div>
         </div>
       </div>
@@ -157,3 +181,58 @@ export function Agents({ agents, skills, modelConfigured, emailConfigured }: { a
 }
 
 const inp: React.CSSProperties = { font: "inherit", fontSize: 13, padding: "6px 9px", border: "1px solid var(--line-2)", borderRadius: 8, background: "#fff", width: "100%" };
+
+/** A Weekly Competitor Pulse schedule: who it is for, what it watches, where it goes, and its runs with their reports. */
+function WeeklyRow({ a, busy, weeks, week, onWeek, onAct, onEdit, open, onToggle }: { a: AgentWithRuns; busy: string | null; weeks: { key: string; label: string }[]; week: string; onWeek: (w: string) => void; onAct: (action: "run" | "pause" | "resume" | "delete") => void; onEdit: () => void; open: boolean; onToggle: () => void }) {
+  const p = a.params as WeeklyParams;
+  const c = p.contract;
+  const watched = c?.watchlist.length ?? 0;
+  const files = (p.formats ?? ["pptx", "pdf"]).map((f) => (f === "pptx" ? "PowerPoint" : "PDF")).join(" + ");
+  const last = a.runs[0];
+  const lastText = (r: AgentRunRow) => (r.delivery_error ? r.delivery_error : r.report_id ? (r.delivered_at ? "sent" : "in the Library") : r.finished_at ? "skipped: no new week of data" : "running");
+  return (
+    <div className="agent weekly">
+      <div>
+        <h4><span className="wbadge">Deck</span>{a.name}</h4>
+        <p>For {c?.client.name ?? "?"} ({c?.client.brands.map((b) => b.name).join(", ")}) · watching {watched} {watched === 1 ? "brand" : "brands"}: {c?.watchlist.map((w) => w.name).join(", ")}</p>
+        <div className="row">
+          <span>{a.schedule_human ?? a.schedule_cron}</span>
+          <span>Files <b>{files}</b></span>
+          <span>To <b>{a.delivery.email || "Library only"}</b></span>
+          <span>Next <b>{a.status === "active" && a.next_run_at ? new Date(a.next_run_at).toLocaleString("en-GB", { timeZone: a.schedule_tz, day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "–"}</b></span>
+          {p.last_week && <span>Last sent <b>{p.last_week}</b></span>}
+          {last && <span>Last run <b>{fmtDate(last.started_at)}</b> · {lastText(last)}</span>}
+        </div>
+        <div className="acts" style={{ marginTop: 10 }}>
+          <select className="dsel sm" value={week} onChange={(e) => onWeek(e.target.value)} aria-label="Week to report">
+            <option value="">Latest full week</option>
+            {weeks.map((w) => <option key={w.key} value={w.key}>{w.label}</option>)}
+          </select>
+          <button className="btn sm" disabled={!!busy} onClick={() => onAct("run")}>{busy === a.id + "run" ? "Making the deck…" : "Run now"}</button>
+          {a.status === "active" ? <button className="btn sm" disabled={!!busy} onClick={() => onAct("pause")}>Pause</button> : <button className="btn sm" disabled={!!busy} onClick={() => onAct("resume")}>Resume</button>}
+          <button className="btn sm" onClick={onEdit}>Edit</button>
+          <button className="btn sm" onClick={onToggle}>{open ? "Hide runs" : `Runs (${a.runs.length})`}</button>
+          <button className="btn sm ghost" disabled={!!busy} onClick={() => { if (confirm(`Delete "${a.name}"? Its reports stay in the Library.`)) onAct("delete"); }}>Delete</button>
+        </div>
+        {open && (
+          <div className="tablewrap" style={{ marginTop: 10 }}>
+            <table>
+              <thead><tr><th>Started</th><th>Outcome</th><th>Report</th></tr></thead>
+              <tbody>
+                {a.runs.length === 0 && <tr><td colSpan={3} style={{ color: "var(--text-3)" }}>No runs yet</td></tr>}
+                {a.runs.map((r) => (
+                  <tr key={r.id} style={{ cursor: "default" }}>
+                    <td>{new Date(r.started_at).toLocaleString("en-GB", { timeZone: "Asia/Jakarta", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</td>
+                    <td style={{ whiteSpace: "normal" }}>{lastText(r)}</td>
+                    <td>{r.report_id ? <Link className="linkbtn" href={`/reports/${r.report_id}`}>open</Link> : "–"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+      <span className={`state ${a.status === "active" ? "run" : a.status === "paused" ? "pause" : "new"}`}>{a.status === "active" ? "Running" : a.status === "paused" ? "Paused" : "Draft"}</span>
+    </div>
+  );
+}

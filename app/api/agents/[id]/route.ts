@@ -3,6 +3,8 @@ import { nextRunAt, humanize, validateCron } from "@/agents/schedule";
 import { deleteAgent, getAgent, listRuns, updateAgent } from "@/agents/store";
 import { getSkill } from "@/skills/registry";
 import { validateParams } from "@/skills/params";
+import { weeklyParamsFrom, type WeeklyParams } from "@/competitor/scheduled";
+import { recipients } from "@/delivery/email";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -18,7 +20,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
   return Response.json({ ...agent, runs: await listRuns(id, 20) });
 }
 
-/** PATCH { status?, name?, params?, schedule?, delivery?, only_if_changed?, diff_config? } */
+/** PATCH { status?, name?, params?, schedule?, delivery?, only_if_changed?, diff_config? }; a weekly report takes { contract?, formats? } instead of params */
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const ws = await currentWorkspaceId();
   const { id } = await ctx.params;
@@ -28,7 +30,11 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   const b = (await req.json().catch(() => ({}))) as Record<string, any>;
   const patch: Parameters<typeof updateAgent>[2] = {};
   if (typeof b.name === "string") patch.name = b.name.slice(0, 120);
-  if (b.params) {
+  if (agent.kind === "weekly_report" && (b.contract || b.formats)) {
+    const params = await weeklyParamsFrom({ contract: b.contract, formats: b.formats }, ws, agent.params as Partial<WeeklyParams>);
+    if ("error" in params) return Response.json({ error: params.error }, { status: 400 });
+    patch.params = params as unknown as Record<string, unknown>;
+  } else if (b.params && agent.kind !== "weekly_report") {
     try {
       patch.params = validateParams(getSkill(agent.skill)!, b.params);
     } catch (e) {
@@ -44,7 +50,11 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     patch.schedule_tz = tz;
     patch.schedule_human = b.schedule.human ?? humanize(cron, tz);
   }
-  if (b.delivery) patch.delivery = { ...agent.delivery, ...b.delivery, channels: Array.from(new Set<string>([...(b.delivery.channels ?? agent.delivery.channels ?? []), "in_app"])) };
+  if (b.delivery) {
+    const email = typeof b.delivery.email === "string" ? b.delivery.email.trim() : agent.delivery.email;
+    if (email && !recipients(email)) return Response.json({ error: `not an email address list: '${email}'` }, { status: 400 });
+    patch.delivery = { ...agent.delivery, ...b.delivery, email: email || undefined, channels: Array.from(new Set<string>([...(b.delivery.channels ?? agent.delivery.channels ?? []), "in_app"])) };
+  }
   if (typeof b.only_if_changed === "boolean") patch.only_if_changed = b.only_if_changed;
   if (b.diff_config) patch.diff_config = b.diff_config;
   if (b.status && ["active", "paused", "draft"].includes(b.status)) patch.status = b.status;
