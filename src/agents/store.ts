@@ -4,7 +4,9 @@ import type { Diff, DiffConfig } from "./diff";
 import { toJson } from "../db/json";
 
 export type AgentRow = {
-  id: string; workspace_id: string; user_id: string | null; name: string; skill: string; params: Record<string, unknown>;
+  id: string; workspace_id: string; user_id: string | null; name: string;
+  /** 'analysis' (a skill, diffed run to run) or 'weekly_report' (the Weekly Competitor Pulse; params hold the contract) */
+  kind?: "analysis" | "weekly_report"; skill: string; params: Record<string, unknown>;
   from_skill_run_id: string | null; decision_id?: string | null; decision_name?: string | null; schedule_cron: string; schedule_tz: string; schedule_human: string | null;
   delivery: { channels: string[]; email?: string; whatsapp?: string }; only_if_changed: boolean; diff_config: DiffConfig;
   status: "active" | "paused" | "draft"; last_run_at: string | null; next_run_at: string | null; created_at: string;
@@ -29,9 +31,9 @@ export async function dueAgents(workspaceId: string | null, now = new Date()): P
 }
 export async function insertAgent(a: Omit<AgentRow, "id" | "created_at" | "last_run_at">): Promise<AgentRow> {
   const r = (await sql.query(
-    `insert into agents (workspace_id, user_id, name, skill, params, from_skill_run_id, schedule_cron, schedule_tz, schedule_human, delivery, only_if_changed, diff_config, status, next_run_at, decision_id)
-     values ($1, $2, $3, $4, $5::jsonb, $6, $7, $8, $9, $10::jsonb, $11, $12::jsonb, $13, $14, $15) returning *`,
-    [a.workspace_id, a.user_id, a.name, a.skill, toJson(a.params), a.from_skill_run_id, a.schedule_cron, a.schedule_tz, a.schedule_human, toJson(a.delivery), a.only_if_changed, toJson(a.diff_config), a.status, a.next_run_at, a.decision_id ?? null],
+    `insert into agents (workspace_id, user_id, name, skill, params, from_skill_run_id, schedule_cron, schedule_tz, schedule_human, delivery, only_if_changed, diff_config, status, next_run_at, decision_id, kind)
+     values ($1, $2, $3, $4, $5::jsonb, $6, $7, $8, $9, $10::jsonb, $11, $12::jsonb, $13, $14, $15, $16) returning *`,
+    [a.workspace_id, a.user_id, a.name, a.skill, toJson(a.params), a.from_skill_run_id, a.schedule_cron, a.schedule_tz, a.schedule_human, toJson(a.delivery), a.only_if_changed, toJson(a.diff_config), a.status, a.next_run_at, a.decision_id ?? null, a.kind ?? "analysis"],
   )) as AgentRow[];
   return r[0];
 }

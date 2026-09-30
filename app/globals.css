@@ -1050,3 +1050,46 @@ th{background:linear-gradient(180deg,#F8FAFE,#F4F7FC)}
 .ctxcard dt{font-size:11px;color:var(--text-3)}
 .ctxcard dd{font-size:12.5px;font-weight:700}
 .ctxcard .post{font-size:12px;font-weight:700;color:var(--blue);margin-top:4px}
+
+/* ---- 30 Sep 2026: scheduled Weekly Competitor Pulse (form, schedule row, Library view) */
+.setup-tabs{margin-bottom:14px;display:flex;width:100%}
+.setup-tabs a{flex:1;text-align:center}
+.wform{display:flex;flex-direction:column;gap:12px}
+.wf{display:flex;flex-direction:column;gap:5px;font-size:12.5px}
+.wf>span{font-weight:700;color:var(--text-2)}
+.wf>span small,.wf small.hint{font-weight:500;color:var(--text-3)}
+.wf input:not([type=checkbox]),.wf select,.wrow select{font:inherit;font-size:13px;padding:7px 10px;border:1px solid var(--line-2);border-radius:10px;background:#fff;color:var(--text);width:100%}
+.wlist{display:flex;flex-direction:column;gap:8px;margin-bottom:6px}
+.wrow{display:grid;grid-template-columns:minmax(0,1fr) auto 22px;gap:6px;align-items:start;padding:8px;border:1px solid var(--line);border-radius:12px;background:#fff}
+.wrow .wname{grid-column:1/2;grid-row:1}
+.wrow select{width:auto;grid-column:2/3;grid-row:1}
+.wrow .x{grid-column:3/4;grid-row:1;border:0;background:transparent;font-size:17px;color:var(--text-3);cursor:pointer;line-height:1.8}
+.wrow .x:hover{color:var(--red)}
+.wrow .wbrands{grid-column:1/4;grid-row:2}
+.wrow .untracked{grid-column:1/4;grid-row:3;color:var(--amber);font-size:11.5px}
+.setup:has(.wform){position:static}
+.wchecks{display:flex;gap:16px}
+.wchecks label{display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:var(--text)}
+.wwhen{display:flex;gap:8px}
+.wactions{display:flex;justify-content:flex-end}
+.agent.weekly{border-color:var(--blue-20);background:linear-gradient(135deg,#fff 60%,var(--blue-10))}
+.wbadge{display:inline-block;font-size:10.5px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--blue);background:var(--blue-10);border-radius:999px;padding:2px 8px;margin-right:8px;vertical-align:1px}
+.dsel.sm{font-size:12px;padding:4px 8px}
+.weeklydoc .wfiles{display:flex;gap:10px;flex-wrap:wrap}
+.wfile{display:flex;flex-direction:column;gap:2px;padding:12px 16px;border:1px solid var(--line);border-radius:14px;background:#fff;min-width:220px;transition:border-color .2s var(--ease),box-shadow .2s var(--ease)}
+.wfile b{font-size:13.5px;font-weight:800;color:var(--blue)}
+.wfile.pdf b{color:var(--coral)}
+.wfile span{font-size:11.5px;color:var(--text-3)}
+.wfile:hover{border-color:var(--blue);box-shadow:var(--shadow-sm)}
+.wsummary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.wsummary>div{background:var(--blue-10);border-radius:14px;padding:14px 16px;display:flex;flex-direction:column;gap:2px}
+.wsummary .l{font-size:12px;font-weight:800;color:var(--blue)}
+.wsummary b{font-size:24px;font-weight:800;letter-spacing:-.02em}
+.wsummary small{font-size:11.5px;color:var(--text-2)}
+.wsummary p{font-size:13px;margin-top:6px;line-height:1.5}
+.wmovers,.wactions-list{padding-left:18px;display:flex;flex-direction:column;gap:10px;font-size:13.5px}
+.wmovers p,.wactions-list p{color:var(--text-2);font-size:13px;margin-top:3px;max-width:70ch}
+.wactions-list small{color:var(--text-3);font-size:11.5px}
+.wmovers .up{color:var(--blue);font-weight:800}.wmovers .down{color:var(--blue);font-weight:800}
+@media (max-width:900px){.wsummary{grid-template-columns:1fr}}
+.agent .acts .dsel.sm{width:auto;max-width:210px}

@@ -398,13 +398,8 @@ function evidenceSlide(pres: PptxGenJS, r: WeeklyReport, page: number, sampleLab
 
 export type DeckOptions = { sampleLabel?: string };
 
-export async function renderDeck(r: WeeklyReport, n: Narrative, path: string, opts: DeckOptions = {}): Promise<string> {
-  const pres = new PptxGenJS();
-  pres.layout = "LAYOUT_WIDE";
-  pres.author = "Fair";
-  pres.company = "Fair";
-  pres.title = `${r.title} · ${r.week.label}`;
-  pres.theme = { headFontFace: FONT, bodyFontFace: FONT };
+/** Lay out every slide on a presentation: the real PptxGenJS for the .pptx, or the recorder the PDF is drawn from (src/competitor/pdfdeck.ts). */
+export function buildDeck(pres: PptxGenJS, r: WeeklyReport, n: Narrative, opts: DeckOptions = {}): void {
   let page = 1;
   summarySlide(pres, r, n, opts.sampleLabel);
   scoreboardSlide(pres, r, n, ++page, opts.sampleLabel);
@@ -413,6 +408,25 @@ export async function renderDeck(r: WeeklyReport, n: Narrative, path: string, op
   actionsSlide(pres, r, n, ++page, opts.sampleLabel);
   portfolioSlide(pres, r, n, ++page, opts.sampleLabel);
   evidenceSlide(pres, r, ++page, opts.sampleLabel);
-  await pres.writeFile({ fileName: path });
+}
+
+/** The deck as a .pptx file in memory (serverless-safe: nothing touches the disk). */
+export async function deckBuffer(r: WeeklyReport, n: Narrative, opts: DeckOptions = {}): Promise<Buffer> {
+  const pres = new PptxGenJS();
+  pres.layout = "LAYOUT_WIDE";
+  pres.author = "Fair";
+  pres.company = "Fair";
+  pres.title = `${r.title} · ${r.week.label}`;
+  pres.theme = { headFontFace: FONT, bodyFontFace: FONT };
+  buildDeck(pres, r, n, opts);
+  return (await pres.write({ outputType: "nodebuffer" })) as Buffer;
+}
+
+export async function renderDeck(r: WeeklyReport, n: Narrative, path: string, opts: DeckOptions = {}): Promise<string> {
+  const { writeFile } = await import("node:fs/promises");
+  await writeFile(path, await deckBuffer(r, n, opts));
   return path;
 }
+
+/** Slide size in inches (LAYOUT_WIDE), for the PDF. */
+export const DECK_SIZE = { w: W, h: 7.5 };
