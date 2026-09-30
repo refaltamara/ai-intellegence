@@ -8,10 +8,12 @@ import { askCopy } from "@/workspace/copy";
 import { sql } from "@/db/client";
 import { registry } from "@/skills/registry";
 import { teamSkills } from "@/skills/team";
+import { resolveAsk } from "@/dashboard/ask";
+import { decodeAsk } from "@/dashboard/askref";
 
 export const dynamic = "force-dynamic";
 
-export default async function ChatsPage({ searchParams }: { searchParams: Promise<{ c?: string; q?: string }> }) {
+export default async function ChatsPage({ searchParams }: { searchParams: Promise<{ c?: string; q?: string; ask?: string }> }) {
   const ws = await currentWorkspaceId();
   const sp = await searchParams;
   const session = await currentSession();
@@ -21,10 +23,13 @@ export default async function ChatsPage({ searchParams }: { searchParams: Promis
     const c = await getConversation(sp.c, ws, session?.uid ?? null);
     if (c) { conversation = c.id; messages = await listMessages(c.id); }
   }
+  // "Ask why" from the dashboard: the link names the click; the figures are read again here
+  const askRef = !conversation ? decodeAsk(sp.ask) : null;
+  const askContext = askRef ? await resolveAsk(ws, askRef).catch(() => null) : null;
   const [s, client, pane, skills] = await Promise.all([workspaceStats(ws), clientBrandName(ws), paneContext(messages, ws), teamSkills(ws).catch(() => [])]);
   const menu = skills.map((d) => ({ name: d.name, title: d.title, description: d.description, example: d.example, group: registry.layers[d.layer]?.title ?? d.layer }));
   const copy = await askCopy(ws, s);
-  return <Ask key={conversation ?? "new"} initialConversation={conversation} initialMessages={messages} prefill={sp.q ?? undefined} stats={{ brands: s.brands, platforms: s.platforms, months: s.months, freshness: s.freshness }} clientName={client} pane={pane} copy={copy} skills={menu} />;
+  return <Ask key={conversation ?? (askContext ? `ask-${sp.ask}` : "new")} initialConversation={conversation} initialMessages={messages} prefill={sp.q ?? undefined} stats={{ brands: s.brands, platforms: s.platforms, months: s.months, freshness: s.freshness }} clientName={client} pane={pane} copy={copy} skills={menu} fromDashboard={askRef && askContext ? { ref: askRef, context: askContext } : null} />;
 }
 
 async function clientBrandName(ws: string): Promise<string | null> {

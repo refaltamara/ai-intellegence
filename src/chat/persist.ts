@@ -1,4 +1,5 @@
 /** Conversations and messages (PRD §5.5) over the Neon HTTP client. */
+import type { AskContext } from "../dashboard/askref";
 import { sql } from "../db/client";
 import type { Evidence } from "../skills/types";
 import type { PaneAction, PaneState } from "./pane";
@@ -24,6 +25,8 @@ export type MessageRow = {
     hidden?: boolean;
     pane_action?: PaneAction;
     note?: string;
+    /** what the person clicked on the dashboard to start this question ("Ask why"); figures re-read on the server */
+    context?: AskContext;
   };
   evidence_json: Record<string, Evidence> | null;
   skill_run_ids: string[] | null;

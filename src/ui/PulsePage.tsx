@@ -34,7 +34,7 @@ export function PulsePage({ d }: { d: PulseData }) {
   return (
     <section className="screen">
       <div className="topbar">
-        <div><h1>Pulse</h1><span className="meta">What is being said about {d.subject}, across {t.platforms} platforms</span></div>
+        <div><h1>Dashboard</h1><span className="meta">What is being said about {d.subject}, across {t.platforms} platforms</span></div>
         <span className="pill live">Posts through {d.postsAsOf} · comments through {d.asOf} WIB</span>
       </div>
       <div className="wrap wide">
@@ -228,14 +228,14 @@ export function PulsePage({ d }: { d: PulseData }) {
               {d.themes.status !== "ok" || !themeRows.length ? <p className="quiet">{d.themes.message ?? "Nothing recurring yet."}</p> : (
                 <ul className="themes">{themeRows.map((r) => <li key={r.term}><b>{r.term}</b> <span>{fmtNum(r.comments)} · {r.share_pct}%</span>{r.examples[0] && <small>“{r.examples[0].slice(0, 110)}”</small>}</li>)}</ul>
               )}
-              <Link className="askit" href={ask(`What are the main complaints in the negative comments about ${d.subject}?`)}>Ask about this</Link>
+              <Link className="askit" href={ask(`What are the main complaints in the negative comments about ${d.subject}?`)}>Ask why</Link>
             </div>
           </div>
           <div className="card">
             <h4>Who is driving it <span>posts by comments drawn</span></h4>
             <div className="body">
               <ul className="themes">{driverRows.map((r) => <li key={r.url}><b>{r.source === "owned" ? `${d.subject} (own ${label(r.platform)})` : `@${r.account} · ${label(r.platform)}`}</b> <span>{fmtNum(r.comments)} comments{r.negative ? ` · ${fmtNum(r.negative)} neg` : ""}{r.stance ? ` · ${r.stance}` : ""}</span>{r.caption && <small>“{r.caption.slice(0, 100)}”</small>}</li>)}</ul>
-              <Link className="askit" href={ask(`Which posts and accounts are driving the negative comments about ${d.subject}?`)}>Ask about this</Link>
+              <Link className="askit" href={ask(`Which posts and accounts are driving the negative comments about ${d.subject}?`)}>Ask why</Link>
             </div>
           </div>
           <div className="card">
@@ -245,7 +245,7 @@ export function PulsePage({ d }: { d: PulseData }) {
                 <ul className="themes">{seedRows.map((r, i) => <li key={i}><b>{r.kind === "same_wording" ? `Same wording, ${r.accounts} accounts` : r.kind === "repeat_account" ? `${r.what}, ${r.comments} comments` : `Burst, ${r.accounts} first-time commenters`}</b> <span>{label(r.platform)} · {when(r.first_at)}</span><small>{r.kind === "same_wording" ? `“${r.what.slice(0, 100)}”` : r.kind === "burst" ? "on one post within ten minutes" : "across several posts"}</small></li>)}</ul>
               )}
               <p className="quiet" style={{ marginTop: 8 }}>Patterns, not proof: memes and pile-ons look like this too.</p>
-              <Link className="askit" href={ask(`Is anyone seeding the comments about ${d.subject}?`)}>Ask about this</Link>
+              <Link className="askit" href={ask(`Is anyone seeding the comments about ${d.subject}?`)}>Ask why</Link>
             </div>
           </div>
         </div>

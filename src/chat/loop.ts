@@ -3,6 +3,8 @@
  * three tools (streaming), run tools server-side, rewrite evidence citations,
  * persist the assistant message. Emits events the SSE route forwards to the UI.
  */
+import type { AskContext, AskRef } from "../dashboard/askref";
+import { contextPreamble, resolveAsk } from "../dashboard/ask";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import Anthropic from "@anthropic-ai/sdk";
@@ -61,6 +63,8 @@ export type ChatTurnInput = {
   decisionId?: string | null;
   /** an action taken in the evidence pane instead of a typed message (PRD-v2 §5.5) */
   paneAction?: PaneAction;
+  /** "Ask why" from the dashboard: what was clicked; the figures are re-read here, never taken from the client */
+  ask?: AskRef;
 };
 
 const SYSTEM_TEMPLATE = readFileSync(path.join(process.cwd(), "src/chat/system.md"), "utf8");
@@ -150,8 +154,9 @@ export async function runChatTurn(input: ChatTurnInput, emit: (e: ChatEvent) => 
   await emit({ type: "conversation", id: conversation.id, title: conversation.title });
   // Bind any freshly uploaded documents to this conversation before the turn runs.
   const claimed = await claimAttachments(input.attachmentIds ?? [], conversation.id, workspaceId, input.userId ?? null).catch(() => [] as AttachmentRow[]);
+  const context = input.ask && !input.paneAction ? await resolveAsk(workspaceId, input.ask).catch(() => null) : null;
   try {
-    await runTurnBody(conversation, userText, emit, claimed, input.followup, input.paneAction, input.userId ?? null);
+    await runTurnBody(conversation, userText, emit, claimed, input.followup, input.paneAction, input.userId ?? null, context);
   } catch (e) {
     const message = describeModelError(e);
     console.error("chat turn failed:", conversation.id, message, (e as Error).stack?.split("\n").slice(0, 3).join(" | "));
@@ -180,7 +185,7 @@ export function userTurn(userText: string, docs: { filename: string; data: strin
 
 /** Replay persisted history for the model. Plain turns become text; an assistant turn that
  *  ended on ask_user is replayed as its tool_use, and the user turn after it as the tool_result. */
-export function historyTurns(history: { role: "user" | "assistant"; content_json: { text: string; note?: string; ask?: { tool_use_id: string; question: string; options: unknown; why: string } } }[]): { messages: Anthropic.MessageParam[]; pendingAsk: string | null; pendingNotes: string[] } {
+export function historyTurns(history: { role: "user" | "assistant"; content_json: { text: string; note?: string; context?: AskContext; ask?: { tool_use_id: string; question: string; options: unknown; why: string } } }[]): { messages: Anthropic.MessageParam[]; pendingAsk: string | null; pendingNotes: string[] } {
   const messages: Anthropic.MessageParam[] = [];
   let pendingAsk: string | null = null;
   // notes ("You exported 41 rows") are not turns of their own: they ride in front of the next user message
@@ -190,6 +195,7 @@ export function historyTurns(history: { role: "user" | "assistant"; content_json
   for (const m of history) {
     let text = m.content_json?.text ?? "";
     if (m.role === "user" && m.content_json?.note) { if (text) notes.push(text); continue; }
+    if (m.role === "user" && text && m.content_json?.context) text = `${contextPreamble(m.content_json.context)}\n\n${text}`;
     if (m.role === "user" && text) text = withNotes(text);
     if (m.role === "assistant" && m.content_json?.ask) {
       const a = m.content_json.ask;
@@ -211,13 +217,13 @@ export function historyTurns(history: { role: "user" | "assistant"; content_json
   return { messages, pendingAsk, pendingNotes: notes };
 }
 
-async function runTurnBody(conversation: { id: string; workspace_id: string; decision_id?: string | null }, userText: string, emit: (e: ChatEvent) => void | Promise<void>, claimed: AttachmentRow[] = [], followup?: ChatTurnInput["followup"], paneAction?: PaneAction, userId: string | null = null): Promise<void> {
+async function runTurnBody(conversation: { id: string; workspace_id: string; decision_id?: string | null }, userText: string, emit: (e: ChatEvent) => void | Promise<void>, claimed: AttachmentRow[] = [], followup?: ChatTurnInput["followup"], paneAction?: PaneAction, userId: string | null = null, context: AskContext | null = null): Promise<void> {
   const workspaceId = conversation.workspace_id;
   const history = await listMessages(conversation.id);
   await addMessage({
     conversationId: conversation.id,
     role: "user",
-    content: { text: userText, ...(claimed.length ? { attachments: claimed.map((a) => ({ id: a.id, filename: a.filename, bytes: a.bytes })) } : {}), ...(paneAction ? { hidden: true, pane_action: paneAction } : {}) },
+    content: { text: userText, ...(claimed.length ? { attachments: claimed.map((a) => ({ id: a.id, filename: a.filename, bytes: a.bytes })) } : {}), ...(paneAction ? { hidden: true, pane_action: paneAction } : {}), ...(context ? { context } : {}) },
   });
 
   // Evidence from earlier turns stays citable (ids are per turn, so latest wins on collision).
@@ -265,6 +271,7 @@ async function runTurnBody(conversation: { id: string; workspace_id: string; dec
     modelText = applied.text;
     for (const r of applied.records) { toolRecords.push(r); if (r.run_id) runIds.push(r.run_id); }
   }
+  if (context) modelText = `${contextPreamble(context)}\n\n${modelText}`;
   if (replay.pendingNotes.length) modelText = `(Earlier: ${replay.pendingNotes.join("; ")}.)\n${modelText}`;
   messages.push(userTurn(modelText, docs, replay.pendingAsk));
   const answer = new AnswerStream(new Set());

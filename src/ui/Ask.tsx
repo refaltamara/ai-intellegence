@@ -18,6 +18,8 @@ import { FileChip, Pane, usePaneRatio, type PaneObject } from "./Pane";
 import type { PaneContext } from "./paneContext";
 import { EvidencePanel, ResultCard } from "./ResultCard";
 import { matchSkills, SlashMenu, type SkillOption } from "./SlashMenu";
+import { AskContextCard } from "./AskContextCard";
+import type { AskContext, AskRef } from "@/dashboard/askref";
 
 export type Attachment = { id: string; filename: string; bytes: number };
 type Ask = { question: string; options: { label: string; value: string }[]; why: string; answered?: string };
@@ -25,6 +27,7 @@ type Msg = {
   id: string; role: "user" | "assistant"; text: string; tools: ToolCallRecord[]; evidence: Record<string, Evidence>;
   attachments?: Attachment[]; ask?: Ask; followups?: Followup[]; activity?: { text: string; done: boolean };
   hidden?: boolean;
+  context?: AskContext;
   streaming?: boolean; status?: string; error?: string; miss?: number;
   timings?: { total_ms: number; model_ms: number; model_calls: number; tools_ms: number; tool_calls: number; setup_ms: number; effort: string };
 };
@@ -44,20 +47,23 @@ type Props = {
   copy?: { hero_title: string; hero_intro: string; suggested: string[]; label: string; kind: string };
   /** what the "/" menu offers: the team's analyses, in plain words */
   skills?: SkillOption[];
+  /** "Ask why" from the dashboard: the click, and the figures the server read for it */
+  fromDashboard?: { ref: AskRef; context: AskContext } | null;
 };
 
 const DEFAULT_COPY = { hero_title: "What's happening in Indonesian beauty?", hero_intro: "", suggested: ["What were competitors doing last week?", "Which brand grew fastest this month?", "Which campaigns ran in the last 90 days with 20 or more creators?", "Find 50 nano creators competitors used on TikTok in the last 90 days"], label: "Beauty · Indonesia", kind: "category" };
 
-export function Ask({ initialConversation, initialMessages, prefill, stats, clientName, decisionId = null, basePath = "/", initialSend, topbar = true, pane, copy = DEFAULT_COPY, skills = [] }: Props) {
+export function Ask({ initialConversation, initialMessages, prefill, stats, clientName, decisionId = null, basePath = "/", initialSend, topbar = true, pane, copy = DEFAULT_COPY, skills = [], fromDashboard = null }: Props) {
   const router = useRouter();
   const [conversationId, setConversationId] = useState<string | null>(initialConversation);
   const [thread, setThread] = useState<Msg[]>(() => {
-    const out: Msg[] = initialMessages.map((m) => ({ id: m.id, role: m.role, text: m.content_json?.text ?? "", tools: m.content_json?.tools ?? [], evidence: m.evidence_json ?? {}, attachments: m.content_json?.attachments, hidden: m.content_json?.hidden, ask: m.content_json?.ask ? { question: m.content_json.ask.question, options: m.content_json.ask.options, why: m.content_json.ask.why } : undefined, followups: m.content_json?.followups, error: m.content_json?.error }));
+    const out: Msg[] = initialMessages.map((m) => ({ id: m.id, role: m.role, text: m.content_json?.text ?? "", tools: m.content_json?.tools ?? [], evidence: m.evidence_json ?? {}, attachments: m.content_json?.attachments, hidden: m.content_json?.hidden, context: m.content_json?.context, ask: m.content_json?.ask ? { question: m.content_json.ask.question, options: m.content_json.ask.options, why: m.content_json.ask.why } : undefined, followups: m.content_json?.followups, error: m.content_json?.error }));
     // a question that already has a reply after it is answered
     for (let i = 0; i < out.length - 1; i++) if (out[i].ask && out[i + 1].role === "user") out[i].ask!.answered = out[i + 1].text;
     return out;
   });
-  const [text, setText] = useState(prefill ?? "");
+  const [text, setText] = useState(prefill ?? fromDashboard?.context.question ?? "");
+  const [pendingAsk, setPendingAsk] = useState(fromDashboard);
   const [busy, setBusy] = useState(false);
   const [open, setOpen] = useState<Record<string, string[]>>({});
   const [toast, setToast] = useState("");
@@ -68,7 +74,7 @@ export function Ask({ initialConversation, initialMessages, prefill, stats, clie
   const fileRef = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const colsRef = useRef<HTMLDivElement>(null);
-  useEffect(() => { if (prefill) taRef.current?.focus(); }, [prefill]);
+  useEffect(() => { if (prefill || fromDashboard) taRef.current?.focus(); }, [prefill, fromDashboard]);
 
   // ---- the "/" menu: typed "/" at the start of an empty box, or the + button
   const [plusOpen, setPlusOpen] = useState(false);
@@ -236,8 +242,10 @@ export function Ask({ initialConversation, initialMessages, prefill, stats, clie
     const sending = files;
     setText("");
     setFiles([]);
-    const userMsg: Msg = { id: `u${Date.now()}`, role: "user", text: q, tools: [], evidence: {}, attachments: sending.length ? sending : undefined };
-    await turn(userMsg, { message: q, conversation_id: conversationId, decision_id: decisionId, attachment_ids: sending.map((f) => f.id), ...(followup ? { followup: { label: followup.label, skill: followup.skill, params: followup.params } } : {}) });
+    const asking = pendingAsk;
+    setPendingAsk(null);
+    const userMsg: Msg = { id: `u${Date.now()}`, role: "user", text: q, tools: [], evidence: {}, attachments: sending.length ? sending : undefined, context: asking?.context };
+    await turn(userMsg, { message: q, conversation_id: conversationId, decision_id: decisionId, attachment_ids: sending.map((f) => f.id), ...(followup ? { followup: { label: followup.label, skill: followup.skill, params: followup.params } } : {}), ...(asking ? { ask: asking.ref } : {}) });
   }
 
   /** A pane action is a hidden user turn; the server works out the numbers and the model phrases them. */
@@ -288,9 +296,11 @@ export function Ask({ initialConversation, initialMessages, prefill, stats, clie
                 <div className="hero">
                   <h2>{copy.hero_title}</h2>
                   <p>{copy.hero_intro || `I've read every creator post about ${stats.brands} brands on TikTok and Instagram. Ask me anything about creators, competitors or campaigns; every number I give you shows its evidence, and I'll tell you when the data disagrees with you.`}</p>
-                  <div className="chips">
-                    {copy.suggested.map((s) => <button key={s} onClick={() => send(s)}>{s}</button>)}
-                  </div>
+                  {!pendingAsk && (
+                    <div className="chips">
+                      {copy.suggested.map((s) => <button key={s} onClick={() => send(s)}>{s}</button>)}
+                    </div>
+                  )}
                 </div>
               )}
               <div className="thread">
@@ -299,12 +309,15 @@ export function Ask({ initialConversation, initialMessages, prefill, stats, clie
                     m.hidden ? (
                       <div className="sysline" key={m.id}>{m.text}</div>
                     ) : (
-                      <div className="msg-u" key={m.id}>
-                        {m.attachments?.length ? (
-                          <div className="files sent">{m.attachments.map((f) => <span className="file" key={f.id} title={f.filename}><b>PDF</b>{f.filename}</span>)}</div>
-                        ) : null}
-                        {m.text}
-                      </div>
+                      <Fragment key={m.id}>
+                        {m.context && <AskContextCard c={m.context} sent />}
+                        <div className="msg-u">
+                          {m.attachments?.length ? (
+                            <div className="files sent">{m.attachments.map((f) => <span className="file" key={f.id} title={f.filename}><b>PDF</b>{f.filename}</span>)}</div>
+                          ) : null}
+                          {m.text}
+                        </div>
+                      </Fragment>
                     )
                   ) : (
                     <div className="msg-a" key={m.id}>
@@ -367,6 +380,7 @@ export function Ask({ initialConversation, initialMessages, prefill, stats, clie
 
           <div className="dock">
             <div className="wrap">
+              {pendingAsk && <AskContextCard c={pendingAsk.context} onRemove={() => setPendingAsk(null)} />}
               <div className="composer">
                 {(files.length > 0 || uploading > 0) && (
                   <div className="files">
