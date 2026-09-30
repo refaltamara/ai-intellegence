@@ -307,7 +307,7 @@ export async function tiers(db: SkillDb, ctx: Context, f: Filters): Promise<Tier
 }
 
 /** Posts per brand per week for the twelve weeks up to the period's end: the brands filtered, or the biggest eight. */
-async function trend(db: SkillDb, ctx: Context, f: Filters, ranked: RankRow[], names: Map<string, { name: string }>): Promise<DashboardData["trend"]> {
+export async function trend(db: SkillDb, ctx: Context, f: Filters, ranked: RankRow[], names: Map<string, { name: string }>): Promise<DashboardData["trend"]> {
   // the last full week inside the period and the data, so the line never ends on a stub
   const end = new Date((f.period.to < ctx.asOf ? f.period.to : ctx.asOf) + "T00:00:00Z");
   const lastMonday = new Date(end);

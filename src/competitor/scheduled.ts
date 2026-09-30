@@ -14,6 +14,7 @@ import { deliver, type DeliveryOutcome } from "../delivery";
 import { SkillDb } from "../skills/db";
 import { loadContext } from "../skills/params";
 import { contractGroups, type WeeklyContract } from "./contract";
+import { latestCompleteWeek } from "../dashboard/period";
 import { deckBuffer } from "./deck";
 import { weeklyReport } from "./facts";
 import type { Narrative } from "./narrative";
@@ -48,11 +49,7 @@ export type WeeklyBlocks = {
 };
 
 /** The Monday of the latest week the data fully covers: the week of `asOf` when it is a Sunday, else the week before. */
-export function latestCompleteWeek(asOf: string): string {
-  const d = new Date(asOf + "T00:00:00Z");
-  const monday = addDays(asOf, -((d.getUTCDay() + 6) % 7));
-  return d.getUTCDay() === 0 ? monday : addDays(monday, -7);
-}
+export { latestCompleteWeek };
 
 /** Shape check for a stored contract; the brand ids are checked against the workspace when the schedule is saved. */
 export function validContract(c: unknown, workspaceId: string): WeeklyContract | string {
