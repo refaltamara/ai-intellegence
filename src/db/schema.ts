@@ -511,3 +511,64 @@ export const reports = pgTable(
     check("reports_source_chk", sql`${t.source} in ('agent','ask')`),
   ],
 );
+
+// ---------------------------------------------------------- connector (MCP)
+/**
+ * Claude, ChatGPT and other MCP clients connect through OAuth 2.1 (dynamic client
+ * registration, PKCE). A token acts for one person in one workspace (the team they
+ * chose on the consent screen); tokens and codes are stored as SHA-256 hashes only.
+ */
+export const mcpClients = pgTable("mcp_clients", {
+  clientId: text("client_id").primaryKey(),
+  clientName: text("client_name"),
+  redirectUris: jsonb("redirect_uris").notNull(),
+  createdAt: createdAt(),
+});
+
+export const mcpCodes = pgTable("mcp_codes", {
+  codeHash: text("code_hash").primaryKey(),
+  clientId: text("client_id").notNull().references(() => mcpClients.clientId, { onDelete: "cascade" }),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  workspaceId: text("workspace_id").notNull().references(() => workspaces.id),
+  redirectUri: text("redirect_uri").notNull(),
+  codeChallenge: text("code_challenge").notNull(),
+  scope: text("scope"),
+  expiresAt: ts("expires_at").notNull(),
+  usedAt: ts("used_at"),
+  createdAt: createdAt(),
+});
+
+export const mcpTokens = pgTable(
+  "mcp_tokens",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    accessHash: text("access_hash").notNull().unique(),
+    refreshHash: text("refresh_hash").unique(),
+    clientId: text("client_id").notNull().references(() => mcpClients.clientId, { onDelete: "cascade" }),
+    userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    workspaceId: text("workspace_id").notNull().references(() => workspaces.id),
+    accessExpiresAt: ts("access_expires_at").notNull(),
+    refreshExpiresAt: ts("refresh_expires_at"),
+    lastUsedAt: ts("last_used_at"),
+    revokedAt: ts("revoked_at"),
+    createdAt: createdAt(),
+  },
+  (t) => [index("mcp_tokens_user_idx").on(t.userId)],
+);
+
+export const mcpCalls = pgTable(
+  "mcp_calls",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
+    workspaceId: text("workspace_id").notNull(),
+    clientId: text("client_id"),
+    tool: text("tool").notNull(),
+    params: jsonb("params"),
+    status: text("status").notNull(),
+    durationMs: integer("duration_ms"),
+    error: text("error"),
+    createdAt: createdAt(),
+  },
+  (t) => [index("mcp_calls_user_created_idx").on(t.userId, t.createdAt), index("mcp_calls_ws_created_idx").on(t.workspaceId, t.createdAt)],
+);

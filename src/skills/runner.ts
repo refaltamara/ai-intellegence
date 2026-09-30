@@ -149,3 +149,16 @@ export async function runSkill(req: SkillRequest): Promise<SkillResult> {
   }
   return result;
 }
+
+/** The skills that can run in this workspace now: implemented, and with every data layer they need loaded. */
+export async function availableSkills(workspaceId: string): Promise<SkillDef[]> {
+  const db = new SkillDb();
+  const [counts, present] = await Promise.all([layerCounts(db, workspaceId), platformsPresent(db, workspaceId)]);
+  const { listSkills } = await import("./registry");
+  return listSkills().filter(
+    (def) =>
+      !!impls[def.name] &&
+      def.requires.every((t) => !LAYER_TABLES.includes(t as (typeof LAYER_TABLES)[number]) || counts[t] > 0) &&
+      (!def.gate?.platforms_present || def.gate.platforms_present.some((p) => present.includes(p))),
+  );
+}

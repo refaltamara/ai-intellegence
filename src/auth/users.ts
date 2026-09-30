@@ -41,9 +41,12 @@ export async function setRole(email: string, role: "owner" | "member", workspace
   return rows.length > 0;
 }
 
+/** Removes the account and its sign-in. Its chats and watches stay in the workspace, detached from the person; connector tokens go with the account. */
 export async function removeUser(email: string, workspaceId?: string): Promise<boolean> {
   const u = await findUserByEmail(email, workspaceId);
   if (!u) return false;
+  await sql.query("update conversations set user_id = null where user_id = $1", [u.id]);
+  await sql.query("update agents set user_id = null where user_id = $1", [u.id]);
   const r = (await sql.query("delete from users where id = $1 returning id", [u.id])) as { id: string }[];
   return r.length > 0;
 }
