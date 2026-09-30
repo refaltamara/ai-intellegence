@@ -534,6 +534,47 @@ export const reportFiles = pgTable(
   ],
 );
 
+/**
+ * Pulses (DECISIONS, 30 Sep 2026): boards a team builds for the situation in
+ * front of it, from the same cards as the Dashboard or from answers pinned in
+ * Chats. A Pulse belongs to a workspace and everyone on that team sees it.
+ */
+export const pulses = pgTable(
+  "pulses",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workspaceId: text("workspace_id").notNull().references(() => workspaces.id),
+    userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
+    name: text("name").notNull(),
+    description: text("description"),
+    createdAt: createdAt(),
+    updatedAt: ts("updated_at").notNull().defaultNow(),
+  },
+  (t) => [index("pulses_workspace_idx").on(t.workspaceId, t.updatedAt)],
+);
+
+/** A card on a Pulse: a dashboard view with its own filters (config), or a pinned analysis (skill_run_id). */
+export const pulseCards = pgTable(
+  "pulse_cards",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workspaceId: text("workspace_id").notNull().references(() => workspaces.id),
+    pulseId: uuid("pulse_id").notNull().references(() => pulses.id, { onDelete: "cascade" }),
+    kind: text("kind").notNull(),
+    title: text("title"),
+    config: jsonb("config").notNull().default(sql`'{}'::jsonb`),
+    size: text("size").notNull().default("m"),
+    position: integer("position").notNull().default(0),
+    skillRunId: uuid("skill_run_id").references(() => skillRuns.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index("pulse_cards_pulse_idx").on(t.pulseId, t.position),
+    check("pulse_cards_kind_chk", sql`${t.kind} in ('kpi','rankings','trend','tiers','creators','content','skill')`),
+    check("pulse_cards_size_chk", sql`${t.size} in ('s','m','l')`),
+  ],
+);
+
 // ---------------------------------------------------------- connector (MCP)
 /**
  * Claude, ChatGPT and other MCP clients connect through OAuth 2.1 (dynamic client

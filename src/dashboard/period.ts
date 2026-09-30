@@ -77,3 +77,17 @@ export function daysCovered(p: Period, earliest: string, asOf: string): { days: 
   const to = p.to > asOf ? asOf : p.to;
   return { days: to < from ? 0 : span(from, to), of: span(p.from, p.to) };
 }
+
+/** The Monday of the latest week the data fully covers: the week of `asOf` when it is a Sunday, else the week before. */
+export function latestCompleteWeek(asOf: string): string {
+  const d = new Date(asOf + "T00:00:00Z");
+  const monday = addDays(asOf, -((d.getUTCDay() + 6) % 7));
+  return d.getUTCDay() === 0 ? monday : addDays(monday, -7);
+}
+
+/** How a card saves the period being looked at: "latest-month" / "latest-week" when it is the newest one, so it keeps moving; otherwise the period itself. */
+export function periodSetting(p: Period, asOf: string): string {
+  if (p.key === monthOf(asOf).key) return "latest-month";
+  if (p.key === weekOf(latestCompleteWeek(asOf)).key) return "latest-week";
+  return p.key;
+}

@@ -1,7 +1,7 @@
 /** What the Scheduled tab offers: the workspace's brands, a starting contract, and the weeks a report can be run for. */
 import paragon from "../../data/weekly/paragon.json";
 import type { WeeklyContract } from "../competitor/contract";
-import { latestCompleteWeek } from "../competitor/scheduled";
+import { latestCompleteWeek } from "../dashboard/period";
 import { addDays, isoWeek, weekLabel } from "../competitor/weeks";
 import { SkillDb } from "../skills/db";
 import { loadContext } from "../skills/params";

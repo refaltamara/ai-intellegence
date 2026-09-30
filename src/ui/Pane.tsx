@@ -6,6 +6,7 @@
  * the only three actions: Pin to decision, Watch this, Export. Anything that changes
  * the meaning of the object goes to the model as a pane action; sort and filter stay here.
  */
+import { AddToPulse } from "./AddToPulse";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { ToolCallRecord } from "@/chat/persist";
 import type { ChartSpec, Evidence } from "@/skills/types";
@@ -236,6 +237,7 @@ function DataObject({ obj, p }: { obj: PaneObject; p: Props }) {
       <div className="pfoot">
         {p.decisionId ? <button className="btn sm" disabled={!runId} onClick={pin}>Pin to decision</button> : <span className="hint" />}
         <button className="btn sm" disabled={!runId} onClick={watch}>Get this every Monday</button>
+        {runId && <AddToPulse payload={{ kind: "skill", skill_run_id: runId }} onDone={p.toast} />}
         <span className="exp">
           <button className="btn sm" disabled={!runId || !rows.length} onClick={() => setExportMenu((m) => !m)}>Export ▾</button>
           {exportMenu && (

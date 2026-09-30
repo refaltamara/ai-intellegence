@@ -8,12 +8,14 @@ import { TeamIcon } from "./TeamIcon";
 type NavItem = { href: string; label: string; tone: string; icon: React.ReactNode; kinds?: string[] };
 
 /**
- * Three places, the same for every team: the numbers (Dashboard), the conversation
- * (Chats), and what gets produced or sent on a schedule (Reports). What CeMO can
+ * The same places for every team: the fixed numbers (Dashboard), the boards the
+ * team builds (Pulse), the conversation (Chats), and what gets produced or sent on
+ * a schedule (Reports). What CeMO can
  * do lives behind "/" in the composer; the data inventory sits under the account.
  */
 const NAV: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", tone: "coral", icon: <><rect x="3" y="3" width="7" height="9" rx="1.5" /><rect x="14" y="3" width="7" height="5" rx="1.5" /><rect x="14" y="12" width="7" height="9" rx="1.5" /><rect x="3" y="16" width="7" height="5" rx="1.5" /></> },
+  { href: "/pulse", label: "Pulse", tone: "violet", icon: <path d="M3 12h4l3-8 4 16 3-8h4" /> },
   { href: "/", label: "Chats", tone: "blue", icon: <path d="M21 12a8 8 0 0 1-8 8H7l-4 3V12a8 8 0 0 1 8-8h2a8 8 0 0 1 8 8z" /> },
   { href: "/reports", label: "Reports", tone: "mint", icon: <><path d="M6 3h9l4 4v14H6z" /><path d="M9 12h6M9 16h6" /></> },
 ];
