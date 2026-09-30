@@ -77,7 +77,7 @@ export function Discovery({ brands, months }: { brands: { id: string; name: stri
             const r = await fetch("/api/agents", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ from_skill_run_id: runId }) });
             const j = await r.json();
             if (j.error) { showToast(j.error); return; }
-            showToast(`Agent "${j.agent.name}" created`); setTimeout(() => router.push("/agents"), 900);
+            showToast(`Agent "${j.agent.name}" created`); setTimeout(() => router.push("/reports?tab=scheduled"), 900);
           }}>Run this weekly</button>
         </div>
       </div>

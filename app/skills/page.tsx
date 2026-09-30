@@ -9,8 +9,8 @@ export default function SkillsPage() {
   return (
     <section className="screen">
       <div className="topbar">
-        <div><h1>Skills</h1><span className="meta">{cards.length} skills · {layers.length} data layers · {available} runnable now</span></div>
-        <span className="pill blue">Type / in Ask to use any skill</span>
+        <div><h1>What CeMO can do</h1><span className="meta">{cards.length} skills · {layers.length} data layers · {available} runnable now</span></div>
+        <span className="pill blue">Type / in Chats to use any of these</span>
       </div>
       <div className="wrap wide">
         <SkillsGrid cards={cards} layers={layers} />

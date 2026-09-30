@@ -121,7 +121,7 @@ function DataObject({ obj, p }: { obj: PaneObject; p: Props }) {
     if (!runId) return;
     const r = await fetch("/api/agents", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ from_skill_run_id: runId, decision_id: p.decisionId }) });
     const j = await r.json();
-    p.toast(j.error ? j.error : "Watching this every Monday. Edit it on the Watching page.");
+    p.toast(j.error ? j.error : "Scheduled for every Monday. Edit it under Reports.");
   }
   async function pin() {
     if (!runId || !p.decisionId) return;
@@ -234,8 +234,8 @@ function DataObject({ obj, p }: { obj: PaneObject; p: Props }) {
       </div>
 
       <div className="pfoot">
-        {p.decisionId ? <button className="btn sm" disabled={!runId} onClick={pin}>Pin to decision</button> : <span className="hint">Open this inside a decision to pin it</span>}
-        <button className="btn sm" disabled={!runId} onClick={watch}>Watch this</button>
+        {p.decisionId ? <button className="btn sm" disabled={!runId} onClick={pin}>Pin to decision</button> : <span className="hint" />}
+        <button className="btn sm" disabled={!runId} onClick={watch}>Get this every Monday</button>
         <span className="exp">
           <button className="btn sm" disabled={!runId || !rows.length} onClick={() => setExportMenu((m) => !m)}>Export ▾</button>
           {exportMenu && (
@@ -328,12 +328,12 @@ function DraftObject({ obj, decisionId, onDone, toast }: { obj: PaneObject; deci
     const body = { ...draft, name, schedule: { cron, tz: sched.tz ?? "Asia/Jakarta", human: known?.human ?? sched.human ?? cron }, delivery: { channels: email ? ["email", "in_app"] : ["in_app"], email: email || undefined }, only_if_changed: onlyChanged, decision_id: decisionId };
     const r = await fetch("/api/agents", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
     const j = await r.json();
-    setState({ busy: false, msg: j.error ? j.error : `Watching: ${j.agent.name}`, done: !j.error });
-    if (!j.error) toast(`Watching "${j.agent.name}"`);
+    setState({ busy: false, msg: j.error ? j.error : `Scheduled: ${j.agent.name}`, done: !j.error });
+    if (!j.error) toast(`Scheduled "${j.agent.name}"`);
   }
   return (
     <div className="pbody pdraft">
-      <p className="lead">Here is how I read that. Change anything, then start watching; you can edit it later on the Watching page.</p>
+      <p className="lead">Here is how I read that. Change anything, then schedule it; you can edit it later under Reports.</p>
       <label>Name<input value={name} onChange={(e) => setName(e.target.value)} /></label>
       <label>When<select value={cron} onChange={(e) => setCron(e.target.value)}>{SCHEDULES.map((s) => <option key={s.cron} value={s.cron}>{s.human}</option>)}{!known && <option value={cron}>{sched.human ?? cron}</option>}</select></label>
       <label>Email the findings to<input value={email} placeholder="optional" onChange={(e) => setEmail(e.target.value)} /></label>
@@ -344,7 +344,7 @@ function DraftObject({ obj, decisionId, onDone, toast }: { obj: PaneObject; deci
         {state.done ? <button className="btn sm" onClick={onDone}>Done</button> : (
           <>
             <button className="btn sm ghost" onClick={onDone}>Discard</button>
-            <button className="btn sm pri" disabled={state.busy || !name.trim()} onClick={start}>{state.busy ? "Starting…" : "Start watching"}</button>
+            <button className="btn sm pri" disabled={state.busy || !name.trim()} onClick={start}>{state.busy ? "Starting…" : "Schedule it"}</button>
           </>
         )}
       </div>

@@ -117,7 +117,7 @@ export function DraftCard({ draft, decisionId = null }: { draft: Record<string, 
   }
   return (
     <div className="draft">
-      <h4>Here's how I read that. Start watching as is, or edit it on the Watching page afterwards.</h4>
+      <h4>Here's how I read that. Schedule it as is, or edit it under Reports afterwards.</h4>
       <div className="field"><span>Name</span><b>{String(draft.name ?? "")}</b></div>
       <div className="field"><span>Skill</span><b><span className="slash">/</span>{String(draft.skill ?? "")}</b></div>
       <div className="field"><span>Schedule</span><b>{schedule.human ?? schedule.cron} · {schedule.tz}</b></div>
@@ -126,7 +126,7 @@ export function DraftCard({ draft, decisionId = null }: { draft: Record<string, 
       <div className="field"><span>Only if changed</span><b>{draft.only_if_changed ? "yes" : "no"}</b></div>
       <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 10, alignItems: "center" }}>
         {state.msg && <span style={{ fontSize: 12, color: state.done ? "var(--green)" : "var(--red)" }}>{state.msg}</span>}
-        {state.done ? <Link className="btn sm" href="/agents">Open Watching</Link> : <button className="btn pri sm" disabled={state.busy} onClick={create}>{state.busy ? "Starting…" : "Start watching"}</button>}
+        {state.done ? <Link className="btn sm" href="/reports?tab=scheduled">See it in Reports</Link> : <button className="btn pri sm" disabled={state.busy} onClick={create}>{state.busy ? "Starting…" : "Schedule it"}</button>}
       </div>
     </div>
   );

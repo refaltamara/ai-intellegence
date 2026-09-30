@@ -7,19 +7,20 @@ import { TeamIcon } from "./TeamIcon";
 
 type NavItem = { href: string; label: string; tone: string; icon: React.ReactNode; kinds?: string[] };
 
+/**
+ * Three places, the same for every team: the numbers (Pulse), the conversation
+ * (Chats), and what gets produced or sent on a schedule (Reports). What CeMO can
+ * do lives behind "/" in the composer; the data inventory sits under the account.
+ */
 const NAV: NavItem[] = [
   { href: "/pulse", label: "Pulse", tone: "coral", icon: <path d="M3 12h4l3-8 4 16 3-8h4" />, kinds: ["profile"] },
   { href: "/", label: "Chats", tone: "blue", icon: <path d="M21 12a8 8 0 0 1-8 8H7l-4 3V12a8 8 0 0 1 8-8h2a8 8 0 0 1 8 8z" /> },
-  { href: "/decisions", label: "Decisions", tone: "violet", icon: <path d="M4 6h16M4 12h10M4 18h7" /> },
-  { href: "/skills", label: "Skills", tone: "sun", icon: <path d="M12 3l2.4 5.6L20 11l-5.6 2.4L12 19l-2.4-5.6L4 11l5.6-2.4z" /> },
-  { href: "/agents", label: "Watching", tone: "mint", icon: <><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z" /><circle cx="12" cy="12" r="2.5" /></> },
-  { href: "/reports", label: "Reports", tone: "blue", icon: <><path d="M6 3h9l4 4v14H6z" /><path d="M9 12h6M9 16h6" /></> },
-  { href: "/data", label: "Data", tone: "violet", icon: <><ellipse cx="12" cy="6" rx="8" ry="3" /><path d="M4 6v12c0 1.7 3.6 3 8 3s8-1.3 8-3V6" /><path d="M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3" /></> },
+  { href: "/reports", label: "Reports", tone: "mint", icon: <><path d="M6 3h9l4 4v14H6z" /><path d="M9 12h6M9 16h6" /></> },
 ];
 
 type Product = { name: string; tagline: string; label: string; kind: string };
 
-export function Sidebar({ recent, user, client, product, teams, currentWorkspace }: { recent: { id: string; title: string; href: string }[]; user: { email: string; role: string }; client: string | null; product: Product; teams: TeamChoice[]; currentWorkspace: string }) {
+export function Sidebar({ recent, user, product, teams, currentWorkspace }: { recent: { id: string; title: string; href: string }[]; user: { email: string; role: string }; product: Product; teams: TeamChoice[]; currentWorkspace: string }) {
   const path = usePathname();
   const router = useRouter();
   const [switching, setSwitching] = useState<string | null>(null);
@@ -38,7 +39,7 @@ export function Sidebar({ recent, user, client, product, teams, currentWorkspace
     router.push(t.home);
     router.refresh();
   }
-  const active = (href: string) => (href === "/" ? path === "/" : href === "/decisions" ? path.startsWith("/decisions") || path.startsWith("/d/") : path.startsWith(href));
+  const active = (href: string) => (href === "/" ? path === "/" : path.startsWith(href));
   const team = teams.find((t) => t.workspace_id === currentWorkspace);
   return (
     <aside className="side">
@@ -71,17 +72,18 @@ export function Sidebar({ recent, user, client, product, teams, currentWorkspace
         </div>
       </div>
       <div className="bottom">
-        <div className="ws">
-          <span>{product.label}</span>
-          <b>{client ? (product.kind === "profile" ? `About ${client}` : `On the side of ${client}`) : product.kind === "profile" ? "No subject set yet" : "No client brand yet"}</b>
-        </div>
         <Link href="/connect" className={`connect ${path.startsWith("/connect") ? "on" : ""}`}>
           <span className="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 7V3M15 7V3M7 7h10v4a5 5 0 0 1-10 0z" /><path d="M12 16v5" /></svg></span>
           Connect Claude / ChatGPT
         </Link>
         <div className="user" style={{ justifyContent: "space-between" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}><div className="avatar">{initials}</div><div style={{ minWidth: 0 }}><b style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 120 }}>{user.email}</b><span>{user.role}</span></div></div>
-          <button className="btn sm ghost" onClick={logout} title="Sign out">Out</button>
+          <span className="useracts">
+            <Link href="/data" className={`iconbtn ${path.startsWith("/data") ? "on" : ""}`} title="Data and settings" aria-label="Data and settings">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><ellipse cx="12" cy="6" rx="8" ry="3" /><path d="M4 6v12c0 1.7 3.6 3 8 3s8-1.3 8-3V6" /><path d="M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3" /></svg>
+            </Link>
+            <button className="btn sm ghost" onClick={logout} title="Sign out">Out</button>
+          </span>
         </div>
       </div>
     </aside>

@@ -1,5 +1,5 @@
 "use client";
-/** Agents screen (PRD §6, §8): list with runs, and the conversational "New agent" panel. */
+/** The Scheduled half of Reports (was Watching; PRD §6, §8): schedules with their runs, and the conversational setup panel. */
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -10,7 +10,8 @@ import { fmtDate } from "./format";
 type AgentWithRuns = AgentRow & { runs: AgentRunRow[] };
 type Draft = Omit<AgentDraft, "from_skill_run_id" | "notes"> & { from_skill_run_id?: string; notes?: string[] };
 
-export function Agents({ agents, skills, modelConfigured, emailConfigured }: { agents: AgentWithRuns[]; skills: string[]; modelConfigured: boolean; emailConfigured: boolean }) {
+export function Agents({ agents, skills, modelConfigured, emailConfigured }: { agents: AgentWithRuns[]; skills: { name: string; title: string }[]; modelConfigured: boolean; emailConfigured: boolean }) {
+  const titleOf = (name: string) => skills.find((s) => s.name === name)?.title ?? name;
   const router = useRouter();
   const [text, setText] = useState("Every Monday, compare Skintific, Somethinc and Emina on TikTok and email me. Only if something changed.");
   const [draft, setDraft] = useState<Draft | null>(null);
@@ -38,7 +39,7 @@ export function Agents({ agents, skills, modelConfigured, emailConfigured }: { a
     const j = await r.json();
     setBusy(null);
     if (j.error) { setError(j.error); return; }
-    setDraft(null); showToast(`Agent created — next run ${fmtDate(j.agent.next_run_at)}`); router.refresh();
+    setDraft(null); showToast(`Scheduled — next run ${fmtDate(j.agent.next_run_at)}`); router.refresh();
   }
   async function act(id: string, action: "run" | "pause" | "resume" | "delete") {
     setBusy(id + action);
@@ -52,22 +53,16 @@ export function Agents({ agents, skills, modelConfigured, emailConfigured }: { a
       const d = j.diff; const del = (j.delivered ?? []).map((x: any) => `${x.channel}: ${x.ok ? "ok" : x.detail}`).join(" · ");
       showToast(j.error ? j.error : d ? `Ran: ${d.first_run ? `${d.new.length} rows (baseline)` : `${d.new.length} new, ${d.gone.length} gone, ${d.changed.length} changed`} · ${del}` : `Run finished: ${j.result_status}`);
       setOpen(id);
-    } else showToast(j.error ?? (action === "delete" ? "Agent deleted" : `Agent ${action}d`));
+    } else showToast(j.error ?? (action === "delete" ? "Schedule deleted" : `Schedule ${action}d`));
     router.refresh();
   }
-  const running = agents.filter((a) => a.status === "active").length;
-  const next = agents.filter((a) => a.next_run_at).map((a) => a.next_run_at!).sort()[0];
 
   return (
-    <section className="screen">
-      <div className="topbar">
-        <div><h1>Watching</h1><span className="meta">Analyses on a schedule</span></div>
-        <span className="pill">{running} running{next ? ` · next run ${new Date(next).toLocaleString("en-GB", { timeZone: "Asia/Jakarta", weekday: "short", hour: "2-digit", minute: "2-digit" })} WIB` : ""}</span>
-      </div>
+    <>
       <div className="wrap wide">
         <div className="two">
           <div className="list">
-            {agents.length === 0 && <div className="empty">No agents yet. Describe one on the right, or open a skill result in Ask and press "Get this every Monday".</div>}
+            {agents.length === 0 && <div className="empty">Nothing scheduled yet. Describe one on the right, or press "Get this every Monday" under an answer in Chats.</div>}
             {agents.map((a) => {
               const last = a.runs[0];
               const d = last?.diff;
@@ -75,7 +70,7 @@ export function Agents({ agents, skills, modelConfigured, emailConfigured }: { a
                 <div className="agent" key={a.id}>
                   <div>
                     <h4>{a.name}</h4>
-                    <p><span className="slash">/</span>{a.skill} · {Object.entries(a.params).filter(([k]) => !["limit"].includes(k)).map(([k, v]) => `${k}=${typeof v === "object" ? JSON.stringify(v) : String(v)}`).join(" · ") || "defaults"}{a.only_if_changed ? " · only if changed" : ""}</p>
+                    <p>{titleOf(a.skill)} · {Object.entries(a.params).filter(([k]) => !["limit"].includes(k)).map(([k, v]) => `${k}=${typeof v === "object" ? JSON.stringify(v) : String(v)}`).join(" · ") || "defaults"}{a.only_if_changed ? " · only if changed" : ""}</p>
                     <div className="row">
                       <span>{a.schedule_human ?? a.schedule_cron} <b>{a.schedule_cron}</b></span>
                       {a.decision_name ? <span>For <b>{a.decision_name}</b></span> : null}<span>Via <b>{a.delivery.channels.join(" + ")}</b>{a.delivery.email ? ` (${a.delivery.email})` : ""}</span>
@@ -114,13 +109,13 @@ export function Agents({ agents, skills, modelConfigured, emailConfigured }: { a
             })}
           </div>
           <div className="setup">
-            <h3>Watch something new</h3>
+            <h3>Schedule something new</h3>
             <p>Describe it the way you'd brief a colleague. We turn it into a schedule you can edit.</p>
             <textarea value={text} onChange={(e) => setText(e.target.value)} />
             <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 10, gap: 8 }}>
               <button className="btn pri sm" disabled={busy === "draft" || !modelConfigured} onClick={parse} title={modelConfigured ? "" : "ANTHROPIC_API_KEY is not set"}>{busy === "draft" ? "Reading…" : "Set it up"}</button>
             </div>
-            {!modelConfigured && <p style={{ marginTop: 8, fontSize: 12, color: "var(--amber)" }}>The model is not configured here, so free-text setup is off. Use "Run this weekly" on a /discovery run or "Get this every Monday" in Ask.</p>}
+            {!modelConfigured && <p style={{ marginTop: 8, fontSize: 12, color: "var(--amber)" }}>The model is not configured here, so free-text setup is off. Use "Get this every Monday" under an answer in Chats.</p>}
             {!emailConfigured && <p style={{ marginTop: 8, fontSize: 12, color: "var(--text-3)" }}>Email delivery needs RESEND_API_KEY and EMAIL_FROM; until then runs are listed here only.</p>}
             {emailConfigured && (
               <p style={{ marginTop: 8, fontSize: 12, color: "var(--text-3)", display: "flex", alignItems: "center", gap: 8 }}>
@@ -139,7 +134,7 @@ export function Agents({ agents, skills, modelConfigured, emailConfigured }: { a
               <div className="parsed on">
                 <h5>Here's how we read that. Edit anything.</h5>
                 <div className="field"><span>Name</span><input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} style={inp} /></div>
-                <div className="field"><span>Skill</span><select value={draft.skill} onChange={(e) => setDraft({ ...draft, skill: e.target.value })} style={inp}>{skills.map((s) => <option key={s} value={s}>/{s}</option>)}</select></div>
+                <div className="field"><span>Analysis</span><select value={draft.skill} onChange={(e) => setDraft({ ...draft, skill: e.target.value })} style={inp}>{skills.map((s) => <option key={s.name} value={s.name}>{s.title}</option>)}</select></div>
                 <div className="field"><span>Params</span><textarea value={paramsText} onChange={(e) => setParamsText(e.target.value)} style={{ ...inp, minHeight: 70, fontFamily: "monospace", fontSize: 12 }} /></div>
                 <div className="field"><span>Cron</span><input value={draft.schedule.cron} onChange={(e) => setDraft({ ...draft, schedule: { ...draft.schedule, cron: e.target.value } })} style={inp} /></div>
                 <div className="field"><span>Schedule</span><b>{draft.schedule.human} · {draft.schedule.tz}</b></div>
@@ -149,7 +144,7 @@ export function Agents({ agents, skills, modelConfigured, emailConfigured }: { a
                 {!!draft.notes?.length && <div style={{ fontSize: 12, color: "var(--text-3)", padding: "8px 0" }}>{draft.notes.join(". ")}.</div>}
                 <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 12 }}>
                   <button className="btn sm" onClick={() => setDraft(null)}>Discard</button>
-                  <button className="btn pri sm" disabled={busy === "create"} onClick={create}>{busy === "create" ? "Creating…" : "Create agent"}</button>
+                  <button className="btn pri sm" disabled={busy === "create"} onClick={create}>{busy === "create" ? "Creating…" : "Schedule it"}</button>
                 </div>
               </div>
             )}
@@ -157,7 +152,7 @@ export function Agents({ agents, skills, modelConfigured, emailConfigured }: { a
         </div>
       </div>
       <div className={`toast ${toast ? "show" : ""}`}>{toast}</div>
-    </section>
+    </>
   );
 }
 

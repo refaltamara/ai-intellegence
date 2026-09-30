@@ -20,7 +20,7 @@ export default async function DataPage() {
       <div className="topbar"><div><h1>Data</h1><span className="meta">What every answer is built from</span></div><span className="pill live">Last load {s.last_load ?? "–"} WIB · data through {s.freshness}</span></div>
       <div className="wrap wide">
         <div className="cats"><span className="on">{cfg?.category_label ?? ws}</span></div>
-        <ClientBrand brands={ctx.brands.map((b) => ({ id: b.id, name: b.name }))} current={ctx.clientBrandId} canEdit={session?.role === "owner"} productName={cfg?.product_name ?? "CeMO"} kind={cfg?.kind ?? "category"} />
+        <ClientBrand brands={ctx.brands.map((b) => ({ id: b.id, name: b.name }))} current={ctx.clientBrandId} canEdit={session?.role === "owner"} productName={cfg?.assistant_name ?? "CeMO"} kind={cfg?.kind ?? "category"} />
         <div className="stats">
           <div className="stat"><b>{s.brands}</b><span>brands tracked · {ctx.brands.filter((b) => b.tiktok_handle && b.instagram_handle).length} on both platforms</span></div>
           <div className="stat"><b>{fmtNum(s.creators)}</b><span>creators with brand history and performance</span></div>

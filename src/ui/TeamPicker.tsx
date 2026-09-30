@@ -32,7 +32,7 @@ export function TeamPicker({ teams, email, next }: { teams: TeamChoice[]; email:
               <span className="ic"><TeamIcon kind={t.kind} /></span>
               <b>{t.label}</b>
               <span className="d">{t.description}</span>
-              <span className="w">{t.name} · {t.product_name}</span>
+              <span className="w">{t.name}</span>
               <span className="go">{busy === t.workspace_id ? "Opening…" : "Continue →"}</span>
             </button>
           ))}

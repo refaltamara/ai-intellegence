@@ -8,7 +8,8 @@ import { buildTools } from "../chat/tools";
 import { MCP_LIMITS } from "../config/mcp";
 import { sql } from "../db/client";
 import { queryMetrics, type QueryMetricsInput } from "../query/builder";
-import { availableSkills, runSkill } from "../skills/runner";
+import { runSkill } from "../skills/runner";
+import { teamSkills } from "../skills/team";
 import type { Evidence } from "../skills/types";
 import { getWorkspace } from "../workspace/store";
 
@@ -17,18 +18,8 @@ export type ToolOutcome = { status: "ok" | "unavailable" | "error"; payload: Rec
 
 const READ_ONLY = { readOnlyHint: true, destructiveHint: false, openWorldHint: false };
 
-/**
- * The analyses a connection offers. A PR team (one subject) gets the comment and post
- * analyses; the creator-market and brand-panel ones are built for a category of
- * competing brands and are not meaningful for one person, as the app's own PR
- * assistant is told (src/chat/loop.ts).
- */
-const NOT_FOR_A_SUBJECT = new Set(["creators", "brands", "audience"]);
-
-export async function connectorSkills(workspaceId: string) {
-  const [skills, cfg] = await Promise.all([availableSkills(workspaceId), getWorkspace(workspaceId)]);
-  return cfg?.kind === "profile" ? skills.filter((s) => !NOT_FOR_A_SUBJECT.has(s.layer)) : skills;
-}
+/** The analyses a connection offers: the same as the team gets in the app. */
+export const connectorSkills = teamSkills;
 
 export async function listTools(workspaceId: string): Promise<McpTool[]> {
   const skills = await connectorSkills(workspaceId);

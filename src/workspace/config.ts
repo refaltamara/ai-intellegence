@@ -10,6 +10,8 @@ export type WorkspaceKind = "category" | "profile";
 
 export type WorkspaceSettings = {
   product_name?: string;
+  /** the name the assistant goes by in Chats; the platform is Fair Intelligence, the assistant is CeMO */
+  assistant_name?: string;
   tagline?: string;
   /** the small label under the product name and on the Data page, e.g. "Beauty · Indonesia" */
   category_label?: string;
@@ -48,6 +50,7 @@ export type WorkspaceConfig = {
   tz: string;
   client_brand_id: string | null;
   product_name: string;
+  assistant_name: string;
   tagline: string;
   category_label: string;
   subject_noun: string;
@@ -59,9 +62,13 @@ export type WorkspaceConfig = {
   team: Team;
 };
 
+/** One platform name everywhere; CeMO is the assistant you talk to in Chats, on every team. */
+const PRODUCT_NAME = "Fair Intelligence";
+const ASSISTANT_NAME = "CeMO";
+
 const CATEGORY_DEFAULTS = {
-  product_name: "CeMO",
-  tagline: "Your CMO",
+  product_name: PRODUCT_NAME,
+  tagline: "Social intelligence",
   subject_noun: "creators",
   persona: "You are CeMO — the CMO in the room for {{name}}. CeMO stands for Creator Intelligence for Market Monitoring.",
   hero_title: "What's happening in {{category}}?",
@@ -70,10 +77,10 @@ const CATEGORY_DEFAULTS = {
 };
 
 const PROFILE_DEFAULTS = {
-  product_name: "Fair Intelligence",
+  product_name: PRODUCT_NAME,
   tagline: "Social intelligence",
   subject_noun: "accounts",
-  persona: "You are the analyst behind Fair Intelligence, working with {{subject}}'s team. {{subject}} is the subject of this workspace: every post and comment here is about them, and you are on their side.",
+  persona: "You are CeMO, the analyst inside Fair Intelligence, working with {{subject}}'s team. {{subject}} is the subject of this workspace: every post and comment here is about them, and you are on their side.",
   hero_title: "What are people saying about {{subject}}?",
   hero_intro: "I've read every post and comment about {{subject}} across {{platforms}}. Ask me what is being said, how it is moving, and who is driving it; every number I give you shows its evidence.",
   suggested: ["What are people saying about {{subject}} this week?", "Which posts drew the most negative comments?", "Who is driving the conversation about {{subject}}?", "How has sentiment moved over the last 30 days?"],
@@ -107,6 +114,7 @@ export function workspaceConfig(row: WorkspaceRow, clientName: string | null = n
     tz: row.tz,
     client_brand_id: row.client_brand_id,
     product_name: s.product_name ?? d.product_name,
+    assistant_name: s.assistant_name ?? ASSISTANT_NAME,
     tagline: s.tagline ?? d.tagline,
     category_label: categoryLabel,
     subject_noun: s.subject_noun ?? d.subject_noun,

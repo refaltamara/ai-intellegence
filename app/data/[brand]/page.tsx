@@ -15,5 +15,5 @@ export default async function BrandDataPage({ params, searchParams }: { params: 
   const ws = await currentWorkspaceId();
   const [d, cfg] = await Promise.all([brandPage(brand, period, ws), getWorkspace(ws)]);
   if (!d) notFound();
-  return <BrandPage d={d} productName={cfg?.product_name ?? "CeMO"} q={{ period, platform: sp.platform, tags: sp.tags, creators: sp.creators, hashtags: sp.hashtags }} />;
+  return <BrandPage d={d} productName={cfg?.assistant_name ?? "CeMO"} q={{ period, platform: sp.platform, tags: sp.tags, creators: sp.creators, hashtags: sp.hashtags }} />;
 }
