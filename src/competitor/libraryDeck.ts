@@ -147,21 +147,22 @@ export function campaignsSlide(pres: PptxGenJS, r: WeeklyReport, n: Narrative, p
   title(s, n.campaigns?.title ?? `What the brands are running ${w8.this}`, n.campaigns?.takeaway);
   const hb: PptxGenJS.TableCellProps = { fontFace: FONT, valign: "middle", margin: [3, 6, 3, 6], border: [{ type: "none" }, { type: "none" }, { pt: 0.75, color: C.line }, { type: "none" }] };
   const right: PptxGenJS.TableCellProps = { ...hb, align: "right" };
-  const heads = ["Brand", "Campaign or event", "Type", "Posts", "Creators", "Views", "Running since", "Top post"];
-  const head = heads.map((h, i) => ({ text: [text(h, { fontSize: 9.5, bold: true, color: C.ink6 })], options: { ...(i >= 3 && i <= 5 ? right : hb), border: [{ type: "none" }, { type: "none" }, { pt: 1, color: C.ink4 }, { type: "none" }] } })) as PptxGenJS.TableRow;
+  const heads = ["Brand", "Campaign or event", "Type", "Posts", "Brand acct", "Creators", "Views", "First seen", "Top post"];
+  const head = heads.map((h, i) => ({ text: [text(h, { fontSize: 9.5, bold: true, color: C.ink6 })], options: { ...(i >= 3 && i <= 6 ? right : hb), border: [{ type: "none" }, { type: "none" }, { pt: 1, color: C.ink4 }, { type: "none" }] } })) as PptxGenJS.TableRow;
   const rows = K.events.slice(0, 9);
   const body = rows.map((e) => [
     { text: [text(e.name, { fontSize: 10.5, bold: true, color: e.client ? C.blue5 : C.ink })], options: hb },
     { text: [text(e.event_name, { fontSize: 10.5, bold: true, color: C.ink })], options: hb },
     { text: [text(EVENT_LABEL[e.event] ?? e.event, { fontSize: 9.5, color: C.ink6 })], options: hb },
-    { text: [text(int(e.posts), { fontSize: 10.5, color: C.ink }), ...(e.owned_posts ? [text(` (${int(e.owned_posts)} own)`, { fontSize: 8.5, color: C.ink4 })] : [])], options: right },
+    { text: [text(int(e.posts), { fontSize: 10.5, color: C.ink })], options: right },
+    { text: [text(e.owned_posts ? int(e.owned_posts) : "–", { fontSize: 10, color: e.owned_posts ? C.ink : C.ink4 })], options: right },
     { text: [text(int(e.creators), { fontSize: 10.5, color: C.ink })], options: right },
     { text: [text(compact(e.views), { fontSize: 10.5, bold: true, color: C.ink })], options: right },
     { text: e.new ? [text("NEW ", { fontSize: 8.5, bold: true, color: C.blue, charSpacing: 0.5 }), text(dayMonth(e.first_seen), { fontSize: 9.5, color: C.blue })] : [text(e.first_seen ? dayMonth(e.first_seen) : "–", { fontSize: 9.5, color: C.ink6 })], options: hb },
     { text: linkRun(e.top), options: hb },
   ]) as PptxGenJS.TableRow[];
   const rh = Math.min(0.42, 3.6 / Math.max(1, rows.length));
-  s.addTable([head, ...body], { x: M, y: 1.7, w: CW, colW: [1.55, 2.75, 1.25, 1.0, 0.85, 0.9, 1.35, 2.683], rowH: [0.34, ...body.map(() => rh)] });
+  s.addTable([head, ...body], { x: M, y: 1.7, w: CW, colW: [1.45, 2.5, 1.15, 0.75, 0.95, 0.85, 0.85, 1.25, 2.583], rowH: [0.34, ...body.map(() => rh)] });
   // offers, brand by brand
   const offers = K.offers.filter((o) => o.read >= 5).slice(0, 6);
   if (offers.length) {
@@ -172,7 +173,7 @@ export function campaignsSlide(pres: PptxGenJS, r: WeeklyReport, n: Narrative, p
       text(`${o.offer_share}% of posts${o.top_offer ? `, mostly ${OFFER_LABEL[o.top_offer] ?? o.top_offer}` : ""}`, { fontSize: 10.5, color: C.ink6 }),
     ]), { x: M, y: y + 0.26, w: CW, h: 0.5, fit: "shrink" });
   }
-  footnote(s, `${captionCoverage(r)} Running since = the first post naming it in the data; new = first seen ${w8.this}. Own = brand-account posts.`);
+  footnote(s, `${captionCoverage(r)} First seen = the first post naming it among the posts read${K.coverage.prev_read_views_share >= 50 ? `; new = first seen ${w8.this}` : ` (${w8.last} is not read yet, so nothing is marked new)`}. Brand acct = posts from the brand's own accounts.`);
   s.addNotes(`${n.campaigns?.title ?? ""}\n${n.campaigns?.takeaway ?? ""}\n` + rows.map((e) => `${e.name} · ${e.event_name}: ${e.top?.url ?? ""}`).join("\n"));
 }
 
@@ -199,7 +200,7 @@ export function anglesSlide(pres: PptxGenJS, r: WeeklyReport, n: Narrative, page
     { text: linkRun(p.top, 9), options: hb },
   ]) as PptxGenJS.TableRow[];
   const rh = Math.min(0.42, 4.3 / Math.max(1, rows.length));
-  s.addTable([head, ...body], { x: M, y: 1.7, w: CW, colW: [1.35, 1.85, 0.7, 0.85, 0.85, 2.15, 2.45, 0.7, 1.433], rowH: [0.34, ...body.map(() => rh)] });
+  s.addTable([head, ...body], { x: M, y: 1.7, w: CW, colW: [1.2, 1.75, 0.6, 0.75, 0.8, 2.15, 2.683, 0.7, 1.7], rowH: [0.34, ...body.map(() => rh)] });
   footnote(s, `${captionCoverage(r)} Products named in at least two posts. Hook = what the posts do to hold attention, with the share of the product's views it brought; offer = share of the product's posts with an offer in the caption.`);
   s.addNotes(`${n.angles?.title ?? ""}\n${n.angles?.takeaway ?? ""}\n` + rows.map((p) => `${p.name} · ${p.product}: ${p.top?.url ?? ""}`).join("\n"));
 }

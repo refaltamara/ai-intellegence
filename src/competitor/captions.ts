@@ -11,8 +11,8 @@ import type { Group, Platform } from "./types";
 
 export type CaptionBrand = { key: string; name: string; client: boolean };
 
-/** How much of the period the tags cover: posts read against posts in the period, by count and by views. */
-export type CaptionCoverage = { posts: number; read: number; views: number; read_views: number; read_views_share: number };
+/** How much of the period the tags cover: posts read against posts in the period, by count and by views; and how much of the period before (whether "new" can be said). */
+export type CaptionCoverage = { posts: number; read: number; views: number; read_views: number; read_views_share: number; prev_read_views_share: number };
 
 export type CaptionEvent = CaptionBrand & {
   event: string;
@@ -23,8 +23,8 @@ export type CaptionEvent = CaptionBrand & {
   views: number;
   /** the first post naming it, in the data up to the period's end */
   first_seen: string;
-  /** first seen inside the period */
-  new: boolean;
+  /** first seen inside the period, when the period before was read well enough to say so; null when it was not */
+  new: boolean | null;
   /** posts naming it in the period before */
   posts_prev: number;
   top: { handle: string | null; url: string; views: number } | null;
@@ -50,6 +50,11 @@ export type CaptionOffers = CaptionBrand & { read: number; offer_posts: number; 
 export type CaptionFacts = { coverage: CaptionCoverage; events: CaptionEvent[]; products: CaptionProduct[]; offers: CaptionOffers[] };
 
 const pct0 = (n: number, d: number) => (d > 0 ? Math.round((n / d) * 100) : 0);
+/** "new" needs the period before to have been read: at least this share of its views */
+const NEW_NEEDS_PREV_READ = 50;
+/** an event or product named by one post only is shown only when that post is big */
+const SINGLE_POST_VIEWS = 1_000_000;
+const tidy = (name: string) => name.replace(/^official[\s_-]*/i, "").replace(/[\s_-]*official$/i, "").replace(/^./, (c) => c.toUpperCase());
 
 export async function captionFacts(
   db: SkillDb,
@@ -57,35 +62,41 @@ export async function captionFacts(
 ): Promise<CaptionFacts> {
   const pairs = o.groups.flatMap((g) => g.brand_ids.map((b) => [g.key, b] as const));
   const brand = new Map(o.groups.map((g) => [g.key, { key: g.key, name: g.key === o.clientKey ? o.clientName : g.name, client: g.key === o.clientKey }]));
-  const empty: CaptionFacts = { coverage: { posts: 0, read: 0, views: 0, read_views: 0, read_views_share: 0 }, events: [], products: [], offers: [] };
+  const empty: CaptionFacts = { coverage: { posts: 0, read: 0, views: 0, read_views: 0, read_views_share: 0, prev_read_views_share: 0 }, events: [], products: [], offers: [] };
   if (!pairs.length) return empty;
   // one CTE for every question: each group's distinct posts in the period ($7..$8) and the one before ($6..$7)
   const base = `with g as (select * from unnest($2::text[], $3::text[]) as t(gkey, brand_id)),
      d as (
-       select distinct on (g.gkey, p.platform, p.url) g.gkey, p.platform, p.url, p.creator_handle, p.source, coalesce(p.views, 0)::float8 as views,
-              p.posted_at >= ($7::date::timestamp at time zone $4) as cur,
-              p.cap_source, p.cap_product, p.cap_event, p.cap_event_name, p.cap_offer, p.cap_hook, p.cap_angle
-       from posts p join g on g.brand_id = p.brand_id
+       -- the client's own brands stay apart (bsub), so Wardah's and Makeover's payday sales are two rows
+       select distinct on (g.gkey, case when g.gkey = $9 then p.brand_id else '' end, p.platform, p.url) g.gkey, p.platform, p.url, p.creator_handle,
+              case when g.gkey = $9 then p.brand_id else '' end as bsub, p.source, coalesce(p.views, 0)::float8 as views,
+              p.posted_at >= ($7::date::timestamp at time zone $4) as cur, b.name as bname,
+              p.cap_source, p.cap_product, p.cap_event, p.cap_event_name, p.cap_offer, p.cap_hook, p.cap_angle,
+              -- the event's key: its name without the brand's own name, so "Glad2Glow Loose Powder launch" and "Loose Powder launch" are one
+              nullif(btrim(regexp_replace(regexp_replace(lower(p.cap_event_name), '\\m' || regexp_replace(lower(b.name), '[^a-z0-9]+', '', 'g') || '\\M', '', 'g'), '\\s+', ' ', 'g')), '') as ekey
+       from posts p join g on g.brand_id = p.brand_id left join brands b on b.id = p.brand_id and b.workspace_id = p.workspace_id
        where p.workspace_id = $1 and p.platform = any($5::text[])
          and p.posted_at >= ($6::date::timestamp at time zone $4) and p.posted_at < ($8::date::timestamp at time zone $4)
-       order by g.gkey, p.platform, p.url, p.views desc nulls last
+       order by g.gkey, case when g.gkey = $9 then p.brand_id else '' end, p.platform, p.url, p.views desc nulls last
      )`;
-  const args = [o.workspaceId, pairs.map((p) => p[0]), pairs.map((p) => p[1]), o.tz, o.platforms, o.prevFrom, o.from, o.to];
+  const args = [o.workspaceId, pairs.map((p) => p[0]), pairs.map((p) => p[1]), o.tz, o.platforms, o.prevFrom, o.from, o.to, o.clientKey ?? ""];
 
-  const cov = await db.one<{ posts: number; read: number; views: number; read_views: number }>(
-    `${base}, u as (select distinct on (platform, url) * from d where cur order by platform, url)
-     select count(*)::int as posts, count(*) filter (where cap_source = 'model')::int as read,
-            coalesce(sum(views), 0)::float8 as views, coalesce(sum(views) filter (where cap_source = 'model'), 0)::float8 as read_views from u`,
+  const cov = await db.one<{ posts: number; read: number; views: number; read_views: number; prev_views: number; prev_read_views: number }>(
+    `${base}, u as (select distinct on (platform, url) * from d order by platform, url)
+     select count(*) filter (where cur)::int as posts, count(*) filter (where cur and cap_source = 'model')::int as read,
+            coalesce(sum(views) filter (where cur), 0)::float8 as views, coalesce(sum(views) filter (where cur and cap_source = 'model'), 0)::float8 as read_views,
+            coalesce(sum(views) filter (where not cur), 0)::float8 as prev_views, coalesce(sum(views) filter (where not cur and cap_source = 'model'), 0)::float8 as prev_read_views from u`,
     args,
   );
-  const coverage: CaptionCoverage = { posts: cov?.posts ?? 0, read: cov?.read ?? 0, views: cov?.views ?? 0, read_views: cov?.read_views ?? 0, read_views_share: pct0(cov?.read_views ?? 0, cov?.views ?? 0) };
+  const coverage: CaptionCoverage = { posts: cov?.posts ?? 0, read: cov?.read ?? 0, views: cov?.views ?? 0, read_views: cov?.read_views ?? 0, read_views_share: pct0(cov?.read_views ?? 0, cov?.views ?? 0), prev_read_views_share: pct0(cov?.prev_read_views ?? 0, cov?.prev_views ?? 0) };
   if (!coverage.read) return { ...empty, coverage };
 
-  const events = await db.q<{ gkey: string; event: string; k: string; event_name: string; posts: number; creators: number; owned_posts: number; views: number; posts_prev: number; top_url: string | null; top_handle: string | null; top_views: number | null; first_seen: string }>(
+  const events = await db.q<{ gkey: string; event: string; k: string; event_name: string; bname: string | null; posts: number; creators: number; owned_posts: number; views: number; posts_prev: number; top_url: string | null; top_handle: string | null; top_views: number | null; first_seen: string }>(
     `${base},
      e as (
-       select gkey, cap_event as event, lower(btrim(cap_event_name)) as k,
+       select gkey, bsub, cap_event as event, ekey as k,
               mode() within group (order by cap_event_name) filter (where cur) as event_name,
+              mode() within group (order by bname) filter (where cur) as bname,
               count(*) filter (where cur)::int as posts,
               count(distinct creator_handle) filter (where cur and source = 'earned')::int as creators,
               count(*) filter (where cur and source = 'owned')::int as owned_posts,
@@ -94,22 +105,25 @@ export async function captionFacts(
               (array_agg(url order by views desc) filter (where cur))[1] as top_url,
               (array_agg(creator_handle order by views desc) filter (where cur))[1] as top_handle,
               (array_agg(views order by views desc) filter (where cur))[1] as top_views
-       from d where cap_source = 'model' and cap_event is not null and cap_event <> 'none' and cap_event_name is not null
-       group by 1, 2, 3 having count(*) filter (where cur) > 0
-       order by 8 desc limit 12
+       from d where cap_source = 'model' and cap_event is not null and cap_event <> 'none' and ekey is not null
+       group by 1, 2, 3, 4
+       having count(*) filter (where cur) >= 2 or max(views) filter (where cur) >= ${SINGLE_POST_VIEWS}
+       order by (count(*) filter (where cur) >= 2) desc, 10 desc limit 12
      )
-     select e.*, (select to_char(min(p.posted_at at time zone $4), 'YYYY-MM-DD') from posts p join g on g.brand_id = p.brand_id
-                  where g.gkey = e.gkey and p.workspace_id = $1 and lower(btrim(p.cap_event_name)) = e.k and p.posted_at < ($8::date::timestamp at time zone $4)) as first_seen
-     from e order by e.views desc`,
+     select e.*, (select to_char(min(x.posted_at at time zone $4), 'YYYY-MM-DD') from (
+                    select p.posted_at, nullif(btrim(regexp_replace(regexp_replace(lower(p.cap_event_name), '\\m' || regexp_replace(lower(b.name), '[^a-z0-9]+', '', 'g') || '\\M', '', 'g'), '\\s+', ' ', 'g')), '') as k
+                    from posts p join g on g.brand_id = p.brand_id left join brands b on b.id = p.brand_id and b.workspace_id = p.workspace_id
+                    where g.gkey = e.gkey and (e.bsub = '' or p.brand_id = e.bsub) and p.workspace_id = $1 and p.cap_event_name is not null and p.posted_at < ($8::date::timestamp at time zone $4)) x where x.k = e.k) as first_seen
+     from e order by (e.posts >= 2) desc, e.views desc`,
     args,
   );
 
-  const products = await db.q<{ gkey: string; product: string; posts: number; creators: number; views: number; posts_prev: number; hook: string | null; hook_views: number | null; angle: string | null; offer_posts: number; top_url: string | null; top_handle: string | null; top_views: number | null }>(
+  const products = await db.q<{ gkey: string; product: string; bname: string | null; posts: number; creators: number; views: number; posts_prev: number; hook: string | null; hook_views: number | null; angle: string | null; offer_posts: number; top_url: string | null; top_handle: string | null; top_views: number | null }>(
     `${base},
      x as (select * from d where cap_source = 'model' and cap_product is not null),
-     h as (select gkey, lower(btrim(cap_product)) as k, cap_hook as hook, sum(views) as v, row_number() over (partition by gkey, lower(btrim(cap_product)) order by sum(views) desc, cap_hook) as rn
-           from x where cur and cap_hook is not null group by 1, 2, 3)
-     select x.gkey, mode() within group (order by x.cap_product) filter (where x.cur) as product,
+     h as (select gkey, bsub, lower(btrim(cap_product)) as k, cap_hook as hook, sum(views) as v, row_number() over (partition by gkey, bsub, lower(btrim(cap_product)) order by sum(views) desc, cap_hook) as rn
+           from x where cur and cap_hook is not null group by 1, 2, 3, 4)
+     select x.gkey, mode() within group (order by x.cap_product) filter (where x.cur) as product, mode() within group (order by x.bname) filter (where x.cur) as bname,
             count(*) filter (where x.cur)::int as posts,
             count(distinct x.creator_handle) filter (where x.cur and x.source = 'earned')::int as creators,
             coalesce(sum(x.views) filter (where x.cur), 0)::float8 as views,
@@ -120,16 +134,16 @@ export async function captionFacts(
             (array_agg(x.url order by x.views desc) filter (where x.cur))[1] as top_url,
             (array_agg(x.creator_handle order by x.views desc) filter (where x.cur))[1] as top_handle,
             (array_agg(x.views order by x.views desc) filter (where x.cur))[1] as top_views
-     from x left join h on h.gkey = x.gkey and h.k = lower(btrim(x.cap_product)) and h.rn = 1
-     group by x.gkey, lower(btrim(x.cap_product))
+     from x left join h on h.gkey = x.gkey and h.bsub = x.bsub and h.k = lower(btrim(x.cap_product)) and h.rn = 1
+     group by x.gkey, x.bsub, lower(btrim(x.cap_product))
      having count(*) filter (where x.cur) >= 2
-     order by 5 desc limit 12`,
+     order by 6 desc limit 12`,
     args,
   );
 
   const offers = await db.q<{ gkey: string; read: number; offer_posts: number; top_offer: string | null; top_offer_posts: number | null }>(
     `${base},
-     r as (select * from d where cur and cap_source = 'model'),
+     r as (select distinct on (gkey, platform, url) * from d where cur and cap_source = 'model' order by gkey, platform, url),
      t as (select gkey, cap_offer, count(*) as n, row_number() over (partition by gkey order by count(*) desc, cap_offer) as rn from r where cap_offer is not null and cap_offer <> 'none' group by 1, 2)
      select r.gkey, count(*)::int as read, count(*) filter (where r.cap_offer is not null and r.cap_offer <> 'none')::int as offer_posts,
             max(t.cap_offer) as top_offer, max(t.n)::int as top_offer_posts
@@ -138,14 +152,23 @@ export async function captionFacts(
   );
 
   const top = (url: string | null, handle: string | null, views: number | null) => (url ? { url, handle, views: views ?? 0 } : null);
+  // "Glad2Glow Loose Powder launch" on Glad2Glow's row reads "Loose Powder launch"
+  const withoutBrand = (name: string, brands: (string | null)[]) => {
+    let t = name;
+    for (const b of brands) if (b) for (const v of [b, tidy(b)]) t = t.replace(new RegExp(`\\b${v.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "ig"), " ");
+    t = t.replace(/\s+/g, " ").trim();
+    return t ? t.charAt(0).toUpperCase() + t.slice(1) : name;
+  };
+  // the client's rows name the client's own brand (Emina, Wardah), not the portfolio
+  const named = (gkey: string, bname: string | null) => { const b = brand.get(gkey)!; return b.client && bname ? { ...b, name: tidy(bname) } : b; };
   return {
     coverage,
     events: events.map((e) => ({
-      ...brand.get(e.gkey)!, event: e.event, event_name: e.event_name, posts: e.posts, creators: e.creators, owned_posts: e.owned_posts, views: e.views,
-      first_seen: e.first_seen, new: !!e.first_seen && e.first_seen >= o.from, posts_prev: e.posts_prev, top: top(e.top_url, e.top_handle, e.top_views),
+      ...named(e.gkey, e.bname), event: e.event, event_name: withoutBrand(e.event_name, [e.bname, brand.get(e.gkey)!.name]), posts: e.posts, creators: e.creators, owned_posts: e.owned_posts, views: e.views,
+      first_seen: e.first_seen, new: coverage.prev_read_views_share >= NEW_NEEDS_PREV_READ ? !!e.first_seen && e.first_seen >= o.from : null, posts_prev: e.posts_prev, top: top(e.top_url, e.top_handle, e.top_views),
     })),
     products: products.map((p) => ({
-      ...brand.get(p.gkey)!, product: p.product, posts: p.posts, creators: p.creators, views: p.views, posts_prev: p.posts_prev,
+      ...named(p.gkey, p.bname), product: p.product, posts: p.posts, creators: p.creators, views: p.views, posts_prev: p.posts_prev,
       hook: p.hook, hook_views_share: pct0(p.hook_views ?? 0, p.views), angle: p.angle, offer_share: pct0(p.offer_posts, p.posts), top: top(p.top_url, p.top_handle, p.top_views),
     })),
     offers: offers
