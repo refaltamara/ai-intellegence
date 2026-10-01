@@ -7,6 +7,7 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import { describeSkillsForTool, skillNames } from "../skills/registry";
 import { ENTITIES, FILTERS, GROUP_BY, METRICS } from "../query/builder";
+import { EVENTS, HOOKS, OFFERS } from "../captions/prompt";
 import { unionSkillParamsSchema } from "./schema";
 
 /** Strict-compatible schema for query_metrics filters: one property per whitelisted filter. */
@@ -27,6 +28,12 @@ const FILTER_SCHEMA = {
     min_views: { type: "integer" },
     min_followers: { type: "integer" },
     earned_only: { type: "boolean" },
+    // read from captions by the model (posts with 10K+ views and brand accounts)
+    caption_event: { type: "array", items: { type: "string", enum: [...EVENTS] } },
+    caption_offer: { type: "array", items: { type: "string", enum: [...OFFERS] } },
+    caption_hook: { type: "array", items: { type: "string", enum: [...HOOKS] } },
+    caption_product: { type: "array", items: { type: "string" }, description: "product names as written, matched loosely" },
+    captions_read: { type: "boolean", description: "only posts whose caption was read" },
   },
   required: [],
   additionalProperties: false,

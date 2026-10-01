@@ -5,6 +5,7 @@
  */
 import { TIER_BANDS } from "../config/thresholds";
 import type { CloseUp, Landscape, Pattern, PatternKind, PostingBrand, ProductRow } from "./landscape";
+import { EVENT_NAME, HOOK_NAME, OFFER_NAME } from "../captions/prompt";
 import { periodWords, type Grain } from "./period";
 import type { Cell, Mover, Platform, WeekPoint, WeeklyReport } from "./types";
 
@@ -84,6 +85,11 @@ export function metricLabel(metric: "posts" | "views" | "er", unit: "share" | "c
 
 /** Segments of text with emphasis, so the deck can style "(last week)" values as muted. */
 export type Seg = { t: string; muted?: boolean; strong?: boolean };
+
+/** Caption tags as slides print them (src/captions/prompt.ts holds the classes). */
+export const EVENT_LABEL: Record<string, string> = EVENT_NAME;
+export const OFFER_LABEL: Record<string, string> = OFFER_NAME;
+export const HOOK_LABEL: Record<string, string> = HOOK_NAME;
 
 /** The report's period words, for the slides and the fact sheet. */
 export const wordsOf = (r: Pick<WeeklyReport, "grain">) => periodWords(r.grain);
@@ -244,6 +250,17 @@ export function displayedNumbers(r: WeeklyReport): { percent: number[]; points: 
   }
   // the creators slide's own counts and its low-engagement line (1.0M views)
   if (r.creators) { counts.push(r.creators.filter((c) => c.first_time).length); views.push(1_000_000); }
+  // campaigns, products and offers read from captions
+  if (r.captions) {
+    const K = r.captions;
+    counts.push(K.coverage.posts, K.coverage.read);
+    views.push(K.coverage.views, K.coverage.read_views, K.floor);
+    percent.push(K.coverage.read_views_share);
+    for (const e of K.events) { counts.push(e.posts, e.creators, e.owned_posts, e.posts_prev); views.push(e.views); if (e.top) views.push(e.top.views); }
+    counts.push(K.events.filter((e) => e.new).length, K.events.length);
+    for (const p of K.products) { counts.push(p.posts, p.creators, p.posts_prev); views.push(p.views); percent.push(p.hook_views_share, p.offer_share); if (p.top) views.push(p.top.views); }
+    for (const o of K.offers) { counts.push(o.read, o.offer_posts, o.top_offer_posts); percent.push(o.offer_share); }
+  }
   for (const f of r.findings ?? []) {
     counts.push(f.rows_total);
     for (const row of f.rows) for (const v of Object.values(row)) if (typeof v === "number" && Number.isFinite(v)) { counts.push(v); views.push(v); percent.push(v); }

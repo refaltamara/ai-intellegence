@@ -1,7 +1,8 @@
 /**
  * The slides decks add to the weekly set (Decks, DECISIONS 2 Oct 2026): the
  * trend (each brand's views period on period, one slide per platform), the top
- * creators, the top content, and findings pinned from Chats. Every number comes
+ * creators, the top content, campaigns and launches and products and angles
+ * (read from captions), and findings pinned from Chats. Every number comes
  * from the report; the narrative supplies the title and the takeaway under it.
  */
 import type PptxGenJS from "pptxgenjs";
@@ -10,7 +11,7 @@ import type { Narrative } from "./narrative";
 import { seriesLabel } from "./period";
 import { trendPlatforms } from "./slides";
 import type { Cell, Finding, FindingColumn, GroupResult, Platform, WeeklyReport } from "./types";
-import { change, compact, dayMonth, int, PLATFORM_NAME, pct, pts, TIER_NAME, wordsOf } from "./view";
+import { change, compact, dayMonth, EVENT_LABEL, HOOK_LABEL, int, OFFER_LABEL, PLATFORM_NAME, pct, pts, TIER_NAME, wordsOf } from "./view";
 
 function footnote(s: Slide, t: string, y = 6.62) {
   add(s, t, { x: M, y, w: CW, h: 0.4, fontSize: 9, color: C.ink4 });
@@ -126,6 +127,81 @@ export function contentSlide(pres: PptxGenJS, r: WeeklyReport, n: Narrative, pag
     postCard(s, p, x, y, cw, ch, { brand: true });
   });
   s.addNotes(`${n.content?.title ?? ""}\n${n.content?.takeaway ?? ""}\n` + posts.map((p) => `${p.ref} ${p.group} ${p.url}`).join("\n"));
+}
+
+// ---------------------------------------------------------------- captions
+/** "Read from captions: 812 of 1,240 posts this week, 91% of views (posts with 10K+ views and brand accounts)." */
+function captionCoverage(r: WeeklyReport): string {
+  const c = r.captions!.coverage;
+  return `Read from captions: ${int(c.read)} of ${int(c.posts)} posts ${wordsOf(r).this}, ${c.read_views_share}% of their views (posts with ${compact(r.captions!.floor)}+ views and brand accounts). Names come from the captions; every count is posts, creators and views in the panel.`;
+}
+
+const linkRun = (top: { handle: string | null; url: string; views: number } | null, size = 9.5) =>
+  top ? [text(top.handle ? `@${top.handle}` : "brand account", { fontSize: size, color: C.blue5, hyperlink: { url: top.url } }), text(` · ${compact(top.views)}`, { fontSize: size - 0.5, color: C.ink4 })] : [text("–", { fontSize: size, color: C.ink4 })];
+
+export function campaignsSlide(pres: PptxGenJS, r: WeeklyReport, n: Narrative, page: number, sampleLabel?: string) {
+  const w8 = wordsOf(r);
+  const K = r.captions!;
+  const s = pres.addSlide();
+  chrome(s, r, page, sampleLabel);
+  title(s, n.campaigns?.title ?? `What the brands are running ${w8.this}`, n.campaigns?.takeaway);
+  const hb: PptxGenJS.TableCellProps = { fontFace: FONT, valign: "middle", margin: [3, 6, 3, 6], border: [{ type: "none" }, { type: "none" }, { pt: 0.75, color: C.line }, { type: "none" }] };
+  const right: PptxGenJS.TableCellProps = { ...hb, align: "right" };
+  const heads = ["Brand", "Campaign or event", "Type", "Posts", "Creators", "Views", "Running since", "Top post"];
+  const head = heads.map((h, i) => ({ text: [text(h, { fontSize: 9.5, bold: true, color: C.ink6 })], options: { ...(i >= 3 && i <= 5 ? right : hb), border: [{ type: "none" }, { type: "none" }, { pt: 1, color: C.ink4 }, { type: "none" }] } })) as PptxGenJS.TableRow;
+  const rows = K.events.slice(0, 9);
+  const body = rows.map((e) => [
+    { text: [text(e.name, { fontSize: 10.5, bold: true, color: e.client ? C.blue5 : C.ink })], options: hb },
+    { text: [text(e.event_name, { fontSize: 10.5, bold: true, color: C.ink })], options: hb },
+    { text: [text(EVENT_LABEL[e.event] ?? e.event, { fontSize: 9.5, color: C.ink6 })], options: hb },
+    { text: [text(int(e.posts), { fontSize: 10.5, color: C.ink }), ...(e.owned_posts ? [text(` (${int(e.owned_posts)} own)`, { fontSize: 8.5, color: C.ink4 })] : [])], options: right },
+    { text: [text(int(e.creators), { fontSize: 10.5, color: C.ink })], options: right },
+    { text: [text(compact(e.views), { fontSize: 10.5, bold: true, color: C.ink })], options: right },
+    { text: e.new ? [text("NEW ", { fontSize: 8.5, bold: true, color: C.blue, charSpacing: 0.5 }), text(dayMonth(e.first_seen), { fontSize: 9.5, color: C.blue })] : [text(e.first_seen ? dayMonth(e.first_seen) : "–", { fontSize: 9.5, color: C.ink6 })], options: hb },
+    { text: linkRun(e.top), options: hb },
+  ]) as PptxGenJS.TableRow[];
+  const rh = Math.min(0.42, 3.6 / Math.max(1, rows.length));
+  s.addTable([head, ...body], { x: M, y: 1.7, w: CW, colW: [1.55, 2.75, 1.25, 1.0, 0.85, 0.9, 1.35, 2.683], rowH: [0.34, ...body.map(() => rh)] });
+  // offers, brand by brand
+  const offers = K.offers.filter((o) => o.read >= 5).slice(0, 6);
+  if (offers.length) {
+    const y = 1.7 + 0.34 + rh * rows.length + 0.25;
+    add(s, "OFFERS IN CAPTIONS", { x: M, y, w: CW, h: 0.24, fontSize: 9.5, bold: true, color: C.ink4, charSpacing: 1 });
+    add(s, offers.flatMap((o, i) => [
+      text(`${i ? "   ·   " : ""}${o.name} `, { fontSize: 10.5, bold: true, color: o.client ? C.blue5 : C.ink }),
+      text(`${o.offer_share}% of posts${o.top_offer ? `, mostly ${OFFER_LABEL[o.top_offer] ?? o.top_offer}` : ""}`, { fontSize: 10.5, color: C.ink6 }),
+    ]), { x: M, y: y + 0.26, w: CW, h: 0.5, fit: "shrink" });
+  }
+  footnote(s, `${captionCoverage(r)} Running since = the first post naming it in the data; new = first seen ${w8.this}. Own = brand-account posts.`);
+  s.addNotes(`${n.campaigns?.title ?? ""}\n${n.campaigns?.takeaway ?? ""}\n` + rows.map((e) => `${e.name} · ${e.event_name}: ${e.top?.url ?? ""}`).join("\n"));
+}
+
+export function anglesSlide(pres: PptxGenJS, r: WeeklyReport, n: Narrative, page: number, sampleLabel?: string) {
+  const w8 = wordsOf(r);
+  const K = r.captions!;
+  const s = pres.addSlide();
+  chrome(s, r, page, sampleLabel);
+  title(s, n.angles?.title ?? `The products and angles that drew the views ${w8.this}`, n.angles?.takeaway);
+  const hb: PptxGenJS.TableCellProps = { fontFace: FONT, valign: "middle", margin: [3, 6, 3, 6], border: [{ type: "none" }, { type: "none" }, { pt: 0.75, color: C.line }, { type: "none" }] };
+  const right: PptxGenJS.TableCellProps = { ...hb, align: "right" };
+  const heads = ["Brand", "Product", "Posts", "Creators", "Views", "Hook that brought the views", "Angle of the top post", "Offer", "Top post"];
+  const head = heads.map((h, i) => ({ text: [text(h, { fontSize: 9.5, bold: true, color: C.ink6 })], options: { ...(i >= 2 && i <= 4 || i === 7 ? right : hb), border: [{ type: "none" }, { type: "none" }, { pt: 1, color: C.ink4 }, { type: "none" }] } })) as PptxGenJS.TableRow;
+  const rows = K.products.slice(0, 10);
+  const body = rows.map((p) => [
+    { text: [text(p.name, { fontSize: 10.5, bold: true, color: p.client ? C.blue5 : C.ink })], options: hb },
+    { text: [text(p.product, { fontSize: 10.5, bold: true, color: C.ink })], options: hb },
+    { text: [text(int(p.posts), { fontSize: 10.5, color: C.ink })], options: right },
+    { text: [text(int(p.creators), { fontSize: 10.5, color: C.ink })], options: right },
+    { text: [text(compact(p.views), { fontSize: 10.5, bold: true, color: C.ink })], options: right },
+    { text: p.hook ? [text(HOOK_LABEL[p.hook] ?? p.hook, { fontSize: 10, color: C.ink }), text(`  ${p.hook_views_share}% of views`, { fontSize: 8.5, color: C.ink4 })] : [text("–", { fontSize: 10, color: C.ink4 })], options: hb },
+    { text: [text(p.angle ? `“${p.angle}”` : "–", { fontSize: 10, italic: !!p.angle, color: p.angle ? C.ink : C.ink4 })], options: hb },
+    { text: [text(p.offer_share ? `${p.offer_share}%` : "–", { fontSize: 10, color: C.ink6 })], options: right },
+    { text: linkRun(p.top, 9), options: hb },
+  ]) as PptxGenJS.TableRow[];
+  const rh = Math.min(0.42, 4.3 / Math.max(1, rows.length));
+  s.addTable([head, ...body], { x: M, y: 1.7, w: CW, colW: [1.35, 1.85, 0.7, 0.85, 0.85, 2.15, 2.45, 0.7, 1.433], rowH: [0.34, ...body.map(() => rh)] });
+  footnote(s, `${captionCoverage(r)} Products named in at least two posts. Hook = what the posts do to hold attention, with the share of the product's views it brought; offer = share of the product's posts with an offer in the caption.`);
+  s.addNotes(`${n.angles?.title ?? ""}\n${n.angles?.takeaway ?? ""}\n` + rows.map((p) => `${p.name} · ${p.product}: ${p.top?.url ?? ""}`).join("\n"));
 }
 
 // ----------------------------------------------------------------- findings

@@ -1,5 +1,6 @@
 /** The weekly competitor report, as data: every number the deck shows lives here. */
 import type { WeeklyRules } from "../config/weekly";
+import type { CaptionFacts } from "./captions";
 import type { Landscape } from "./landscape";
 import type { Grain } from "./period";
 import type { SlideKind } from "./slides";
@@ -195,6 +196,8 @@ export type WeeklyReport = {
   content?: EvidencePost[];
   /** analyses pinned from Chats (decks) */
   findings?: Finding[];
+  /** campaigns, products and angles read from captions (decks; src/captions/), with the views floor the reading used */
+  captions?: CaptionFacts & { floor: number };
   data_as_of: string;
   generated_at: string;
 };
