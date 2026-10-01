@@ -2,57 +2,17 @@
  * The weekly competitor report as a PowerPoint deck (Fair's white and blue:
  * hairline tables, blue only for what the rule highlights, last week muted).
  * Slides: summary · scoreboard · movers · what's driving it (one per mover) ·
- * what the client should do · appendix: client portfolio · appendix: evidence
- * and how to read. Every number comes from the report; the narrative supplies
+ * the landscape (creator tiers, products, posting pattern, close-ups, patterns;
+ * src/competitor/landscapeDeck.ts) · what the client should do · appendix:
+ * client portfolio · appendix: evidence and how to read. Every number comes from the report; the narrative supplies
  * the words and is checked before rendering.
  */
 import PptxGenJS from "pptxgenjs";
 import type { Narrative } from "./narrative";
 import type { Cell, EvidencePost, Flag, GroupResult, Mover, Platform, WeeklyReport } from "./types";
-import { PLATFORM_NAME, TIER_NAME, change, compact, dayMonth, flagValue, formatName, int, lensLines, metricLabel, pct, pts, type Seg } from "./view";
-
-type Slide = PptxGenJS.Slide;
-type Runs = PptxGenJS.TextProps[];
-
-const C = {
-  blue: "1D4ED8", blue5: "2563EB", blue1: "DBEAFE", blue05: "EFF6FF",
-  ink: "0F172A", ink6: "475569", ink4: "94A3B8", line: "E2E8F0", white: "FFFFFF",
-  warn: "B45309", warnBg: "FEF3C7", bar: "CBD5E1",
-};
-const FONT = "Arial";
-const W = 13.333;
-const M = 0.5;
-const CW = W - 2 * M;
-
-const arrow = (f: Flag) => (f.direction === "up" ? "▲" : "▼");
-const text = (t: string, o: PptxGenJS.TextPropsOptions = {}): PptxGenJS.TextProps => ({ text: t, options: { fontFace: FONT, ...o } });
-
-function segRuns(segs: Seg[], size: number, color = C.ink): Runs {
-  return segs.filter((s) => s.t).map((s) => text(s.t, { fontSize: size, bold: !!s.strong, color: s.muted ? C.ink4 : color }));
-}
-
-function add(slide: Slide, runs: Runs | string, o: PptxGenJS.TextPropsOptions) {
-  slide.addText(runs as Runs, { fontFace: FONT, margin: 0, valign: "top", isTextBox: true, ...o } as PptxGenJS.TextPropsOptions);
-}
-
-function chrome(slide: Slide, r: WeeklyReport, page: number, sampleLabel?: string) {
-  add(slide, `${r.title} · ${r.week.label}`, { x: M, y: 0.32, w: 8, h: 0.25, fontSize: 10, color: C.ink4 });
-  if (sampleLabel) add(slide, sampleLabel, { x: W - M - 4.5, y: 0.32, w: 4.5, h: 0.25, fontSize: 10, color: C.warn, align: "right" });
-  add(slide, `Fair · prepared for ${r.client}`, { x: M, y: 7.08, w: 6, h: 0.22, fontSize: 9, color: C.ink4 });
-  add(slide, String(page), { x: W - M - 1, y: 7.08, w: 1, h: 0.22, fontSize: 9, color: C.ink4, align: "right" });
-}
-
-function title(slide: Slide, t: string, sub?: string) {
-  add(slide, t, { x: M, y: 0.62, w: CW, h: 0.6, fontSize: 26, bold: true, color: C.ink, valign: "middle", fit: "shrink" });
-  if (sub) add(slide, sub, { x: M, y: 1.22, w: CW, h: 0.3, fontSize: 12, color: C.ink6 });
-}
-
-function chip(slide: Slide, t: string, x: number, y: number, o: { fill?: string; color?: string; w?: number; size?: number } = {}) {
-  const w = o.w ?? Math.max(0.7, t.length * 0.075 + 0.3);
-  slide.addShape("roundRect", { x, y, w, h: 0.26, fill: { color: o.fill ?? C.blue05 }, line: { color: o.fill ?? C.blue05, width: 0 }, rectRadius: 0.13 });
-  add(slide, t, { x, y, w, h: 0.26, fontSize: o.size ?? 9, bold: true, color: o.color ?? C.blue, align: "center", valign: "middle" });
-  return w;
-}
+import { PLATFORM_NAME, TIER_NAME, change, compact, dayMonth, flagValue, formatName, int, lensLines, metricLabel, pct, pts } from "./view";
+import { landscapeSlides, movesSlide } from "./landscapeDeck";
+import { add, arrow, C, chip, chrome, CW, FONT, M, segRuns, text, title, W, type Runs, type Slide } from "./draw";
 
 // ------------------------------------------------------------------ 1 summary
 function summarySlide(pres: PptxGenJS, r: WeeklyReport, n: Narrative, sampleLabel?: string) {
@@ -405,7 +365,10 @@ export function buildDeck(pres: PptxGenJS, r: WeeklyReport, n: Narrative, opts: 
   scoreboardSlide(pres, r, n, ++page, opts.sampleLabel);
   moversSlide(pres, r, n, ++page, opts.sampleLabel);
   r.movers.forEach((m) => driverSlide(pres, r, m, n.drivers.find((d) => d.key === m.key)!, ++page, opts.sampleLabel));
-  actionsSlide(pres, r, n, ++page, opts.sampleLabel);
+  if (r.landscape) {
+    page += landscapeSlides(pres, r, n, page + 1, opts.sampleLabel);
+    movesSlide(pres, r, n, ++page, opts.sampleLabel);
+  } else actionsSlide(pres, r, n, ++page, opts.sampleLabel);
   portfolioSlide(pres, r, n, ++page, opts.sampleLabel);
   evidenceSlide(pres, r, ++page, opts.sampleLabel);
 }

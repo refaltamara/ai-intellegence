@@ -2,5 +2,5 @@
 import { redirect } from "next/navigation";
 
 export default function AgentsPage() {
-  redirect("/reports?tab=scheduled");
+  redirect("/reports");
 }

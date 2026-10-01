@@ -1,7 +1,7 @@
 "use client";
 /** What a Pulse card shows, by kind. Numbers arrive computed (src/pulses/cards.ts); this only lays them out. */
 import Link from "next/link";
-import { change as changeText, compact, dayMonth, int, pct, pts } from "@/competitor/view";
+import { change as changeText, compact, dayMonth, hourLabel, int, PATTERN_NAME, patternSignal, pct, postingBehind, productName, pts, TIER_NAME } from "@/competitor/view";
 import { askHref, type AskRef } from "@/dashboard/askref";
 import type { CardData, RenderedCard } from "@/pulses/cards";
 import { Chart } from "../Chart";
@@ -102,6 +102,107 @@ export function CardBody({ card, names, onRefresh, refreshing }: { card: Rendere
           ))}
         </div>
       ) : <div className="empty">No posts match.</div>;
+    case "tier_mix":
+      return d.rows.length ? (
+        <div className="pc-mix">
+          <div className="legend">{["nano", "micro", "mid", "macro", "mega"].map((t) => <span key={t}><i className={`t-${t}`} />{TIER_NAME[t]}</span>)}</div>
+          <table className="pc-table">
+            <thead><tr><th>Brand</th><th className="num">Creator posts</th><th>Share of content</th><th>Share of views</th><th>Biggest tier by views</th></tr></thead>
+            <tbody>
+              {d.rows.map((r) => (
+                <tr key={r.key} className={r.client ? "client" : ""}>
+                  <td><Link className="bn" href={askHref({ ...base, k: "brand", brand: r.key })} title="Ask why">{r.name}</Link></td>
+                  <td className="num">{int(r.posts)}</td>
+                  <td><span className="mixbar">{r.tiers.map((t) => t.posts > 0 ? <i key={t.tier} className={`t-${t.tier}`} style={{ flexGrow: t.posts }} title={`${TIER_NAME[t.tier]} ${t.content_share}%`} /> : null)}</span></td>
+                  <td><span className="mixbar">{r.tiers.map((t) => t.views > 0 ? <i key={t.tier} className={`t-${t.tier}`} style={{ flexGrow: t.views }} title={`${TIER_NAME[t.tier]} ${t.views_share}%`} /> : null)}</span></td>
+                  <td className="muted">{r.top ? `${TIER_NAME[r.top.tier]} · ${int(r.top.posts)} posts · ${compact(r.top.views)} (${r.top.views_share}%)` : "–"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <small className="muted">Median views per creator post: {d.benchmark.filter((b) => b.median_views != null && b.posts >= 5).map((b) => `${TIER_NAME[b.tier]} ${compact(b.median_views)}`).join(" · ") || "–"}. Brand accounts left out.</small>
+        </div>
+      ) : <div className="empty">No creator posts in {card.period.label}.</div>;
+    case "products":
+      return d.rows.length ? (
+        <table className="pc-table">
+          <thead><tr><th>Brand</th><th>Categories named in captions (posts · views)</th><th>In the TikTok cart</th><th className="num">Names none</th></tr></thead>
+          <tbody>
+            {d.rows.map((p) => (
+              <tr key={p.key} className={p.client ? "client" : ""}>
+                <td><Link className="bn" href={askHref({ ...base, k: "brand", brand: p.key })} title="Ask why">{p.name}</Link></td>
+                <td><span className="cats">{p.categories.map((c) => <span key={c.key} className="tag">{c.label} <b>{int(c.posts)}</b> · {compact(c.views)}</span>)}</span></td>
+                <td className="muted">{p.cart.slice(0, 2).map((c) => `${productName(c.name)} (${int(c.posts)})`).join("; ") || "–"}</td>
+                <td className="num muted">{p.unnamed_share}%</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      ) : <div className="empty">No posts in {card.period.label}.</div>;
+    case "posting": {
+      const P = d.posting;
+      const max = Math.max(1, ...P.days.map((x) => x.posts));
+      return (
+        <div className="pc-posting">
+          <div className="days" style={{ ["--n" as string]: P.days.length }}>
+            {P.days.map((x) => (
+              <span key={x.date} className={x.current ? "cur" : ""} title={`${dayMonth(x.date)}: ${int(x.posts)} posts, ${int(x.promo_posts)} with promo language`}>
+                <i style={{ height: `${(x.posts / max) * 100}%` }} />
+              </span>
+            ))}
+          </div>
+          <div className="axis"><span>{dayMonth(P.days[0]?.date ?? "")}</span><span>{prev} · then {card.period.label}</span><span>{dayMonth(P.days[P.days.length - 1]?.date ?? "")}</span></div>
+          <table className="pc-table">
+            <thead><tr><th>Brand</th><th>Peak day</th><th>Concentration</th><th>What sits behind it</th></tr></thead>
+            <tbody>
+              {P.brands.map((b) => (
+                <tr key={b.key} className={b.client ? "client" : ""}>
+                  <td><b>{b.name}</b></td>
+                  <td>{b.peak_day ? dayMonth(b.peak_day) : "–"}</td>
+                  <td>{b.peak_posts_share}% of posts, {b.peak_views_share}% of views</td>
+                  <td className="muted">{postingBehind(b)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {P.window && <small className="muted">{P.window.share}% of posts go up between {hourLabel(P.window.from)} and {hourLabel(P.window.to)}{P.peak_hour != null ? `, peaking at ${hourLabel(P.peak_hour)}` : ""}.</small>}
+        </div>
+      );
+    }
+    case "closeup": {
+      const c = d.closeup;
+      if (!c) return <div className="empty">No posts for this brand in {card.period.label}.</div>;
+      return (
+        <div className="pc-closeup">
+          <div className="stats">
+            <div><b>{int(c.posts)}</b><small>content</small></div>
+            <div><b>{compact(c.views)}</b><small>views</small></div>
+            <div><b>{compact(c.likes)}</b><small>likes</small></div>
+            <div><b>{c.er != null ? `${c.er.toFixed(1)}%` : "–"}</b><small>eng. rate</small></div>
+          </div>
+          <dl>{d.lines.map((l) => <div key={l.label}><dt>{l.label}</dt><dd className={l.muted ? "muted" : ""}>{l.text}</dd></div>)}</dl>
+          <div className="pc-foot">
+            {c.top_post ? <a href={c.top_post.url} target="_blank" rel="noreferrer">Top post {c.top_post.handle ? `@${c.top_post.handle}` : ""} · {compact(c.top_post.views)} ↗</a> : <span />}
+            <Link className="askwhy" href={askHref({ ...base, k: "brand", brand: c.key })}>Ask why</Link>
+          </div>
+        </div>
+      );
+    }
+    case "patterns":
+      return d.patterns.length ? (
+        <ul className="pc-patterns">
+          {d.patterns.map((p, i) => (
+            <li key={`${p.kind}-${p.key}-${i}`}>
+              <span className="pk">{PATTERN_NAME[p.kind]}</span>
+              <div>
+                <b>{p.name}</b> <span className="muted">{patternSignal(p)}</span>
+                <small>{int(p.accounts)} account{p.accounts === 1 ? "" : "s"} · {int(p.posts)} post{p.posts === 1 ? "" : "s"} · {compact(p.views)} views · {p.views_share}% of the brand's views</small>
+              </div>
+              {p.examples[0] ? <a href={p.examples[0].url} target="_blank" rel="noreferrer">{p.examples[0].handle ? `@${p.examples[0].handle}` : "post"} ↗</a> : <span />}
+            </li>
+          ))}
+        </ul>
+      ) : <div className="empty">No clippers, seeding tags, affiliate bursts or one-creator weeks in {card.period.label}.</div>;
     case "skill":
       return (
         <div className="pc-skill">

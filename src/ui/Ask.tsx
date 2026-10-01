@@ -125,13 +125,12 @@ export function Ask({ initialConversation, initialMessages, prefill, stats, clie
   const [ratio, setRatio] = usePaneRatio();
   const [paneStates, setPaneStates] = useState<Record<string, PaneState>>(pane?.paneStates ?? {});
   const saveTimer = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
-  // on a reload with objects in the thread, the pane starts open on the latest (wide screens only)
+  // on a reload the pane stays closed until asked for; it remembers the latest object
   const booted = useRef(false);
   useEffect(() => {
     if (booted.current || !objects.length) return;
     booted.current = true;
     setActiveId(objects[objects.length - 1].id);
-    if (typeof window !== "undefined" && window.innerWidth > 1100) setPaneOpen(true);
   }, [objects]);
   const showObject = useCallback((id: string) => { setActiveId(id); setPaneOpen(true); }, []);
   const onState = useCallback((runId: string, state: PaneState) => {
@@ -223,7 +222,8 @@ export function Ask({ initialConversation, initialMessages, prefill, stats, clie
             const ev = Object.fromEntries(e.evidence.map((x) => [x.id, x]));
             update((m) => ({ ...m, tools: [...m.tools, e.tool], evidence: { ...m.evidence, ...ev }, status: "Writing…" }));
           }
-          if (e.type === "pane_open") showObject(e.tool_id);
+          // the pane opens when the person asks for it (the result card's button); a new result only switches an open pane
+          if (e.type === "pane_open") setActiveId(e.tool_id);
           if (e.type === "done") update((m) => ({ ...m, id: e.message_id, evidence: { ...m.evidence, ...e.evidence }, streaming: false, status: undefined, miss: e.evidence_miss, timings: e.timings, activity: m.activity ? { ...m.activity, done: true } : undefined }));
           if (e.type === "error") update((m) => ({ ...m, error: e.message, streaming: false, status: undefined }));
         }
@@ -269,7 +269,6 @@ export function Ask({ initialConversation, initialMessages, prefill, stats, clie
   }
 
   const empty = thread.length === 0;
-  const lastAssistantId = [...thread].reverse().find((m) => m.role === "assistant")?.id;
   const split = paneOpen && objects.length > 0;
   const activeObject = objects.find((o) => o.id === activeId) ?? objects[objects.length - 1];
   return (
@@ -296,11 +295,6 @@ export function Ask({ initialConversation, initialMessages, prefill, stats, clie
                 <div className="hero">
                   <h2>{copy.hero_title}</h2>
                   <p>{copy.hero_intro || `I've read every creator post about ${stats.brands} brands on TikTok and Instagram. Ask me anything about creators, competitors or campaigns; every number I give you shows its evidence, and I'll tell you when the data disagrees with you.`}</p>
-                  {!pendingAsk && (
-                    <div className="chips">
-                      {copy.suggested.map((s) => <button key={s} onClick={() => send(s)}>{s}</button>)}
-                    </div>
-                  )}
                 </div>
               )}
               <div className="thread">
@@ -349,17 +343,13 @@ export function Ask({ initialConversation, initialMessages, prefill, stats, clie
                         {open[m.id]?.length ? <EvidencePanel ids={open[m.id]} evidence={m.evidence} title={`Evidence · ${open[m.id].join(", ")}`} /> : null}
                         {m.error && <div className="errbox">{m.error}</div>}
                         {!m.streaming && !m.error && !m.text && !m.ask && m.tools.length === 0 && <div className="errbox">This answer was cut off before it finished (the server did not save a reply). Ask again in a new conversation.</div>}
-                        {!m.streaming && m.followups?.length && m.id === lastAssistantId && !busy ? (
-                          <div className="follow">{m.followups.map((f) => <button key={f.label} onClick={() => send(f.prompt, f)}>{f.label}</button>)}</div>
-                        ) : null}
                         {!m.streaming && !m.error && m.text && !m.ask && (
                           <div className="acts">
                             <button className="btn sm" onClick={() => send("Watch this every Monday and only tell me when something changes")}>Watch this weekly</button>
-                            <button className="btn sm" disabled={!m.tools.some((t) => t.run_id)} title={m.tools.some((t) => t.run_id) ? "" : "Nothing to report on yet"} onClick={async () => {
-                              const run = [...m.tools].reverse().find((t) => t.run_id);
-                              if (!run) return;
-                              showToast("Writing the report…");
-                              const r = await fetch("/api/reports", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ skill_run_id: run.run_id, decision_id: decisionId }) });
+                            <button className="btn sm" disabled={!conversationId || busy} title="A report from this whole conversation: every question, answer, table and its evidence" onClick={async () => {
+                              if (!conversationId) return;
+                              showToast("Writing the report from this conversation…");
+                              const r = await fetch("/api/reports", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ conversation_id: conversationId }) });
                               const j = await r.json();
                               if (j.error) { showToast(j.error); return; }
                               router.push(`/reports/${j.id}`);
@@ -446,13 +436,13 @@ export function textGroups(text: string): { list: boolean; lines: string[] }[] {
   return groups.filter((g) => g.lines.length);
 }
 
-/** Renders assistant text: paragraphs, "- " bullets, **bold**, <ev id> chips, and <counter> blocks. */
+/** Renders assistant text: paragraphs, "- " bullets, **bold** and <ev id> chips. A <counter> block from older answers reads as plain text. */
 export function RichText({ text, onChip }: { text: string; onChip?: (id: string) => void }) {
   return (
     <>
       {splitCounters(text).map((seg, si) =>
         seg.kind === "counter" ? (
-          <div className="counter" key={si}>{textGroups(seg.text).map((g, i) => <Fragment key={i}>{g.lines.map((l, j) => <Fragment key={j}>{j > 0 && <br />}{inline(l, onChip)}</Fragment>)}</Fragment>)}</div>
+          <p key={si}>{textGroups(seg.text).map((g, i) => <Fragment key={i}>{g.lines.map((l, j) => <Fragment key={j}>{j > 0 && <br />}{inline(l, onChip)}</Fragment>)}</Fragment>)}</p>
         ) : (
           <Fragment key={si}>
             {textGroups(seg.text).map((g, i) =>

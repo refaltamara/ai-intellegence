@@ -1,5 +1,4 @@
 /** Pulses (DECISIONS, 30 Sep 2026): the boards a team builds for the situation in front of it. */
-import Link from "next/link";
 import { currentWorkspaceId } from "@/auth/current";
 import { panelWorkspace } from "@/pulses/api";
 import { editorOptions } from "@/pulses/page";
@@ -7,6 +6,7 @@ import { listPulses } from "@/pulses/store";
 import { TEMPLATES } from "@/pulses/templates";
 import { KIND_INFO, type CardKind } from "@/pulses/cards";
 import { NewPulse } from "@/ui/pulse/NewPulse";
+import { PulseList } from "@/ui/pulse/PulseList";
 
 export const dynamic = "force-dynamic";
 
@@ -22,15 +22,10 @@ export default async function PulsesPage() {
       </div>
       <div className="wrap wide">
         {pulses.length > 0 && (
-          <div className="plist">
-            {pulses.map((p) => (
-              <Link key={p.id} href={`/pulse/${p.id}`} className="pitem">
-                <b>{p.name}</b>
-                <span>{p.description ?? ""}</span>
-                <small>{p.cards} card{p.cards === 1 ? "" : "s"}{p.kinds.length ? ` · ${[...new Set(p.kinds)].slice(0, 4).map((k) => KIND_INFO[k as CardKind]?.label ?? k).join(", ")}` : ""} · updated {new Date(p.updated_at).toLocaleDateString("en-GB", { timeZone: "Asia/Jakarta", day: "numeric", month: "short" })}</small>
-              </Link>
-            ))}
-          </div>
+          <PulseList pulses={pulses.map((p) => ({
+            id: p.id, name: p.name, description: p.description ?? null,
+            meta: `${p.cards} card${p.cards === 1 ? "" : "s"}${p.kinds.length ? ` · ${[...new Set(p.kinds)].slice(0, 4).map((k) => KIND_INFO[k as CardKind]?.label ?? k).join(", ")}` : ""} · updated ${new Date(p.updated_at).toLocaleDateString("en-GB", { timeZone: "Asia/Jakarta", day: "numeric", month: "short" })}`,
+          }))} />
         )}
         <NewPulse templates={templates} brands={options.brands} panel={panel} first={pulses.length === 0} />
       </div>

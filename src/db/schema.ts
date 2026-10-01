@@ -570,7 +570,7 @@ export const pulseCards = pgTable(
   },
   (t) => [
     index("pulse_cards_pulse_idx").on(t.pulseId, t.position),
-    check("pulse_cards_kind_chk", sql`${t.kind} in ('kpi','rankings','trend','tiers','creators','content','skill')`),
+    check("pulse_cards_kind_chk", sql`${t.kind} in ('kpi','rankings','trend','tiers','creators','content','tier_mix','products','posting','closeup','patterns','skill')`),
     check("pulse_cards_size_chk", sql`${t.size} in ('s','m','l')`),
   ],
 );

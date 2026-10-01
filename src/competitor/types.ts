@@ -1,5 +1,6 @@
 /** The weekly competitor report, as data: every number the deck shows lives here. */
 import type { WeeklyRules } from "../config/weekly";
+import type { Landscape } from "./landscape";
 
 export type Platform = "tiktok" | "instagram";
 export type Metric = "posts" | "views" | "er";
@@ -142,6 +143,8 @@ export type WeeklyReport = {
   near_misses: { key: string; name: string; platform: Platform; metric: Metric; z: number | null; value: number | null; previous: number | null; miss: string | null }[];
   notes: { kind: "coverage" | "method"; text: string }[];
   evidence: EvidencePost[];
+  /** the week beyond the highlighted moves: tiers, products, posting, close-ups, patterns (reports made before 1 Oct 2026 have none) */
+  landscape?: Landscape;
   data_as_of: string;
   generated_at: string;
 };

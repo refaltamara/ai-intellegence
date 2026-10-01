@@ -30,6 +30,7 @@ export async function pulsePageData(id: string, workspaceId: string): Promise<{ 
     const r = await getSkillRun(runId, workspaceId);
     return r ? { skill: r.skill, result: r.result as SkillResult, created_at: r.created_at } : null;
   };
-  const cards = await Promise.all(rows.map((c) => renderCard(c, ctx, { handles, skillRun })));
+  const landscapes = new Map();
+  const cards = await Promise.all(rows.map((c) => renderCard(c, ctx, { handles, skillRun, landscapes })));
   return { pulse, cards };
 }

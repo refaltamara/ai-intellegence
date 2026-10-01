@@ -10,9 +10,9 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import { anthropicClient, describeModelError } from "../chat/client";
 import { hasModelCredentials, modelId } from "../chat/loop";
-import { checkNarrative, type Narrative } from "./narrative";
+import { checkNarrative, PRIORITIES, type Narrative } from "./narrative";
 import type { Cell, GroupResult, Mover, Platform, WeeklyReport } from "./types";
-import { change, compact, flagValue, int, lensLines, metricLabel, PLATFORM_NAME, pct, pts } from "./view";
+import { change, closeupLines, closeupPicks, compact, dayMonth, flagValue, hourLabel, int, lensLines, metricLabel, PATTERN_HOW, PATTERN_NAME, patternSignal, PLATFORM_NAME, postingBehind, productName, pct, pts, TIER_NAME, tierLegend } from "./view";
 
 export type Written = { narrative: Narrative; by: "model" | "fallback"; attempts: number; problems: string[] };
 type Create = (params: Anthropic.MessageCreateParamsNonStreaming) => Promise<Anthropic.Message>;
@@ -71,10 +71,55 @@ export function factSheet(r: WeeklyReport): string {
     `CLIENT: ${r.client} (reported in the appendix; the actions are for ${r.client}). Their brands: ${r.client_brands.map((g) => g.group.name).join(", ")}.`,
     groupBlock(r, r.portfolio),
     ...r.client_brands.filter((g) => r.platforms.some((pl) => g.cells[pl]?.flags.length)).map((g) => groupBlock(r, g)),
+    ...(r.landscape ? ["", ...landscapeSheet(r)] : []),
     "",
     "DATA NOTES",
     ...r.notes.map((n) => `- ${n.text}`),
   ].join("\n");
+}
+
+const count = (n: number, one: string) => `${int(n)} ${n === 1 ? one : `${one}s`}`;
+
+/** The landscape slides' facts, printed the way the slides print them. */
+function landscapeSheet(r: WeeklyReport): string[] {
+  const L = r.landscape!;
+  const tag = (b: { name: string; client: boolean }) => `${b.name}${b.client ? " (client)" : ""}`;
+  const out: string[] = [];
+  out.push(`CREATOR TIERS (creator posts only, brand accounts excluded; followers: ${tierLegend().map((t) => t.label).join(", ")})`);
+  for (const t of L.tiers.rows) {
+    out.push(`- ${tag(t)}: ${int(t.posts)} creator posts, ${compact(t.views)} views. Share of content: ${t.tiers.map((x) => `${TIER_NAME[x.tier]} ${x.content_share}%`).join(", ")}. Share of views: ${t.tiers.map((x) => `${TIER_NAME[x.tier]} ${x.views_share}%`).join(", ")}.${t.top ? ` Biggest tier by views: ${TIER_NAME[t.top.tier]}, ${int(t.top.posts)} posts, ${compact(t.top.views)} views (${t.top.views_share}%).` : ""}`);
+  }
+  out.push(`Median views per creator post this week: ${L.tiers.benchmark.filter((b) => b.median_views != null).map((b) => `${TIER_NAME[b.tier]} ${compact(b.median_views)} (${int(b.posts)} posts)`).join(" · ")}.`);
+  out.push(`Across these brands: ${L.tiers.overall.map((o) => `${TIER_NAME[o.tier]} ${o.content_share}% of posts, ${o.views_share}% of views`).join("; ")}.`);
+  out.push("", "PRODUCTS (categories named in captions, posts · views; a post can name several; cart = TikTok Shop products tagged)");
+  for (const p of L.products) {
+    out.push(`- ${tag(p)}: ${int(p.posts)} posts, ${p.unnamed_share}% name no category. ${p.categories.map((c) => `${c.label} ${int(c.posts)} posts · ${compact(c.views)} views`).join("; ") || "no category named"}.${p.cart.length ? ` Cart: ${p.cart.map((c) => `${productName(c.name)} ${count(c.posts, "post")} · ${compact(c.views)} views`).join("; ")}.` : ""}`);
+  }
+  const P = L.posting;
+  const cur = P.days.filter((d) => d.current);
+  const prev = P.days.filter((d) => !d.current);
+  out.push("", `POSTING (the watchlist and ${r.client} together; days and hours in ${L.tz})`);
+  out.push(`Posts per day last week: ${prev.map((d) => `${dayMonth(d.date)} ${int(d.posts)} (promo ${int(d.promo_posts)})`).join(", ")}.`);
+  out.push(`Posts per day this week: ${cur.map((d) => `${dayMonth(d.date)} ${int(d.posts)} (promo ${int(d.promo_posts)})`).join(", ")}.`);
+  out.push(`This week ${int(cur.reduce((a, d) => a + d.posts, 0))} posts against ${int(prev.reduce((a, d) => a + d.posts, 0))} last week.${P.window ? ` ${P.window.share}% of this week's posts go up between ${hourLabel(P.window.from)} and ${hourLabel(P.window.to)}` : ""}${P.peak_hour != null ? `, peaking at ${hourLabel(P.peak_hour)}` : ""}.${P.hour_median_range ? ` Median views per post by hour run from ${compact(P.hour_median_range.low)} to ${compact(P.hour_median_range.high)}.` : ""}`);
+  for (const b of P.brands) out.push(`- ${tag(b)}: ${int(b.posts)} posts; peak day ${b.peak_day ? dayMonth(b.peak_day) : "–"} with ${b.peak_posts_share}% of posts and ${b.peak_views_share}% of views; ${postingBehind(b)}.`);
+  const picks = closeupPicks(r);
+  out.push("", `CLOSE-UPS (${picks.length} ${picks.length === 1 ? "slide" : "slides"}: ${picks.map((p) => p.map((c) => c.name).join(" + ")).join("; ")}). closeups[].key must be exactly, in order: ${picks.flat().map((c) => `"${c.key}"`).join(", ")}. closeup_titles: exactly ${picks.length}.`);
+  for (const c of picks.flat()) {
+    out.push(`- key="${c.key}" ${c.name}: ${int(c.posts)} content (${int(c.tiktok_posts)} TikTok, ${int(c.instagram_posts)} Instagram), ${compact(c.views)} views, ${compact(c.likes)} likes, ${compact(c.comments)} comments, eng. rate ${c.er != null ? `${c.er.toFixed(1)}%` : "–"} (likes + comments ÷ views).`);
+    for (const l of closeupLines(c, P.brands.find((b) => b.key === c.key))) out.push(`    ${l.label}: ${l.text}`);
+    if (c.top_post) out.push(`    Top post: ${c.top_post.handle ? "@" + c.top_post.handle : "brand account"}, ${compact(c.top_post.views)} views on ${PLATFORM_NAME[c.top_post.platform]}.`);
+  }
+  const client = L.closeups.find((c) => c.client);
+  if (client) {
+    out.push(`- ${r.client} for comparison (not a close-up slide): ${int(client.posts)} content, ${compact(client.views)} views, eng. rate ${client.er != null ? `${client.er.toFixed(1)}%` : "–"}.`);
+    for (const l of closeupLines(client, P.brands.find((b) => b.key === client.key))) out.push(`    ${l.label}: ${l.text}`);
+  }
+  out.push("", L.patterns.length ? "PATTERNS (shown on the patterns slide, biggest first)" : "PATTERNS: none this week; leave patterns out.");
+  for (const p of L.patterns.slice(0, 5)) {
+    out.push(`- ${PATTERN_NAME[p.kind]} · ${tag(p)}: ${patternSignal(p)}; ${count(p.accounts, "account")}, ${count(p.posts, "post")}, ${compact(p.views)} views, ${p.views_share}% of the brand's views.${p.examples[0] ? ` ${p.kind === "affiliate" ? "Biggest" : "Top post"} ${p.examples[0].handle ? "@" + p.examples[0].handle : ""} ${compact(p.examples[0].views)} views.` : ""} (${PATTERN_HOW[p.kind]})`);
+  }
+  return out;
 }
 
 // ------------------------------------------------------------------ model
@@ -95,6 +140,17 @@ Fields and word limits (hard limits; a longer field is rejected):
 - portfolio_note: optional, max 30 words, the client's own notable move.
 
 Call ${TOOL_NAME} exactly once with the whole narrative.`;
+
+/** The extra rules when the report carries the landscape slides (reports from 1 Oct 2026). */
+const SYSTEM_LANDSCAPE = `This report also has landscape slides: creator tiers, products, posting pattern, competitor close-ups and patterns. They are where the insight lives: say what each brand actually did and what it means for the client, the way a strategist would brief a brand team.
+
+Fields and limits for the landscape (hard limits):
+- tiers, products, posting: { title, takeaway }. title max 12 words: the finding, not the topic ("MOP is the only makeup brand working Macro and Mega creators", not "Creator tiers"). takeaway max 28 words: the one comparison that matters, with its numbers.
+- closeups: one per close-up brand, in the given order, key exactly as given. label max 3 words naming the brand's play ("Own-channel reach", "Offer cadence", "Seeding wave"). next max 22 words: what to watch next week, concrete (a date, a product, a creator).
+- closeup_titles: one per close-up slide, max 12 words, naming the brands and what they share.
+- patterns (only when the fact sheet lists patterns): { title, takeaway }. Say what the pattern is and why it matters to the client.
+- actions_title: max 12 words, e.g. "What Paragon does next: four moves, two before 7.7".
+- actions (this replaces the one-to-three rule above): three to five, most important first. title max 10 words, an instruction. detail max 48 words: the number that justifies it (from any slide), then exactly what to do, with whom, how much and by when. priority: "High" (do this week), "Medium" (this month) or "Test" (a small pilot). based_on: the slide or move it comes from. Never write "look closely", "monitor" or "check": recommend a move.`;
 
 const EXAMPLE = `Example of the voice (a different week): summary New "11.2%" / "Timephoria's share of Instagram views" / "Timephoria pushed a new skintint stick through mid-tier reviewers; the top two reviews drew 5.2M and 4.7M views." Driver why: "Mid-tier reviewers carried a new skintint stick: 125 creators posted, double last week's 62, and Instagram views rose from 81K to 34.5M. Engagement stayed at 0.2%, so the reach looks paid rather than earned." Action: "Meet the skintint stick where people buy" / "Timephoria's stick lives in Instagram reviews with no cart. A base-product review series on TikTok with cart links meets the same shopper closer to checkout."`;
 
@@ -121,10 +177,33 @@ function tool(r: WeeklyReport, clientBrands: string[]): Anthropic.Tool {
           items: { type: "object", properties: { title: { type: "string" }, detail: { type: "string" }, brands: { type: "array", items: { type: "string", enum: [...clientBrands, "All brands"] } }, based_on: { type: "string" } }, required: ["title", "detail", "brands", "based_on"] },
         },
         portfolio_note: { type: "string" },
+        ...(r.landscape ? landscapeProps(r, clientBrands) : {}),
       },
-      required: ["summary", "scoreboard_title", "movers_title", "drivers", "actions"],
+      required: ["summary", "scoreboard_title", "movers_title", "drivers", "actions", ...(r.landscape ? ["actions_title", "tiers", "products", "posting", "closeups", "closeup_titles", ...(r.landscape.patterns.length ? ["patterns"] : [])] : [])],
     },
   } as Anthropic.Tool;
+}
+
+function landscapeProps(r: WeeklyReport, clientBrands: string[]): Record<string, unknown> {
+  const section = { type: "object", properties: { title: { type: "string" }, takeaway: { type: "string" } }, required: ["title", "takeaway"] };
+  const picks = closeupPicks(r);
+  const keys = picks.flat().map((c) => c.key);
+  return {
+    actions_title: { type: "string" },
+    actions: {
+      type: "array", minItems: 3, maxItems: 5,
+      items: { type: "object", properties: { title: { type: "string" }, detail: { type: "string" }, brands: { type: "array", items: { type: "string", enum: [...clientBrands, "All brands"] } }, based_on: { type: "string" }, priority: { type: "string", enum: PRIORITIES } }, required: ["title", "detail", "brands", "based_on", "priority"] },
+    },
+    tiers: section,
+    products: section,
+    posting: section,
+    patterns: section,
+    closeups: {
+      type: "array", minItems: keys.length, maxItems: keys.length,
+      items: { type: "object", properties: { key: keys.length ? { type: "string", enum: keys } : { type: "string" }, label: { type: "string" }, next: { type: "string" } }, required: ["key", "label", "next"] },
+    },
+    closeup_titles: { type: "array", minItems: picks.length, maxItems: picks.length, items: { type: "string" } },
+  };
 }
 
 function asNarrative(input: unknown, r: WeeklyReport): Narrative {
@@ -137,6 +216,15 @@ function asNarrative(input: unknown, r: WeeklyReport): Narrative {
     drivers: Array.isArray(o.drivers) ? o.drivers : [],
     actions: Array.isArray(o.actions) ? o.actions : [],
     ...(o.portfolio_note ? { portfolio_note: String(o.portfolio_note) } : {}),
+    ...(r.landscape
+      ? {
+          actions_title: String(o.actions_title ?? ""),
+          tiers: o.tiers, products: o.products, posting: o.posting,
+          closeups: Array.isArray(o.closeups) ? o.closeups : [],
+          closeup_titles: Array.isArray(o.closeup_titles) ? o.closeup_titles.map(String) : [],
+          ...(o.patterns ? { patterns: o.patterns } : {}),
+        }
+      : {}),
   };
 }
 
@@ -153,8 +241,8 @@ export async function writeNarrative(r: WeeklyReport, opts: { create?: Create } 
         attempts++;
         const res = await create({
           model: modelId(),
-          max_tokens: 3000,
-          system: [{ type: "text", text: SYSTEM, cache_control: { type: "ephemeral" } }],
+          max_tokens: r.landscape ? 6000 : 3000,
+          system: [{ type: "text", text: r.landscape ? `${SYSTEM}\n\n${SYSTEM_LANDSCAPE}` : SYSTEM, cache_control: { type: "ephemeral" } }],
           tools: [tool(r, clientBrands)],
           tool_choice: { type: "auto" },
           messages,
@@ -240,6 +328,7 @@ export function plainNarrative(r: WeeklyReport): Narrative {
     : [{ title: "Use the quiet week to test a brief", detail: "No watchlist brand moved beyond normal. A quiet week is a good moment to test a new creator brief without a competitor push in the way.", brands: ["All brands"], based_on: "Scoreboard · no highlighted moves" }];
 
   const n: Narrative = { week: r.week.iso, summary, scoreboard_title, movers_title, drivers, actions };
+  if (r.landscape) plainLandscape(r, n);
   // belt and braces: anything the check still objects to loses its number
   for (const p of checkNarrative(n, r)) {
     const m = /^summary\[(\d)\]\.(stat|text|stat_label)/.exec(p);
@@ -253,4 +342,40 @@ export function plainNarrative(r: WeeklyReport): Narrative {
     if (d) { const x = n.drivers.find((y) => y.key === d[1]); if (x) x.why = "See the lens lines and posts on this slide."; }
   }
   return n;
+}
+
+/** The landscape words without a model: titles, one plain takeaway each, close-up labels, and three to five moves. */
+function plainLandscape(r: WeeklyReport, n: Narrative) {
+  const L = r.landscape!;
+  const client = L.tiers.rows.find((t) => t.client);
+  const big = [...L.tiers.overall].sort((a, b) => b.content_share - a.content_share)[0];
+  n.tiers = {
+    title: "Creator tiers: where each brand puts its content",
+    takeaway: [client?.top ? `${r.client}'s ${TIER_NAME[client.top.tier]} creators brought ${client.top.views_share}% of its creator views.` : "", big ? `Across these brands ${TIER_NAME[big.tier]} is ${big.content_share}% of posts and ${big.views_share}% of views.` : ""].filter(Boolean).join(" "),
+  };
+  const lead = [...L.products].filter((p) => !p.client && p.categories.length).sort((a, b) => b.categories[0].views - a.categories[0].views)[0];
+  n.products = {
+    title: "What each brand's creators put in front of the camera",
+    takeaway: lead ? `${lead.name}'s ${lead.categories[0].label.toLowerCase()} posts drew the most views on the watchlist: ${int(lead.categories[0].posts)} posts, ${compact(lead.categories[0].views)} views.` : "Most captions name no product category this week.",
+  };
+  const w = L.posting.window;
+  n.posting = {
+    title: "Posting pattern: when the watchlist posts",
+    takeaway: w ? `${w.share}% of this week's posts went up in one stretch of the day; peaks by brand are in the table.` : "Posting was spread across the week.",
+  };
+  const picks = closeupPicks(r);
+  n.closeups = picks.flat().map((c) => ({
+    key: c.key,
+    label: c.owned && c.owned.views_share >= 50 ? "Own-channel reach" : c.repeat_share != null && c.repeat_share >= 30 ? "Repeat creators" : c.promo_share >= 15 ? "Offer cadence" : "Creator-led",
+    next: "Watch whether next week's posts keep the same mix.",
+  }));
+  n.closeup_titles = picks.map((pair) => `${pair.map((c) => c.name).join(" and ")}: a closer look`);
+  const p0 = L.patterns[0];
+  if (p0) n.patterns = { title: "Patterns worth knowing this week", takeaway: `${PATTERN_NAME[p0.kind]} on ${p0.name}: ${int(p0.accounts)} accounts, ${int(p0.posts)} posts, ${compact(p0.views)} views.` };
+  n.actions_title = `What ${r.client} should do next`;
+  const acts: Narrative["actions"] = n.actions.map((a, i) => ({ ...a, priority: i === 0 && r.movers.length ? "High" : "Medium" }));
+  if (p0 && acts.length < 5) acts.push({ title: `Look into ${p0.name}'s ${PATTERN_NAME[p0.kind].toLowerCase()}`.split(/\s+/).slice(0, 10).join(" "), detail: `${int(p0.accounts)} accounts brought ${compact(p0.views)} views for ${p0.name} this week. Decide whether ${r.client} should run the same play.`, brands: ["All brands"], based_on: `Patterns · ${p0.name}`, priority: "Test" });
+  if (client?.top && acts.length < 5) acts.push({ title: `Review ${r.client}'s creator tier mix`, detail: `${TIER_NAME[client.top.tier]} creators brought ${client.top.views_share}% of ${r.client}'s creator views. Check the tier slide before the next brief.`, brands: ["All brands"], based_on: "Creator tiers", priority: "Medium" });
+  while (acts.length < 3) acts.push({ title: "Use the quiet week to test a brief", detail: "No competitor push is in the way. Test one new creator brief and compare it against this week's numbers.", brands: ["All brands"], based_on: "Scoreboard", priority: "Test" });
+  n.actions = acts.slice(0, 5);
 }

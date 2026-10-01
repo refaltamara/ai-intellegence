@@ -1,9 +1,24 @@
 {
   "week": "2026-W23",
   "summary": [
-    { "label": "New", "stat": "11.2%", "stat_label": "Timephoria's share of Instagram views", "text": "Timephoria pushed a new skintint stick through mid-tier reviewers; the top two reviews drew 5.2M and 4.7M views." },
-    { "label": "Working", "stat": "3.8%", "stat_label": "Glad2Glow TikTok engagement rate", "text": "Glad2Glow's cushion tutorials by one mid-tier creator lifted engagement from 0.9%; the top post drew 4.0M views." },
-    { "label": "Worth testing", "stat": "15", "stat_label": "creators on #skintificcushion", "text": "Skintific ran one cushion hashtag across 15 creators, and every post on the tag was theirs." }
+    {
+      "label": "New",
+      "stat": "11.2%",
+      "stat_label": "Timephoria's share of Instagram views",
+      "text": "Timephoria pushed a new skintint stick through mid-tier reviewers; the top two reviews drew 5.2M and 4.7M views."
+    },
+    {
+      "label": "Working",
+      "stat": "3.8%",
+      "stat_label": "Glad2Glow TikTok engagement rate",
+      "text": "Glad2Glow's cushion tutorials by one mid-tier creator lifted engagement from 0.9%; the top post drew 4.0M views."
+    },
+    {
+      "label": "Worth testing",
+      "stat": "15",
+      "stat_label": "creators on #skintificcushion",
+      "text": "Skintific ran one cushion hashtag across 15 creators, and every post on the tag was theirs."
+    }
   ],
   "scoreboard_title": "Timephoria's skintint push leads; Glad2Glow and Skintific also moved",
   "movers_title": "Three brands moved outside their normal range",
@@ -29,23 +44,83 @@
   ],
   "actions": [
     {
+      "title": "Shift Nano slots into Mid-tier creators",
+      "priority": "High",
+      "detail": "Mid-tier is 6% of Paragon's creator posts but 51% of its views, and a Mid-tier post earns a 21K median against 593 for Nano. Cut the weakest Nano posts and brief Mid-tier creators for Wardah and Make Over before 7.7.",
+      "brands": [
+        "Wardah",
+        "Make Over"
+      ],
+      "based_on": "Creator tiers"
+    },
+    {
+      "title": "Post fewer, bigger TikToks from brand accounts",
+      "priority": "High",
+      "detail": "Paragon's 201 brand-account TikToks drew 10.9M views at a 4K median; Hanasui's 20 drew 13.1M at a 105K median, 86% of its TikTok views. Cut the weakest daily posts and put media behind two or three hero videos a week.",
+      "brands": [
+        "All brands"
+      ],
+      "based_on": "Close-up · Hanasui own channel"
+    },
+    {
       "title": "Meet the skintint stick where people buy",
-      "detail": "Timephoria's stick lives in Instagram reviews with no cart. A base-product review series on TikTok with cart links meets the same shopper closer to checkout.",
-      "brands": ["Make Over", "OMG"],
-      "based_on": "Timephoria · Instagram views"
+      "priority": "High",
+      "detail": "Timephoria's skin tint posts drew 16.4M views, but its Instagram engagement was 0.2% and Instagram has no cart. Answer with a Make Over base review series on TikTok with cart links, where the same shopper is closer to checkout.",
+      "brands": [
+        "Make Over"
+      ],
+      "based_on": "Timephoria · Instagram views; Products"
     },
     {
-      "title": "Brief tutorials, not showcases, for cushion pushes",
-      "detail": "Glad2Glow's engagement came from application tutorials, while product showcases were 35% of its posts. Test tutorial briefs on the next cushion wave.",
-      "brands": ["Make Over", "Emina"],
+      "title": "Give Emina's next launch one seeding tag",
+      "priority": "Medium",
+      "detail": "Glad2Glow's #brighteninggelmask put 62 accounts behind one mask for 12.9M views, 25% of its week. Give Emina's next launch a single tag and a one-post brief per creator, so each wave reads as one number week by week.",
+      "brands": [
+        "Emina"
+      ],
+      "based_on": "Patterns · Glad2Glow seeding tag"
+    },
+    {
+      "title": "Pilot tutorial briefs for the cushion line",
+      "priority": "Test",
+      "detail": "Glad2Glow's TikTok engagement rose to 3.8% on two cushion tutorials by @chika_adelia16 worth 4.0M and 1.9M views. Pilot five tutorial briefs for Wardah's cushion and compare engagement against its showcase posts.",
+      "brands": [
+        "Wardah"
+      ],
       "based_on": "Glad2Glow · TikTok engagement rate"
-    },
-    {
-      "title": "Give every seeding wave its own hashtag",
-      "detail": "Skintific's #skintificcushion made 15 creators readable as one number. One tag per wave shows each wave's reach and cart share, week by week.",
-      "brands": ["All brands"],
-      "based_on": "Skintific · TikTok share of posts"
     }
   ],
-  "portfolio_note": "Kahf's Instagram views rose from 909K to 19.1M, lifting Paragon's Instagram engagement rate from 2.0% to 8.4%."
+  "portfolio_note": "Kahf's Instagram views rose from 909K to 19.1M, lifting Paragon's Instagram engagement rate from 2.0% to 8.4%.",
+  "tiers": {
+    "title": "Paragon's views come from Mid-tier; most of its posts are Nano",
+    "takeaway": "Mid-tier is 6% of Paragon's creator posts but 51% of its views; Nano is 82% of posts for 11%. Glad2Glow gets 39% of views from Nano."
+  },
+  "products": {
+    "title": "Rivals win views on one hero product; Paragon spreads thin",
+    "takeaway": "Glad2Glow's 71 mask posts drew 13.5M views and Skintific's 51 serum posts 72.7M; Paragon's 288 lip posts drew 1.4M."
+  },
+  "posting": {
+    "title": "Paragon talks 6.6 most; Timephoria grew with no promo at all",
+    "takeaway": "Paragon wrote 40 double-date captions and Glad2Glow 22, while Timephoria put promo language in 0% of posts and still landed 38% of its views in one day."
+  },
+  "closeups": [
+    {
+      "key": "hanasui",
+      "label": "Own-channel reach",
+      "next": "Watch whether the Mattedorable lip cream, 1.3M views from one cart post, gets a creator wave before 7.7."
+    },
+    {
+      "key": "esqa",
+      "label": "Own-account offers",
+      "next": "Its buy-one-get-three blush offer runs from the brand account; watch whether 7.7 finally brings creators in."
+    }
+  ],
+  "closeup_titles": [
+    "Hanasui and ESQA: reach from their own TikTok accounts"
+  ],
+  "patterns": {
+    "title": "Glad2Glow seeded one mask tag across 62 creators",
+    "takeaway": "#brighteninggelmask: 63 posts from 62 accounts brought 12.9M views, 25% of Glad2Glow's week. One tag, one product, about one post per creator."
+  },
+  "actions_title": "What Paragon does next: five moves, three before 7.7"
 }

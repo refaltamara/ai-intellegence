@@ -11,6 +11,7 @@ import { SkillDb } from "../skills/db";
 import { loadContext } from "../skills/params";
 import { contractGroups, type WeeklyContract } from "./contract";
 import { assessAll, covered, evaluate } from "./flags";
+import { landscape, weekPeriod } from "./landscape";
 import { addDays, isoWeek, shortDay, weekLabel, weekStart } from "./weeks";
 import type { Cell, EvidencePost, Flag, Group, GroupResult, Mover, Panel, PanelPoint, Platform, WeekPoint, WeeklyReport } from "./types";
 
@@ -193,6 +194,11 @@ export async function weeklyReport(contract: WeeklyContract, week: string, opts:
   const snapshots = await db.one<{ n: number }>("select count(*)::int as n from post_snapshots s join posts p on p.id = s.post_id where p.workspace_id = $1", [ctx.workspaceId]);
   if (!snapshots?.n) notes.push({ kind: "method", text: "Views and engagement are as captured once per post, not at a fixed age, so this week's posts have had less time to collect views than last week's. The live collector measures every post at day 7." });
 
+  const scene = await landscape(db, {
+    workspaceId: ctx.workspaceId, tz, platforms, period: weekPeriod(W), clientKey: portfolio.key, clientName: contract.client.name, brandKeys: brandNameKeys(ctx).keys,
+    groups: [portfolio, ...watch.filter((r) => platforms.some((pl) => r.cells[pl]?.covered)).map((r) => r.group)],
+  });
+
   return {
     version: 1,
     title: contract.title ?? "Weekly Competitor Pulse",
@@ -212,6 +218,7 @@ export async function weeklyReport(contract: WeeklyContract, week: string, opts:
     near_misses: nearMisses,
     notes,
     evidence,
+    landscape: scene,
     data_as_of: ctx.asOf,
     generated_at: new Date().toISOString(),
   };

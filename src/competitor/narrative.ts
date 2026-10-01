@@ -4,7 +4,7 @@
  * numbers the facts contain. `checkNarrative` enforces that, plus the length
  * limits that keep the deck presentable ("no bertele-tele").
  */
-import { displayedNumbers } from "./view";
+import { closeupPicks, displayedNumbers } from "./view";
 import type { WeeklyReport } from "./types";
 
 export type Narrative = {
@@ -16,10 +16,25 @@ export type Narrative = {
   movers_title: string;
   /** one per mover, in the report's order */
   drivers: { key: string; title: string; why: string; attention_to_action: string }[];
-  /** what Paragon should do: up to three */
-  actions: { title: string; detail: string; brands: string[]; based_on: string }[];
+  /** what the client should do: up to three; three to five, each with a priority, when the report has a landscape */
+  actions: { title: string; detail: string; brands: string[]; based_on: string; priority?: Priority }[];
   portfolio_note?: string;
+  // ---- the landscape slides (reports from 1 Oct 2026; required when the report has a landscape)
+  actions_title?: string;
+  tiers?: Section;
+  products?: Section;
+  posting?: Section;
+  /** one per brand the close-up slides show, in that order (closeupPicks) */
+  closeups?: { key: string; label: string; next: string }[];
+  /** one title per close-up slide */
+  closeup_titles?: string[];
+  /** when the week has patterns worth knowing */
+  patterns?: Section;
 };
+
+export type Priority = "High" | "Medium" | "Test";
+export const PRIORITIES: Priority[] = ["High", "Medium", "Test"];
+export type Section = { title: string; takeaway: string };
 
 const LIMITS = {
   summary_text: 18,
@@ -31,6 +46,11 @@ const LIMITS = {
   action_title: 9,
   action_detail: 30,
   portfolio_note: 30,
+  action_detail_v2: 48,
+  action_title_v2: 10,
+  takeaway: 28,
+  closeup_label: 3,
+  closeup_next: 22,
 };
 
 const words = (s: string) => s.trim().split(/\s+/).filter(Boolean).length;
@@ -46,6 +66,9 @@ export function numbersIn(text: string): { raw: string; value: number; decimals:
     .replace(/\bW(eek\s*)?\d{1,2}\b/gi, " ")
     .replace(/\b20\d\d\b/g, " ")
     .replace(/\bday\s+\d+\b/gi, " ")
+    .replace(/\b\d{1,2}:\d{2}\b/g, " ")
+    // a double date ("6.6", "12.12"), never a value with a unit ("1.1M", "2.2 pt")
+    .replace(/(?<![\d.])(\d{1,2})\.\1(?!\d|\.\d|[%A-Za-z×])(?!\s?(%|pts?\b|points?\b|M\b|K\b|B\b|x\b|×))/g, " ")
     .replace(/\b\d+(-|\s)(week|day)s?\b/gi, " ");
   const out: ReturnType<typeof numbersIn> = [];
   const re = /(?<![A-Za-z\d.])[×x]?(\d{1,3}(?:,\d{3})+|\d+)(\.\d+)?\s?(%|pts?\b|pt\b|M\b|K\b|B\b|x\b|×)?(?![A-Za-z\d])/g;
@@ -77,7 +100,20 @@ export function checkNarrative(n: Narrative, r: WeeklyReport): string[] {
   const moverKeys = r.movers.map((m) => m.key);
   const driverKeys = (n.drivers ?? []).map((d) => d.key);
   if (moverKeys.join() !== driverKeys.join()) problems.push(`drivers must follow the movers [${moverKeys.join(", ")}], got [${driverKeys.join(", ")}]`);
-  if (!n.actions?.length || n.actions.length > 3) problems.push("actions: one to three");
+  const v2 = !!r.landscape;
+  if (!v2 && (!n.actions?.length || n.actions.length > 3)) problems.push("actions: one to three");
+  if (v2) {
+    if (!n.actions?.length || n.actions.length < 3 || n.actions.length > 5) problems.push("actions: three to five");
+    n.actions?.forEach((a, i) => { if (!a.priority || !PRIORITIES.includes(a.priority)) problems.push(`actions[${i}].priority must be one of ${PRIORITIES.join(", ")}`); });
+    if (!n.actions_title) problems.push("actions_title is required");
+    for (const k of ["tiers", "products", "posting"] as const) if (!n[k]?.title || !n[k]?.takeaway) problems.push(`${k}: title and takeaway are required`);
+    const picks = closeupPicks(r);
+    const want = picks.flat().map((c) => c.key);
+    const got = (n.closeups ?? []).map((c) => c.key);
+    if (want.join() !== got.join()) problems.push(`closeups must follow the close-up brands [${want.join(", ")}], got [${got.join(", ")}]`);
+    if ((n.closeup_titles ?? []).length !== picks.length) problems.push(`closeup_titles: exactly ${picks.length} (one per close-up slide)`);
+    if (r.landscape!.patterns.length && (!n.patterns?.title || !n.patterns?.takeaway)) problems.push("patterns: title and takeaway are required (the week has patterns)");
+  }
 
   const limit = (label: string, s: string | undefined, max: number) => {
     if (s && words(s) > max) problems.push(`${label} is ${words(s)} words (max ${max}): "${s}"`);
@@ -95,10 +131,20 @@ export function checkNarrative(n: Narrative, r: WeeklyReport): string[] {
     limit(`drivers.${d.key}.attention_to_action`, d.attention_to_action, LIMITS.attention_to_action);
   });
   n.actions?.forEach((a, i) => {
-    limit(`actions[${i}].title`, a.title, LIMITS.action_title);
-    limit(`actions[${i}].detail`, a.detail, LIMITS.action_detail);
+    limit(`actions[${i}].title`, a.title, v2 ? LIMITS.action_title_v2 : LIMITS.action_title);
+    limit(`actions[${i}].detail`, a.detail, v2 ? LIMITS.action_detail_v2 : LIMITS.action_detail);
   });
   limit("portfolio_note", n.portfolio_note, LIMITS.portfolio_note);
+  limit("actions_title", n.actions_title, LIMITS.title);
+  for (const k of ["tiers", "products", "posting", "patterns"] as const) {
+    limit(`${k}.title`, n[k]?.title, LIMITS.title);
+    limit(`${k}.takeaway`, n[k]?.takeaway, LIMITS.takeaway);
+  }
+  n.closeups?.forEach((c) => {
+    limit(`closeups.${c.key}.label`, c.label, LIMITS.closeup_label);
+    limit(`closeups.${c.key}.next`, c.next, LIMITS.closeup_next);
+  });
+  n.closeup_titles?.forEach((t, i) => limit(`closeup_titles[${i}]`, t, LIMITS.title));
 
   // every number must come from the facts
   const pool = displayedNumbers(r);
@@ -109,6 +155,10 @@ export function checkNarrative(n: Narrative, r: WeeklyReport): string[] {
     ...(n.drivers ?? []).flatMap((d) => [[`drivers.${d.key}.title`, d.title], [`drivers.${d.key}.why`, d.why], [`drivers.${d.key}.attention_to_action`, d.attention_to_action]] as [string, string][]),
     ...(n.actions ?? []).flatMap((a, i) => [[`actions[${i}].title`, a.title], [`actions[${i}].detail`, a.detail], [`actions[${i}].based_on`, a.based_on]] as [string, string][]),
     ["portfolio_note", n.portfolio_note ?? ""],
+    ["actions_title", n.actions_title ?? ""],
+    ...(["tiers", "products", "posting", "patterns"] as const).flatMap((k) => [[`${k}.title`, n[k]?.title ?? ""], [`${k}.takeaway`, n[k]?.takeaway ?? ""]] as [string, string][]),
+    ...(n.closeups ?? []).flatMap((c) => [[`closeups.${c.key}.label`, c.label], [`closeups.${c.key}.next`, c.next]] as [string, string][]),
+    ...(n.closeup_titles ?? []).map((t, i) => [`closeup_titles[${i}]`, t] as [string, string]),
   ];
   for (const [where, text] of texts) {
     for (const t of numbersIn(text ?? "")) {

@@ -1,32 +1,118 @@
 {
   "week": "2026-W26",
   "summary": [
-    { "label": "New", "stat": "0", "stat_label": "watchlist moves beyond normal", "text": "A quiet week: no watchlist brand moved outside its own 8-week range on TikTok or Instagram." },
-    { "label": "Working", "stat": "54%", "stat_label": "Glad2Glow's share of Instagram views", "text": "Glad2Glow still takes over half of Instagram panel views, at 0.2% engagement: reach that looks paid." },
-    { "label": "Worth testing", "stat": "20.8%", "stat_label": "Paragon's share of TikTok posts", "text": "Use the quiet week to test a TikTok push: Paragon's share of posts fell from 26.0% to 20.8%." }
+    {
+      "label": "New",
+      "stat": "47%",
+      "stat_label": "of Timephoria's views from one post",
+      "text": "One Instagram post by @nadiyarawil drew 8.7M views; Timephoria's skin tint posts drew 12.8M."
+    },
+    {
+      "label": "Working",
+      "stat": "74",
+      "stat_label": "creators on #loosepowderg2g",
+      "text": "Glad2Glow seeded its loose powder under one tag; its powder posts drew 15.9M views."
+    },
+    {
+      "label": "Worth testing",
+      "stat": "20.8%",
+      "stat_label": "Paragon's share of TikTok posts",
+      "text": "Use the quiet week to test a TikTok push: Paragon's share of posts fell from 26.0% to 20.8%."
+    }
   ],
-  "scoreboard_title": "A quiet week on the watchlist",
+  "scoreboard_title": "A quiet week on the watchlist, but Paragon lost TikTok share",
   "movers_title": "Nothing moved beyond normal; here is what came closest",
   "drivers": [],
   "actions": [
     {
-      "title": "Win back TikTok share while rivals are flat",
-      "detail": "Paragon's TikTok share fell from 26.0% to 20.8% of posts and 28.1% to 12.7% of views while rivals held still. Push a seeding wave now.",
-      "brands": ["Wardah", "Make Over", "Emina"],
+      "title": "Win back TikTok share with a payday-to-7.7 push",
+      "priority": "High",
+      "detail": "Paragon's share of TikTok posts fell from 26.0% to 20.8%, below its own normal range, while rivals held still. Run a Wardah and Make Over creator wave from payday into 7.7, with cart links on every post.",
+      "brands": [
+        "Wardah",
+        "Make Over"
+      ],
       "based_on": "Appendix · Paragon TikTok share of posts"
     },
     {
-      "title": "Don't chase Glad2Glow's Instagram views",
-      "detail": "Glad2Glow holds 54% of Instagram panel views at 0.2% engagement, the pattern of paid reach. Compete on engagement and TikTok carts instead.",
-      "brands": ["Emina", "Wardah"],
-      "based_on": "Glad2Glow · Instagram views"
+      "title": "Shift Nano slots into Mid-tier creators",
+      "priority": "High",
+      "detail": "Nano is 81% of Paragon's creator posts but 20% of its views; Mid-tier is 5% of posts and 46% of views, at a 16K median per post against 618 for Nano. Move part of the Nano budget to Mid-tier for the 7.7 wave.",
+      "brands": [
+        "All brands"
+      ],
+      "based_on": "Creator tiers"
     },
     {
-      "title": "Find out who took TikTok's extra views",
-      "detail": "Panel TikTok views rose 55%, but Paragon, Hanasui, Timephoria and ESQA all lost share of views. A brand outside the watchlist may be surging; check before it compounds.",
-      "brands": ["All brands"],
-      "based_on": "Panel · TikTok views"
+      "title": "Test one big creator on Make Over's base line",
+      "priority": "High",
+      "detail": "One post can carry a week: @nadiyarawil gave Timephoria 47% of its views, and a Mega post earns a 270K median. Book one Macro or Mega creator for Make Over's base line before 7.7 and track the week's views.",
+      "brands": [
+        "Make Over"
+      ],
+      "based_on": "Patterns · Timephoria"
+    },
+    {
+      "title": "Give Emina's next launch one seeding tag",
+      "priority": "Medium",
+      "detail": "Glad2Glow's #loosepowderg2g put 74 accounts behind one powder, and its powder posts drew 15.9M views. Give Emina's next launch a single tag and a one-post brief per creator, so each wave reads as one number.",
+      "brands": [
+        "Emina"
+      ],
+      "based_on": "Patterns · Glad2Glow seeding tag"
+    },
+    {
+      "title": "Post fewer, bigger TikToks from brand accounts",
+      "priority": "Medium",
+      "detail": "Paragon's 385 brand-account TikToks drew 7.9M views at a 4K median; Hanasui's 37 drew 5.8M at a 41K median, 67% of its TikTok views. Cut the weakest daily posts and back two or three hero videos a week.",
+      "brands": [
+        "All brands"
+      ],
+      "based_on": "Close-up · Hanasui own channel"
     }
   ],
-  "portfolio_note": "Paragon's share of TikTok posts fell from 26.0% to 20.8%; Instaperfect's TikTok views rose from 53K to 2.8M."
+  "portfolio_note": "Paragon's share of TikTok posts fell from 26.0% to 20.8%; Instaperfect's TikTok views rose from 53K to 2.8M.",
+  "tiers": {
+    "title": "Two Macro posts gave Hanasui 42% of its creator views",
+    "takeaway": "Paragon's Mid-tier is 5% of creator posts and 46% of views, while Nano is 81% of posts for 20%. A Mid-tier post earns a 16K median."
+  },
+  "products": {
+    "title": "Glad2Glow's powder and Timephoria's skin tint win on few posts",
+    "takeaway": "Glad2Glow's 88 powder posts drew 15.9M views and Timephoria's 19 skin tint posts 12.8M; Paragon's 425 lip posts drew 3.0M."
+  },
+  "posting": {
+    "title": "Payday, not a double date, drove this week's promo peak",
+    "takeaway": "Promo captions peaked at 71 posts on 24 Jun, the run-up to payday; Paragon wrote 94 payday captions and Glad2Glow 26."
+  },
+  "closeups": [
+    {
+      "key": "g2g",
+      "label": "Seeding at scale",
+      "next": "Watch whether #loosepowderg2g keeps its 74 accounts, and whether the serum bibir cart line (33 posts) grows."
+    },
+    {
+      "key": "skintific",
+      "label": "Cushion and sunscreen",
+      "next": "Cushion (6.2M) and sunscreen (6.0M) carry the views on few posts; watch for a creator wave before 7.7."
+    },
+    {
+      "key": "timephoria",
+      "label": "One big post",
+      "next": "One post gave 47% of its views; watch whether Timephoria briefs more Mid-tier creators on the skin tint."
+    },
+    {
+      "key": "hanasui",
+      "label": "Own-channel reach",
+      "next": "Brand accounts gave 67% of its TikTok views; watch the Mattedorable lipstick, 11 cart posts this week."
+    }
+  ],
+  "closeup_titles": [
+    "Glad2Glow and Skintific: big views from a few product lines",
+    "Timephoria and Hanasui: one post, one account, most of the views"
+  ],
+  "patterns": {
+    "title": "One creator brought 47% of Timephoria's week",
+    "takeaway": "@nadiyarawil's one Instagram post drew 8.7M views; #loosepowderg2g spread 75 posts over 74 accounts for 8.1M: one big face versus many small ones."
+  },
+  "actions_title": "What Paragon does next: five moves, three before 7.7"
 }

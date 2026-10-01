@@ -27,7 +27,9 @@ d("reports (live)", () => {
     const fetched = await getReport(report.id, WS);
     expect(fetched?.blocks.skill).toBe("compare");
     const list = await listReports(WS);
-    expect(list.some((r) => r.id === report.id)).toBe(true);
-    expect(list[0].blocks.diff).toBeNull();
+    // other live tests write reports in parallel, so look this one up rather than taking the newest
+    const listed = list.find((r) => r.id === report.id);
+    expect(listed).toBeTruthy();
+    expect(listed!.blocks.diff).toBeNull();
   }, 120_000);
 });

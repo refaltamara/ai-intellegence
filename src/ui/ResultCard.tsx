@@ -36,6 +36,7 @@ export function ResultCard({ tool, evidence, onOpenEvidence, decisionId = null, 
   const [showAll, setShowAll] = useState(false);
   const [open, setOpen] = useState(false);
   const [about, setAbout] = useState(false);
+  const [chartOn, setChartOn] = useState(false);
   const rows = tool.rows ?? [];
   const cols = columnsOf(rows);
   const title = tool.title ?? (tool.name === "query_metrics" ? "The numbers" : tool.skill ?? "Analysis");
@@ -74,7 +75,8 @@ export function ResultCard({ tool, evidence, onOpenEvidence, decisionId = null, 
           {isDiscovery && (
             <div className="body"><Link className="btn sm pri" href={`/skills/discovery?run=${tool.run_id}`}>Open the full list</Link> <span style={{ fontSize: 12, color: "var(--text-3)", marginLeft: 8 }}>every row, filters, CSV export</span></div>
           )}
-          {showChart ? <div className="chart"><Chart spec={chart} /></div> : null}
+          {showChart && rows.length > 0 ? <div className="body"><button className="btn sm ghost" onClick={() => setChartOn((c) => !c)}>{chartOn ? "Hide chart" : "Show chart"}</button></div> : null}
+          {showChart && (chartOn || rows.length === 0) ? <div className="chart"><Chart spec={chart} /></div> : null}
           {rows.length > 0 && (
             <div className="tablewrap">
               <table>
@@ -126,7 +128,7 @@ export function DraftCard({ draft, decisionId = null }: { draft: Record<string, 
       <div className="field"><span>Only if changed</span><b>{draft.only_if_changed ? "yes" : "no"}</b></div>
       <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 10, alignItems: "center" }}>
         {state.msg && <span style={{ fontSize: 12, color: state.done ? "var(--green)" : "var(--red)" }}>{state.msg}</span>}
-        {state.done ? <Link className="btn sm" href="/reports?tab=scheduled">See it in Reports</Link> : <button className="btn pri sm" disabled={state.busy} onClick={create}>{state.busy ? "Starting…" : "Schedule it"}</button>}
+        {state.done ? <Link className="btn sm" href="/reports">See it in Reports</Link> : <button className="btn pri sm" disabled={state.busy} onClick={create}>{state.busy ? "Starting…" : "Schedule it"}</button>}
       </div>
     </div>
   );
