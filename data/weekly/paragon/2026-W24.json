@@ -1,9 +1,24 @@
 {
   "week": "2026-W24",
   "summary": [
-    { "label": "New", "stat": "5.9%", "stat_label": "Skintific's share of TikTok views", "text": "Two mega creators posted Skintific's new launch; its TikTok views rose from 1.2M to 10.9M." },
-    { "label": "Working", "stat": "2.9M", "stat_label": "views from one nano creator", "text": "A 5K-follower creator's three Skintific posts drew 2.9M views: small accounts still break out." },
-    { "label": "Worth testing", "stat": "28", "stat_label": "creators on #dealsforyoudays", "text": "Skintific held 88% of #dealsforyoudays posts with 28 creators; its cart share rose to 31%." }
+    {
+      "label": "New",
+      "stat": "5.9%",
+      "stat_label": "Skintific's share of TikTok views",
+      "text": "Two mega creators posted Skintific's new launch; its TikTok views rose from 1.2M to 10.9M."
+    },
+    {
+      "label": "Working",
+      "stat": "2.9M",
+      "stat_label": "views from one nano creator",
+      "text": "A 5K-follower creator's three Skintific posts drew 2.9M views: small accounts still break out."
+    },
+    {
+      "label": "Worth testing",
+      "stat": "28",
+      "stat_label": "creators on #dealsforyoudays",
+      "text": "Skintific held 88% of #dealsforyoudays posts with 28 creators; its cart share rose to 31%."
+    }
   ],
   "scoreboard_title": "Only Skintific's TikTok views moved beyond normal this week",
   "movers_title": "Skintific's share of TikTok views jumped to 5.9%",
@@ -17,23 +32,94 @@
   ],
   "actions": [
     {
-      "title": "Pair a mega reveal with a nano wave",
-      "detail": "Skintific's reach came from two mega posts plus one nano breakout. Brief one or two big names for the reveal and let nano creators carry the volume.",
-      "brands": ["Make Over", "OMG"],
-      "based_on": "Skintific · TikTok views"
+      "title": "Post fewer, bigger TikToks from brand accounts",
+      "priority": "High",
+      "detail": "Paragon's 449 brand-account TikToks drew 19.5M views at a 3K median; Hanasui's 34 drew 20.2M at a 132K median. Cut the weakest daily posts and put media behind two or three hero videos a week.",
+      "brands": [
+        "All brands"
+      ],
+      "based_on": "Close-up · Hanasui own channel"
+    },
+    {
+      "title": "Pair a big-name reveal with a nano wave",
+      "priority": "High",
+      "detail": "Mega creators are 1% of Paragon's creator posts but 22% of its views, and Skintific's launch rode two big posts. Book one Mega reveal for Make Over's next launch and let Nano creators carry the volume.",
+      "brands": [
+        "Make Over",
+        "OMG"
+      ],
+      "based_on": "Creator tiers · Skintific · TikTok views"
     },
     {
       "title": "Join the platform sale tag with carts on",
-      "detail": "Skintific held 88% of #dealsforyoudays posts with 28 creators. For the next TikTok Shop campaign, brief creators to use the tag and the cart together.",
-      "brands": ["All brands"],
+      "priority": "High",
+      "detail": "Skintific held 88% of #dealsforyoudays posts with 28 creators while its cart share rose to 31%. For the next TikTok Shop campaign, brief creators to use the tag and the cart together.",
+      "brands": [
+        "All brands"
+      ],
       "based_on": "Skintific · #dealsforyoudays"
     },
     {
-      "title": "Check Make Over's TikTok surge converts",
-      "detail": "Make Over's TikTok posts rose from 156 to 844, 9.9% of the panel, while its Instagram posts fell to 58. Read the wave's cart share before scaling it.",
-      "brands": ["Make Over"],
+      "title": "Read Make Over's TikTok wave before scaling it",
+      "priority": "Medium",
+      "detail": "Make Over's TikTok posts rose from 156 to 844, 9.9% of the panel, while its Instagram fell to 58. Look at the wave's cart share and its repeat posters before adding budget.",
+      "brands": [
+        "Make Over"
+      ],
       "based_on": "Appendix · Make Over TikTok posts"
+    },
+    {
+      "title": "Test a moisturizer-led creator brief",
+      "priority": "Test",
+      "detail": "Hanasui's 29 moisturizer posts drew 8.4M views and its ceramide gel sat in the cart on 21 posts. Pilot a Wardah moisturizer brief with ten creators and compare views per post against lip.",
+      "brands": [
+        "Wardah"
+      ],
+      "based_on": "Products · Hanasui"
     }
   ],
-  "portfolio_note": "Make Over's TikTok posts rose from 156 to 844, and Wardah's TikTok engagement rate reached 7.4%."
+  "portfolio_note": "Make Over's TikTok posts rose from 156 to 844, and Wardah's TikTok engagement rate reached 7.4%.",
+  "tiers": {
+    "title": "Mega posts gave Paragon 22% of its creator views from 1%",
+    "takeaway": "Paragon's Mega creators are 1% of its creator posts but 22% of views; Mid-tier adds 31% from 4%. Nano is 83% of posts for 29%."
+  },
+  "products": {
+    "title": "Hanasui's moisturizer gel and Skintific's serum drew views on few posts",
+    "takeaway": "Hanasui's 29 moisturizer posts drew 8.4M views and its ceramide gel sits in the cart on 21 posts; Paragon's 613 lip posts drew 13.8M."
+  },
+  "posting": {
+    "title": "Paragon's peak day carried 32% of its views",
+    "takeaway": "TikTok capture rose 206% this week, so read volumes with care; Skintific landed 36% of its views on one day."
+  },
+  "closeups": [
+    {
+      "key": "g2g",
+      "label": "One-post reach",
+      "next": "One Instagram post by @marvellabry brought 28% of its views; watch whether the serum push gets a second wave."
+    },
+    {
+      "key": "hanasui",
+      "label": "Own-channel reach",
+      "next": "34 brand-account TikToks drew 20.2M views at a 132K median; watch the ceramide gel, in the cart on 21 posts."
+    },
+    {
+      "key": "timephoria",
+      "label": "Lip-led creators",
+      "next": "Lip posts drew 8.6M views from 174 posts with almost no brand-account help; watch the lip and cheek cart line."
+    },
+    {
+      "key": "esqa",
+      "label": "Own-account offers",
+      "next": "84% of its TikTok views come from its own accounts; watch whether the blush offer pulls creators in."
+    }
+  ],
+  "closeup_titles": [
+    "Glad2Glow and Hanasui: one big post, one big own channel",
+    "Timephoria and ESQA: creators on lip, brand accounts on offers"
+  ],
+  "patterns": {
+    "title": "Paragon's affiliates posted 251 times for 836K views",
+    "takeaway": "27 accounts posted five or more times for Paragon's brands this week, led by @crazecharm with 600K views; Skintific seeded #skintificcushion through 22 accounts."
+  },
+  "actions_title": "What Paragon does next: five moves, two before payday"
 }

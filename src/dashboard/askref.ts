@@ -19,7 +19,16 @@ export type AskTarget =
 export type AskRef = AskTarget & { platform: PlatformFilter; brands: string[]; period: string };
 export type Fact = { label: string; value: string };
 /** What the chat shows above the question and what the model is told. */
-export type AskContext = { source: "dashboard"; title: string; scope: string; facts: Fact[]; back: string; question: string };
+export type AskContext = {
+  source: "dashboard" | "slide";
+  title: string;
+  scope: string;
+  facts: Fact[];
+  back: string;
+  question: string;
+  /** "Ask AI" on a weekly report slide: the slide as text and the week it covers (src/reports/slideAsk.ts) */
+  slide?: { report_id: string; n: number; total: number; deck: string; week: { from: string; to: string; label: string; previous: string }; text: string };
+};
 
 /** base64url(JSON), the same in the browser and on the server */
 export function encodeAsk(ref: AskRef): string {

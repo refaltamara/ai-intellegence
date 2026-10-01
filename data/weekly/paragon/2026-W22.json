@@ -1,0 +1,125 @@
+{
+  "week": "2026-W22",
+  "summary": [
+    {
+      "label": "New",
+      "stat": "68%",
+      "stat_label": "Hanasui creator views from 4 posts",
+      "text": "Four Mega posts drove Hanasui's TikTok views to 46.2M, and 116 accounts seeded #cantikmuhanasui."
+    },
+    {
+      "label": "Working",
+      "stat": "93.8M",
+      "stat_label": "Emina TikTok views",
+      "text": "Emina's TikTok views reached 20.4% of the panel, outside its own normal range."
+    },
+    {
+      "label": "Worth testing",
+      "stat": "40",
+      "stat_label": "Paragon payday captions",
+      "text": "Paragon talked payday 40 times while Glad2Glow ran 19 double-date captions ahead of 6.6."
+    }
+  ],
+  "scoreboard_title": "Hanasui went big on Mega creators; Glad2Glow's Instagram engagement jumped",
+  "movers_title": "Hanasui and Glad2Glow moved up; Timephoria's Instagram slipped",
+  "drivers": [
+    {
+      "key": "hanasui",
+      "title": "Hanasui seeded #cantikmuhanasui across a wider Instagram base",
+      "why": "Hanasui's Instagram creators rose from 125 to 189, and 51 of them used #cantikmuhanasui, a tag only Hanasui used. Nano creators wrote 89% of creator posts; the top post drew only 20K views.",
+      "attention_to_action": "Volume without reach on Instagram, and no cart there; the reach sat on TikTok, where four Mega posts carried 68% of creator views."
+    },
+    {
+      "key": "g2g",
+      "title": "One 6.5M-view post lifted Glad2Glow's Instagram engagement",
+      "why": "@sandrinna_11's post drew 6.5M views at 8.9% engagement, 23% of the brand's Instagram views, while creators fell from 441 to 211. Engagement rose from 0.5% to 2.5%.",
+      "attention_to_action": "Instagram has no cart, and Glad2Glow's TikTok engagement fell to 0.9%: the lift is attention, not yet a sales push."
+    },
+    {
+      "key": "timephoria",
+      "title": "Timephoria's Instagram volume slipped below its range",
+      "why": "Instagram posts fell to 66 and creators from 94 to 62, while TikTok held at 295 posts. The top Instagram post, by a makeup artist, drew 53K views, 65% of the week's views.",
+      "attention_to_action": "No campaign tag took hold on Instagram this week; Timephoria's push stayed on TikTok, where its lip posts drew 4.6M views."
+    }
+  ],
+  "actions_title": "What Paragon does next: five moves, two before 6.6",
+  "actions": [
+    {
+      "title": "Book Mega creators for the next launch",
+      "priority": "High",
+      "detail": "Hanasui's four Mega posts carried 68% of its creator views, and Mega creators earn a 66K median per post against 540 for Nano. Book two Mega creators for Make Over's next launch before 6.6.",
+      "brands": [
+        "Make Over"
+      ],
+      "based_on": "Creator tiers · Hanasui"
+    },
+    {
+      "title": "Turn payday talk into cart posts",
+      "priority": "High",
+      "detail": "Paragon wrote 40 payday captions with promo language in 5% of its posts, while Glad2Glow ran 19 double-date captions and 11% promo. Brief payday creators with cart links and one offer line.",
+      "brands": [
+        "All brands"
+      ],
+      "based_on": "Posting pattern"
+    },
+    {
+      "title": "Give Emina's TikTok reach a cart",
+      "priority": "Medium",
+      "detail": "Emina's TikTok views reached 93.8M, 20.4% of the panel, at 0.3% engagement. Find the posts that carried it, then put cart links and a review series behind the same products.",
+      "brands": [
+        "Emina"
+      ],
+      "based_on": "Appendix · Emina TikTok views"
+    },
+    {
+      "title": "Post fewer, bigger TikToks from brand accounts",
+      "priority": "Medium",
+      "detail": "Paragon's 455 brand-account TikToks drew 34.6M views at a 3K median. Cut the weakest daily posts and put media behind the two or three that clear that median on their own.",
+      "brands": [
+        "All brands"
+      ],
+      "based_on": "Close-up · Paragon own channel"
+    },
+    {
+      "title": "Pilot a seeding tag for one hero product",
+      "priority": "Test",
+      "detail": "Hanasui's #cantikmuhanasui reached 116 accounts and 156 posts. Pilot one tag for Wardah's next hero product with one-post briefs and track its reach week by week.",
+      "brands": [
+        "Wardah"
+      ],
+      "based_on": "Patterns · Hanasui seeding tag"
+    }
+  ],
+  "portfolio_note": "Emina's TikTok views reached 93.8M, 20.4% of the panel; Labore and Tavi also posted far more than usual.",
+  "tiers": {
+    "title": "Four Mega posts gave Hanasui 68% of its creator views",
+    "takeaway": "Paragon's Mega creators are 1% of its creator posts but 31% of views, and Mid-tier adds 47%; Nano is 82% of posts for 7%."
+  },
+  "products": {
+    "title": "Paragon's cushion posts carried views; its lip posts did not",
+    "takeaway": "Paragon's 338 cushion posts drew 11.1M views and 413 lip posts 3.2M; Hanasui's niacinamide serum sat in the cart on 11 posts for 5.8M."
+  },
+  "posting": {
+    "title": "Glad2Glow warmed up for 6.6; Paragon talked payday",
+    "takeaway": "Glad2Glow ran 19 double-date captions with promo language in 11% of posts; Paragon wrote 40 payday captions but promo in only 5%."
+  },
+  "closeups": [
+    {
+      "key": "skintific",
+      "label": "One-post reach",
+      "next": "One Instagram post by @rizkyandinijuniarr brought 32% of its views; watch whether the moisturizer line gets creators next."
+    },
+    {
+      "key": "esqa",
+      "label": "Own-account offers",
+      "next": "94% of its TikTok views came from its own accounts; watch whether the buy-one-get-three offer brings creators in."
+    }
+  ],
+  "closeup_titles": [
+    "Skintific and ESQA: one big post, one brand account"
+  ],
+  "patterns": {
+    "title": "Three Glad2Glow affiliates posted 58 times for 2.5M views",
+    "takeaway": "@pretty.withcaa led Glad2Glow's affiliate burst, while Hanasui's #cantikmuhanasui spread 156 posts over 116 accounts; Paragon's 30 affiliate accounts posted 292 times for 1.1M."
+  }
+}

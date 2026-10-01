@@ -83,6 +83,40 @@ export function recordDeck(r: WeeklyReport, n: Narrative, opts: DeckOptions = {}
   return rec.slides.map((s) => s.ops);
 }
 
+/** One slide as plain text: what Ask AI is told the slide shows. Page chrome (header, footer, page number) is left out. */
+export type SlideText = { n: number; title: string; text: string };
+
+const runText = (runs: Run[]) => runs.map((r) => String(r.text ?? "") + (r.options?.breakLine ? "\n" : "")).join("").replace(/[ \t]+\n/g, "\n").trim();
+
+/** The deck's slides as text, in order, from the same layout the files are drawn from. */
+export function slideTexts(r: WeeklyReport, n: Narrative, opts: DeckOptions = {}): SlideText[] {
+  return recordDeck(r, n, opts).map((ops, i) => {
+    let title = "";
+    let size = 0;
+    const lines: string[] = [];
+    for (const op of ops) {
+      if (op.op === "text") {
+        // header and footer chrome sit above 0.6 in and below 7.0 in
+        if (op.o.y < 0.6 || op.o.y > 7.0) continue;
+        const t = runText(op.runs);
+        if (!t) continue;
+        const fs = Math.max(op.o.fontSize ?? 0, ...op.runs.map((x) => x.options?.fontSize ?? 0));
+        if (fs >= 24 && fs > size && t.length > 12) { title = t; size = fs; }
+        lines.push(t);
+      } else if (op.op === "table") {
+        for (const row of op.rows) {
+          const cells = row.map((c) => (typeof c.text === "string" ? c.text : runText(c.text)).replace(/\n/g, " ")).filter((x) => x.trim());
+          if (cells.length) lines.push(cells.join(" | "));
+        }
+      } else if (op.op === "chart") {
+        const d = op.data[0];
+        if (d) lines.push(`Chart (${d.name}): ${d.labels.map((l, j) => `${l} ${Math.round(d.values[j] * 100) / 100}`).join("; ")}`);
+      }
+    }
+    return { n: i + 1, title: title || lines[0]?.slice(0, 120) || `Slide ${i + 1}`, text: lines.join("\n").slice(0, 6000) };
+  });
+}
+
 // ---------------------------------------------------------------- drawing
 const PT = 72;
 const FONT_DIR = path.join(process.cwd(), "assets/fonts");
