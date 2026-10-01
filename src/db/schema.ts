@@ -185,6 +185,20 @@ export const posts = pgTable(
     /** profile workspaces only: what an earned post says about the subject ('positive' | 'neutral' | 'negative'); owned posts and category workspaces stay null */
     stance: text("stance"),
     stanceSource: text("stance_source"),
+    /**
+     * Caption reading (DECISIONS, 2 Oct 2026; src/captions/): what the post is about, read by the model
+     * from the caption, the same on every brand row of one url. Category workspaces, posts that matter
+     * (views over the workspace's floor, or brand accounts). The model names; SQL counts.
+     */
+    capProduct: text("cap_product"),
+    capEvent: text("cap_event"),
+    capEventName: text("cap_event_name"),
+    capOffer: text("cap_offer"),
+    capHook: text("cap_hook"),
+    capAngle: text("cap_angle"),
+    /** 'model' | 'model_failed' (tried once more) | 'model_failed_final' */
+    capSource: text("cap_source"),
+    capReadAt: ts("cap_read_at"),
     sourceFile: text("source_file"),
     loadId: uuid("load_id"),
     createdAt: createdAt(),
@@ -201,6 +215,7 @@ export const posts = pgTable(
     check("posts_source_chk", sql`${t.source} in ('owned','earned')`),
     check("posts_tier_chk", sql`${t.tier} is null or ${t.tier} in ('nano','micro','mid','macro','mega')`),
     check("posts_stance_chk", sql`${t.stance} is null or ${t.stance} in ('positive','neutral','negative')`),
+    index("posts_cap_pick_idx").on(t.workspaceId, t.capSource, t.postedAt),
   ],
 );
 
