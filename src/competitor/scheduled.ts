@@ -13,7 +13,7 @@ import { toJson } from "../db/json";
 import { deliver, type DeliveryOutcome } from "../delivery";
 import { SkillDb } from "../skills/db";
 import { loadContext } from "../skills/params";
-import { contractGroups, type WeeklyContract } from "./contract";
+import { contractGroups, contractHasClient, type ClientContract, type WeeklyContract } from "./contract";
 import { latestCompleteWeek } from "../dashboard/period";
 import { deckBuffer } from "./deck";
 import { weeklyReport } from "./facts";
@@ -27,11 +27,14 @@ import { saveReportFile, type ReportFileMeta } from "../reports/files";
 
 export type ReportFormat = "pptx" | "pdf";
 export const FORMATS: ReportFormat[] = ["pptx", "pdf"];
-export type WeeklyParams = { contract: WeeklyContract; formats: ReportFormat[]; last_week?: string };
+export type WeeklyParams = { contract: ClientContract; formats: ReportFormat[]; last_week?: string };
 
-/** What the Library shows for a weekly report; the full numbers live in the files. */
+/** What the Library shows for a weekly report, or for a version of a deck (kind "deck"); the full numbers live in the files. */
 export type WeeklyBlocks = {
-  kind: "weekly";
+  kind: "weekly" | "deck";
+  /** a deck's version: the deck it belongs to and its grain */
+  deck_id?: string;
+  grain?: "week" | "month";
   title: string;
   client: string;
   week: { iso: string; label: string; from: string; to: string };
@@ -55,16 +58,18 @@ export type WeeklyBlocks = {
 export { latestCompleteWeek };
 
 /** Shape check for a stored contract; the brand ids are checked against the workspace when the schedule is saved. */
-export function validContract(c: unknown, workspaceId: string): WeeklyContract | string {
+export function validContract(c: unknown, workspaceId: string): ClientContract | string {
   if (!c || typeof c !== "object") return "the report needs a client and a watchlist";
   const o = c as WeeklyContract;
-  const contract: WeeklyContract = { ...o, workspace: workspaceId };
+  // the weekly report carries its fixed slides, by week, for a client
+  const { slides: _s, grain: _g, ...rest } = o;
+  const contract: WeeklyContract = { ...rest, workspace: workspaceId };
   try {
     contractGroups(contract);
   } catch (e) {
     return (e as Error).message.replace(/^contract: /, "");
   }
-  return contract;
+  return contractHasClient(contract) ? (contract as ClientContract) : "the report needs a client and a watchlist";
 }
 
 export function blocksFor(r: WeeklyReport, n: Narrative, by: "model" | "fallback", problems: string[], agentName?: string, withSlides = false): WeeklyBlocks {
@@ -165,17 +170,19 @@ export async function runWeekly(agent: AgentLike, runId: string, opts: { reason?
   return { status: "ok", message: `${iso}: ${r.movers.length} mover${r.movers.length === 1 ? "" : "s"}, words by ${written.by === "model" ? "CeMO" : "the plain template"}`, report_id: reportId, week: iso, delivered, narrative_by: written.by };
 }
 
-/** Store one weekly report: the blocks (with the slide texts and the fact sheet for Ask AI) and its files. */
-export async function storeWeekly(o: { workspaceId: string; agentName?: string; runId: string | null; report: WeeklyReport; narrative: Narrative; by: "model" | "fallback"; problems: string[]; formats: ReportFormat[] }): Promise<{ reportId: string; blocks: WeeklyBlocks; saved: (ReportFileMeta & { data: Buffer })[]; title: string }> {
+/** Store one weekly report, or one version of a deck: the blocks (with the slide texts and the fact sheet for Ask AI) and its files. */
+export async function storeWeekly(o: { workspaceId: string; agentName?: string; runId: string | null; report: WeeklyReport; narrative: Narrative; by: "model" | "fallback"; problems: string[]; formats: ReportFormat[]; deck?: { id: string; name: string } }): Promise<{ reportId: string; blocks: WeeklyBlocks; saved: (ReportFileMeta & { data: Buffer })[]; title: string }> {
   const r = o.report;
   const blocks = blocksFor(r, o.narrative, o.by, o.problems, o.agentName, true);
-  const title = `${r.title} · ${r.client} · ${r.week.label}`;
+  if (o.deck) Object.assign(blocks, { kind: "deck", deck_id: o.deck.id, grain: r.grain ?? "week" });
+  const title = o.deck ? `${o.deck.name} · ${r.week.label}` : `${r.title} · ${r.client} · ${r.week.label}`;
   const rows = (await sql.query(
-    "insert into reports (workspace_id, title, source, agent_run_id, body_md, blocks) values ($1, $2, 'agent', $3, $4, $5::jsonb) returning id",
-    [o.workspaceId, title, o.runId, weeklyEmail(blocks, null, []).text, toJson(blocks)],
+    "insert into reports (workspace_id, title, source, agent_run_id, deck_id, body_md, blocks) values ($1, $2, $3, $4, $5, $6, $7::jsonb) returning id",
+    [o.workspaceId, title, o.deck ? "deck" : "agent", o.runId, o.deck?.id ?? null, weeklyEmail(blocks, null, []).text, toJson(blocks)],
   )) as { id: string }[];
   const reportId = rows[0].id;
-  const base = `${r.title.replace(/[^A-Za-z0-9]+/g, "-")}_${r.client.replace(/[^A-Za-z0-9]+/g, "-")}_${r.week.iso}`;
+  const slug = (t: string) => t.replace(/[^A-Za-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  const base = o.deck ? `${slug(o.deck.name) || "Deck"}_${r.week.iso}` : `${slug(r.title)}_${slug(r.client)}_${r.week.iso}`;
   const saved: (ReportFileMeta & { data: Buffer })[] = [];
   for (const f of o.formats) {
     const data = f === "pptx" ? await deckBuffer(r, o.narrative) : await pdfBuffer(r, o.narrative);
@@ -197,7 +204,7 @@ export async function weeklyParamsFrom(input: { contract?: unknown; formats?: un
   if (!contract.watchlist.some((w) => (w.brand_ids ?? []).length)) return { error: "pick at least one brand to watch" };
   const formats = Array.isArray(input.formats) ? input.formats.filter((f): f is ReportFormat => FORMATS.includes(f as ReportFormat)) : previous?.formats ?? FORMATS;
   if (!formats.length) return { error: "pick PowerPoint, PDF or both" };
-  const clean: WeeklyContract = {
+  const clean: ClientContract = {
     title: String(contract.title ?? "Weekly Competitor Pulse").slice(0, 60),
     workspace: workspaceId,
     client: { name: String(contract.client.name).slice(0, 60), brands: contract.client.brands.filter((b) => b.brand_ids.length).map((b) => ({ name: String(b.name).slice(0, 60), brand_ids: b.brand_ids })) },

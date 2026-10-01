@@ -3,17 +3,23 @@
  * shows is computed here, in SQL over the panel; the model only phrases them
  * (CLAUDE.md rule 1). Distinct posts throughout: an Instagram post tagging two
  * brands of one group counts once for the group.
+ *
+ * Decks (DECISIONS, 2 Oct 2026) run the same facts by week or by month, with or
+ * without a client, and add the top creators and top content when they carry
+ * those slides; findings pinned from Chats come in ready-made.
  */
 import { GENERIC_HASHTAGS } from "../config/hashtags";
 import { weeklyRules } from "../config/weekly";
 import { brandNameKeys } from "../skills/campaigns";
 import { SkillDb } from "../skills/db";
 import { loadContext } from "../skills/params";
-import { contractGroups, type WeeklyContract } from "./contract";
+import { contractGroups, contractHasClient, type WeeklyContract } from "./contract";
 import { assessAll, covered, evaluate } from "./flags";
-import { landscape, weekPeriod } from "./landscape";
-import { addDays, isoWeek, shortDay, weekLabel, weekStart } from "./weeks";
-import type { Cell, EvidencePost, Flag, Group, GroupResult, Mover, Panel, PanelPoint, Platform, WeekPoint, WeeklyReport } from "./types";
+import { landscape } from "./landscape";
+import { deckPeriod, nextStart, periodWords, stepFrom, type Grain } from "./period";
+import { cleanSlides, LANDSCAPE_SLIDES } from "./slides";
+import { shortDay } from "./weeks";
+import type { Cell, CreatorRow, EvidencePost, Finding, Flag, Group, GroupResult, Mover, Panel, PanelPoint, Platform, WeekPoint, WeeklyReport } from "./types";
 
 const PLATFORM_NAME: Record<Platform, string> = { tiktok: "TikTok", instagram: "Instagram" };
 /** Owned-account posts are captured on TikTok only in the current panel. */
@@ -32,19 +38,28 @@ function emptyPoint(week: string): WeekPoint {
 
 type SeriesRow = Omit<WeekPoint, "er" | "posts_share" | "views_share"> & { gkey: string; platform: Platform };
 
-export async function weeklyReport(contract: WeeklyContract, week: string, opts: { db?: SkillDb } = {}): Promise<WeeklyReport> {
+/** `week` is the period: a Monday or YYYY-Www for the week grain, YYYY-MM for the month grain. */
+export async function weeklyReport(contract: WeeklyContract, week: string, opts: { db?: SkillDb; findings?: Finding[] } = {}): Promise<WeeklyReport> {
   const db = opts.db ?? new SkillDb();
   const ctx = await loadContext(db, contract.workspace);
   const tz = ctx.tz;
-  const rules = weeklyRules(contract.rules);
+  const grain: Grain = contract.grain === "month" ? "month" : "week";
+  // a whitelisted literal, never input: date_trunc's unit
+  const unit = grain === "month" ? "month" : "week";
+  const words = periodWords(grain);
+  const rules = weeklyRules(contract.rules, grain);
   const platforms: Platform[] = contract.platforms?.length ? contract.platforms : ["tiktok", "instagram"];
-  const W = weekStart(week);
+  const slides = contract.slides ? cleanSlides(contract.slides) : undefined;
+  const period = deckPeriod(grain, week);
+  const W = period.from;
   const L = rules.lookback_weeks;
-  const weeks = Array.from({ length: L + 1 }, (_, i) => addDays(W, -7 * (L - i)));
+  const weeks = Array.from({ length: L + 1 }, (_, i) => stepFrom(grain, W, i - L));
   const from = weeks[0];
-  const toExcl = addDays(W, 7);
+  const toExcl = nextStart(period);
+  const step = (d: string, n: number) => stepFrom(grain, d, n);
+  const withClient = contractHasClient(contract);
   const { watchlist, portfolio, clientBrands } = contractGroups(contract);
-  const all = [...watchlist, portfolio, ...clientBrands];
+  const all = [...watchlist, ...(withClient ? [portfolio, ...clientBrands] : [])];
 
   const known = new Set(ctx.brands.map((b) => b.id));
   const unknown = all.flatMap((g) => g.brand_ids).filter((id) => !known.has(id));
@@ -56,7 +71,7 @@ export async function weeklyReport(contract: WeeklyContract, week: string, opts:
      d as (
        select distinct on (g.gkey, p.platform, p.url)
               g.gkey, p.platform, p.url, p.source, p.creator_handle, p.views, p.engagements, p.has_cart,
-              (date_trunc('week', p.posted_at at time zone $4))::date as wk
+              (date_trunc('${unit}', p.posted_at at time zone $4))::date as wk
        from posts p join g on g.brand_id = p.brand_id
        where p.workspace_id = $1 and p.platform = any($5::text[])
          and p.posted_at >= ($6::date::timestamp at time zone $4) and p.posted_at < ($7::date::timestamp at time zone $4)
@@ -78,7 +93,7 @@ export async function weeklyReport(contract: WeeklyContract, week: string, opts:
   );
   const panelRows = await db.q<PanelPoint & { platform: Platform }>(
     `with d as (
-       select distinct on (p.platform, p.url) p.platform, p.url, p.views, (date_trunc('week', p.posted_at at time zone $2))::date as wk
+       select distinct on (p.platform, p.url) p.platform, p.url, p.views, (date_trunc('${unit}', p.posted_at at time zone $2))::date as wk
        from posts p
        where p.workspace_id = $1 and p.platform = any($3::text[])
          and p.posted_at >= ($4::date::timestamp at time zone $2) and p.posted_at < ($5::date::timestamp at time zone $2)
@@ -98,7 +113,7 @@ export async function weeklyReport(contract: WeeklyContract, week: string, opts:
     const prev = hist[hist.length - 1];
     panel[pl] = { now, prev, history: hist, posts_change_pct: round(prev.posts > 0 ? (now.posts / prev.posts - 1) * 100 : null, 0), views_change_pct: round(prev.views > 0 ? (now.views / prev.views - 1) * 100 : null, 0) };
   }
-  if (platforms.every((pl) => panel[pl]!.now.posts === 0)) throw new Error(`No posts in the panel for the week of ${W}`);
+  if (platforms.every((pl) => panel[pl]!.now.posts === 0)) throw new Error(`No posts in the panel for the ${words.unit} of ${W}`);
 
   // ---- cells
   const point = (g: Group, pl: Platform, wk: string): WeekPoint => {
@@ -153,7 +168,7 @@ export async function weeklyReport(contract: WeeklyContract, week: string, opts:
   const movers: Mover[] = [];
   for (const l of leaders) {
     const r = watch.find((w) => w.group.key === l.key)!;
-    movers.push(await drivers(db, ctx.workspaceId, tz, r, l.platform, l.flag, weeks, rules, flagged.filter((f) => f.key === l.key && f.flag !== l.flag).map((f) => ({ platform: f.platform, flag: f.flag })), evidence, brandNameKeys(ctx).keys));
+    movers.push(await drivers(db, ctx.workspaceId, tz, r, l.platform, l.flag, weeks, rules, flagged.filter((f) => f.key === l.key && f.flag !== l.flag).map((f) => ({ platform: f.platform, flag: f.flag })), evidence, brandNameKeys(ctx).keys, { unit, step }));
   }
 
   // ---- notes the reader needs next to the numbers
@@ -161,7 +176,7 @@ export async function weeklyReport(contract: WeeklyContract, week: string, opts:
   for (const pl of platforms) {
     const pn = panel[pl]!;
     if (pn.posts_change_pct != null && Math.abs(pn.posts_change_pct) >= rules.panel_swing_pct) {
-      notes.push({ kind: "coverage", text: `${PLATFORM_NAME[pl]}: the panel holds ${pn.now.posts.toLocaleString("en-US")} posts this week against ${pn.prev.posts.toLocaleString("en-US")} last week (${pn.posts_change_pct > 0 ? "+" : ""}${pn.posts_change_pct}%). Every brand's count moves with that, so brands are judged on their share of the panel.` });
+      notes.push({ kind: "coverage", text: `${PLATFORM_NAME[pl]}: the panel holds ${pn.now.posts.toLocaleString("en-US")} posts ${words.this} against ${pn.prev.posts.toLocaleString("en-US")} ${words.last} (${pn.posts_change_pct > 0 ? "+" : ""}${pn.posts_change_pct}%). Every brand's count moves with that, so brands are judged on their share of the panel.` });
     }
   }
   const lastSeen = await db.q<{ gkey: string; platform: Platform; last: string | null; n: number }>(
@@ -192,20 +207,29 @@ export async function weeklyReport(contract: WeeklyContract, week: string, opts:
     notes.push({ kind: "coverage", text: `${g.name} is outside current coverage: ${[untracked, ...parts].filter(Boolean).join("; ")}.` });
   }
   const snapshots = await db.one<{ n: number }>("select count(*)::int as n from post_snapshots s join posts p on p.id = s.post_id where p.workspace_id = $1", [ctx.workspaceId]);
-  if (!snapshots?.n) notes.push({ kind: "method", text: "Views and engagement are as captured once per post, not at a fixed age, so this week's posts have had less time to collect views than last week's. The live collector measures every post at day 7." });
+  if (!snapshots?.n) notes.push({ kind: "method", text: `Views and engagement are as captured once per post, not at a fixed age, so ${words.this}'s posts have had less time to collect views than ${words.last}'s. The live collector measures every post at day 7.` });
 
-  const scene = await landscape(db, {
-    workspaceId: ctx.workspaceId, tz, platforms, period: weekPeriod(W), clientKey: portfolio.key, clientName: contract.client.name, brandKeys: brandNameKeys(ctx).keys,
-    groups: [portfolio, ...watch.filter((r) => platforms.some((pl) => r.cells[pl]?.covered)).map((r) => r.group)],
-  });
+  const coveredWatch = watch.filter((r) => platforms.some((pl) => r.cells[pl]?.covered)).map((r) => r.group);
+  const scene = !slides || slides.some((k) => LANDSCAPE_SLIDES.has(k))
+    ? await landscape(db, {
+        workspaceId: ctx.workspaceId, tz, platforms, period: { from: W, to: toExcl, prevFrom: weeks[L - 1] }, clientKey: withClient ? portfolio.key : null, clientName: contract.client?.name ?? "", brandKeys: brandNameKeys(ctx).keys,
+        groups: [...(withClient ? [portfolio] : []), ...coveredWatch],
+      })
+    : undefined;
+  const reach = [...(withClient ? [portfolio] : []), ...coveredWatch];
+  const creators = slides?.includes("creators") ? await topCreators(db, { workspaceId: ctx.workspaceId, tz, platforms, groups: reach, from, at: W, toExcl }) : undefined;
+  const content = slides?.includes("content") ? await topContent(db, { workspaceId: ctx.workspaceId, tz, platforms, groups: reach, at: W, toExcl }, evidence) : undefined;
+  const prev = deckPeriod(grain, weeks[L - 1]);
 
   return {
     version: 1,
     title: contract.title ?? "Weekly Competitor Pulse",
-    client: contract.client.name,
+    client: withClient ? contract.client!.name : "",
     workspace_id: ctx.workspaceId,
-    week: { from: W, to: addDays(W, 6), label: weekLabel(W), iso: isoWeek(W) },
-    previous_week: { from: weeks[L - 1], to: addDays(weeks[L - 1], 6), label: weekLabel(weeks[L - 1]) },
+    grain,
+    ...(slides ? { slides } : {}),
+    week: { from: W, to: period.to, label: period.label, iso: period.key },
+    previous_week: { from: prev.from, to: prev.to, label: prev.label },
     history_weeks: weeks.slice(0, L),
     rules,
     platforms,
@@ -218,7 +242,10 @@ export async function weeklyReport(contract: WeeklyContract, week: string, opts:
     near_misses: nearMisses,
     notes,
     evidence,
-    landscape: scene,
+    ...(scene ? { landscape: scene } : {}),
+    ...(creators ? { creators } : {}),
+    ...(content ? { content } : {}),
+    ...(opts.findings && slides?.includes("findings") ? { findings: opts.findings } : {}),
     data_as_of: ctx.asOf,
     generated_at: new Date().toISOString(),
   };
@@ -229,7 +256,7 @@ type PostRow = { url: string; creator_handle: string | null; source: string; tie
 /** The fixed lenses behind one highlighted move: who, what, campaign, owned vs earned, action. */
 async function drivers(
   db: SkillDb, workspaceId: string, tz: string, r: GroupResult, platform: Platform, flag: Flag, weeks: string[], rules: ReturnType<typeof weeklyRules>,
-  otherFlags: Mover["other_flags"], evidence: EvidencePost[], brandKeys: string[],
+  otherFlags: Mover["other_flags"], evidence: EvidencePost[], brandKeys: string[], g8: { unit: "week" | "month"; step: (d: string, n: number) => string },
 ): Promise<Mover> {
   const g = r.group;
   const cell = r.cells[platform]!;
@@ -237,15 +264,15 @@ async function drivers(
   const prev = cell.prev!;
   const W = weeks[weeks.length - 1];
   const P = weeks[weeks.length - 2];
-  // one week further back, so last week's creators are judged against a full lookback too
-  const from = addDays(weeks[0], -7);
-  const toExcl = addDays(W, 7);
+  // one period further back, so the previous period's creators are judged against a full lookback too
+  const from = g8.step(weeks[0], -1);
+  const toExcl = g8.step(W, 1);
   const L = weeks.length - 1;
   // one CTE shape for every lens: the group's distinct posts on this platform across the lookback and the week
   const base = `with d as (
        select distinct on (p.url) p.url, p.creator_handle, p.source, p.tier, p.followers_at_post as followers, p.views, p.engagements,
               p.content_format, p.has_cart, p.product_name, p.caption, p.hashtags, p.posted_at,
-              to_char((date_trunc('week', p.posted_at at time zone $3))::date, 'YYYY-MM-DD') as wk
+              to_char((date_trunc('${g8.unit}', p.posted_at at time zone $3))::date, 'YYYY-MM-DD') as wk
        from posts p
        where p.workspace_id = $1 and p.platform = $2 and p.brand_id = any($4::text[])
          and p.posted_at >= ($5::date::timestamp at time zone $3) and p.posted_at < ($6::date::timestamp at time zone $3)
@@ -260,7 +287,7 @@ async function drivers(
                 select 1 from d h where h.creator_handle = d.creator_handle and h.source = 'earned' and h.wk < $7 and h.wk >= $8))::int as new_creators,
               count(distinct d.creator_handle)::int as creators
        from d where d.wk = $7 and d.source = 'earned' and d.creator_handle is not null`,
-      [...args, wk, addDays(wk, -7 * L)],
+      [...args, wk, g8.step(wk, -L)],
     )) ?? { new_creators: 0, creators: 0 };
   const [creators, creatorsPrev] = [await newCreators(W), await newCreators(P)];
   const tiers = await db.q<{ tier: string; now: number; prev: number }>(
@@ -301,13 +328,13 @@ async function drivers(
        select h as tag, count(distinct p.url)::int as posts_all
        from posts p, unnest(p.hashtags) h
        where p.workspace_id = $1 and p.platform = $2
-         and p.posted_at >= ($7::date::timestamp at time zone $3) and p.posted_at < (($7::date + 7)::timestamp at time zone $3)
+         and p.posted_at >= ($7::date::timestamp at time zone $3) and p.posted_at < ($11::date::timestamp at time zone $3)
          and h in (select tag from agg where creators >= $10)
        group by 1
      )
      select agg.tag, agg.creators, agg.posts, agg.views, round(agg.posts::numeric / nullif(tot.posts_all, 0) * 100, 1)::float8 as brand_share
      from agg left join tot using (tag) where agg.creators >= $10 order by agg.creators desc, agg.views desc limit 5`,
-    [...args, W, GENERIC_HASHTAGS, brandKeys, MIN_TAG_CREATORS],
+    [...args, W, GENERIC_HASHTAGS, brandKeys, MIN_TAG_CREATORS, toExcl],
   );
   const products = CART_PLATFORMS.includes(platform)
     ? await db.q<{ name: string; posts: number; views: number }>(
@@ -378,4 +405,102 @@ async function drivers(
       : null,
     distribution: { boosted: now.views >= rules.boosted_min_views && now.er != null && now.er < rules.boosted_er_pct, er: now.er, views: now.views },
   };
+}
+
+type Reach = { workspaceId: string; tz: string; platforms: Platform[]; groups: Group[]; at: string; toExcl: string };
+
+/**
+ * The top-creators slide: earned posts across the brands the deck covers, the
+ * creators who brought the most views in the period on each platform (views are
+ * not compared across platforms: ten split evenly between them), and whether
+ * each is new to those brands (no post for them since the start of the lookback).
+ */
+async function topCreators(db: SkillDb, o: Reach & { from: string }): Promise<CreatorRow[]> {
+  const pairs = o.groups.flatMap((g) => g.brand_ids.map((b) => [g.key, b] as const));
+  if (!pairs.length) return [];
+  const rows = await db.q<{ handle: string; platform: Platform; tier: string | null; followers: number | null; posts: number; views: number; eng: number | null; vr: number | null; gkeys: string[]; seen: boolean; top_url: string | null; top_views: number | null }>(
+    `with g as (select * from unnest($2::text[], $3::text[]) as t(gkey, brand_id)),
+     d as (
+       select distinct on (p.platform, p.url, g.gkey) g.gkey, p.platform, p.url, p.creator_handle, p.tier, p.followers_at_post as followers, p.views, p.engagements, p.posted_at
+       from posts p join g on g.brand_id = p.brand_id
+       where p.workspace_id = $1 and p.platform = any($5::text[]) and p.source = 'earned' and p.creator_handle is not null
+         and p.posted_at >= ($6::date::timestamp at time zone $4) and p.posted_at < ($8::date::timestamp at time zone $4)
+       order by p.platform, p.url, g.gkey, p.views desc nulls last
+     ),
+     cur as (select * from d where posted_at >= ($7::date::timestamp at time zone $4)),
+     one as (select distinct on (platform, url) * from cur order by platform, url, views desc nulls last),
+     agg as (
+       select platform, creator_handle as handle, count(*)::int as posts, coalesce(sum(views), 0)::float8 as views,
+              sum(engagements) filter (where ${RATED})::float8 as eng, sum(views) filter (where ${RATED})::float8 as vr,
+              max(followers)::int as followers, (array_agg(tier order by followers desc nulls last))[1] as tier,
+              (array_agg(url order by views desc nulls last))[1] as top_url, (array_agg(views order by views desc nulls last))[1]::float8 as top_views
+       from one group by 1, 2
+     ),
+     gk as (select platform, creator_handle as handle, gkey, count(*) as n from cur group by 1, 2, 3),
+     top as (select a.*, row_number() over (partition by a.platform order by a.views desc, a.posts desc, a.handle) as rn from agg a)
+     select a.*,
+            (select array_agg(gkey order by n desc, gkey) from gk where gk.platform = a.platform and gk.handle = a.handle) as gkeys,
+            exists (select 1 from d where d.platform = a.platform and d.creator_handle = a.handle and d.posted_at < ($7::date::timestamp at time zone $4)) as seen
+     from top a where a.rn <= $9 order by array_position($5::text[], a.platform), a.rn`,
+    [o.workspaceId, pairs.map((p) => p[0]), pairs.map((p) => p[1]), o.tz, o.platforms, o.from, o.at, o.toExcl, Math.floor(10 / Math.max(1, o.platforms.length))],
+  );
+  const name = new Map(o.groups.map((g) => [g.key, g.name]));
+  return rows.map((r) => ({
+    handle: r.handle,
+    platform: r.platform,
+    tier: r.tier,
+    followers: r.followers,
+    posts: r.posts,
+    views: r.views,
+    er: round(r.vr ? pct(r.eng ?? 0, r.vr) : null, 1),
+    brands: (r.gkeys ?? []).map((k) => name.get(k) ?? k),
+    first_time: !r.seen,
+    top_post: r.top_url ? { url: r.top_url, views: r.top_views } : null,
+  }));
+}
+
+/** The top-content slide: the period's most-viewed posts across the brands the deck covers, six split evenly between the platforms, cited as evidence. */
+async function topContent(db: SkillDb, o: Reach, evidence: EvidencePost[]): Promise<EvidencePost[]> {
+  const pairs = o.groups.flatMap((g) => g.brand_ids.map((b) => [g.key, b] as const));
+  if (!pairs.length) return [];
+  const rows = await db.q<PostRow & { gkey: string; platform: Platform }>(
+    `with g as (select * from unnest($2::text[], $3::text[]) as t(gkey, brand_id)),
+     d as (
+       select distinct on (p.platform, p.url) g.gkey, p.platform, p.url, p.creator_handle, p.source, p.tier, p.followers_at_post as followers,
+              to_char(p.posted_at at time zone $4, 'YYYY-MM-DD') as posted_at, p.views::float8 as views, p.engagements::float8 as engagements,
+              p.content_format, p.has_cart, p.product_name, p.caption
+       from posts p join g on g.brand_id = p.brand_id
+       where p.workspace_id = $1 and p.platform = any($5::text[])
+         and p.posted_at >= ($6::date::timestamp at time zone $4) and p.posted_at < ($7::date::timestamp at time zone $4)
+       order by p.platform, p.url, p.views desc nulls last, g.gkey
+     ),
+     top as (select d.*, row_number() over (partition by platform order by views desc nulls last, url) as rn from d)
+     select * from top where rn <= $8 order by array_position($5::text[], platform), rn`,
+    [o.workspaceId, pairs.map((p) => p[0]), pairs.map((p) => p[1]), o.tz, o.platforms, o.at, o.toExcl, Math.floor(6 / Math.max(1, o.platforms.length))],
+  );
+  const name = new Map(o.groups.map((g) => [g.key, g.name]));
+  return rows.map((p) => {
+    // a post a driver slide already cites keeps its ref
+    const cited = evidence.find((e) => e.url === p.url);
+    if (cited) return cited;
+    const e: EvidencePost = {
+      ref: `P${evidence.length + 1}`,
+      url: p.url,
+      platform: p.platform,
+      group: name.get(p.gkey) ?? p.gkey,
+      creator_handle: p.creator_handle,
+      source: p.source,
+      tier: p.tier,
+      followers: p.followers,
+      posted_at: p.posted_at,
+      views: p.views,
+      er: p.views && p.views > 0 && p.engagements != null && p.engagements <= p.views ? round((p.engagements / p.views) * 100, 1) : null,
+      content_format: p.content_format,
+      has_cart: p.has_cart,
+      product_name: p.product_name,
+      caption: p.caption ? p.caption.replace(/\s+/g, " ").trim().slice(0, 220) : null,
+    };
+    evidence.push(e);
+    return e;
+  });
 }

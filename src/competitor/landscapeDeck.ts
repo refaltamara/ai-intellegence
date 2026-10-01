@@ -7,10 +7,11 @@
  */
 import type PptxGenJS from "pptxgenjs";
 import { add, C, chip, chrome, CW, FONT, M, text, title, W, type Runs, type Slide } from "./draw";
-import type { CloseUp, Landscape, TierName } from "./landscape";
+import type { CloseUp, TierName } from "./landscape";
 import type { Narrative } from "./narrative";
+import { hasClient } from "./slides";
 import type { WeeklyReport } from "./types";
-import { categoryCell, closeupLines, closeupPicks, compact, dayMonth, hourLabel, int, PATTERN_HOW, PATTERN_NAME, patternSignal, postingBehind, productName, TIER_NAME, tierLegend } from "./view";
+import { categoryCell, closeupLines, closeupPicks, compact, dayMonth, hourLabel, int, PATTERN_NAME, patternHow, patternSignal, postingBehind, productName, TIER_NAME, tierLegend, wordsOf } from "./view";
 
 const TIER_COLOR: Record<TierName, string> = { nano: "D5DBE4", micro: "94A3B8", mid: "475569", macro: "0F172A", mega: "2563EB", unknown: "E2E8F0" };
 const LABEL = { fontSize: 10, color: C.ink4, bold: true, charSpacing: 1 } as const;
@@ -77,7 +78,7 @@ export function tiersSlide(pres: PptxGenJS, r: WeeklyReport, n: Narrative, page:
   const best = [...ov].sort((a, b) => b.views_share - a.views_share)[0];
   const after = hy + 0.4 + rows.length * rh + 0.3;
   footnote(s, [
-    bench ? `Median views per creator post this week: ${bench}.` : "",
+    bench ? `Median views per creator post ${wordsOf(r).this}: ${bench}.` : "",
     big ? ` Across these brands ${TIER_NAME[big.tier]} is ${big.content_share}% of creator posts and ${big.views_share}% of views${best && best.tier !== big.tier ? `; ${TIER_NAME[best.tier]} is ${best.content_share}% of posts and ${best.views_share}% of views` : ""}.` : "",
     " Creator posts only; brand accounts excluded.",
   ].join(""), Math.min(6.3, after));
@@ -113,10 +114,11 @@ export function postingSlide(pres: PptxGenJS, r: WeeklyReport, n: Narrative, pag
   const s = pres.addSlide();
   chrome(s, r, page, sampleLabel);
   title(s, n.posting?.title ?? "Posting pattern", n.posting?.takeaway);
-  // left: posts per day, last week then this week
+  // left: posts per day, the period before then this one
   const cx = M;
   const cw = 6.05;
-  add(s, `WATCHLIST + ${r.client.toUpperCase()} · POSTS PER DAY`, { x: cx, y: 1.68, w: cw, h: 0.24, ...LABEL });
+  const w8 = wordsOf(r);
+  add(s, `${r.client ? `WATCHLIST + ${r.client.toUpperCase()}` : "WATCHLIST"} · POSTS PER DAY`, { x: cx, y: 1.68, w: cw, h: 0.24, ...LABEL });
   const cur = P.days.filter((d) => d.current);
   const sorted = [...cur].map((d) => d.posts).sort((a, b) => a - b);
   const median = sorted[Math.floor(sorted.length / 2)] ?? 0;
@@ -126,21 +128,25 @@ export function postingSlide(pres: PptxGenJS, r: WeeklyReport, n: Narrative, pag
   const top = 2.25, base = 4.95;
   const band = cw / P.days.length;
   const bw = band * 0.68;
+  // a month of days is too many to label each: the counts go above the spike only, the dates every week
+  const dense = P.days.length > 14;
   P.days.forEach((d, i) => {
     const h = ((base - top) * d.posts) / max;
     const x = cx + band * i + (band - bw) / 2;
     const color = d.date === spike ? C.blue5 : d.current ? "94A3B8" : "D5DBE4";
     if (h > 0) s.addShape("rect", { x, y: base - h, w: bw, h, fill: { color }, line: { color, width: 0 } });
-    add(s, int(d.posts), { x: cx + band * i - 0.05, y: base - h - 0.24, w: band + 0.1, h: 0.22, fontSize: 8, color: d.current ? C.ink : C.ink4, align: "center" });
-    add(s, String(Number(d.date.slice(8, 10))), { x: cx + band * i, y: base + 0.05, w: band, h: 0.2, fontSize: 8.5, color: C.ink6, align: "center" });
+    if (!dense || d.date === spike) add(s, int(d.posts), { x: cx + band * i - (dense ? 0.25 : 0.05), y: base - h - 0.24, w: band + (dense ? 0.5 : 0.1), h: 0.22, fontSize: 8, color: d.current ? C.ink : C.ink4, align: "center" });
+    if (!dense || (Number(d.date.slice(8, 10)) - 1) % 7 === 0) add(s, String(Number(d.date.slice(8, 10))), { x: cx + band * i - (dense ? 0.15 : 0), y: base + 0.05, w: band + (dense ? 0.3 : 0), h: 0.2, fontSize: 8.5, color: C.ink6, align: "center" });
   });
   s.addShape("line", { x: cx, y: base, w: cw, h: 0, line: { color: C.line, width: 0.75 } });
-  add(s, `last week · ${dayMonth(P.days[0].date)}–${dayMonth(P.days[6].date)}`, { x: cx, y: base + 0.27, w: cw / 2, h: 0.2, fontSize: 8.5, color: C.ink4, align: "center" });
-  add(s, `this week · ${dayMonth(P.days[7].date)}–${dayMonth(P.days[13].date)}`, { x: cx + cw / 2, y: base + 0.27, w: cw / 2, h: 0.2, fontSize: 8.5, color: C.ink6, align: "center", bold: true });
+  const before = P.days.filter((d) => !d.current);
+  const split = before.length * 2 === P.days.length ? cw / 2 : (cw * before.length) / P.days.length;
+  if (before.length) add(s, `${w8.last} · ${dayMonth(before[0].date)}–${dayMonth(before[before.length - 1].date)}`, { x: cx, y: base + 0.27, w: split, h: 0.2, fontSize: 8.5, color: C.ink4, align: "center" });
+  if (cur.length) add(s, `${w8.this} · ${dayMonth(cur[0].date)}–${dayMonth(cur[cur.length - 1].date)}`, { x: cx + split, y: base + 0.27, w: cw - split, h: 0.2, fontSize: 8.5, color: C.ink6, align: "center", bold: true });
   const curPosts = cur.reduce((a, d) => a + d.posts, 0);
   const prevPosts = P.days.filter((d) => !d.current).reduce((a, d) => a + d.posts, 0);
   const promoPeak = [...cur].sort((a, b) => b.promo_posts - a.promo_posts)[0];
-  add(s, `${int(curPosts)} posts this week against ${int(prevPosts)} last week.${promoPeak?.promo_posts ? ` Promo captions peak on ${dayMonth(promoPeak.date)} (${int(promoPeak.promo_posts)} posts).` : ""}${spike ? ` Blue = this week's spike.` : ""}`, { x: cx, y: base + 0.55, w: cw, h: 0.5, fontSize: 10, color: C.ink6 });
+  add(s, `${int(curPosts)} posts ${w8.this} against ${int(prevPosts)} ${w8.last}.${promoPeak?.promo_posts ? ` Promo captions peak on ${dayMonth(promoPeak.date)} (${int(promoPeak.promo_posts)} posts).` : ""}${spike ? ` Blue = ${w8.this}'s spike.` : ""}`, { x: cx, y: base + 0.55, w: cw, h: 0.5, fontSize: 10, color: C.ink6 });
 
   // right: per brand
   const rx = M + cw + 0.4;
@@ -164,7 +170,7 @@ export function postingSlide(pres: PptxGenJS, r: WeeklyReport, n: Narrative, pag
   const hm = P.hour_median_range;
   add(s, [
     text("Time of day: ", { fontSize: 10.5, bold: true, color: C.ink }),
-    text(`${w ? `${w.share}% of this week's posts go up between ${hourLabel(w.from)} and ${hourLabel(w.to)} ${tz}` : "Posting is spread across the day"}${P.peak_hour != null ? `, peaking at ${hourLabel(P.peak_hour)}` : ""}.${hm ? ` Median views per post by hour run from ${compact(hm.low)} to ${compact(hm.high)}.` : ""}`, { fontSize: 10.5, color: C.ink }),
+    text(`${w ? `${w.share}% of ${w8.this}'s posts go up between ${hourLabel(w.from)} and ${hourLabel(w.to)} ${tz}` : "Posting is spread across the day"}${P.peak_hour != null ? `, peaking at ${hourLabel(P.peak_hour)}` : ""}.${hm ? ` Median views per post by hour run from ${compact(hm.low)} to ${compact(hm.high)}.` : ""}`, { fontSize: 10.5, color: C.ink }),
   ], { x: M, y: 6.2, w: CW, h: 0.5 });
   s.addNotes(`${n.posting?.title ?? ""}\n${n.posting?.takeaway ?? ""}`);
 }
@@ -181,7 +187,7 @@ function closeupColumn(s: Slide, r: WeeklyReport, c: CloseUp, words: { label: st
     add(s, l, { x: x + i * sw, y: 2.7, w: sw, h: 0.26, fontSize: 10, color: C.ink6 });
   });
   s.addShape("line", { x, y: 3.05, w, h: 0, line: { color: C.line, width: 0.75 } });
-  const lines = [...closeupLines(c, L.posting.brands.find((b) => b.key === c.key)), { label: "Next", text: words?.next ?? "", muted: false }];
+  const lines = [...closeupLines(c, L.posting.brands.find((b) => b.key === c.key), wordsOf(r).this), { label: "Next", text: words?.next ?? "", muted: false }];
   const lh = 0.74;
   lines.forEach((l, i) => {
     const y = 3.12 + i * lh;
@@ -241,7 +247,7 @@ export function patternsSlide(pres: PptxGenJS, r: WeeklyReport, n: Narrative, pa
   const bh = Math.min(6.9 - by, 0.5 + 0.48 * kinds.length);
   s.addShape("roundRect", { x: M, y: by, w: CW, h: bh, fill: { color: C.blue05 }, line: { color: C.line, width: 0.75 }, rectRadius: 0.08 });
   const runs: Runs = [text("HOW WE SPOT EACH PATTERN", { fontSize: 9.5, bold: true, color: C.ink4, breakLine: true, charSpacing: 1, paraSpaceAfter: 4 })];
-  kinds.forEach((k, i) => runs.push(text(`${PATTERN_NAME[k]}. `, { fontSize: 10, bold: true, color: C.ink }), text(PATTERN_HOW[k], { fontSize: 10, color: C.ink6, breakLine: i < kinds.length - 1, paraSpaceAfter: 4 })));
+  kinds.forEach((k, i) => runs.push(text(`${PATTERN_NAME[k]}. `, { fontSize: 10, bold: true, color: C.ink }), text(patternHow(k, r.grain), { fontSize: 10, color: C.ink6, breakLine: i < kinds.length - 1, paraSpaceAfter: 4 })));
   add(s, runs, { x: M + 0.25, y: by + 0.15, w: CW - 0.5, h: bh - 0.3, fit: "shrink" });
   s.addNotes(`${n.patterns?.title ?? ""}\n${n.patterns?.takeaway ?? ""}\n` + shown.map((p) => `${PATTERN_NAME[p.kind]} · ${p.name}: ${p.examples.map((e) => e.url).join(" ")}`).join("\n"));
 }
@@ -256,7 +262,7 @@ const PRIORITY_STYLE: Record<string, { fill: string; color: string }> = {
 export function movesSlide(pres: PptxGenJS, r: WeeklyReport, n: Narrative, page: number, sampleLabel?: string) {
   const s = pres.addSlide();
   chrome(s, r, page, sampleLabel);
-  title(s, n.actions_title ?? `What ${r.client} should do next`, "From this week's moves, creator tiers, products, timing and patterns");
+  title(s, n.actions_title ?? (r.client ? `What ${r.client} should do next` : "What to do next"), `From ${wordsOf(r).this}'s moves, creator tiers, products, timing and patterns`);
   const k = n.actions.length;
   const top = 1.72;
   const rh = Math.min(1.08, (6.95 - top) / k);
@@ -268,20 +274,7 @@ export function movesSlide(pres: PptxGenJS, r: WeeklyReport, n: Narrative, page:
     add(s, [text(a.detail, { fontSize: 10.5, color: C.ink, breakLine: true }), text(`Based on: ${a.based_on}`, { fontSize: 8.5, color: C.ink4 })], { x: M + 3.85, y: y + 0.1, w: 6.75, h: rh - 0.16, fit: "shrink" });
     const p = PRIORITY_STYLE[a.priority ?? "Medium"] ?? PRIORITY_STYLE.Medium;
     chip(s, (a.priority ?? "Medium").toUpperCase(), W - M - 1.3, y + 0.14, { w: 1.3, fill: p.fill, color: p.color });
-    add(s, a.brands.join(" · "), { x: W - M - 1.6, y: y + 0.46, w: 1.6, h: rh - 0.55, fontSize: 9, color: C.ink6, align: "right", fit: "shrink" });
+    if (hasClient(r)) add(s, a.brands.join(" · "), { x: W - M - 1.6, y: y + 0.46, w: 1.6, h: rh - 0.55, fontSize: 9, color: C.ink6, align: "right", fit: "shrink" });
   });
   s.addNotes(n.actions.map((a, i) => `${i + 1}. [${a.priority ?? ""}] ${a.title} — ${a.detail} (${a.brands.join(", ")}; based on ${a.based_on})`).join("\n"));
-}
-
-/** The landscape slides in deck order; returns how many pages they took. */
-export function landscapeSlides(pres: PptxGenJS, r: WeeklyReport, n: Narrative, startPage: number, sampleLabel?: string): number {
-  const L: Landscape | undefined = r.landscape;
-  if (!L) return 0;
-  let page = startPage;
-  if (L.tiers.rows.length) tiersSlide(pres, r, n, page++, sampleLabel);
-  if (L.products.length) productsSlide(pres, r, n, page++, sampleLabel);
-  if (L.posting.posts) postingSlide(pres, r, n, page++, sampleLabel);
-  page += closeupSlides(pres, r, n, page, sampleLabel);
-  if (L.patterns.length) patternsSlide(pres, r, n, page++, sampleLabel);
-  return page - startPage;
 }

@@ -50,6 +50,21 @@ export const WEEKLY_RULES: WeeklyRules = {
   panel_swing_pct: 30,
 };
 
-export function weeklyRules(overrides?: Partial<WeeklyRules> | null): WeeklyRules {
-  return { ...WEEKLY_RULES, ...(overrides ?? {}) };
+/**
+ * A deck that runs month on month (Decks, 2 Oct 2026) judges each brand against
+ * its own last three months (TikTok in the panel starts in April 2026, so a
+ * longer lookback would leave every brand out of coverage), needs two of them
+ * with posts, and scales the size floors to a month. The field names keep
+ * "weeks"; read them as periods.
+ */
+export const MONTHLY_RULES: Partial<WeeklyRules> = {
+  lookback_weeks: 3,
+  min_history_weeks: 2,
+  min_posts: 100,
+  min_views: 4_000_000,
+  boosted_min_views: 20_000_000,
+};
+
+export function weeklyRules(overrides?: Partial<WeeklyRules> | null, grain: "week" | "month" = "week"): WeeklyRules {
+  return { ...WEEKLY_RULES, ...(grain === "month" ? MONTHLY_RULES : {}), ...(overrides ?? {}) };
 }

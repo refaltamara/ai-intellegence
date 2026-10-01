@@ -29,10 +29,11 @@ export type ReportBlocks = {
   kind?: string;
   week?: { iso: string; label: string };
 };
-export type ReportRow = { id: string; workspace_id: string; title: string; source: "agent" | "ask"; skill_run_id: string | null; agent_run_id: string | null; body_md: string | null; blocks: ReportBlocks; created_at: string };
+export type ReportRow = { id: string; workspace_id: string; title: string; source: "agent" | "ask" | "deck"; deck_id?: string | null; skill_run_id: string | null; agent_run_id: string | null; body_md: string | null; blocks: ReportBlocks; created_at: string };
 
+/** The Reports list: every report but a deck's versions, which live in Decks. */
 export async function listReports(workspaceId: string, limit = 50): Promise<ReportRow[]> {
-  return (await sql.query("select id, workspace_id, title, source, skill_run_id, agent_run_id, created_at, jsonb_build_object('skill', blocks->'skill', 'diff', blocks->'diff', 'data_window', blocks->'data_window', 'agent_name', blocks->'agent_name', 'kind', blocks->'kind', 'week', blocks->'week') as blocks from reports where workspace_id = $1 order by created_at desc limit $2", [workspaceId, limit])) as ReportRow[];
+  return (await sql.query("select id, workspace_id, title, source, skill_run_id, agent_run_id, created_at, jsonb_build_object('skill', blocks->'skill', 'diff', blocks->'diff', 'data_window', blocks->'data_window', 'agent_name', blocks->'agent_name', 'kind', blocks->'kind', 'week', blocks->'week') as blocks from reports where workspace_id = $1 and source <> 'deck' order by created_at desc limit $2", [workspaceId, limit])) as ReportRow[];
 }
 export async function getReport(id: string, workspaceId: string): Promise<ReportRow | null> {
   const r = (await sql.query("select * from reports where id = $1 and workspace_id = $2", [id, workspaceId])) as ReportRow[];

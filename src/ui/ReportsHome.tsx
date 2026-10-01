@@ -10,7 +10,7 @@ import { useRouter } from "next/navigation";
 import { useState, type ReactNode } from "react";
 import type { AgentDraft } from "@/agents/promote";
 import type { AgentRow, AgentRunRow } from "@/agents/store";
-import type { WeeklyContract } from "@/competitor/contract";
+import type { ClientContract as WeeklyContract } from "@/competitor/contract";
 import type { ReportRow } from "@/reports/store";
 import { fmtDate } from "./format";
 import { WeeklyForm } from "./WeeklyForm";

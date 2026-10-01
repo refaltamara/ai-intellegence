@@ -65,6 +65,7 @@ export function Ask({ initialConversation, initialMessages, prefill, stats, clie
   const [text, setText] = useState(prefill ?? fromDashboard?.context.question ?? "");
   const [pendingAsk, setPendingAsk] = useState(fromDashboard);
   const [busy, setBusy] = useState(false);
+  const [deckBusy, setDeckBusy] = useState(false);
   const [open, setOpen] = useState<Record<string, string[]>>({});
   const [toast, setToast] = useState("");
   const [files, setFiles] = useState<Attachment[]>([]);
@@ -354,6 +355,18 @@ export function Ask({ initialConversation, initialMessages, prefill, stats, clie
                               if (j.error) { showToast(j.error); return; }
                               router.push(`/reports/${j.id}`);
                             }}>Turn into a report</button>
+                            {copy.kind !== "profile" && (
+                              <button className="btn sm" disabled={!conversationId || busy || deckBusy} title="A deck from this conversation: every analysis becomes a slide, run again for each version, next to a scoreboard and the moves" onClick={async () => {
+                                if (!conversationId) return;
+                                setDeckBusy(true);
+                                showToast("Making the deck from this conversation… (about a minute)");
+                                const r = await fetch("/api/decks/from-chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ conversation_id: conversationId }) });
+                                const j = await r.json().catch(() => ({}));
+                                setDeckBusy(false);
+                                if (!r.ok || !j.deck) { showToast(j.error ?? "Could not make the deck"); return; }
+                                router.push(`/decks/${j.deck.id}${j.version?.report_id ? `?v=${j.version.report_id}` : ""}`);
+                              }}>{deckBusy ? "Making the deck…" : "Turn into a deck"}</button>
+                            )}
                             <button className="btn sm" onClick={() => { navigator.clipboard?.writeText(m.text.replace(/<ev id="(ev_\d+)"><\/ev>/g, "[$1]").replace(/<\/?counter>/g, "")); showToast("Copied"); }}>Copy</button>
                             {m.miss ? <span className="pill" title="citations to evidence that does not exist were removed">evidence_miss {m.miss}</span> : null}
                             {m.timings && <span className="pill" title={`setup ${m.timings.setup_ms} ms · effort ${m.timings.effort}`}>{(m.timings.total_ms / 1000).toFixed(1)}s</span>}
@@ -408,7 +421,7 @@ export function Ask({ initialConversation, initialMessages, prefill, stats, clie
             onCloseTab={(id) => setClosedTabs((s) => new Set([...s, id]))}
             states={paneStates} onState={onState} onAction={act} onNote={note} busy={busy}
             decisionId={decisionId} conversationId={conversationId} brands={pane?.brands ?? []} months={pane?.months ?? []}
-            expanded={expanded} onExpand={() => setExpanded((x) => !x)} toast={showToast}
+            expanded={expanded} onExpand={() => setExpanded((x) => !x)} toast={showToast} kind={copy.kind}
           />
         )}
       </div>
