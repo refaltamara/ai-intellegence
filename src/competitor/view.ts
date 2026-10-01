@@ -5,6 +5,7 @@
  */
 import { TIER_BANDS } from "../config/thresholds";
 import type { CloseUp, Landscape, Pattern, PatternKind, PostingBrand, ProductRow } from "./landscape";
+import { periodWords, type Grain } from "./period";
 import type { Cell, Mover, Platform, WeekPoint, WeeklyReport } from "./types";
 
 export const PLATFORM_NAME: Record<Platform, string> = { tiktok: "TikTok", instagram: "Instagram" };
@@ -84,14 +85,18 @@ export function metricLabel(metric: "posts" | "views" | "er", unit: "share" | "c
 /** Segments of text with emphasis, so the deck can style "(last week)" values as muted. */
 export type Seg = { t: string; muted?: boolean; strong?: boolean };
 
-export function lensLines(m: Mover): { label: string; segs: Seg[]; warn?: boolean }[] {
+/** The report's period words, for the slides and the fact sheet. */
+export const wordsOf = (r: Pick<WeeklyReport, "grain">) => periodWords(r.grain);
+
+export function lensLines(m: Mover, p: { lookback: number; grain?: Grain } = { lookback: 8 }): { label: string; segs: Seg[]; warn?: boolean }[] {
   const lines: { label: string; segs: Seg[]; warn?: boolean }[] = [];
   const pl = PLATFORM_NAME[m.platform];
+  const w = periodWords(p.grain);
 
   // Who
   const movedTier = [...m.who.tier_mix].filter((t) => t.tier !== "unknown").sort((a, b) => Math.abs(b.share - b.share_prev) - Math.abs(a.share - a.share_prev))[0];
   const who: Seg[] = [{ t: `${int(m.who.creators)} creators`, strong: true }, { t: ` (${int(m.who.creators_prev)})`, muted: true }];
-  if (m.who.new_creator_share != null) who.push({ t: ` · ${m.who.new_creator_share}% first-time in 8 weeks` }, { t: m.who.new_creator_share_prev != null ? ` (${m.who.new_creator_share_prev}%)` : "", muted: true });
+  if (m.who.new_creator_share != null) who.push({ t: ` · ${m.who.new_creator_share}% first-time in ${p.lookback} ${w.unit}s` }, { t: m.who.new_creator_share_prev != null ? ` (${m.who.new_creator_share_prev}%)` : "", muted: true });
   if (movedTier) who.push({ t: ` · ${TIER_NAME[movedTier.tier]} ${pct(movedTier.share, 0)} of creator posts` }, { t: ` (${pct(movedTier.share_prev, 0)})`, muted: true });
   lines.push({ label: "Who", segs: who });
 
@@ -99,7 +104,7 @@ export function lensLines(m: Mover): { label: string; segs: Seg[]; warn?: boolea
   const top = m.what.top_posts[0];
   const what: Seg[] = top
     ? [{ t: `Top post ${top.creator_handle ? "@" + top.creator_handle : "(brand account)"}`, strong: true }, { t: `, ${compact(top.views)} views` }, { t: m.what.top_post_view_share != null ? ` (${m.what.top_post_view_share}% of views)` : "", muted: true }]
-    : [{ t: "No posts this week" }];
+    : [{ t: `No posts ${w.this}` }];
   // the format whose share moved most, when that move is worth a mention; otherwise the leading format
   const movedFormat = [...m.what.formats].sort((a, b) => Math.abs(b.share - b.share_prev) - Math.abs(a.share - a.share_prev))[0];
   const leadFormat = [...m.what.formats].sort((a, b) => b.share - a.share)[0];
@@ -229,6 +234,20 @@ export function displayedNumbers(r: WeeklyReport): { percent: number[]; points: 
     if (n.previous != null) percent.push(n.previous);
   }
   if (r.landscape) landscapeNumbers(r.landscape, { percent, points, views, counts, ratios });
+  // deck slides (2 Oct 2026): top creators, and the rows of findings pinned from Chats
+  for (const c of r.creators ?? []) {
+    counts.push(c.posts);
+    views.push(c.views);
+    if (c.followers != null) views.push(c.followers);
+    if (c.er != null) percent.push(c.er);
+    if (c.top_post?.views != null) views.push(c.top_post.views);
+  }
+  // the creators slide's own counts and its low-engagement line (1.0M views)
+  if (r.creators) { counts.push(r.creators.filter((c) => c.first_time).length); views.push(1_000_000); }
+  for (const f of r.findings ?? []) {
+    counts.push(f.rows_total);
+    for (const row of f.rows) for (const v of Object.values(row)) if (typeof v === "number" && Number.isFinite(v)) { counts.push(v); views.push(v); percent.push(v); }
+  }
   return { percent, points, views, counts, ratios };
 }
 
@@ -257,27 +276,31 @@ export const PATTERN_HOW: Record<PatternKind, string> = {
   seeding: "A hashtag used by five or more creators where 90% or more of the tag's posts are about this brand: a seeding wave run under one tag.",
 };
 
-/** The brands that get a close-up: watched brands that are not this week's movers, biggest first, two per slide; one slide on a busy week, two on a quiet one. */
+/** How a pattern is spotted, in the report's period ("in one week", "in one month"). */
+export const patternHow = (k: PatternKind, grain?: Grain) => (grain === "month" ? PATTERN_HOW[k].replace(/\bweek\b/g, "month") : PATTERN_HOW[k]);
+
+/** The brands that get a close-up: watched brands that are not this week's movers, biggest first, two per slide; one slide on a busy week, two on a quiet one. A deck's close-ups take its biggest brands, up to two slides. */
 export function closeupPicks(r: WeeklyReport): CloseUp[][] {
   const L = r.landscape;
   if (!L) return [];
-  const movers = new Set(r.movers.map((m) => m.key));
+  // a deck picked the close-ups itself: its biggest watched brands, movers included (a deep-dive's one brand is often the mover)
+  const movers = new Set(r.slides ? [] : r.movers.map((m) => m.key));
   const pool = L.closeups.filter((c) => !c.client && !movers.has(c.key) && c.posts >= 30).sort((a, b) => b.views - a.views);
-  const slides = r.movers.length >= 2 ? 1 : 2;
+  const slides = r.slides ? 2 : r.movers.length >= 2 ? 1 : 2;
   const out: CloseUp[][] = [];
   for (let i = 0; i < slides && i * 2 < pool.length; i++) out.push(pool.slice(i * 2, i * 2 + 2));
   return out;
 }
 
 /** The deterministic rows of a close-up: what the brand pushed, its own channel, its creators, its offers. */
-export function closeupLines(c: CloseUp, posting?: PostingBrand): { label: string; text: string; muted?: boolean }[] {
+export function closeupLines(c: CloseUp, posting?: PostingBrand, thisPeriod = "this week"): { label: string; text: string; muted?: boolean }[] {
   const lines: { label: string; text: string; muted?: boolean }[] = [];
   const cats = c.categories.map((x) => `${x.label} ${int(x.posts)} posts, ${compact(x.views)} views`).join("; ");
   lines.push({ label: "Pushing", text: [cats || "No category named in most captions", c.cart ? `Cart: ${productName(c.cart.name)} (${int(c.cart.posts)} ${c.cart.posts === 1 ? "post" : "posts"}, ${compact(c.cart.views)} views)` : null].filter(Boolean).join(". ") + "." });
   if (c.owned) {
     lines.push(c.owned.posts
       ? { label: "Own channel", text: `${int(c.owned.posts)} TikTok posts from brand accounts brought ${compact(c.owned.views)} views, ${c.owned.views_share}% of the brand's TikTok views${c.owned.median_views != null ? `, at a ${compact(c.owned.median_views)} median` : ""}.` }
-      : { label: "Own channel", text: "No brand-account posts on TikTok this week.", muted: true });
+      : { label: "Own channel", text: `No brand-account posts on TikTok ${thisPeriod}.`, muted: true });
   } else lines.push({ label: "Own channel", text: "Brand-account posts are collected on TikTok only.", muted: true });
   const t = c.top_creator;
   lines.push({

@@ -12,7 +12,7 @@ import { DashFilters } from "./DashFilters";
 import { MentionsChart } from "./MentionsChart";
 import { RankTable } from "./RankTable";
 import { periodSetting } from "@/dashboard/period";
-import { AddToPulse } from "../AddToPulse";
+import { AddToDeck } from "../AddToDeck";
 
 const TIER_TONE: Record<string, string> = { nano: "mint", micro: "blue", mid: "violet", macro: "sun", mega: "coral" };
 const TIER_SHORT: Record<string, string> = { nano: "Nano", micro: "Micro", mid: "Mid-tier", macro: "Macro", mega: "Mega" };
@@ -109,12 +109,12 @@ export function Dashboard({ d, content, cq }: { d: DashboardData; content: { car
         </div>
 
         <div className="dsection">
-          <header><h2>Brand performance rankings</h2><AddToPulse className="btn sm ghost pin" payload={{ kind: "rankings", config: { ...pin, limit: 10 } }} /><span>Every brand with content in {f.period.label}; growth is views against {f.prev.label}.</span></header>
+          <header><h2>Brand performance rankings</h2><AddToDeck className="btn sm ghost pin" payload={{ slide: "scoreboard", brands: pin.brands, grain: f.period.grain }} /><span>Every brand with content in {f.period.label}; growth is views against {f.prev.label}.</span></header>
           <RankTable rows={d.rankings} base={base} prevLabel={f.prev.label} erFloor={ER_MIN_POSTS} />
         </div>
 
         <div className="dsection">
-          <header><h2>Creator tiers</h2><AddToPulse className="btn sm ghost pin" payload={{ kind: "tiers", config: pin }} /><span>Who posted in {f.period.label}, by follower band. Brand accounts are left out; posts with unknown followers are not in a tier.</span></header>
+          <header><h2>Creator tiers</h2><AddToDeck className="btn sm ghost pin" payload={{ slide: "tiers", brands: pin.brands, grain: f.period.grain }} /><span>Who posted in {f.period.label}, by follower band. Brand accounts are left out; posts with unknown followers are not in a tier.</span></header>
           <div className="tiers">
             {d.tiers.map((t) => (
               <div className="tiercard" data-tone={TIER_TONE[t.tier]} key={t.tier}>
@@ -135,12 +135,12 @@ export function Dashboard({ d, content, cq }: { d: DashboardData; content: { car
         </div>
 
         <div className="dsection">
-          <header><h2>Mentions over time</h2><AddToPulse className="btn sm ghost pin" payload={{ kind: "trend", config: { ...pin, metric: "posts" } }} /><span>Weekly, the twelve weeks up to the end of {f.period.label}.</span></header>
+          <header><h2>Mentions over time</h2><AddToDeck className="btn sm ghost pin" payload={{ slide: "trend", brands: pin.brands, grain: f.period.grain }} /><span>Weekly, the twelve weeks up to the end of {f.period.label}.</span></header>
           <div className="dcard"><MentionsChart weeks={d.trend.weeks} series={d.trend.series} base={base} chosen={d.trend.chosen} /></div>
         </div>
 
         <div className="dsection">
-          <header><h2>Top creators</h2><AddToPulse className="btn sm ghost pin" payload={{ kind: "creators", config: { ...pin, by: "views", limit: 8 } }} /><span>{f.period.label}; brand accounts left out, each post counted once.</span></header>
+          <header><h2>Top creators</h2><AddToDeck className="btn sm ghost pin" payload={{ slide: "creators", brands: pin.brands, grain: f.period.grain }} /><span>{f.period.label}; brand accounts left out, each post counted once.</span></header>
           <div className="two-eq">
             <CreatorTable title="By views" rows={d.creators.by_views} metric="views" base={base} names={names} />
             <CreatorTable title="By comments" rows={d.creators.by_comments} metric="comments" base={base} names={names} />
@@ -148,7 +148,7 @@ export function Dashboard({ d, content, cq }: { d: DashboardData; content: { car
         </div>
 
         <div className="dsection" id="content">
-          <header><h2>Trending content</h2><AddToPulse className="btn sm ghost pin" payload={{ kind: "content", config: { ...pin, sort: cq.sort, q: cq.q, limit: 6 } }} /><span>{int(content.total)} post{content.total === 1 ? "" : "s"} in {f.period.label}{cq.q ? ` matching “${cq.q}”` : ""}{cq.sort === "er" ? `; engagement rate ranks posts with ${compact(ER_MIN_VIEWS)}+ views` : ""}.</span></header>
+          <header><h2>Trending content</h2><AddToDeck className="btn sm ghost pin" payload={{ slide: "content", brands: pin.brands, grain: f.period.grain }} /><span>{int(content.total)} post{content.total === 1 ? "" : "s"} in {f.period.label}{cq.q ? ` matching “${cq.q}”` : ""}{cq.sort === "er" ? `; engagement rate ranks posts with ${compact(ER_MIN_VIEWS)}+ views` : ""}.</span></header>
           <div className="ctools">
             <div className="seg sm" role="tablist" aria-label="Sort content">
               {([["views", "By views"], ["engagement", "By engagement"], ["er", "By engagement rate"]] as const).map(([s, label]) => (

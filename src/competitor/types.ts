@@ -1,6 +1,8 @@
 /** The weekly competitor report, as data: every number the deck shows lives here. */
 import type { WeeklyRules } from "../config/weekly";
 import type { Landscape } from "./landscape";
+import type { Grain } from "./period";
+import type { SlideKind } from "./slides";
 
 export type Platform = "tiktok" | "instagram";
 export type Metric = "posts" | "views" | "er";
@@ -122,11 +124,53 @@ export type Mover = {
   distribution: { boosted: boolean; er: number | null; views: number };
 };
 
+/** A creator on the top-creators slide: earned posts only, across the brands the report covers. */
+export type CreatorRow = {
+  handle: string;
+  platform: Platform;
+  tier: string | null;
+  followers: number | null;
+  posts: number;
+  views: number;
+  /** platform-native engagements over views, % */
+  er: number | null;
+  /** the groups the creator posted for, most posts first */
+  brands: string[];
+  /** no post for these brands in the lookback periods */
+  first_time: boolean;
+  top_post: { url: string; views: number | null } | null;
+};
+
+/** One column of a finding's table, and how its values print. */
+export type FindingColumn = { key: string; label: string; format: "int" | "num" | "compact" | "pct" | "text" | "date" };
+
+/** An analysis pinned from Chats into a deck, run again for the deck's period (Decks, 2 Oct 2026). */
+export type Finding = {
+  key: string;
+  /** what the analysis is, from the registry ("Top content", "Creator tiers") */
+  title: string;
+  /** the question it answered in Chats */
+  question: string;
+  status: "ok" | "empty" | "unavailable" | "error";
+  message?: string;
+  columns: FindingColumn[];
+  /** the first rows, as the skill returned them */
+  rows: Record<string, unknown>[];
+  rows_total: number;
+  data_window: { from: string; to: string } | null;
+};
+
 export type WeeklyReport = {
   version: 1;
   title: string;
+  /** the client's name; empty for a deck without a client */
   client: string;
   workspace_id: string;
+  /** week (absent on reports made before 2 Oct 2026) or month */
+  grain?: Grain;
+  /** a deck's slides; absent on the weekly report (src/competitor/slides.ts) */
+  slides?: SlideKind[];
+  /** the period reported on: a week or a month despite the name */
   week: { from: string; to: string; label: string; iso: string };
   previous_week: { from: string; to: string; label: string };
   history_weeks: string[];
@@ -145,6 +189,12 @@ export type WeeklyReport = {
   evidence: EvidencePost[];
   /** the week beyond the highlighted moves: tiers, products, posting, close-ups, patterns (reports made before 1 Oct 2026 have none) */
   landscape?: Landscape;
+  /** the top-creators slide (decks) */
+  creators?: CreatorRow[];
+  /** the top-content slide (decks); the posts are in `evidence` too */
+  content?: EvidencePost[];
+  /** analyses pinned from Chats (decks) */
+  findings?: Finding[];
   data_as_of: string;
   generated_at: string;
 };

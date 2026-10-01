@@ -6,6 +6,7 @@
  * the only three actions: Pin to decision, Watch this, Export. Anything that changes
  * the meaning of the object goes to the model as a pane action; sort and filter stay here.
  */
+import { AddToDeck } from "./AddToDeck";
 import { AddToPulse } from "./AddToPulse";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { ToolCallRecord } from "@/chat/persist";
@@ -37,6 +38,8 @@ type Props = {
   expanded: boolean;
   onExpand: () => void;
   toast: (m: string) => void;
+  /** a team with a brand panel pins into decks; a PR team into Pulses */
+  kind?: string;
 };
 
 const WHAT: Record<string, string> = { creator_id: "creators", brand_id: "brands", post_id: "posts", hashtag: "hashtags", theme: "themes", product_id: "products", campaign_id: "campaigns" };
@@ -242,7 +245,7 @@ function DataObject({ obj, p }: { obj: PaneObject; p: Props }) {
       <div className="pfoot">
         {p.decisionId ? <button className="btn sm" disabled={!runId} onClick={pin}>Pin to decision</button> : <span className="hint" />}
         <button className="btn sm" disabled={!runId} onClick={watch}>Get this every Monday</button>
-        {runId && <AddToPulse payload={{ kind: "skill", skill_run_id: runId }} onDone={p.toast} />}
+        {runId && (p.kind === "profile" ? <AddToPulse payload={{ kind: "skill", skill_run_id: runId }} onDone={p.toast} /> : <AddToDeck payload={{ skill_run_id: runId }} onDone={p.toast} />)}
         <span className="exp">
           <button className="btn sm" disabled={!runId || !rows.length} onClick={() => setExportMenu((m) => !m)}>Export ▾</button>
           {exportMenu && (

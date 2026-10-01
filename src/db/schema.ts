@@ -25,7 +25,9 @@ import {
   timestamp,
   uniqueIndex,
   uuid,
- customType } from "drizzle-orm/pg-core";
+  customType,
+  type AnyPgColumn,
+} from "drizzle-orm/pg-core";
 
 const ts = (name: string) => timestamp(name, { withTimezone: true, mode: "string" });
 const createdAt = () => ts("created_at").notNull().defaultNow();
@@ -505,13 +507,16 @@ export const reports = pgTable(
     skillRunId: uuid("skill_run_id").references(() => skillRuns.id, { onDelete: "set null" }),
     agentRunId: uuid("agent_run_id").references(() => agentRuns.id, { onDelete: "set null" }),
     decisionId: uuid("decision_id").references(() => decisions.id, { onDelete: "set null" }),
+    /** a version of a deck (Decks, 2 Oct 2026): one report per period it was made for */
+    deckId: uuid("deck_id").references((): AnyPgColumn => decks.id, { onDelete: "cascade" }),
     bodyMd: text("body_md"),
     blocks: jsonb("blocks"),
     createdAt: createdAt(),
   },
   (t) => [
     index("reports_workspace_created_idx").on(t.workspaceId, t.createdAt),
-    check("reports_source_chk", sql`${t.source} in ('agent','ask')`),
+    check("reports_source_chk", sql`${t.source} in ('agent','ask','deck')`),
+    index("reports_deck_idx").on(t.deckId, t.createdAt),
   ],
 );
 
@@ -572,6 +577,38 @@ export const pulseCards = pgTable(
     index("pulse_cards_pulse_idx").on(t.pulseId, t.position),
     check("pulse_cards_kind_chk", sql`${t.kind} in ('kpi','rankings','trend','tiers','creators','content','tier_mix','products','posting','closeup','patterns','skill')`),
     check("pulse_cards_size_chk", sql`${t.size} in ('s','m','l')`),
+  ],
+);
+
+/**
+ * Decks (DECISIONS, 2 Oct 2026): slide decks a team builds from a template, from
+ * scratch or from a conversation in Chats. The spec holds the brands, the grain
+ * (week or month), the platforms and the slides; each version is a report for one
+ * period with its .pptx and .pdf. A recurring deck makes the next version when a
+ * new period of data lands. Pulses were folded in.
+ */
+export const decks = pgTable(
+  "decks",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workspaceId: text("workspace_id").notNull().references(() => workspaces.id),
+    userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
+    name: text("name").notNull(),
+    source: text("source").notNull().default("template"),
+    template: text("template"),
+    spec: jsonb("spec").notNull(),
+    recurring: boolean("recurring").notNull().default(false),
+    nextRunAt: ts("next_run_at"),
+    lastPeriod: text("last_period"),
+    lastError: text("last_error"),
+    conversationId: uuid("conversation_id").references(() => conversations.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+    updatedAt: ts("updated_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("decks_workspace_idx").on(t.workspaceId, t.updatedAt),
+    index("decks_due_idx").on(t.recurring, t.nextRunAt),
+    check("decks_source_chk", sql`${t.source} in ('template','scratch','chat','pulse')`),
   ],
 );
 

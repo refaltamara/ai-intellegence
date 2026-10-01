@@ -20,5 +20,5 @@ export default async function WeeklyPage({ searchParams }: { searchParams: Promi
   }
   const selected = items.find((i) => i.id === sp.r) ?? items[items.length - 1];
   const slide = Math.max(1, Math.min(selected.slides.length, Number(sp.s) || 1));
-  return <WeeklyViewer items={items} initialId={selected.id} initialSlide={slide} />;
+  return <WeeklyViewer items={items} initialId={selected.id} initialSlide={slide} actions={<Link className="btn sm ghost" href="/reports" title="When it runs, who gets it, and every report it made">Schedule</Link>} />;
 }

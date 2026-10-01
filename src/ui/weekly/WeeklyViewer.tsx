@@ -2,9 +2,10 @@
 /**
  * Weekly Reports (DECISIONS, 2 Oct 2026): the actual slides of a weekly deck, drawn from its PDF in the
  * browser (pdf.js), a week switcher, downloads, a Present mode, and "Ask AI" beside the slide. Ask AI
- * sends only which report and slide; the server reads the slide and the report's facts.
+ * sends only which report and slide; the server reads the slide and the report's facts. Decks show
+ * their versions in the same viewer, with their own title, address and actions.
  */
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import type { WeeklyItem } from "@/reports/weekly";
 import { SlideAsk } from "./SlideAsk";
 
@@ -63,7 +64,23 @@ function Thumb({ doc, n, on, title, onClick }: { doc: PdfDoc | null; n: number; 
   );
 }
 
-export function WeeklyViewer({ items, initialId, initialSlide }: { items: WeeklyItem[]; initialId: string; initialSlide: number }) {
+type ViewerProps = {
+  items: WeeklyItem[];
+  initialId: string;
+  initialSlide: number;
+  /** the page's heading and line under it; Weekly Reports by default */
+  title?: string;
+  subtitle?: string;
+  /** where the address points: `${path}?${param}=<report>&s=<slide>` */
+  path?: string;
+  param?: string;
+  /** buttons before the downloads */
+  actions?: ReactNode;
+  /** told which version is on screen */
+  onPick?: (id: string) => void;
+};
+
+export function WeeklyViewer({ items, initialId, initialSlide, title = "Weekly Reports", subtitle, path = "/weekly", param = "r", actions, onPick }: ViewerProps) {
   const [id, setId] = useState(initialId);
   const [n, setN] = useState(initialSlide);
   const [loaded, setLoaded] = useState<{ file: string; doc: PdfDoc } | null>(null);
@@ -81,8 +98,9 @@ export function WeeklyViewer({ items, initialId, initialSlide }: { items: Weekly
 
   // the URL follows the week and the slide, so a link opens the same place
   useEffect(() => {
-    window.history.replaceState(null, "", `/weekly?r=${id}&s=${n}`);
-  }, [id, n]);
+    window.history.replaceState(null, "", `${path}?${param}=${id}&s=${n}`);
+  }, [id, n, path, param]);
+  useEffect(() => { onPick?.(id); }, [id, onPick]);
 
   useEffect(() => {
     let live = true;
@@ -144,8 +162,9 @@ export function WeeklyViewer({ items, initialId, initialSlide }: { items: Weekly
   return (
     <section className="screen weekly">
       <div className="topbar">
-        <div><h1>Weekly Reports</h1><span className="meta">{item.deck} · {item.client} · the actual slides, with Ask AI on each one</span></div>
+        <div><h1>{title}</h1><span className="meta">{subtitle ?? `${item.deck} · ${item.client} · the actual slides, with Ask AI on each one`}</span></div>
         <div className="wk-actions">
+          {actions}
           {item.pdf && <a className="btn sm" href={`/api/reports/files/${item.pdf}`}>Download PDF</a>}
           {item.pptx && <a className="btn sm" href={`/api/reports/files/${item.pptx}`}>PowerPoint</a>}
           <button className="btn pri sm" onClick={present}>{presenting ? "Exit presenting" : "Present"}</button>
@@ -157,7 +176,7 @@ export function WeeklyViewer({ items, initialId, initialSlide }: { items: Weekly
             {clients.length > 1 && <b>{c}</b>}
             {items.filter((i) => i.client === c).map((i) => (
               <button key={i.id} role="tab" aria-selected={i.id === id} className={i.id === id ? "on" : ""} onClick={() => pickWeek(i.id)}>
-                <span>{i.iso.slice(5)}</span>{i.label}
+                {i.iso.includes("W") && <span>{i.iso.slice(5)}</span>}{i.label}
               </button>
             ))}
           </div>

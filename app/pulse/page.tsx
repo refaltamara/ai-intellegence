@@ -1,4 +1,5 @@
 /** Pulses (DECISIONS, 30 Sep 2026): the boards a team builds for the situation in front of it. */
+import { redirect } from "next/navigation";
 import { currentWorkspaceId } from "@/auth/current";
 import { panelWorkspace } from "@/pulses/api";
 import { editorOptions } from "@/pulses/page";
@@ -12,6 +13,8 @@ export const dynamic = "force-dynamic";
 
 export default async function PulsesPage() {
   const ws = await currentWorkspaceId();
+  // a team with a brand panel builds decks now (DECISIONS, 2 Oct 2026); its old boards are listed there
+  if (await panelWorkspace(ws)) redirect("/decks");
   const [pulses, panel, options] = await Promise.all([listPulses(ws), panelWorkspace(ws), editorOptions(ws)]);
   const templates = TEMPLATES.filter((t) => panel || !t.panel).map((t) => ({ key: t.key, name: t.name, description: t.description, kinds: t.cards.map((c) => KIND_INFO[c.kind].label) }));
   return (

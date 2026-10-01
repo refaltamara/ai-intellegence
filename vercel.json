@@ -6,6 +6,10 @@
       "schedule": "*/15 * * * *"
     },
     {
+      "path": "/api/cron/decks",
+      "schedule": "*/15 * * * *"
+    },
+    {
       "path": "/api/cron/brief",
       "schedule": "0 23 * * *"
     },

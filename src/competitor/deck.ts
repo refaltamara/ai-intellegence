@@ -9,18 +9,21 @@
  */
 import PptxGenJS from "pptxgenjs";
 import type { Narrative } from "./narrative";
-import type { Cell, EvidencePost, Flag, GroupResult, Mover, Platform, WeeklyReport } from "./types";
-import { PLATFORM_NAME, TIER_NAME, change, compact, dayMonth, flagValue, formatName, int, lensLines, metricLabel, pct, pts } from "./view";
-import { landscapeSlides, movesSlide } from "./landscapeDeck";
-import { add, arrow, C, chip, chrome, CW, FONT, M, segRuns, text, title, W, type Runs, type Slide } from "./draw";
+import type { Cell, Flag, GroupResult, Mover, WeeklyReport } from "./types";
+import { PLATFORM_NAME, change, compact, dayMonth, flagValue, int, lensLines, metricLabel, pct, pts, wordsOf } from "./view";
+import { closeupSlides, movesSlide, patternsSlide, postingSlide, productsSlide, tiersSlide } from "./landscapeDeck";
+import { contentSlide, creatorsSlide, findingSlides, trendSlides } from "./libraryDeck";
+import { add, arrow, C, chip, chrome, CW, FONT, M, postCard, segRuns, text, title, W, type Runs, type Slide } from "./draw";
+import { seriesLabel, type PeriodWords } from "./period";
+import { deckSlides, hasClient, isDeck } from "./slides";
 
 // ------------------------------------------------------------------ 1 summary
-function summarySlide(pres: PptxGenJS, r: WeeklyReport, n: Narrative, sampleLabel?: string) {
+function summarySlide(pres: PptxGenJS, r: WeeklyReport, n: Narrative, page: number, sampleLabel?: string) {
   const s = pres.addSlide();
-  chrome(s, r, 1, sampleLabel);
+  chrome(s, r, page, sampleLabel);
   add(s, r.title, { x: M, y: 0.7, w: 9, h: 0.4, fontSize: 16, bold: true, color: C.blue });
   add(s, r.week.label, { x: M, y: 1.08, w: 9, h: 0.8, fontSize: 40, bold: true, color: C.ink, valign: "middle" });
-  add(s, `Prepared for ${r.client} · ${r.platforms.map((p) => PLATFORM_NAME[p]).join(" and ")} · week ${Number(r.week.iso.slice(-2))}`, { x: M, y: 1.9, w: 9, h: 0.3, fontSize: 13, color: C.ink6 });
+  add(s, [r.client ? `Prepared for ${r.client}` : null, r.platforms.map((p) => PLATFORM_NAME[p]).join(" and "), r.grain === "month" ? `against ${r.previous_week.label}` : `week ${Number(r.week.iso.slice(-2))}`].filter(Boolean).join(" · "), { x: M, y: 1.9, w: 9, h: 0.3, fontSize: 13, color: C.ink6 });
 
   const gap = 0.3;
   const cw = (CW - 2 * gap) / 3;
@@ -39,10 +42,9 @@ function summarySlide(pres: PptxGenJS, r: WeeklyReport, n: Narrative, sampleLabe
   add(s, [
     text("Watchlist  ", { fontSize: 10, bold: true, color: C.ink6 }),
     text(core.join(" · "), { fontSize: 10, color: C.ink6 }),
-    text("      When relevant  ", { fontSize: 10, bold: true, color: C.ink6 }),
-    text(relevant.join(" · "), { fontSize: 10, color: C.ink6 }),
+    ...(relevant.length || !isDeck(r) ? [text("      When relevant  ", { fontSize: 10, bold: true, color: C.ink6 }), text(relevant.join(" · "), { fontSize: 10, color: C.ink6 })] : []),
   ], { x: M, y: 6.15, w: CW, h: 0.28 });
-  add(s, `Highlighted = outside the brand's own ${r.rules.lookback_weeks}-week normal. Source: Fair social listening panel, posts about Indonesian beauty brands on ${r.platforms.map((p) => PLATFORM_NAME[p]).join(" and ")}.`, { x: M, y: 6.47, w: CW, h: 0.28, fontSize: 9, color: C.ink4 });
+  add(s, `Highlighted = outside the brand's own ${wordsOf(r).span(r.rules.lookback_weeks)} normal. Source: Fair social listening panel, posts about Indonesian beauty brands on ${r.platforms.map((p) => PLATFORM_NAME[p]).join(" and ")}.`, { x: M, y: 6.47, w: CW, h: 0.28, fontSize: 9, color: C.ink4 });
   s.addNotes(n.summary.map((x) => `${x.label}: ${x.stat} ${x.stat_label}. ${x.text}`).join("\n"));
 }
 
@@ -51,7 +53,7 @@ function flagOf(c: Cell | undefined, metric: Flag["metric"]): Flag | undefined {
   return c?.flags.find((f) => f.metric === metric);
 }
 
-function metricCell(c: Cell | undefined, metric: Flag["metric"], compactRow = false): PptxGenJS.TableCell {
+function metricCell(c: Cell | undefined, metric: Flag["metric"], compactRow: boolean, w: PeriodWords): PptxGenJS.TableCell {
   const base: PptxGenJS.TableCellProps = { fontFace: FONT, valign: "middle", margin: [2, 6, 2, 6], border: [{ type: "none" }, { type: "none" }, { pt: 0.75, color: C.line }, { type: "none" }] };
   if (!c?.covered || !c.now || !c.prev) return { text: [text("—", { fontSize: 11, color: C.ink4 })], options: { ...base, align: "center" } };
   const f = flagOf(c, metric);
@@ -61,7 +63,7 @@ function metricCell(c: Cell | undefined, metric: Flag["metric"], compactRow = fa
   const main = `${f && metric === "er" ? arrow(f) + " " : ""}${metric === "posts" ? int(now.posts) : metric === "views" ? compact(now.views) : pct(now.er)}`;
   const wow = metric === "posts" ? change(now.posts, prev.posts) : metric === "views" ? change(now.views, prev.views) : pts(now.er, prev.er);
   const sub =
-    metric === "er" ? `last week ${pct(prev.er)}`
+    metric === "er" ? `${w.last} ${pct(prev.er)}`
     : `SOV ${pct(metric === "posts" ? now.posts_share : now.views_share)} (${pts(metric === "posts" ? now.posts_share : now.views_share, metric === "posts" ? prev.posts_share : prev.views_share)})`;
   const runs: Runs = [
     text(main, { fontSize: compactRow ? 10.5 : 12, bold: true, color: f ? C.blue : C.ink }),
@@ -94,7 +96,7 @@ function scoreTable(r: WeeklyReport, rows: { label: string; strong?: boolean; gr
       text: [text(row.label, { fontSize: compactRow ? 10.5 : 12, bold: true, color: C.ink })],
       options: { fontFace: FONT, valign: "middle", margin: [2, 6, 2, 0], border: [{ type: "none" }, { type: "none" }, { pt: 0.75, color: C.line }, { type: "none" }], fill: row.strong ? { color: C.blue05 } : undefined },
     };
-    return [label, ...r.platforms.flatMap((pl) => (["posts", "views", "er"] as const).map((m) => metricCell(g.cells[pl], m, compactRow)))];
+    return [label, ...r.platforms.flatMap((pl) => (["posts", "views", "er"] as const).map((m) => metricCell(g.cells[pl], m, compactRow, wordsOf(r))))];
   });
   return [head1, head2, ...body];
 }
@@ -111,7 +113,7 @@ function coverageLine(r: WeeklyReport): string {
   return [
     out.length ? `Not in coverage yet: ${out.join(", ")}` : null,
     partial.length ? `One platform only: ${partial.join(", ")}` : null,
-    swings.length ? `Whole-panel posts moved ${swings.join(", ")} against last week, so brands are judged on SOV` : null,
+    swings.length ? `Whole-panel posts moved ${swings.join(", ")} against ${wordsOf(r).last}, so brands are judged on SOV` : null,
   ].filter(Boolean).join(" · ") + (out.length || partial.length || swings.length ? "." : "");
 }
 
@@ -131,7 +133,7 @@ function scoreboardSlide(pres: PptxGenJS, r: WeeklyReport, n: Narrative, page: n
   const rowH = [0.42, 0.32, ...rows.map((x) => (x.section ? 0.3 : 0.6))];
   s.addTable(scoreTable(r, rows, false), { x: M, y: 1.68, w: CW, colW, rowH, fontFace: FONT });
 
-  const rule = `Blue = unusual for that brand (outside its ${r.rules.lookback_weeks}-week range, ≥${r.rules.z} SD from its average), ≥${r.rules.min_change_pct}% against last week (≥${r.rules.min_er_change_pts} pt for ER), and ≥${r.rules.min_posts} posts or ≥${compact(r.rules.min_views)} views. SOV = share of all posts or views in the panel on that platform.`;
+  const rule = `Blue = unusual for that brand (outside its ${wordsOf(r).span(r.rules.lookback_weeks)} range, ≥${r.rules.z} SD from its average), ≥${r.rules.min_change_pct}% against ${wordsOf(r).last} (≥${r.rules.min_er_change_pts} pt for ER), and ≥${r.rules.min_posts} posts or ≥${compact(r.rules.min_views)} views. SOV = share of all posts or views in the panel on that platform.`;
   const coverage = coverageLine(r);
   const top = 1.68 + rowH.reduce((a, b) => a + b, 0) + 0.16;
   add(s, [text(rule, { fontSize: 9, color: C.ink4, breakLine: !!coverage }), ...(coverage ? [text(coverage, { fontSize: 9, color: C.warn })] : [])], { x: M, y: top, w: CW, h: 6.98 - top });
@@ -143,11 +145,11 @@ function moversSlide(pres: PptxGenJS, r: WeeklyReport, n: Narrative, page: numbe
   const s = pres.addSlide();
   chrome(s, r, page, sampleLabel);
   if (!r.movers.length) {
-    title(s, n.movers_title, `No watchlist brand moved outside its own ${r.rules.lookback_weeks}-week normal on any platform.`);
+    title(s, n.movers_title, `No watchlist brand moved outside its own ${wordsOf(r).span(r.rules.lookback_weeks)} normal on any platform.`);
     add(s, "Quiet week", { x: M, y: 1.85, w: 5, h: 0.6, fontSize: 30, bold: true, color: C.blue });
     add(s, "Closest to the line, and why each is not news:", { x: M, y: 2.55, w: CW, h: 0.3, fontSize: 13, color: C.ink6 });
     const hb: PptxGenJS.TableCellProps = { fontFace: FONT, valign: "middle", margin: [3, 6, 3, 6], border: [{ type: "none" }, { type: "none" }, { pt: 0.75, color: C.line }, { type: "none" }] };
-    const head = ["Brand", "Platform", "Measure", "This week", "Last week", "Why it is not highlighted"].map((h) => ({ text: [text(h, { fontSize: 10, bold: true, color: C.ink6 })], options: { ...hb, border: [{ type: "none" }, { type: "none" }, { pt: 1, color: C.ink4 }, { type: "none" }] } })) as PptxGenJS.TableRow;
+    const head = ["Brand", "Platform", "Measure", cap(wordsOf(r).this), cap(wordsOf(r).last), "Why it is not highlighted"].map((h) => ({ text: [text(h, { fontSize: 10, bold: true, color: C.ink6 })], options: { ...hb, border: [{ type: "none" }, { type: "none" }, { pt: 1, color: C.ink4 }, { type: "none" }] } })) as PptxGenJS.TableRow;
     const why = MISS_TEXT(r);
     const body = r.near_misses.map((x) => {
       const unit = x.metric === "er" ? "er" : r.rules.basis;
@@ -160,7 +162,7 @@ function moversSlide(pres: PptxGenJS, r: WeeklyReport, n: Narrative, page: numbe
     s.addNotes(`${n.movers_title}\nQuiet week: nothing on the watchlist moved outside its own normal range. Closest to the line: ${r.near_misses.map((x) => `${x.name} ${PLATFORM_NAME[x.platform]} ${x.metric}`).join("; ")}.`);
     return;
   }
-  title(s, n.movers_title, `Each brand's highlighted measure over the last ${r.rules.lookback_weeks + 1} weeks · blue bar = this week`);
+  title(s, n.movers_title, `Each brand's highlighted measure over the last ${r.rules.lookback_weeks + 1} ${wordsOf(r).unit}s · blue bar = ${wordsOf(r).this}`);
   const k = r.movers.length;
   const gap = 0.35;
   const side = k === 1 && r.near_misses.length > 0 ? 4.3 : 0;
@@ -175,10 +177,10 @@ function moversSlide(pres: PptxGenJS, r: WeeklyReport, n: Narrative, page: numbe
     chip(s, PLATFORM_NAME[m.platform], x + pw - 1.15, y + 0.05, { w: 1.15 });
     add(s, metricLabel(f.metric, f.unit, m.platform), { x, y: y + 0.42, w: pw, h: 0.28, fontSize: 10.5, color: C.ink6 });
     add(s, [text(`${arrow(f)} `, { fontSize: 22, color: C.blue, bold: true }), text(flagValue(f.unit, f.metric, f.value), { fontSize: 30, color: C.blue, bold: true })], { x, y: y + 0.72, w: pw, h: 0.62, valign: "middle" });
-    add(s, `last week ${flagValue(f.unit, f.metric, f.previous)} · ${r.rules.lookback_weeks}-week range ${flagValue(f.unit, f.metric, f.low)}–${flagValue(f.unit, f.metric, f.high)}`, { x, y: y + 1.36, w: pw, h: 0.28, fontSize: 10, color: C.ink6 });
+    add(s, `${wordsOf(r).last} ${flagValue(f.unit, f.metric, f.previous)} · ${wordsOf(r).span(r.rules.lookback_weeks)} range ${flagValue(f.unit, f.metric, f.low)}–${flagValue(f.unit, f.metric, f.high)}`, { x, y: y + 1.36, w: pw, h: 0.28, fontSize: 10, color: C.ink6 });
     const pick = (p: typeof c.history[number]) => (f.metric === "er" ? p.er : f.unit === "share" ? (f.metric === "posts" ? p.posts_share : p.views_share) : f.metric === "posts" ? p.posts : p.views) ?? 0;
     const series = [...c.history, c.now!];
-    s.addChart(pres.ChartType.bar, [{ name: metricLabel(f.metric, f.unit, m.platform), labels: series.map((p) => dayMonth(p.week)), values: series.map(pick) }], {
+    s.addChart(pres.ChartType.bar, [{ name: metricLabel(f.metric, f.unit, m.platform), labels: series.map((p) => seriesLabel(r.grain, p.week)), values: series.map(pick) }], {
       x: x - 0.05, y: y + 1.72, w: pw + 0.1, h: 3.05,
       barDir: "col", barGapWidthPct: 45,
       chartColors: [...c.history.map(() => C.bar), C.blue],
@@ -196,7 +198,7 @@ function moversSlide(pres: PptxGenJS, r: WeeklyReport, n: Narrative, page: numbe
     for (const it of items) if ([...shown, it].join(" · ").length <= 150) shown.push(it);
     const more = items.length - shown.length;
     add(s, [
-      text("Also highlighted this week   ", { fontSize: 10, bold: true, color: C.ink6 }),
+      text(`Also highlighted ${wordsOf(r).this}   `, { fontSize: 10, bold: true, color: C.ink6 }),
       text(shown.join("  ·  ") + (more ? `  ·  +${more} more` : ""), { fontSize: 10, color: C.blue }),
     ], { x: M, y: 6.62, w: CW, h: 0.3 });
   }
@@ -204,10 +206,12 @@ function moversSlide(pres: PptxGenJS, r: WeeklyReport, n: Narrative, page: numbe
 }
 
 const MISS_TEXT = (r: WeeklyReport): Record<string, string> => ({
-  "within normal range": `within ${r.rules.z} SD of its ${r.rules.lookback_weeks}-week average`,
-  "inside 8-week range": `inside its ${r.rules.lookback_weeks}-week range`,
-  "change too small": `under ${r.rules.min_change_pct}% against last week`,
+  "within normal range": `within ${r.rules.z} SD of its ${wordsOf(r).span(r.rules.lookback_weeks)} average`,
+  "inside 8-week range": `inside its ${wordsOf(r).span(r.rules.lookback_weeks)} range`,
+  "change too small": `under ${r.rules.min_change_pct}% against ${wordsOf(r).last}`,
 });
+
+const cap = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
 
 function nearMissPanel(s: Slide, r: WeeklyReport, x: number, y: number, w: number) {
   s.addShape("roundRect", { x, y, w, h: 4.75, fill: { color: C.blue05 }, line: { color: C.line, width: 0.75 }, rectRadius: 0.08 });
@@ -220,28 +224,17 @@ function nearMissPanel(s: Slide, r: WeeklyReport, x: number, y: number, w: numbe
     add(s, [
       text(`${nm.name} · ${PLATFORM_NAME[nm.platform]}`, { fontSize: 11, bold: true, color: C.ink, breakLine: true }),
       text(`${nm.metric === "er" ? "Engagement rate" : `SOV of ${nm.metric}`} ${nm.value == null ? "–" : flagValue(unit, nm.metric, nm.value)}`, { fontSize: 10, color: C.ink }),
-      text(`  (${nm.previous == null ? "–" : flagValue(unit, nm.metric, nm.previous)} last week)`, { fontSize: 10, color: C.ink4, breakLine: true }),
+      text(`  (${nm.previous == null ? "–" : flagValue(unit, nm.metric, nm.previous)} ${wordsOf(r).last})`, { fontSize: 10, color: C.ink4, breakLine: true }),
       text(why[nm.miss ?? ""] ?? nm.miss ?? "", { fontSize: 9, color: C.ink6 }),
     ], { x: x + 0.25, y: yy, w: w - 0.5, h: 1.05 });
   });
 }
 
 // ----------------------------------------------------------------- drivers
-function postCard(s: Slide, p: EvidencePost, x: number, y: number, w: number, h: number) {
-  s.addShape("roundRect", { x, y, w, h, fill: { color: C.white }, line: { color: C.line, width: 0.75 }, rectRadius: 0.06 });
-  chip(s, p.ref, x + w - 0.62, y + 0.12, { w: 0.5, fill: C.blue1 });
-  const handle = p.creator_handle ? `@${p.creator_handle}` : "brand account";
-  add(s, [text(handle, { fontSize: handle.length > 22 ? 8.5 : handle.length > 18 ? 9.5 : 11, bold: true, color: C.blue5, hyperlink: { url: p.url } })], { x: x + 0.14, y: y + 0.12, w: w - 0.8, h: 0.26, valign: "middle" });
-  const line1 = [p.source === "owned" ? "Brand account" : TIER_NAME[p.tier ?? "unknown"] ?? p.tier, `${compact(p.views)} views`, p.er != null ? `${pct(p.er)} ER` : null].filter(Boolean).join(" · ");
-  const line2 = [p.content_format && p.content_format !== "other" ? formatName(p.content_format) : null, p.has_cart ? "yellow cart" : null, dayMonth(p.posted_at)].filter(Boolean).join(" · ");
-  add(s, [text(line1, { fontSize: 9, color: C.ink, breakLine: true }), text(line2, { fontSize: 8.5, color: C.ink4 })], { x: x + 0.14, y: y + 0.42, w: w - 0.28, h: 0.42 });
-  if (p.caption) add(s, `“${p.caption.length > 100 ? p.caption.slice(0, 99) + "…" : p.caption}”`, { x: x + 0.14, y: y + 0.92, w: w - 0.28, h: h - 1.02, fontSize: 9, italic: true, color: C.ink6 });
-}
-
 function driverSlide(pres: PptxGenJS, r: WeeklyReport, m: Mover, d: Narrative["drivers"][number], page: number, sampleLabel?: string) {
   const s = pres.addSlide();
   chrome(s, r, page, sampleLabel);
-  title(s, d.title, `What's driving it · ${m.name} on ${PLATFORM_NAME[m.platform]} · this week, last week in grey`);
+  title(s, d.title, `What's driving it · ${m.name} on ${PLATFORM_NAME[m.platform]} · ${wordsOf(r).this}, ${wordsOf(r).last} in grey`);
   const f = m.flag;
   // left: the move, the why, attention → action
   const lx = M;
@@ -249,7 +242,7 @@ function driverSlide(pres: PptxGenJS, r: WeeklyReport, m: Mover, d: Narrative["d
   chip(s, PLATFORM_NAME[m.platform], lx, 1.75, { w: 1.15 });
   add(s, metricLabel(f.metric, f.unit, m.platform), { x: lx + 1.3, y: 1.75, w: lw - 1.3, h: 0.26, fontSize: 10, color: C.ink6, valign: "middle" });
   add(s, [text(`${arrow(f)} `, { fontSize: 24, color: C.blue, bold: true }), text(flagValue(f.unit, f.metric, f.value), { fontSize: 34, bold: true, color: C.blue })], { x: lx, y: 2.12, w: lw, h: 0.7, valign: "middle" });
-  add(s, `from ${flagValue(f.unit, f.metric, f.previous)} last week · normal ${flagValue(f.unit, f.metric, f.low)}–${flagValue(f.unit, f.metric, f.high)}`, { x: lx, y: 2.84, w: lw, h: 0.26, fontSize: 10, color: C.ink6 });
+  add(s, `from ${flagValue(f.unit, f.metric, f.previous)} ${wordsOf(r).last} · normal ${flagValue(f.unit, f.metric, f.low)}–${flagValue(f.unit, f.metric, f.high)}`, { x: lx, y: 2.84, w: lw, h: 0.26, fontSize: 10, color: C.ink6 });
   add(s, d.why, { x: lx, y: 3.25, w: lw, h: 1.75, fontSize: 13.5, color: C.ink, fit: "shrink" });
   s.addShape("roundRect", { x: lx, y: 5.15, w: lw, h: 1.72, fill: { color: C.blue05 }, line: { color: C.blue1, width: 0.75 }, rectRadius: 0.08 });
   add(s, "Attention → action", { x: lx + 0.2, y: 5.3, w: lw - 0.4, h: 0.26, fontSize: 10, bold: true, color: C.blue });
@@ -258,7 +251,7 @@ function driverSlide(pres: PptxGenJS, r: WeeklyReport, m: Mover, d: Narrative["d
   // right: the five lenses, then the posts behind them
   const rx = M + lw + 0.45;
   const rw = W - M - rx;
-  const lines = lensLines(m);
+  const lines = lensLines(m, { lookback: r.rules.lookback_weeks, grain: r.grain });
   const lh = 0.47;
   lines.forEach((l, i) => {
     const y = 1.72 + i * lh;
@@ -304,14 +297,14 @@ function actionsSlide(pres: PptxGenJS, r: WeeklyReport, n: Narrative, page: numb
 function portfolioSlide(pres: PptxGenJS, r: WeeklyReport, n: Narrative, page: number, sampleLabel?: string) {
   const s = pres.addSlide();
   chrome(s, r, page, sampleLabel);
-  title(s, `Appendix · ${r.client} this week`, n.portfolio_note ?? `${r.client}'s brands on the same measures and the same rule as the watchlist · blue = a significant move`);
+  title(s, `Appendix · ${r.client} ${wordsOf(r).this}`, n.portfolio_note ?? `${r.client}'s brands on the same measures and the same rule as the watchlist · blue = a significant move`);
   const withPosts = r.client_brands.filter((g) => r.platforms.some((pl) => (g.cells[pl]?.now?.posts ?? 0) + (g.cells[pl]?.prev?.posts ?? 0) > 0));
   const rows = [{ label: r.portfolio.group.name, strong: true, group: r.portfolio }, ...withPosts.map((g) => ({ label: g.group.name, group: g }))];
   const colW = [2.13, ...r.platforms.flatMap(() => [1.7, 1.7, 1.7])];
   const rowH = [0.4, 0.3, ...rows.map(() => 0.36)];
   s.addTable(scoreTable(r, rows, true), { x: M, y: 1.62, w: CW, colW, rowH, fontFace: FONT });
   const top = 1.62 + rowH.reduce((a, b) => a + b, 0) + 0.12;
-  add(s, `Each value: this week, change against last week. Portfolio = distinct posts across ${r.client}'s ${r.client_brands.length} brands; brands with no posts on either platform in the two weeks are left out.`, { x: M, y: Math.min(top, 6.7), w: CW, h: 0.3, fontSize: 8.5, color: C.ink4 });
+  add(s, `Each value: ${wordsOf(r).this}, change against ${wordsOf(r).last}. Portfolio = distinct posts across ${r.client}'s ${r.client_brands.length} brands; brands with no posts on either platform in the two ${wordsOf(r).unit}s are left out.`, { x: M, y: Math.min(top, 6.7), w: CW, h: 0.3, fontSize: 8.5, color: C.ink4 });
   s.addNotes(`${r.client} portfolio and brands. ${n.portfolio_note ?? ""}`);
 }
 
@@ -338,7 +331,7 @@ function evidenceSlide(pres: PptxGenJS, r: WeeklyReport, page: number, sampleLab
       add(s, cap.length > 58 ? cap.slice(0, 57) + "…" : cap, { x: M + 6.5, y, w: lw - 6.5, h: rh, fontSize: 8, italic: true, color: C.ink4, valign: "middle" });
     });
   } else {
-    add(s, "No driver slides this week, so no posts are cited.", { x: M, y: 1.6, w: lw, h: 0.3, fontSize: 12, color: C.ink6 });
+    add(s, `No driver slides ${wordsOf(r).this}, so no posts are cited.`, { x: M, y: 1.6, w: lw, h: 0.3, fontSize: 12, color: C.ink6 });
   }
   const rx = M + lw + 0.4;
   const rw = W - M - rx;
@@ -346,8 +339,8 @@ function evidenceSlide(pres: PptxGenJS, r: WeeklyReport, page: number, sampleLab
   const rules = r.rules;
   const how: Runs = [
     text("How to read this report", { fontSize: 11, bold: true, color: C.ink, breakLine: true }),
-    text(`A move is highlighted only when it is unusual for that brand (outside its own ${rules.lookback_weeks}-week range, ≥${rules.z} standard deviations from its average), large (≥${rules.min_change_pct}% against last week, ≥${rules.min_er_change_pts} pt for engagement rate) and big enough to matter (≥${rules.min_posts} posts or ≥${compact(rules.min_views)} views).`, { fontSize: 9, color: C.ink6, breakLine: true, paraSpaceAfter: 6 }),
-    text(`Posts and views are judged as share of voice (SOV): the brand's share of every post or view in the panel on that platform that week. At most ${rules.max_movers} brands get a "what's driving it" slide, the most unusual first.`, { fontSize: 9, color: C.ink6, breakLine: true, paraSpaceAfter: 6 }),
+    text(`A move is highlighted only when it is unusual for that brand (outside its own ${wordsOf(r).span(rules.lookback_weeks)} range, ≥${rules.z} standard deviations from its average), large (≥${rules.min_change_pct}% against ${wordsOf(r).last}, ≥${rules.min_er_change_pts} pt for engagement rate) and big enough to matter (≥${rules.min_posts} posts or ≥${compact(rules.min_views)} views).`, { fontSize: 9, color: C.ink6, breakLine: true, paraSpaceAfter: 6 }),
+    text(`Posts and views are judged as share of voice (SOV): the brand's share of every post or view in the panel on that platform that ${wordsOf(r).unit}. At most ${rules.max_movers} brands get a "what's driving it" slide, the most unusual first.`, { fontSize: 9, color: C.ink6, breakLine: true, paraSpaceAfter: 6 }),
     text("Engagement rate = likes, comments, shares and saves over views on TikTok; likes and comments over views on Instagram. Never compared across platforms.", { fontSize: 9, color: C.ink6, breakLine: true, paraSpaceAfter: 8 }),
     text("Data notes", { fontSize: 11, bold: true, color: C.ink, breakLine: true }),
     ...r.notes.map((x, i) => text(x.text, { fontSize: 9, color: x.kind === "coverage" ? C.warn : C.ink6, breakLine: i < r.notes.length - 1, paraSpaceAfter: 5 })),
@@ -358,19 +351,34 @@ function evidenceSlide(pres: PptxGenJS, r: WeeklyReport, page: number, sampleLab
 
 export type DeckOptions = { sampleLabel?: string };
 
-/** Lay out every slide on a presentation: the real PptxGenJS for the .pptx, or the recorder the PDF is drawn from (src/competitor/pdfdeck.ts). */
+/**
+ * Lay out every slide on a presentation: the real PptxGenJS for the .pptx, or
+ * the recorder the PDF is drawn from (src/competitor/pdfdeck.ts). The slides
+ * and their order come from src/competitor/slides.ts: the weekly report's fixed
+ * set, or the slides a deck picked.
+ */
 export function buildDeck(pres: PptxGenJS, r: WeeklyReport, n: Narrative, opts: DeckOptions = {}): void {
-  let page = 1;
-  summarySlide(pres, r, n, opts.sampleLabel);
-  scoreboardSlide(pres, r, n, ++page, opts.sampleLabel);
-  moversSlide(pres, r, n, ++page, opts.sampleLabel);
-  r.movers.forEach((m) => driverSlide(pres, r, m, n.drivers.find((d) => d.key === m.key)!, ++page, opts.sampleLabel));
-  if (r.landscape) {
-    page += landscapeSlides(pres, r, n, page + 1, opts.sampleLabel);
-    movesSlide(pres, r, n, ++page, opts.sampleLabel);
-  } else actionsSlide(pres, r, n, ++page, opts.sampleLabel);
-  portfolioSlide(pres, r, n, ++page, opts.sampleLabel);
-  evidenceSlide(pres, r, ++page, opts.sampleLabel);
+  const S = opts.sampleLabel;
+  const L = r.landscape;
+  let page = 0;
+  for (const k of deckSlides(r)) {
+    if (k === "summary") summarySlide(pres, r, n, ++page, S);
+    else if (k === "findings") page += findingSlides(pres, r, n, page + 1, S);
+    else if (k === "scoreboard") scoreboardSlide(pres, r, n, ++page, S);
+    else if (k === "trend") page += trendSlides(pres, r, n, page + 1, S);
+    else if (k === "movers") moversSlide(pres, r, n, ++page, S);
+    else if (k === "drivers") r.movers.forEach((m) => driverSlide(pres, r, m, n.drivers.find((d) => d.key === m.key)!, ++page, S));
+    else if (k === "creators") creatorsSlide(pres, r, n, ++page, S);
+    else if (k === "content") contentSlide(pres, r, n, ++page, S);
+    else if (k === "tiers") { if (L?.tiers.rows.length) tiersSlide(pres, r, n, ++page, S); }
+    else if (k === "products") { if (L?.products.length) productsSlide(pres, r, n, ++page, S); }
+    else if (k === "posting") { if (L?.posting.posts) postingSlide(pres, r, n, ++page, S); }
+    else if (k === "closeups") { if (L) page += closeupSlides(pres, r, n, page + 1, S); }
+    else if (k === "patterns") { if (L?.patterns.length) patternsSlide(pres, r, n, ++page, S); }
+    else if (k === "moves") { if (L || isDeck(r)) movesSlide(pres, r, n, ++page, S); else actionsSlide(pres, r, n, ++page, S); }
+    else if (k === "portfolio") { if (hasClient(r)) portfolioSlide(pres, r, n, ++page, S); }
+    else if (k === "evidence") evidenceSlide(pres, r, ++page, S);
+  }
 }
 
 /** The deck as a .pptx file in memory (serverless-safe: nothing touches the disk). */

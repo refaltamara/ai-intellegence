@@ -156,7 +156,7 @@ export function contextPreamble(c: AskContext): string {
     return [
       `[The person is presenting slide ${s.n} of ${s.total} of the ${s.deck}, ${s.week.label} (compared with ${s.week.previous}), titled "${c.title}". Someone in the room may have asked them this question, so answer in a few sentences they can say out loud, with the numbers.`,
       `What the slide shows, computed from the data:\n${s.text}`,
-      `Answer about this slide and this week (${s.week.from} to ${s.week.to}). Quote the report's numbers exactly. When the question needs more than the report holds (which creators, which posts, a brand's tier mix or products), run the analyses with window from ${s.week.from} to ${s.week.to} and the brands named, and cite the evidence.]`,
+      `Answer about this slide and its period (${s.week.from} to ${s.week.to}). Quote the report's numbers exactly. When the question needs more than the report holds (which creators, which posts, a brand's tier mix or products), run the analyses with window from ${s.week.from} to ${s.week.to} and the brands named, and cite the evidence.]`,
     ].join("\n\n");
   }
   return [

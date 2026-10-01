@@ -6,7 +6,7 @@
  */
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import type { WeeklyContract } from "@/competitor/contract";
+import type { ClientContract as WeeklyContract } from "@/competitor/contract";
 import { MultiSelect } from "./MultiSelect";
 
 type Watch = { name: string; brand_ids: string[]; group: "core" | "when_relevant"; untracked?: string[]; short?: string };

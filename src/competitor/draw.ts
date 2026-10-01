@@ -4,8 +4,8 @@
  * the PDF recorder alike (src/competitor/pdfdeck.ts).
  */
 import type PptxGenJS from "pptxgenjs";
-import type { Flag, WeeklyReport } from "./types";
-import type { Seg } from "./view";
+import type { EvidencePost, Flag, WeeklyReport } from "./types";
+import { compact, dayMonth, formatName, pct, TIER_NAME, type Seg } from "./view";
 
 export type Slide = PptxGenJS.Slide;
 export type Runs = PptxGenJS.TextProps[];
@@ -34,7 +34,7 @@ export function add(slide: Slide, runs: Runs | string, o: PptxGenJS.TextPropsOpt
 export function chrome(slide: Slide, r: WeeklyReport, page: number, sampleLabel?: string) {
   add(slide, `${r.title} · ${r.week.label}`, { x: M, y: 0.32, w: 8, h: 0.25, fontSize: 10, color: C.ink4 });
   if (sampleLabel) add(slide, sampleLabel, { x: W - M - 4.5, y: 0.32, w: 4.5, h: 0.25, fontSize: 10, color: C.warn, align: "right" });
-  add(slide, `Fair · prepared for ${r.client}`, { x: M, y: 7.08, w: 6, h: 0.22, fontSize: 9, color: C.ink4 });
+  add(slide, r.client ? `Fair · prepared for ${r.client}` : "Fair Intelligence", { x: M, y: 7.08, w: 6, h: 0.22, fontSize: 9, color: C.ink4 });
   add(slide, String(page), { x: W - M - 1, y: 7.08, w: 1, h: 0.22, fontSize: 9, color: C.ink4, align: "right" });
 }
 
@@ -50,3 +50,15 @@ export function chip(slide: Slide, t: string, x: number, y: number, o: { fill?: 
   return w;
 }
 
+
+/** One post as a card: who, reach, format, date, the caption; the evidence ref in the corner. `brand` names the brand too (posts from several brands). */
+export function postCard(s: Slide, p: EvidencePost, x: number, y: number, w: number, h: number, o: { brand?: boolean } = {}) {
+  s.addShape("roundRect", { x, y, w, h, fill: { color: C.white }, line: { color: C.line, width: 0.75 }, rectRadius: 0.06 });
+  chip(s, p.ref, x + w - 0.62, y + 0.12, { w: 0.5, fill: C.blue1 });
+  const handle = p.creator_handle ? `@${p.creator_handle}` : "brand account";
+  add(s, [text(handle, { fontSize: handle.length > 22 ? 8.5 : handle.length > 18 ? 9.5 : 11, bold: true, color: C.blue5, hyperlink: { url: p.url } })], { x: x + 0.14, y: y + 0.12, w: w - 0.8, h: 0.26, valign: "middle" });
+  const line1 = [p.source === "owned" ? "Brand account" : TIER_NAME[p.tier ?? "unknown"] ?? p.tier, `${compact(p.views)} views`, p.er != null ? `${pct(p.er)} ER` : null].filter(Boolean).join(" · ");
+  const line2 = [o.brand ? p.group : null, p.content_format && p.content_format !== "other" ? formatName(p.content_format) : null, p.has_cart ? "yellow cart" : null, dayMonth(p.posted_at)].filter(Boolean).join(" · ");
+  add(s, [text(line1, { fontSize: 9, color: C.ink, breakLine: true }), text(line2, { fontSize: 8.5, color: C.ink4 })], { x: x + 0.14, y: y + 0.42, w: w - 0.28, h: 0.42 });
+  if (p.caption) add(s, `“${p.caption.length > 100 ? p.caption.slice(0, 99) + "…" : p.caption}”`, { x: x + 0.14, y: y + 0.92, w: w - 0.28, h: h - 1.02, fontSize: 9, italic: true, color: C.ink6 });
+}
