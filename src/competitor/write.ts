@@ -15,7 +15,7 @@ import { checkNarrative, PRIORITIES, type Narrative } from "./narrative";
 import type { PeriodWords } from "./period";
 import { deckSlides, hasClient, isDeck, trendPlatforms, type SlideKind } from "./slides";
 import type { Cell, GroupResult, Mover, Platform, WeeklyReport } from "./types";
-import { change, closeupLines, closeupPicks, compact, dayMonth, flagValue, hourLabel, int, lensLines, metricLabel, PATTERN_NAME, patternHow, patternSignal, PLATFORM_NAME, postingBehind, productName, pct, pts, TIER_NAME, tierLegend, wordsOf } from "./view";
+import { change, closeupLines, closeupPicks, compact, dayMonth, EVENT_LABEL, flagValue, HOOK_LABEL, hourLabel, int, lensLines, metricLabel, OFFER_LABEL, PATTERN_NAME, patternHow, patternSignal, PLATFORM_NAME, postingBehind, productName, pct, pts, TIER_NAME, tierLegend, wordsOf } from "./view";
 
 export type Written = { narrative: Narrative; by: "model" | "fallback"; attempts: number; problems: string[] };
 type Create = (params: Anthropic.MessageCreateParamsNonStreaming) => Promise<Anthropic.Message>;
@@ -174,6 +174,20 @@ function deckSheet(r: WeeklyReport, has: Set<SlideKind>): string[] {
     out.push("", "TOP CONTENT (the most-viewed posts, as the slide shows them)");
     for (const p of r.content ?? []) out.push(`- ${p.ref} ${p.creator_handle ? "@" + p.creator_handle : "brand account"} for ${p.group} on ${PLATFORM_NAME[p.platform]}: ${compact(p.views)} views${p.er != null ? `, ${pct(p.er)} ER` : ""}${p.content_format ? `, ${p.content_format}` : ""}${p.has_cart ? ", yellow cart" : ""}. "${(p.caption ?? "").slice(0, 140)}"`);
   }
+  if ((has.has("campaigns") || has.has("angles")) && r.captions) {
+    const K = r.captions;
+    out.push("", `READ FROM CAPTIONS (the model named each post's product, campaign or event, offer, hook and angle; every number is a count in the panel). Coverage: ${int(K.coverage.read)} of ${int(K.coverage.posts)} posts ${w.this} were read, ${K.coverage.read_views_share}% of their views (posts with ${compact(K.floor)}+ views and brand accounts are read).`);
+    if (has.has("campaigns")) {
+      out.push("CAMPAIGNS AND LAUNCHES (biggest first; first seen = the first post naming it among the posts read)");
+      for (const e of K.events) out.push(`- ${e.name}${e.client ? " (client)" : ""} · ${EVENT_LABEL[e.event] ?? e.event} "${e.event_name}": ${count(e.posts, "post")}${e.owned_posts ? ` (${int(e.owned_posts)} from brand accounts)` : ""}, ${count(e.creators, "creator")}, ${compact(e.views)} views; first seen ${dayMonth(e.first_seen)}${e.new ? ` (new ${w.this})` : e.new === null ? " (whether it is new is unknown: earlier posts are not read)" : ""}; ${w.last} ${count(e.posts_prev, "post")}.${e.top ? ` Top post ${e.top.handle ? "@" + e.top.handle : "brand account"}, ${compact(e.top.views)} views.` : ""}`);
+      out.push("OFFERS (share of each brand's read posts with an offer in the caption)");
+      for (const o of K.offers.filter((x) => x.read >= 5)) out.push(`- ${o.name}${o.client ? " (client)" : ""}: ${o.offer_share}% of ${count(o.read, "read post")} (${int(o.offer_posts)})${o.top_offer ? `, most often ${OFFER_LABEL[o.top_offer] ?? o.top_offer} (${count(o.top_offer_posts, "post")})` : ""}.`);
+    }
+    if (has.has("angles")) {
+      out.push("PRODUCTS AND ANGLES (products named in at least two posts, biggest first)");
+      for (const p of K.products) out.push(`- ${p.name}${p.client ? " (client)" : ""} · ${p.product}: ${count(p.posts, "post")}, ${count(p.creators, "creator")}, ${compact(p.views)} views (${w.last} ${count(p.posts_prev, "post")}); hook ${p.hook ? `${HOOK_LABEL[p.hook] ?? p.hook}, ${p.hook_views_share}% of its views` : "–"}; top post's angle ${p.angle ? `"${p.angle}"` : "–"}; offer in ${p.offer_share}% of its posts.${p.top ? ` Top post ${p.top.handle ? "@" + p.top.handle : "brand account"}, ${compact(p.top.views)} views.` : ""}`);
+    }
+  }
   if (has.has("findings")) {
     const fs = r.findings ?? [];
     out.push("", `FINDINGS PINNED FROM CHATS (one slide each; findings[].key must be exactly, in order: ${fs.map((f) => `"${f.key}"`).join(", ")}). Each was asked in Chats and is run again for ${r.week.label}.`);
@@ -234,6 +248,8 @@ export function deckSystem(r: WeeklyReport): string {
     has.has("trend") ? `- trends: one per trend slide, platform exactly as given, in order. title max 12 words: the finding ("Timephoria's TikTok views tripled in three ${w.unit}s", not "Trend"); takeaway max 28 words: the ${w.over} comparison that matters, with its numbers.` : "",
     has.has("creators") ? "- creators: { title, takeaway } for the top-creators slide: who carried the views, their tiers, how many are first-timers. title max 12 words, takeaway max 28." : "",
     has.has("content") ? "- content: { title, takeaway } for the top-content slide: what the most-viewed posts share (format, product, cart, creator). title max 12 words, takeaway max 28." : "",
+    has.has("campaigns") ? `- campaigns: { title, takeaway } for the campaigns slide: name what each brand is running (launches, sale events, collabs) as the fact sheet names it, say which are new ${w.this}, and what it means. title max 12 words, takeaway max 28.` : "",
+    has.has("angles") ? "- angles: { title, takeaway } for the products-and-angles slide: which product drew the views and through which hook and angle, quoted as the fact sheet quotes it. title max 12 words, takeaway max 28." : "",
     ...(["tiers", "products", "posting"] as const).filter((k) => has.has(k)).map((k) => `- ${k}: { title, takeaway }. title max 12 words: the finding, not the topic. takeaway max 28 words: the one comparison that matters, with its numbers.`),
     has.has("closeups") ? `- closeups: one per close-up brand, in the given order, key exactly as given. label max 3 words naming the brand's play ("Own-channel reach", "Offer cadence", "Seeding wave"). next max 22 words: what to watch next ${w.unit}, concrete (a date, a product, a creator). closeup_titles: one per close-up slide, max 12 words.` : "",
     has.has("patterns") ? "- patterns: { title, takeaway }: what the pattern is and why it matters. title max 12 words, takeaway max 28." : "",
@@ -282,7 +298,7 @@ function deckTool(r: WeeklyReport, clientBrands: string[]): Anthropic.Tool {
     const pls = trendPlatforms(r);
     want("trends", { type: "array", minItems: pls.length, maxItems: pls.length, items: { type: "object", properties: { platform: { type: "string", enum: pls }, title: { type: "string" }, takeaway: { type: "string" } }, required: ["platform", "title", "takeaway"] } });
   }
-  for (const k of ["creators", "content", "tiers", "products", "posting", "patterns"] as const) if (has.has(k)) want(k, SECTION);
+  for (const k of ["creators", "content", "campaigns", "angles", "tiers", "products", "posting", "patterns"] as const) if (has.has(k)) want(k, SECTION);
   if (has.has("closeups")) {
     const l = landscapeProps(r, clientBrands);
     want("closeups", l.closeups);
@@ -379,6 +395,8 @@ function asNarrative(input: unknown, r: WeeklyReport): Narrative {
           ...(Array.isArray(o.trends) ? { trends: o.trends } : {}),
           ...(o.creators ? { creators: o.creators } : {}),
           ...(o.content ? { content: o.content } : {}),
+          ...(o.campaigns ? { campaigns: o.campaigns } : {}),
+          ...(o.angles ? { angles: o.angles } : {}),
           ...(Array.isArray(o.findings) ? { findings: o.findings } : {}),
         }
       : {}),
@@ -500,9 +518,9 @@ export function plainNarrative(r: WeeklyReport): Narrative {
     }
     const d = /^drivers\.([^.]+)\.why/.exec(p);
     if (d) { const x = n.drivers.find((y) => y.key === d[1]); if (x) x.why = "See the lens lines and posts on this slide."; }
-    const t = /^(trends\[(\d+)\]|creators|content|tiers|products|posting|patterns|findings\.([^.]+))\.takeaway/.exec(p);
+    const t = /^(trends\[(\d+)\]|creators|content|campaigns|angles|tiers|products|posting|patterns|findings\.([^.]+))\.takeaway/.exec(p);
     if (t) {
-      const sec = t[2] != null ? n.trends?.[Number(t[2])] : t[3] != null ? n.findings?.find((f) => f.key === t[3]) : n[t[1] as "creators" | "content" | "tiers" | "products" | "posting" | "patterns"];
+      const sec = t[2] != null ? n.trends?.[Number(t[2])] : t[3] != null ? n.findings?.find((f) => f.key === t[3]) : n[t[1] as "creators" | "content" | "campaigns" | "angles" | "tiers" | "products" | "posting" | "patterns"];
       if (sec) sec.takeaway = "The numbers are on the slide.";
     }
   }
@@ -528,6 +546,10 @@ function plainDeck(r: WeeklyReport, n: Narrative) {
   if (has.has("creators")) n.creators = { title: `The creators who brought the most views ${w.this}`, takeaway: c0 ? `@${c0.handle} led with ${compact(c0.views)} views for ${c0.brands[0]}${c0.first_time ? ", posting for these brands for the first time" : ""}.` : "No creator posts in the period." };
   const p0 = r.content?.[0];
   if (has.has("content")) n.content = { title: `The posts that drew the most views ${w.this}`, takeaway: p0 ? `The top post, by ${p0.creator_handle ? "@" + p0.creator_handle : "a brand account"} for ${p0.group}, drew ${compact(p0.views)} views.` : "No posts in the period." };
+  const e0 = r.captions?.events[0];
+  if (has.has("campaigns")) n.campaigns = { title: `What the brands are running ${w.this}`, takeaway: e0 ? `${e0.name}'s ${e0.event_name} led: ${count(e0.posts, "post")}, ${compact(e0.views)} views${e0.new ? `, new ${w.this}` : ""}.` : "No campaign named in the captions read." };
+  const pr0 = r.captions?.products[0];
+  if (has.has("angles")) n.angles = { title: `The products and angles that drew the views ${w.this}`, takeaway: pr0 ? `${pr0.name}'s ${pr0.product} drew ${compact(pr0.views)} views across ${count(pr0.posts, "post")}${pr0.angle ? `; the top post's angle: "${pr0.angle}"` : ""}.` : "No product named in two or more captions." };
   if (has.has("findings")) n.findings = (r.findings ?? []).map((f) => ({ key: f.key, title: f.title, takeaway: f.status === "ok" ? `The analysis from Chats, run again for ${r.week.label}.` : f.message ?? "No result for this period." }));
   if (has.has("moves") && !r.landscape) {
     n.actions_title = r.client ? `What ${r.client} should do next` : "What to do next";

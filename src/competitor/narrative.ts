@@ -36,6 +36,9 @@ export type Narrative = {
   trends?: (Section & { platform: Platform })[];
   creators?: Section;
   content?: Section;
+  /** read from captions */
+  campaigns?: Section;
+  angles?: Section;
   /** one per finding pinned from Chats, in the report's order */
   findings?: (Section & { key: string })[];
 };
@@ -136,7 +139,7 @@ export function checkNarrative(n: Narrative, r: WeeklyReport): string[] {
     if (want.join() !== got.join()) problems.push(`trends must follow the platforms [${want.join(", ")}], got [${got.join(", ")}]`);
     n.trends?.forEach((t, i) => { if (!t.title || !t.takeaway) problems.push(`trends[${i}]: title and takeaway are required`); });
   }
-  for (const k of ["creators", "content"] as const) if (has.has(k) && (!n[k]?.title || !n[k]?.takeaway)) problems.push(`${k}: title and takeaway are required`);
+  for (const k of ["creators", "content", "campaigns", "angles"] as const) if (has.has(k) && (!n[k]?.title || !n[k]?.takeaway)) problems.push(`${k}: title and takeaway are required`);
   if (has.has("findings")) {
     const want = (r.findings ?? []).map((f) => f.key);
     const got = (n.findings ?? []).map((f) => f.key);
@@ -165,7 +168,7 @@ export function checkNarrative(n: Narrative, r: WeeklyReport): string[] {
   });
   limit("portfolio_note", n.portfolio_note, LIMITS.portfolio_note);
   limit("actions_title", n.actions_title, LIMITS.title);
-  for (const k of ["tiers", "products", "posting", "patterns", "creators", "content"] as const) {
+  for (const k of ["tiers", "products", "posting", "patterns", "creators", "content", "campaigns", "angles"] as const) {
     limit(`${k}.title`, n[k]?.title, LIMITS.title);
     limit(`${k}.takeaway`, n[k]?.takeaway, LIMITS.takeaway);
   }
@@ -187,7 +190,7 @@ export function checkNarrative(n: Narrative, r: WeeklyReport): string[] {
     ...(n.actions ?? []).flatMap((a, i) => [[`actions[${i}].title`, a.title], [`actions[${i}].detail`, a.detail], [`actions[${i}].based_on`, a.based_on]] as [string, string][]),
     ["portfolio_note", n.portfolio_note ?? ""],
     ["actions_title", n.actions_title ?? ""],
-    ...(["tiers", "products", "posting", "patterns", "creators", "content"] as const).flatMap((k) => [[`${k}.title`, n[k]?.title ?? ""], [`${k}.takeaway`, n[k]?.takeaway ?? ""]] as [string, string][]),
+    ...(["tiers", "products", "posting", "patterns", "creators", "content", "campaigns", "angles"] as const).flatMap((k) => [[`${k}.title`, n[k]?.title ?? ""], [`${k}.takeaway`, n[k]?.takeaway ?? ""]] as [string, string][]),
     ...(n.trends ?? []).flatMap((t, i) => [[`trends[${i}].title`, t.title], [`trends[${i}].takeaway`, t.takeaway]] as [string, string][]),
     ...(n.findings ?? []).flatMap((f) => [[`findings.${f.key}.title`, f.title], [`findings.${f.key}.takeaway`, f.takeaway]] as [string, string][]),
     ...(n.closeups ?? []).flatMap((c) => [[`closeups.${c.key}.label`, c.label], [`closeups.${c.key}.next`, c.next]] as [string, string][]),

@@ -13,11 +13,13 @@ import { weeklyRules } from "../config/weekly";
 import { brandNameKeys } from "../skills/campaigns";
 import { SkillDb } from "../skills/db";
 import { loadContext } from "../skills/params";
+import { captionSettings } from "../captions/run";
 import { contractGroups, contractHasClient, type WeeklyContract } from "./contract";
 import { assessAll, covered, evaluate } from "./flags";
+import { captionFacts } from "./captions";
 import { landscape } from "./landscape";
 import { deckPeriod, nextStart, periodWords, stepFrom, type Grain } from "./period";
-import { cleanSlides, LANDSCAPE_SLIDES } from "./slides";
+import { CAPTION_SLIDES, cleanSlides, LANDSCAPE_SLIDES } from "./slides";
 import { shortDay } from "./weeks";
 import type { Cell, CreatorRow, EvidencePost, Finding, Flag, Group, GroupResult, Mover, Panel, PanelPoint, Platform, WeekPoint, WeeklyReport } from "./types";
 
@@ -219,6 +221,9 @@ export async function weeklyReport(contract: WeeklyContract, week: string, opts:
   const reach = [...(withClient ? [portfolio] : []), ...coveredWatch];
   const creators = slides?.includes("creators") ? await topCreators(db, { workspaceId: ctx.workspaceId, tz, platforms, groups: reach, from, at: W, toExcl }) : undefined;
   const content = slides?.includes("content") ? await topContent(db, { workspaceId: ctx.workspaceId, tz, platforms, groups: reach, at: W, toExcl }, evidence) : undefined;
+  const captions = slides?.some((k) => CAPTION_SLIDES.has(k))
+    ? { ...(await captionFacts(db, { workspaceId: ctx.workspaceId, tz, platforms, groups: reach, clientKey: withClient ? portfolio.key : null, clientName: contract.client?.name ?? "", from: W, to: toExcl, prevFrom: weeks[L - 1] })), floor: (await captionSettings(ctx.workspaceId)).min_views }
+    : undefined;
   const prev = deckPeriod(grain, weeks[L - 1]);
 
   return {
@@ -245,6 +250,7 @@ export async function weeklyReport(contract: WeeklyContract, week: string, opts:
     ...(scene ? { landscape: scene } : {}),
     ...(creators ? { creators } : {}),
     ...(content ? { content } : {}),
+    ...(captions ? { captions } : {}),
     ...(opts.findings && slides?.includes("findings") ? { findings: opts.findings } : {}),
     data_as_of: ctx.asOf,
     generated_at: new Date().toISOString(),

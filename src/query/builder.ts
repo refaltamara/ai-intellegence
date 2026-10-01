@@ -9,7 +9,11 @@ import { aggregateEvidence, EvidenceList } from "../skills/common";
 import type { Evidence, Row } from "../skills/types";
 
 export const ENTITIES = ["posts", "creators", "brand_weeks", "creator_brand_months"] as const;
-export const GROUP_BY = ["brand_id", "platform", "source", "tier", "week", "month", "creator_id", "content_format", "product_category", "universe"] as const;
+export const GROUP_BY = ["brand_id", "platform", "source", "tier", "week", "month", "creator_id", "content_format", "product_category", "universe", "caption_product", "caption_event", "caption_event_name", "caption_offer", "caption_hook"] as const;
+/** Read from captions by the model (src/captions/): posts not read yet group as "not read". */
+const CAPTION_DIMS = new Set(["caption_product", "caption_event", "caption_event_name", "caption_offer", "caption_hook"]);
+const capDim = (col: string, none: string) => `case when p.cap_source = 'model' then coalesce(nullif(${col}, 'none'), '${none}') else 'not read' end`;
+const list = (v: unknown) => (Array.isArray(v) ? v : [v]).map((s) => String(s).toLowerCase());
 export const METRICS = ["count_posts", "count_creators", "sum_views", "median_views", "avg_views", "sum_engagements", "sum_comments", "er_pct", "comment_rate_pct", "cart_pct", "share_of_voice"] as const;
 
 /** filter name -> SQL fragment builder (over alias p = posts) */
@@ -31,6 +35,12 @@ export const FILTERS: Record<string, (v: unknown, add: (val: unknown) => string,
   min_views: (v, add) => `p.views >= ${add(Number(v))}`,
   min_followers: (v, add) => `p.followers_at_post >= ${add(Number(v))}`,
   earned_only: (v) => (v ? "p.creator_id is not null and p.source = 'earned'" : null),
+  // read from captions (src/captions/prompt.ts names the classes)
+  caption_event: (v, add) => `p.cap_event = any(${add(list(v))}::text[])`,
+  caption_offer: (v, add) => `p.cap_offer = any(${add(list(v))}::text[])`,
+  caption_hook: (v, add) => `p.cap_hook = any(${add(list(v))}::text[])`,
+  caption_product: (v, add) => `lower(p.cap_product) like any(${add(list(v).map((s) => `%${s.replace(/[%_]/g, "")}%`))}::text[])`,
+  captions_read: (v) => (v ? "p.cap_source = 'model'" : null),
 };
 
 const DIM_SQL: Record<(typeof GROUP_BY)[number], (ctx: Context) => string> = {
@@ -44,6 +54,11 @@ const DIM_SQL: Record<(typeof GROUP_BY)[number], (ctx: Context) => string> = {
   content_format: () => "coalesce(p.content_format, 'unknown')",
   product_category: () => "coalesce(p.product_category, 'unknown')",
   universe: () => "coalesce(p.universe, 'unknown')",
+  caption_product: () => capDim("p.cap_product", "none named"),
+  caption_event: () => capDim("p.cap_event", "none"),
+  caption_event_name: () => capDim("p.cap_event_name", "none"),
+  caption_offer: () => capDim("p.cap_offer", "none"),
+  caption_hook: () => capDim("p.cap_hook", "other"),
 };
 
 const METRIC_SQL: Record<(typeof METRICS)[number], string> = {
@@ -143,7 +158,10 @@ export async function queryMetrics(input: QueryMetricsInput, workspaceId: string
       status: "ok",
       rows,
       evidence: ev.list,
-      meta: { entity: input.entity, filters, group_by: groupBy, metrics, matched, returned: rows.length, sql_hash: db.sqlHash(), duration_ms: Date.now() - started, caveats: ["Aggregates over posts; owned-account posts are included unless earned_only or source=earned is set."] },
+      meta: { entity: input.entity, filters, group_by: groupBy, metrics, matched, returned: rows.length, sql_hash: db.sqlHash(), duration_ms: Date.now() - started, caveats: [
+        "Aggregates over posts; owned-account posts are included unless earned_only or source=earned is set.",
+        ...(groupBy.some((g) => CAPTION_DIMS.has(g)) || Object.keys(filters).some((f) => f.startsWith("caption")) ? ["Products, campaigns, offers and hooks are read from captions by the model, for posts with 10K+ views and brand-account posts; other posts show as \"not read\"."] : []),
+      ] },
     };
   } catch (e) {
     return fail((e as Error).message);

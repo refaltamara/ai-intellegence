@@ -140,3 +140,43 @@ describe("findings from Chats", () => {
     expect(findingColumns([{ brand_a: "a", brand_b: "b", shared_creators: 3, jaccard: 0.06 }]).map((c) => c.format)).toEqual(["text", "text", "int", "num"]);
   });
 });
+
+describe("slides read from captions", () => {
+  const captions = {
+    floor: 10_000,
+    coverage: { posts: 1200, read: 800, views: 90_000_000, read_views: 81_000_000, read_views_share: 90 },
+    events: [
+      { key: "skintific", name: "Skintific", client: false, event: "launch", event_name: "Green Cushion launch", posts: 42, creators: 30, owned_posts: 4, views: 12_400_000, first_seen: "2026-06-02", new: true, posts_prev: 0, top: { handle: "rina", url: "https://x/1", views: 2_100_000 } },
+      { key: "g2g", name: "Glad2Glow", client: false, event: "sale_event", event_name: "6.6 sale", posts: 18, creators: 12, owned_posts: 6, views: 3_300_000, first_seen: "2026-05-28", new: false, posts_prev: 9, top: null },
+    ],
+    products: [
+      { key: "skintific", name: "Skintific", client: false, product: "Green Cushion", posts: 60, creators: 41, views: 15_000_000, posts_prev: 12, hook: "transformation", hook_views_share: 55, angle: "oily skin all-day cover", offer_share: 20, top: { handle: "rina", url: "https://x/1", views: 2_100_000 } },
+    ],
+    offers: [{ key: "g2g", name: "Glad2Glow", client: false, read: 120, offer_posts: 41, offer_share: 34, top_offer: "bundle", top_offer_posts: 20 }],
+  };
+  const withCaptions = (slides: string[]) => ({ ...asDeck(slides), captions }) as WeeklyReport;
+  it("are carried when the deck picked them and the captions hold something", () => {
+    expect(deckSlides(withCaptions(["campaigns", "angles", "moves"]))).toEqual(["summary", "campaigns", "angles", "moves"]);
+    expect(deckSlides(asDeck(["campaigns", "angles", "moves"]))).toEqual(["summary", "moves"]);
+  });
+  it("draw a page each and their plain words pass the check", () => {
+    const d = withCaptions(["campaigns", "angles", "moves"]);
+    const n = plainNarrative(d);
+    expect(checkNarrative(n, d)).toEqual([]);
+    expect(n.campaigns?.takeaway).toContain("Green Cushion launch");
+    const texts = slideTexts(d, n);
+    expect(texts.length).toBe(4);
+    expect(texts[1].text).toContain("Green Cushion launch");
+    expect(texts[1].text).toContain("34% of posts, mostly bundle");
+    expect(texts[2].text).toContain("oily skin all-day cover");
+  });
+  it("the fact sheet prints the caption facts and the words may cite them", () => {
+    const d = withCaptions(["campaigns", "angles"]);
+    const sheet = factSheet(d);
+    expect(sheet).toContain('Launch "Green Cushion launch": 42 posts (4 from brand accounts), 30 creators, 12.4M views; first seen 2 Jun (new this week)');
+    expect(sheet).toContain("90% of their views");
+    const n = { ...plainNarrative(d), campaigns: { title: "Skintific launched Green Cushion", takeaway: "42 posts and 12.4M views; Glad2Glow ran a 6.6 sale with offers in 34% of posts." }, angles: { title: "Green Cushion won on before/after", takeaway: "55% of its 15.0M views came from before/after posts." } };
+    expect(checkNarrative(n, d)).toEqual([]);
+    expect(checkNarrative({ ...n, angles: { title: "x", takeaway: "88.88% of its views" } }, d).some((p) => p.includes(`"88.88%"`))).toBe(true);
+  });
+});

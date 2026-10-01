@@ -94,11 +94,15 @@ export async function readCaptions(workspaceId: string, opts: CaptionOptions = {
   const batch = opts.batchSize ?? DEFAULT_BATCH;
   const parallel = Math.max(1, opts.parallel ?? DEFAULT_PARALLEL);
   const client = opts.client ?? anthropicClient();
-  const inBudget = () => Date.now() - started < budget;
+  // a round is as slow as its slowest call (about a minute); one that cannot finish inside the budget is
+  // not started, so the function is never cut off mid-round with paid answers unsaved
+  let lastRound = 0;
+  const inBudget = () => Date.now() - started + lastRound * 1.2 < budget;
   let lastError: string | undefined;
 
   try {
     while (inBudget()) {
+      const roundStarted = Date.now();
       const { rows, retry } = await nextPosts(workspaceId, s.min_views, batch * parallel);
       if (!rows.length) break;
       const batches = chunk(rows.map((r, i) => ({ ...r, ref: `p${i + 1}` })), batch);
@@ -147,6 +151,7 @@ export async function readCaptions(workspaceId: string, opts: CaptionOptions = {
         out.failed += missing.length;
       }
       if (retry) out.retried += rows.length;
+      lastRound = Date.now() - roundStarted;
     }
   } catch (e) {
     out.stopped = "error";

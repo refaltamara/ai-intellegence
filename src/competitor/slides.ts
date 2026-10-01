@@ -8,7 +8,7 @@ import type { WeeklyReport } from "./types";
 import { closeupPicks } from "./view";
 
 export type SlideKind =
-  | "summary" | "findings" | "scoreboard" | "trend" | "movers" | "drivers" | "creators" | "content"
+  | "summary" | "findings" | "scoreboard" | "trend" | "movers" | "drivers" | "creators" | "content" | "campaigns" | "angles"
   | "tiers" | "products" | "posting" | "closeups" | "patterns" | "moves" | "portfolio" | "evidence";
 
 export type SlideInfo = {
@@ -23,6 +23,8 @@ export type SlideInfo = {
   needs?: "client" | "finding";
   /** computed with the landscape facts */
   landscape?: boolean;
+  /** read from captions (src/captions/) */
+  captions?: boolean;
 };
 
 export const SLIDES: SlideInfo[] = [
@@ -34,6 +36,8 @@ export const SLIDES: SlideInfo[] = [
   { kind: "drivers", title: "What's driving it", description: "One slide per mover: who posted, what, the campaign tags, own channel against creators, and the cart.", pages: "1 per mover" },
   { kind: "creators", title: "Top creators", description: "The creators who brought the most views, with their tier, brand, posts and engagement; first-timers marked.", pages: "1" },
   { kind: "content", title: "Top content", description: "The six posts that drew the most views, with caption, format and cart.", pages: "1" },
+  { kind: "campaigns", title: "Campaigns and launches", description: "What each brand is running, read from captions: launches, sale events, collabs, offline events; which are new; how much carries an offer.", pages: "1", captions: true },
+  { kind: "angles", title: "Products and angles", description: "The products creators talk about, the hook that brought their views and the angle of the best post, read from captions.", pages: "1", captions: true },
   { kind: "tiers", title: "Creator tiers", description: "Where each brand puts its content and where its views come from, Nano to Mega.", pages: "1", landscape: true },
   { kind: "products", title: "Products", description: "The categories creators name in captions and the products in the TikTok cart.", pages: "1", landscape: true },
   { kind: "posting", title: "Posting pattern", description: "Posts per day and hour, peaks, promo and double-date captions.", pages: "1", landscape: true },
@@ -46,6 +50,7 @@ export const SLIDES: SlideInfo[] = [
 
 export const SLIDE_KINDS: SlideKind[] = SLIDES.map((s) => s.kind);
 export const LANDSCAPE_SLIDES = new Set<SlideKind>(SLIDES.filter((s) => s.landscape).map((s) => s.kind));
+export const CAPTION_SLIDES = new Set<SlideKind>(SLIDES.filter((s) => s.captions).map((s) => s.kind));
 export const slideInfo = (k: SlideKind) => SLIDES.find((s) => s.kind === k)!;
 
 /** The weekly report's fixed set, before and after the landscape slides (1 Oct 2026). */
@@ -75,6 +80,8 @@ export function deckSlides(r: WeeklyReport): SlideKind[] {
     if (k === "findings") return !!r.findings?.length;
     if (k === "creators") return !!r.creators?.length;
     if (k === "content") return !!r.content?.length;
+    if (k === "campaigns") return !!r.captions?.events.length;
+    if (k === "angles") return !!r.captions?.products.length;
     if (k === "trend") return trendPlatforms(r).length > 0;
     if (k === "tiers") return !!L?.tiers.rows.length;
     if (k === "products") return !!L?.products.length;

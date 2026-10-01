@@ -12,7 +12,7 @@ import type { Narrative } from "./narrative";
 import type { Cell, Flag, GroupResult, Mover, WeeklyReport } from "./types";
 import { PLATFORM_NAME, change, compact, dayMonth, flagValue, int, lensLines, metricLabel, pct, pts, wordsOf } from "./view";
 import { closeupSlides, movesSlide, patternsSlide, postingSlide, productsSlide, tiersSlide } from "./landscapeDeck";
-import { contentSlide, creatorsSlide, findingSlides, trendSlides } from "./libraryDeck";
+import { anglesSlide, campaignsSlide, contentSlide, creatorsSlide, findingSlides, trendSlides } from "./libraryDeck";
 import { add, arrow, C, chip, chrome, CW, FONT, M, postCard, segRuns, text, title, W, type Runs, type Slide } from "./draw";
 import { seriesLabel, type PeriodWords } from "./period";
 import { deckSlides, hasClient, isDeck } from "./slides";
@@ -370,6 +370,8 @@ export function buildDeck(pres: PptxGenJS, r: WeeklyReport, n: Narrative, opts: 
     else if (k === "drivers") r.movers.forEach((m) => driverSlide(pres, r, m, n.drivers.find((d) => d.key === m.key)!, ++page, S));
     else if (k === "creators") creatorsSlide(pres, r, n, ++page, S);
     else if (k === "content") contentSlide(pres, r, n, ++page, S);
+    else if (k === "campaigns") { if (r.captions?.events.length) campaignsSlide(pres, r, n, ++page, S); }
+    else if (k === "angles") { if (r.captions?.products.length) anglesSlide(pres, r, n, ++page, S); }
     else if (k === "tiers") { if (L?.tiers.rows.length) tiersSlide(pres, r, n, ++page, S); }
     else if (k === "products") { if (L?.products.length) productsSlide(pres, r, n, ++page, S); }
     else if (k === "posting") { if (L?.posting.posts) postingSlide(pres, r, n, ++page, S); }
