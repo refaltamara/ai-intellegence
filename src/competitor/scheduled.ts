@@ -18,11 +18,11 @@ import { latestCompleteWeek } from "../dashboard/period";
 import { deckBuffer } from "./deck";
 import { weeklyReport } from "./facts";
 import type { Narrative } from "./narrative";
-import { pdfBuffer } from "./pdfdeck";
+import { pdfBuffer, slideTexts, type SlideText } from "./pdfdeck";
 import type { WeeklyReport } from "./types";
 import { addDays, isoWeek, weekStart } from "./weeks";
 import { flagValue, metricLabel, PLATFORM_NAME } from "./view";
-import { writeNarrative } from "./write";
+import { factSheet, writeNarrative } from "./write";
 import { saveReportFile, type ReportFileMeta } from "../reports/files";
 
 export type ReportFormat = "pptx" | "pdf";
@@ -46,6 +46,9 @@ export type WeeklyBlocks = {
   narrative_problems: string[];
   data_as_of: string;
   agent_name?: string;
+  /** what each slide shows, as text, and every fact the report holds: what "Ask AI" on a slide is told (reports from 2 Oct 2026) */
+  slides?: SlideText[];
+  sheet?: string;
 };
 
 /** The Monday of the latest week the data fully covers: the week of `asOf` when it is a Sunday, else the week before. */
@@ -64,8 +67,9 @@ export function validContract(c: unknown, workspaceId: string): WeeklyContract |
   return contract;
 }
 
-export function blocksFor(r: WeeklyReport, n: Narrative, by: "model" | "fallback", problems: string[], agentName?: string): WeeklyBlocks {
+export function blocksFor(r: WeeklyReport, n: Narrative, by: "model" | "fallback", problems: string[], agentName?: string, withSlides = false): WeeklyBlocks {
   return {
+    ...(withSlides ? { slides: slideTexts(r, n), sheet: factSheet(r) } : {}),
     kind: "weekly",
     title: r.title,
     client: r.client,
@@ -152,27 +156,33 @@ export async function runWeekly(agent: AgentLike, runId: string, opts: { reason?
   const r = await weeklyReport(contract, monday);
   const written = await writeNarrative(r);
   const formats = (params.formats?.length ? params.formats : FORMATS).filter((f): f is ReportFormat => FORMATS.includes(f as ReportFormat));
-  const blocks = blocksFor(r, written.narrative, written.by, written.problems, agent.name);
-  const title = `${r.title} · ${r.client} · ${r.week.label}`;
-  const rows = (await sql.query(
-    "insert into reports (workspace_id, title, source, agent_run_id, body_md, blocks) values ($1, $2, 'agent', $3, $4, $5::jsonb) returning id",
-    [agent.workspace_id, title, runId, weeklyEmail(blocks, null, []).text, toJson(blocks)],
-  )) as { id: string }[];
-  const reportId = rows[0].id;
-
-  const base = `${r.title.replace(/[^A-Za-z0-9]+/g, "-")}_${r.client.replace(/[^A-Za-z0-9]+/g, "-")}_${r.week.iso}`;
-  const saved: (ReportFileMeta & { data: Buffer })[] = [];
-  for (const f of formats) {
-    const data = f === "pptx" ? await deckBuffer(r, written.narrative) : await pdfBuffer(r, written.narrative);
-    const meta = await saveReportFile({ workspaceId: agent.workspace_id, reportId, format: f, filename: `${base}.${f}`, data });
-    saved.push({ ...meta, data });
-  }
+  const { reportId, blocks, saved, title } = await storeWeekly({ workspaceId: agent.workspace_id, agentName: agent.name, runId, report: r, narrative: written.narrative, by: written.by, problems: written.problems, formats });
 
   const url = appUrl();
-  const link = url ? `${url}/reports/${reportId}` : null;
+  const link = url ? `${url}/weekly?r=${reportId}` : null;
   const email = weeklyEmail(blocks, link, saved.map((s) => s.filename));
   const delivered = await deliver(agent.delivery, { subject: `[Fair Intelligence] ${title}`, html: email.html, text: email.text, attachments: saved.map((s) => ({ filename: s.filename, content: s.data })) });
   return { status: "ok", message: `${iso}: ${r.movers.length} mover${r.movers.length === 1 ? "" : "s"}, words by ${written.by === "model" ? "CeMO" : "the plain template"}`, report_id: reportId, week: iso, delivered, narrative_by: written.by };
+}
+
+/** Store one weekly report: the blocks (with the slide texts and the fact sheet for Ask AI) and its files. */
+export async function storeWeekly(o: { workspaceId: string; agentName?: string; runId: string | null; report: WeeklyReport; narrative: Narrative; by: "model" | "fallback"; problems: string[]; formats: ReportFormat[] }): Promise<{ reportId: string; blocks: WeeklyBlocks; saved: (ReportFileMeta & { data: Buffer })[]; title: string }> {
+  const r = o.report;
+  const blocks = blocksFor(r, o.narrative, o.by, o.problems, o.agentName, true);
+  const title = `${r.title} · ${r.client} · ${r.week.label}`;
+  const rows = (await sql.query(
+    "insert into reports (workspace_id, title, source, agent_run_id, body_md, blocks) values ($1, $2, 'agent', $3, $4, $5::jsonb) returning id",
+    [o.workspaceId, title, o.runId, weeklyEmail(blocks, null, []).text, toJson(blocks)],
+  )) as { id: string }[];
+  const reportId = rows[0].id;
+  const base = `${r.title.replace(/[^A-Za-z0-9]+/g, "-")}_${r.client.replace(/[^A-Za-z0-9]+/g, "-")}_${r.week.iso}`;
+  const saved: (ReportFileMeta & { data: Buffer })[] = [];
+  for (const f of o.formats) {
+    const data = f === "pptx" ? await deckBuffer(r, o.narrative) : await pdfBuffer(r, o.narrative);
+    const meta = await saveReportFile({ workspaceId: o.workspaceId, reportId, format: f, filename: `${base}.${f}`, data });
+    saved.push({ ...meta, data });
+  }
+  return { reportId, blocks, saved, title };
 }
 
 /** Check what the Reports form sends before it becomes a schedule: a client with brands, a watchlist, known brand ids, formats. */

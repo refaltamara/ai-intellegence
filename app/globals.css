@@ -1255,3 +1255,60 @@ th{background:linear-gradient(180deg,#F8FAFE,#F4F7FC)}
 .convdoc .cr-th{display:flex;align-items:center;gap:10px;margin-bottom:6px}
 .convdoc .cr-th b{font-size:13px}
 .convdoc .cr-th span{font-size:12px;color:var(--text-3);flex:1}
+/* Weekly Reports (2 Oct 2026): the actual slides, Ask AI beside them */
+.screen.weekly{display:flex;flex-direction:column;min-height:100vh}
+.wk-actions{display:flex;gap:8px;align-items:center}
+.wk-weeks{display:flex;gap:16px;flex-wrap:wrap;padding:10px 28px 0}
+.wk-client{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.wk-client>b{font-size:12px;color:var(--text-3);margin-right:4px}
+.wk-weeks button{border:1px solid var(--line-2);background:#fff;border-radius:999px;padding:6px 12px;font:inherit;font-size:12.5px;color:var(--text-2);cursor:pointer;display:inline-flex;gap:6px;align-items:center}
+.wk-weeks button span{font-weight:800;color:var(--text-3);font-size:11px}
+.wk-weeks button.on{border-color:var(--blue);background:var(--blue-10);color:var(--blue)}
+.wk-weeks button.on span{color:var(--blue)}
+.wk-shell{flex:1;display:grid;grid-template-columns:minmax(0,1fr);gap:18px;padding:14px 28px 22px;min-height:0}
+.wk-shell.asking{grid-template-columns:minmax(0,1fr) 380px}
+.wk-main{display:flex;flex-direction:column;min-width:0;min-height:0}
+.wk-stage{flex:none;min-height:180px;display:flex;align-items:center;justify-content:center;position:relative}
+.wk-slide{display:block;border-radius:6px;box-shadow:0 1px 2px rgba(15,23,42,.06),0 8px 28px rgba(15,23,42,.12);background:#fff;cursor:pointer}
+.wk-slide.loading{opacity:.2}
+.wk-loading{position:absolute;inset:0;display:grid;place-items:center;color:var(--text-3);font-size:13px}
+.wk-nav{display:flex;align-items:center;gap:10px;justify-content:center;padding:10px 0 6px}
+.wk-count{font-size:12.5px;color:var(--text-2);max-width:60ch;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wk-count b{color:var(--text)}
+.wk-askbtn{margin-left:12px}
+.wk-thumbs{display:flex;gap:8px;overflow-x:auto;padding:6px 2px 4px}
+.wk-thumb{flex:none;border:2px solid transparent;border-radius:6px;padding:0;background:#fff;cursor:pointer;position:relative;box-shadow:0 1px 3px rgba(15,23,42,.1)}
+.wk-thumb canvas{display:block;border-radius:4px;width:132px;height:74px}
+.wk-thumb span{position:absolute;left:4px;bottom:3px;font-size:10px;font-weight:700;color:var(--text-3);background:rgba(255,255,255,.9);border-radius:4px;padding:0 4px}
+.wk-thumb.on{border-color:var(--blue)}
+.wk-ask{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:14px;background:#fff;min-height:0;max-height:calc(100vh - 150px);position:sticky;top:12px}
+.wk-ask header{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;padding:12px 14px;border-bottom:1px solid var(--line)}
+.wk-ask header b{display:block;font-size:14px}
+.wk-ask header span{display:block;font-size:12px;color:var(--text-3);margin-top:2px;line-height:1.35}
+.wk-ask .x{border:0;background:none;font-size:18px;color:var(--text-3);cursor:pointer;line-height:1}
+.wk-thread{flex:1;overflow:auto;padding:12px 14px;display:flex;flex-direction:column;gap:10px;min-height:180px}
+.wk-hint{font-size:12.5px;color:var(--text-3);line-height:1.5;background:var(--surface);border-radius:10px;padding:10px 12px}
+.wk-q{align-self:flex-end;max-width:92%;background:var(--blue-10);color:var(--text);border-radius:12px 12px 2px 12px;padding:8px 11px;font-size:13px;line-height:1.45}
+.wk-q .tag{display:block;font-size:10.5px;font-weight:700;color:var(--blue);margin-bottom:2px}
+.wk-a{font-size:13px;line-height:1.55}
+.wk-a p{margin:0 0 6px}
+.wk-a ul{padding-left:18px;margin:0 0 6px}
+.wk-a .activity{font-size:12px;color:var(--text-3);display:flex;align-items:center;gap:6px}
+.wk-a .activity .dot{width:6px;height:6px;border-radius:50%;background:var(--blue);animation:pulse 1s infinite}
+.wk-tools{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
+.wk-tools span{font-size:11px;color:var(--text-3);background:var(--surface);border-radius:999px;padding:2px 8px}
+.wk-opts{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.wk-opts p{width:100%;margin:0}
+.wk-compose{border-top:1px solid var(--line);padding:10px 12px}
+.wk-compose textarea{width:100%;border:1px solid var(--line-2);border-radius:10px;padding:8px 10px;font:inherit;font-size:13px;resize:none;outline:none}
+.wk-compose textarea:focus{border-color:var(--blue);box-shadow:0 0 0 3px var(--blue-10)}
+.wk-compose .row{display:flex;justify-content:space-between;align-items:center;margin-top:6px;font-size:12px}
+/* presenting: full screen, dark around the slide, Ask AI stays beside it */
+.wk-shell.presenting{background:#0B1220;padding:18px;gap:16px;height:100vh;box-sizing:border-box}
+.wk-shell.presenting .wk-main{justify-content:center}
+.wk-shell.presenting .wk-slide{box-shadow:0 10px 40px rgba(0,0,0,.5)}
+.wk-shell.presenting .wk-count{color:#CBD5E1}
+.wk-shell.presenting .wk-count b{color:#fff}
+.wk-shell.presenting .wk-nav .btn{color:#E2E8F0;border-color:#334155;background:transparent}
+.wk-shell.presenting .wk-ask{max-height:calc(100vh - 36px);top:0}
+@media (max-width:1100px){.wk-shell.asking{grid-template-columns:1fr}.wk-ask{position:static;max-height:none}}

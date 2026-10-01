@@ -151,6 +151,14 @@ async function brandWeeks(db: SkillDb, ctx: Context, f: Filters, brand: string, 
 
 /** What the model reads in front of the person's question. */
 export function contextPreamble(c: AskContext): string {
+  if (c.source === "slide" && c.slide) {
+    const s = c.slide;
+    return [
+      `[The person is presenting slide ${s.n} of ${s.total} of the ${s.deck}, ${s.week.label} (compared with ${s.week.previous}), titled "${c.title}". Someone in the room may have asked them this question, so answer in a few sentences they can say out loud, with the numbers.`,
+      `What the slide shows, computed from the data:\n${s.text}`,
+      `Answer about this slide and this week (${s.week.from} to ${s.week.to}). Quote the report's numbers exactly. When the question needs more than the report holds (which creators, which posts, a brand's tier mix or products), run the analyses with window from ${s.week.from} to ${s.week.to} and the brands named, and cite the evidence.]`,
+    ].join("\n\n");
+  }
   return [
     `[The person opened this chat from the dashboard, looking at: ${c.title} (${c.scope}).`,
     `Figures on their screen, computed from the data: ${c.facts.map((x) => `${x.label}: ${x.value}`).join("; ")}.`,

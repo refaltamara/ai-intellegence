@@ -15,6 +15,7 @@ type NavItem = { href: string; label: string; tone: string; icon: React.ReactNod
  */
 const NAV: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", tone: "coral", icon: <><rect x="3" y="3" width="7" height="9" rx="1.5" /><rect x="14" y="3" width="7" height="5" rx="1.5" /><rect x="14" y="12" width="7" height="9" rx="1.5" /><rect x="3" y="16" width="7" height="5" rx="1.5" /></> },
+  { href: "/weekly", label: "Weekly Reports", tone: "sun", kinds: ["category"], icon: <><rect x="3" y="4" width="18" height="13" rx="2" /><path d="M8 21h8M12 17v4" /><path d="M7 13l3-3 3 2 4-4" /></> },
   { href: "/pulse", label: "Pulse", tone: "violet", icon: <path d="M3 12h4l3-8 4 16 3-8h4" /> },
   { href: "/", label: "Chats", tone: "blue", icon: <path d="M21 12a8 8 0 0 1-8 8H7l-4 3V12a8 8 0 0 1 8-8h2a8 8 0 0 1 8 8z" /> },
   { href: "/reports", label: "Reports", tone: "mint", icon: <><path d="M6 3h9l4 4v14H6z" /><path d="M9 12h6M9 16h6" /></> },

@@ -17,7 +17,8 @@
     "skill": "NODE_USE_ENV_PROXY=1 tsx scripts/skill.ts",
     "user": "NODE_USE_ENV_PROXY=1 tsx scripts/user.ts",
     "workspace": "NODE_USE_ENV_PROXY=1 tsx scripts/workspace.ts",
-    "weekly": "NODE_USE_ENV_PROXY=1 tsx scripts/weekly.ts"
+    "weekly": "NODE_USE_ENV_PROXY=1 tsx scripts/weekly.ts",
+    "weekly:publish": "NODE_USE_ENV_PROXY=1 tsx scripts/weekly-publish.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "0.122.0",
@@ -27,6 +28,7 @@
     "cron-parser": "^5.10.0",
     "drizzle-orm": "^0.45.2",
     "next": "^16.3.4",
+    "pdfjs-dist": "^4.10.38",
     "pdfkit": "~0.17.2",
     "pptxgenjs": "^4.0.1",
     "react": "^19.2.8",

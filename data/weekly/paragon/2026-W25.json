@@ -1,9 +1,24 @@
 {
   "week": "2026-W25",
   "summary": [
-    { "label": "New", "stat": "67", "stat_label": "creators on #timephorialipstain", "text": "Timephoria scaled its lip stain on TikTok: 356 creators, and cart posts rose from 48% to 64%." },
-    { "label": "Working", "stat": "2.6M", "stat_label": "views on one ESQA story post", "text": "One mid-tier creator's wedding-prep story drew half of ESQA's TikTok views, at 7.2% engagement." },
-    { "label": "Worth testing", "stat": "15%", "stat_label": "ESQA views from its own accounts", "text": "ESQA's own accounts fell from 84% of its TikTok views to 15% as creator stories took over." }
+    {
+      "label": "New",
+      "stat": "67",
+      "stat_label": "creators on #timephorialipstain",
+      "text": "Timephoria scaled its lip stain on TikTok: 356 creators, and cart posts rose from 48% to 64%."
+    },
+    {
+      "label": "Working",
+      "stat": "2.6M",
+      "stat_label": "views on one ESQA story post",
+      "text": "One mid-tier creator's wedding-prep story drew half of ESQA's TikTok views, at 7.2% engagement."
+    },
+    {
+      "label": "Worth testing",
+      "stat": "15%",
+      "stat_label": "ESQA views from its own accounts",
+      "text": "ESQA's own accounts fell from 84% of its TikTok views to 15% as creator stories took over."
+    }
   ],
   "scoreboard_title": "Timephoria and ESQA took TikTok reach; Hanasui's Instagram volume slipped",
   "movers_title": "Two TikTok gains and one Instagram drop",
@@ -29,23 +44,83 @@
   ],
   "actions": [
     {
-      "title": "Give the next lip launch one creator tag",
-      "detail": "Timephoria put 67 creators on one lip stain tag and lifted cart posts to 64%. One tag per launch makes the wave and its sales readable.",
-      "brands": ["Wardah", "Make Over", "OMG"],
+      "title": "Turn the clippers into a programme",
+      "priority": "High",
+      "detail": "Nine clipper accounts drew 5.4M views, 12% of Paragon's week, at a 3K median against 546 for other posts. Brief them with one tag and the product on screen, and pay on views for a month.",
+      "brands": [
+        "All brands"
+      ],
+      "based_on": "Patterns · Paragon clippers"
+    },
+    {
+      "title": "Run one seeding tag per hero product",
+      "priority": "High",
+      "detail": "Glad2Glow's #rekomendasisettingspray put 84 accounts behind one product for 24.2M views, 19% of its week. Give Make Over's setting spray the same: one tag and one-post briefs, before 7.7.",
+      "brands": [
+        "Make Over"
+      ],
+      "based_on": "Patterns · Glad2Glow seeding tag"
+    },
+    {
+      "title": "Scale #gelatocleanser while it is working",
+      "priority": "High",
+      "detail": "#gelatocleanser already has 101 accounts and 137 posts for 2.9M views. Add cart links to every post and brief Mid-tier creators, who earn an 8K median per post against 583 for Nano.",
+      "brands": [
+        "All brands"
+      ],
+      "based_on": "Patterns · Paragon seeding tag"
+    },
+    {
+      "title": "Answer Timephoria's lip stain wave on TikTok",
+      "priority": "Medium",
+      "detail": "Timephoria's #timephorialipstain reached 67 creators and its cart posts rose from 48% to 64%. Put Wardah and Make Over lip creators on TikTok with cart links before payday.",
+      "brands": [
+        "Wardah",
+        "Make Over"
+      ],
       "based_on": "Timephoria · TikTok views"
     },
     {
-      "title": "Brief life-moment stories, not product demos",
-      "detail": "ESQA's best post was a personal wedding-prep story at 7.2% engagement; its brand-account post drew 0.1%. Test life-moment briefs with mid-tier creators.",
-      "brands": ["Wardah", "Emina"],
+      "title": "Pilot story-led creator posts",
+      "priority": "Test",
+      "detail": "One wedding-prep story by @dyahcoppen drew 2.6M views, 50% of ESQA's week, at 7.2% engagement. Pilot three story-led posts for Emina and compare them against showcase posts.",
+      "brands": [
+        "Emina"
+      ],
       "based_on": "ESQA · TikTok views"
-    },
-    {
-      "title": "Hold Instagram volume while Hanasui retreats",
-      "detail": "Hanasui's Instagram posts fell to 78, below its 8-week range, while Paragon's rose to 1,384. Keep that share while Hanasui is quiet.",
-      "brands": ["OMG", "Emina", "Make Over"],
-      "based_on": "Hanasui · Instagram posts"
     }
   ],
-  "portfolio_note": "Putri's Instagram posts rose from 11 to 79, and Paragon's Instagram posts rose to 1,384."
+  "portfolio_note": "Putri's Instagram posts rose from 11 to 79, and Paragon's Instagram posts rose to 1,384.",
+  "tiers": {
+    "title": "Hanasui's Micro creators carried 80% of its creator views",
+    "takeaway": "Paragon's Mega posts are 1% of its creator posts but 27% of views; Glad2Glow gets 53% of views from Nano, 596 posts."
+  },
+  "products": {
+    "title": "Glad2Glow's skin tint and setting spray took the week's views",
+    "takeaway": "Glad2Glow's 119 skin tint posts drew 31.7M views and 93 setting posts 23.4M; Paragon's 317 cushion posts drew 10.7M."
+  },
+  "posting": {
+    "title": "Glad2Glow landed 38% of its views on one day",
+    "takeaway": "Glad2Glow's peak day carried 27% of its posts and 38% of its views; Paragon spread evenly, 18% of posts and 14% of views on its peak."
+  },
+  "closeups": [
+    {
+      "key": "g2g",
+      "label": "Seeding at scale",
+      "next": "#rekomendasisettingspray reached 84 accounts for 24.2M views; watch whether skin tint gets its own tag next."
+    },
+    {
+      "key": "skintific",
+      "label": "Quieter week",
+      "next": "Views fell to 32.2M with serum still leading at 7.3M; watch for its next launch push before 7.7."
+    }
+  ],
+  "closeup_titles": [
+    "Glad2Glow and Skintific: one seeds at scale, one goes quiet"
+  ],
+  "patterns": {
+    "title": "Clippers already carry 12% of Paragon's views",
+    "takeaway": "Nine clipper accounts posted 18 clips for 5.4M views at a 3K median, against 546 for other posts; Glad2Glow's #rekomendasisettingspray drew 24.2M from 84 accounts."
+  },
+  "actions_title": "What Paragon does next: five moves, two before 7.7"
 }

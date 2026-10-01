@@ -5,6 +5,7 @@
  */
 import type { AskContext, AskRef } from "../dashboard/askref";
 import { contextPreamble, resolveAsk } from "../dashboard/ask";
+import { resolveSlide, type SlideRef } from "../reports/slideAsk";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import Anthropic from "@anthropic-ai/sdk";
@@ -65,6 +66,8 @@ export type ChatTurnInput = {
   paneAction?: PaneAction;
   /** "Ask why" from the dashboard: what was clicked; the figures are re-read here, never taken from the client */
   ask?: AskRef;
+  /** "Ask AI" on a weekly report slide: which report and slide; the slide and the fact sheet are read here */
+  slide?: SlideRef;
 };
 
 const SYSTEM_TEMPLATE = readFileSync(path.join(process.cwd(), "src/chat/system.md"), "utf8");
@@ -154,9 +157,12 @@ export async function runChatTurn(input: ChatTurnInput, emit: (e: ChatEvent) => 
   await emit({ type: "conversation", id: conversation.id, title: conversation.title });
   // Bind any freshly uploaded documents to this conversation before the turn runs.
   const claimed = await claimAttachments(input.attachmentIds ?? [], conversation.id, workspaceId, input.userId ?? null).catch(() => [] as AttachmentRow[]);
-  const context = input.ask && !input.paneAction ? await resolveAsk(workspaceId, input.ask).catch(() => null) : null;
+  const slide = input.slide && !input.paneAction ? await resolveSlide(workspaceId, input.slide).catch(() => null) : null;
+  const context = slide?.context ?? (input.ask && !input.paneAction ? await resolveAsk(workspaceId, input.ask).catch(() => null) : null);
+  // the report's whole fact sheet rides with this turn only; history keeps the slide, not the sheet
+  const extra = slide?.sheet ? `[The report's full fact sheet, every number already computed:\n${slide.sheet}]` : null;
   try {
-    await runTurnBody(conversation, userText, emit, claimed, input.followup, input.paneAction, input.userId ?? null, context);
+    await runTurnBody(conversation, userText, emit, claimed, input.followup, input.paneAction, input.userId ?? null, context, extra);
   } catch (e) {
     const message = describeModelError(e);
     console.error("chat turn failed:", conversation.id, message, (e as Error).stack?.split("\n").slice(0, 3).join(" | "));
@@ -217,7 +223,7 @@ export function historyTurns(history: { role: "user" | "assistant"; content_json
   return { messages, pendingAsk, pendingNotes: notes };
 }
 
-async function runTurnBody(conversation: { id: string; workspace_id: string; decision_id?: string | null }, userText: string, emit: (e: ChatEvent) => void | Promise<void>, claimed: AttachmentRow[] = [], followup?: ChatTurnInput["followup"], paneAction?: PaneAction, userId: string | null = null, context: AskContext | null = null): Promise<void> {
+async function runTurnBody(conversation: { id: string; workspace_id: string; decision_id?: string | null }, userText: string, emit: (e: ChatEvent) => void | Promise<void>, claimed: AttachmentRow[] = [], followup?: ChatTurnInput["followup"], paneAction?: PaneAction, userId: string | null = null, context: AskContext | null = null, extra: string | null = null): Promise<void> {
   const workspaceId = conversation.workspace_id;
   const history = await listMessages(conversation.id);
   await addMessage({
@@ -271,7 +277,7 @@ async function runTurnBody(conversation: { id: string; workspace_id: string; dec
     modelText = applied.text;
     for (const r of applied.records) { toolRecords.push(r); if (r.run_id) runIds.push(r.run_id); }
   }
-  if (context) modelText = `${contextPreamble(context)}\n\n${modelText}`;
+  if (context) modelText = `${contextPreamble(context)}${extra ? `\n\n${extra}` : ""}\n\n${modelText}`;
   if (replay.pendingNotes.length) modelText = `(Earlier: ${replay.pendingNotes.join("; ")}.)\n${modelText}`;
   messages.push(userTurn(modelText, docs, replay.pendingAsk));
   const answer = new AnswerStream(new Set());
