@@ -6,7 +6,8 @@
  *
  * Which posts: those that matter to a deck: views at or over the workspace's
  * floor (`settings.captions.min_views`, 10K by default) or posted by a brand
- * account, newest first. One read per url: an Instagram post tagging two brands
+ * account, newest first, from `settings.captions.since` (a date, WIB) when one
+ * is set, so a panel can read only the months it reports on. One read per url: an Instagram post tagging two brands
  * is read once and the tags go on both rows. Same retry rule as the sentiment
  * labeller: a post a batch came back without is tried once more when nothing
  * new is waiting, then left alone.
@@ -18,8 +19,15 @@ import { sql } from "../db/client";
 import { toJson } from "../db/json";
 import { captionBatchPrompt, captionSystem, parseTags, READ_CAPTIONS_TOOL, type PostForReading } from "./prompt";
 
-export type CaptionSettings = { enabled: boolean; min_views: number };
-export const CAPTION_DEFAULTS: CaptionSettings = { enabled: false, min_views: 10_000 };
+export type CaptionSettings = { enabled: boolean; min_views: number; since: string | null };
+export const CAPTION_DEFAULTS: CaptionSettings = { enabled: false, min_views: 10_000, since: null };
+
+/** A YYYY-MM-DD date that exists, or null. */
+export function captionSince(v: unknown): string | null {
+  if (typeof v !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(v)) return null;
+  const d = new Date(`${v}T00:00:00Z`);
+  return !isNaN(d.getTime()) && d.toISOString().slice(0, 10) === v ? v : null;
+}
 
 export type CaptionOutcome = {
   workspace: string;
@@ -46,7 +54,12 @@ export const captionModel = () => process.env.ANTHROPIC_MODEL_CAPTIONS || modelI
 export async function captionSettings(workspaceId: string): Promise<CaptionSettings & { kind: string }> {
   const r = (await sql.query("select kind, settings->'captions' as c from workspaces where id = $1", [workspaceId])) as { kind: string; c: Partial<CaptionSettings> | null }[];
   const c = r[0]?.c ?? {};
-  return { kind: r[0]?.kind ?? "category", enabled: c.enabled === true, min_views: Number.isFinite(Number(c.min_views)) && Number(c.min_views) >= 0 ? Number(c.min_views) : CAPTION_DEFAULTS.min_views };
+  return {
+    kind: r[0]?.kind ?? "category",
+    enabled: c.enabled === true,
+    min_views: Number.isFinite(Number(c.min_views)) && Number(c.min_views) >= 0 ? Number(c.min_views) : CAPTION_DEFAULTS.min_views,
+    since: captionSince(c.since),
+  };
 }
 
 async function callModel(client: Anthropic, req: Anthropic.MessageCreateParamsNonStreaming): Promise<Anthropic.Message> {
@@ -61,11 +74,13 @@ async function callModel(client: Anthropic, req: Anthropic.MessageCreateParamsNo
   }
 }
 
-/** The posts worth reading in a workspace ($1), with the views floor ($2); `a` is the table alias. */
-const scope = (a: string) => `${a}.workspace_id = $1 and ${a}.caption is not null and length(btrim(${a}.caption)) >= 8 and ${a}.content_type is distinct from 'stub' and (${a}.views >= $2 or ${a}.source = 'owned')`;
+/** The posts worth reading in a workspace ($1), with the views floor ($2) and the first day ($3, null for all); `a` is the table alias. */
+const scope = (a: string) =>
+  `${a}.workspace_id = $1 and ${a}.caption is not null and length(btrim(${a}.caption)) >= 8 and ${a}.content_type is distinct from 'stub' and (${a}.views >= $2 or ${a}.source = 'owned')
+   and ($3::date is null or ${a}.posted_at >= ($3::date::timestamp at time zone 'Asia/Jakarta'))`;
 
 /** The next posts to read, one per url: new ones first, the once-failed only when nothing new is waiting. */
-async function nextPosts(workspaceId: string, minViews: number, limit: number): Promise<{ rows: Omit<PostForReading, "ref">[]; retry: boolean }> {
+async function nextPosts(workspaceId: string, minViews: number, since: string | null, limit: number): Promise<{ rows: Omit<PostForReading, "ref">[]; retry: boolean }> {
   const pick = (where: string) =>
     `select p.platform, p.url, array_agg(distinct b.name order by b.name) as brands, max(p.source) as source, max(p.creator_handle) as handle,
             max(p.content_format) as format, max(p.product_name) as cart_product, (array_agg(p.caption order by length(p.caption) desc))[1] as caption
@@ -73,10 +88,10 @@ async function nextPosts(workspaceId: string, minViews: number, limit: number): 
      where ${scope("p")} and ${where}
      group by p.platform, p.url
      order by max(p.posted_at) desc, max(p.views) desc nulls last
-     limit $3`;
-  const fresh = (await sql.query(pick("p.cap_source is null"), [workspaceId, minViews, limit])) as Omit<PostForReading, "ref">[];
+     limit $4`;
+  const fresh = (await sql.query(pick("p.cap_source is null"), [workspaceId, minViews, since, limit])) as Omit<PostForReading, "ref">[];
   if (fresh.length) return { rows: fresh, retry: false };
-  return { rows: (await sql.query(pick("p.cap_source = 'model_failed'"), [workspaceId, minViews, limit])) as Omit<PostForReading, "ref">[], retry: true };
+  return { rows: (await sql.query(pick("p.cap_source = 'model_failed'"), [workspaceId, minViews, since, limit])) as Omit<PostForReading, "ref">[], retry: true };
 }
 
 function chunk<T>(rows: T[], size: number): T[][] {
@@ -103,7 +118,7 @@ export async function readCaptions(workspaceId: string, opts: CaptionOptions = {
   try {
     while (inBudget()) {
       const roundStarted = Date.now();
-      const { rows, retry } = await nextPosts(workspaceId, s.min_views, batch * parallel);
+      const { rows, retry } = await nextPosts(workspaceId, s.min_views, s.since, batch * parallel);
       if (!rows.length) break;
       const batches = chunk(rows.map((r, i) => ({ ...r, ref: `p${i + 1}` })), batch);
       const results = await Promise.all(batches.map(async (b) => {
@@ -157,7 +172,7 @@ export async function readCaptions(workspaceId: string, opts: CaptionOptions = {
     out.stopped = "error";
     out.error = (e as Error).message;
   }
-  out.remaining = await remainingCaptions(workspaceId, s.min_views);
+  out.remaining = await remainingCaptions(workspaceId, s.min_views, s.since);
   if (out.stopped === "done" && out.remaining) out.stopped = "budget";
   out.duration_ms = Date.now() - started;
   if (out.calls > 0 || out.error) {
@@ -171,10 +186,10 @@ export async function readCaptions(workspaceId: string, opts: CaptionOptions = {
 }
 
 /** Posts (by url) still waiting to be read. */
-export async function remainingCaptions(workspaceId: string, minViews: number): Promise<number> {
+export async function remainingCaptions(workspaceId: string, minViews: number, since: string | null = null): Promise<number> {
   const r = (await sql.query(
     `select count(distinct (p.platform, p.url))::int as n from posts p where ${scope("p")} and coalesce(p.cap_source, '') in ('', 'model_failed')`,
-    [workspaceId, minViews],
+    [workspaceId, minViews, since],
   )) as { n: number }[];
   return r[0]?.n ?? 0;
 }
@@ -188,5 +203,5 @@ export async function captionStatus(workspaceId: string): Promise<CaptionSetting
      from posts where workspace_id = $1 and cap_source is not null`,
     [workspaceId],
   )) as { read: number; failed: number }[];
-  return { enabled: s.enabled, min_views: s.min_views, read: r[0]?.read ?? 0, failed: r[0]?.failed ?? 0, remaining: await remainingCaptions(workspaceId, s.min_views) };
+  return { enabled: s.enabled, min_views: s.min_views, since: s.since, read: r[0]?.read ?? 0, failed: r[0]?.failed ?? 0, remaining: await remainingCaptions(workspaceId, s.min_views, s.since) };
 }
