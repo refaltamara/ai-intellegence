@@ -33,6 +33,9 @@ describe("the words of a scheduled report", () => {
     expect(s).toContain('drivers[].key must be exactly: "timephoria", "g2g", "skintific"');
     expect(s).toContain("11.2%");
     expect(factSheet(quiet)).toContain("quiet week");
+    expect(s).toContain("CREATOR TIERS");
+    expect(s).toContain('closeups[].key must be exactly, in order: "hanasui", "esqa"');
+    expect(s).toContain("#brighteninggelmask");
   });
 
   it("the plain narrative always passes the check, busy week or quiet", () => {
@@ -75,15 +78,22 @@ describe("the words of a scheduled report", () => {
 });
 
 describe("the PDF is the deck's layout", () => {
-  it("records one page per slide: summary, scoreboard, movers, a driver per mover, actions, two appendices", () => {
-    expect(recordDeck(busy, sample)).toHaveLength(6 + busy.movers.length);
-    expect(recordDeck(quiet, plainNarrative(quiet))).toHaveLength(6);
+  it("records one page per slide: summary, scoreboard, movers, drivers, the landscape, the moves, two appendices", () => {
+    // busy: 3 drivers + tiers, products, posting, 1 close-up slide, patterns → 12 slides and 2 appendix pages
+    expect(recordDeck(busy, sample)).toHaveLength(14);
+    // quiet: no drivers, 2 close-up slides → 10 slides and 2 appendix pages
+    expect(recordDeck(quiet, plainNarrative(quiet))).toHaveLength(12);
+  });
+
+  it("a report from before the landscape keeps its old shape", () => {
+    const { landscape: _l, ...old } = busy;
+    expect(recordDeck(old as WeeklyReport, { ...sample, actions: sample.actions.slice(0, 3) })).toHaveLength(6 + busy.movers.length);
   });
 
   it("draws a PDF with those pages", async () => {
     const pdf = await drawPdf(recordDeck(busy, sample), { title: "test" });
     expect(pdf.subarray(0, 5).toString()).toBe("%PDF-");
-    expect((pdf.toString("latin1").match(/\/Type \/Page\b/g) ?? []).length).toBe(9);
+    expect((pdf.toString("latin1").match(/\/Type \/Page\b/g) ?? []).length).toBe(14);
   }, 20_000);
 
   it("chart axes end just above the tallest bar", () => {

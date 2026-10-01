@@ -17,6 +17,7 @@ describe("card settings", () => {
     expect(cleanConfig("content", { platform: "x", period: "last year", sort: "drop table", limit: 999 }, known)).toEqual({ platform: "all", brands: [], period: "latest-month", sort: "views", q: "", limit: 12 });
     expect(cleanConfig("creators", null, known)).toMatchObject({ by: "views", limit: 8 });
     expect(cleanConfig("trend", { metric: "er" }, known).metric).toBe("posts");
+    expect(cleanConfig("closeup", { brands: ["skintific_official", "glad2glow_id"] }, known).brands).toEqual(["skintific_official"]);
   });
 
   it("every kind has a label and a default size, and only pinned analyses work without a brand panel", () => {
@@ -36,6 +37,16 @@ describe("periods on a card", () => {
     expect(periodSetting(parsePeriod("2026-06")!, "2026-06-30")).toBe("latest-month");
     expect(periodSetting(parsePeriod("2026-W26")!, "2026-06-30")).toBe("latest-week");
     expect(periodSetting(parsePeriod("2026-05")!, "2026-06-30")).toBe("2026-05");
+  });
+});
+
+describe("report-depth cards", () => {
+  it("the report's points of view are card kinds of their own", () => {
+    for (const k of ["tier_mix", "products", "posting", "closeup", "patterns"] as const) {
+      expect(CARD_KINDS).toContain(k);
+      expect(KIND_INFO[k].panel).toBe(true);
+    }
+    expect(TEMPLATES.find((t) => t.key === "competitor-deep-dive")!.cards.map((c) => c.kind)).toEqual(["rankings", "tier_mix", "products", "posting", "patterns", "closeup"]);
   });
 });
 

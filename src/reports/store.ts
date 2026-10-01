@@ -38,8 +38,10 @@ export async function getReport(id: string, workspaceId: string): Promise<Report
   const r = (await sql.query("select * from reports where id = $1 and workspace_id = $2", [id, workspaceId])) as ReportRow[];
   return r[0] ?? null;
 }
+/** Delete a report and its files; the schedule run that made it forgets it (the run itself stays in the schedule's history). */
 export async function deleteReport(id: string, workspaceId: string): Promise<boolean> {
   const r = (await sql.query("delete from reports where id = $1 and workspace_id = $2 returning id", [id, workspaceId])) as { id: string }[];
+  if (r.length) await sql.query("update agent_runs set report_id = null where report_id = $1", [id]);
   return r.length > 0;
 }
 

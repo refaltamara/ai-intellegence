@@ -3,6 +3,8 @@
  * dashboard and the narrative check all format through here, so a number in
  * the text can always be traced to the same number on the slide.
  */
+import { TIER_BANDS } from "../config/thresholds";
+import type { CloseUp, Landscape, Pattern, PatternKind, PostingBrand, ProductRow } from "./landscape";
 import type { Cell, Mover, Platform, WeekPoint, WeeklyReport } from "./types";
 
 export const PLATFORM_NAME: Record<Platform, string> = { tiktok: "TikTok", instagram: "Instagram" };
@@ -226,5 +228,143 @@ export function displayedNumbers(r: WeeklyReport): { percent: number[]; points: 
     if (n.value != null) percent.push(n.value);
     if (n.previous != null) percent.push(n.previous);
   }
+  if (r.landscape) landscapeNumbers(r.landscape, { percent, points, views, counts, ratios });
   return { percent, points, views, counts, ratios };
+}
+
+// ------------------------------------------------------------- landscape
+/** "Nano under 10K", "Micro 10K–50K", … from the tier bands in src/config. */
+export function tierLegend(): { tier: string; label: string }[] {
+  return TIER_BANDS.map((b) => ({
+    tier: b.tier,
+    label: `${TIER_NAME[b.tier]} ${b.min <= 1 ? `under ${compact(b.max! + 1)}` : b.max == null ? `${compact(b.min - 1)}+` : `${compact(b.min - 1)}–${compact(b.max)}`}`,
+  }));
+}
+
+export const PATTERN_NAME: Record<PatternKind, string> = {
+  clipper: "Clippers",
+  carry: "One creator carries the brand",
+  affiliate: "Affiliate bursts",
+  templated: "Templated captions",
+  seeding: "Seeding tag",
+};
+/** What each pattern is and how the report spots it: shown next to the numbers. */
+export const PATTERN_HOW: Record<PatternKind, string> = {
+  clipper: "Accounts that cut short clips from longer creator content and repost them with the brand tagged, usually paid on views. Spotted by a handle built around \u201cclip\u201d or a clipping-community tag.",
+  carry: "One creator brings a large share of the brand's views in the week. Spotted when one creator holds 40% or more of a brand's views on at least 1.0M views.",
+  affiliate: "A creator posting for the same brand five times or more in one week, usually an affiliate or a paid retainer.",
+  templated: "Three or more creators posting the same caption (mentions and hashtags aside): a brief handed out word for word.",
+  seeding: "A hashtag used by five or more creators where 90% or more of the tag's posts are about this brand: a seeding wave run under one tag.",
+};
+
+/** The brands that get a close-up: watched brands that are not this week's movers, biggest first, two per slide; one slide on a busy week, two on a quiet one. */
+export function closeupPicks(r: WeeklyReport): CloseUp[][] {
+  const L = r.landscape;
+  if (!L) return [];
+  const movers = new Set(r.movers.map((m) => m.key));
+  const pool = L.closeups.filter((c) => !c.client && !movers.has(c.key) && c.posts >= 30).sort((a, b) => b.views - a.views);
+  const slides = r.movers.length >= 2 ? 1 : 2;
+  const out: CloseUp[][] = [];
+  for (let i = 0; i < slides && i * 2 < pool.length; i++) out.push(pool.slice(i * 2, i * 2 + 2));
+  return out;
+}
+
+/** The deterministic rows of a close-up: what the brand pushed, its own channel, its creators, its offers. */
+export function closeupLines(c: CloseUp, posting?: PostingBrand): { label: string; text: string; muted?: boolean }[] {
+  const lines: { label: string; text: string; muted?: boolean }[] = [];
+  const cats = c.categories.map((x) => `${x.label} ${int(x.posts)} posts, ${compact(x.views)} views`).join("; ");
+  lines.push({ label: "Pushing", text: [cats || "No category named in most captions", c.cart ? `Cart: ${productName(c.cart.name)} (${int(c.cart.posts)} ${c.cart.posts === 1 ? "post" : "posts"}, ${compact(c.cart.views)} views)` : null].filter(Boolean).join(". ") + "." });
+  if (c.owned) {
+    lines.push(c.owned.posts
+      ? { label: "Own channel", text: `${int(c.owned.posts)} TikTok posts from brand accounts brought ${compact(c.owned.views)} views, ${c.owned.views_share}% of the brand's TikTok views${c.owned.median_views != null ? `, at a ${compact(c.owned.median_views)} median` : ""}.` }
+      : { label: "Own channel", text: "No brand-account posts on TikTok this week.", muted: true });
+  } else lines.push({ label: "Own channel", text: "Brand-account posts are collected on TikTok only.", muted: true });
+  const t = c.top_creator;
+  lines.push({
+    label: "Creators",
+    text: [`${int(c.creators)} creators`, c.repeat_share != null ? `${c.repeat_share}% of creator posts from accounts posting 3+ times` : null, t ? `top: @${t.handle}, ${int(t.posts)} ${t.posts === 1 ? "post" : "posts"}, ${t.views_share}% of the brand's views` : null].filter(Boolean).join("; ") + ".",
+  });
+  const offers = [`Promo language in ${c.promo_share}% of posts`, posting?.double_date_posts ? `${int(posting.double_date_posts)} double-date ${posting.double_date_posts === 1 ? "caption" : "captions"} (${posting.double_dates.join(", ")})` : null, posting?.payday_posts ? `${int(posting.payday_posts)} payday ${posting.payday_posts === 1 ? "caption" : "captions"}` : null].filter(Boolean).join("; ");
+  lines.push({ label: "Offers", text: offers + "." });
+  return lines;
+}
+
+/** "Lip 288 · 1.4M" for the product table. */
+export function categoryCell(p: ProductRow): string {
+  return p.categories.map((c) => `${c.label} ${int(c.posts)} · ${compact(c.views)}`).join("  |  ");
+}
+
+/** What sits behind a brand's posting peak, in words with numbers. */
+export function postingBehind(b: PostingBrand): string {
+  const parts = [
+    b.double_date_posts ? `${int(b.double_date_posts)} double-date ${b.double_date_posts === 1 ? "caption" : "captions"} (${b.double_dates.join(", ")})` : null,
+    b.payday_posts ? `${int(b.payday_posts)} payday ${b.payday_posts === 1 ? "caption" : "captions"}` : null,
+    `promo language in ${b.promo_share}% of posts`,
+  ].filter(Boolean) as string[];
+  const s = parts.join("; ");
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+export function hourLabel(h: number): string {
+  return `${String(h % 24).padStart(2, "0")}:00`;
+}
+
+export function patternSignal(p: Pattern): string {
+  if (p.kind === "seeding") return `#${p.label}`;
+  if (p.kind === "carry" || p.kind === "affiliate") return p.label ? `@${p.label}` : "";
+  if (p.kind === "templated") return `\u201c${(p.label ?? "").slice(0, 60)}${(p.label ?? "").length > 60 ? "…" : ""}\u201d`;
+  if (p.kind === "clipper" && p.median_views != null) return `median ${compact(p.median_views)} a clip vs ${compact(p.median_other ?? 0)} other posts`;
+  return "";
+}
+
+function landscapeNumbers(L: Landscape, pool: { percent: number[]; points: number[]; views: number[]; counts: number[]; ratios: number[] }) {
+  const { percent, views, counts } = pool;
+  for (const t of L.tiers.rows) {
+    counts.push(t.posts);
+    views.push(t.views);
+    for (const x of t.tiers) { counts.push(x.posts); views.push(x.views); percent.push(x.content_share, x.views_share); }
+    if (t.top) { counts.push(t.top.posts); views.push(t.top.views); percent.push(t.top.views_share); }
+  }
+  for (const b of L.tiers.benchmark) { counts.push(b.posts); if (b.median_views != null) views.push(b.median_views); }
+  for (const o of L.tiers.overall) percent.push(o.content_share, o.views_share);
+  for (const p of L.products) {
+    counts.push(p.posts);
+    percent.push(p.unnamed_share, 100 - p.unnamed_share);
+    for (const c of p.categories) { counts.push(c.posts); views.push(c.views); }
+    for (const c of p.cart) { counts.push(c.posts); views.push(c.views); }
+  }
+  const P = L.posting;
+  for (const d of P.days) { counts.push(d.posts, d.promo_posts); views.push(d.views); }
+  for (const h of P.hours) { counts.push(h.posts); if (h.median_views != null) views.push(h.median_views); }
+  counts.push(P.posts, P.promo_posts);
+  if (P.window) percent.push(P.window.share);
+  if (P.hour_median_range) views.push(P.hour_median_range.low, P.hour_median_range.high);
+  const cur = P.days.filter((d) => d.current).reduce((s, d) => s + d.posts, 0);
+  const prev = P.days.filter((d) => !d.current).reduce((s, d) => s + d.posts, 0);
+  counts.push(cur, prev);
+  if (prev > 0) percent.push(Math.abs((cur / prev - 1) * 100));
+  for (const b of P.brands) { counts.push(b.posts, b.peak_posts, b.promo_posts, b.double_date_posts, b.payday_posts); percent.push(b.peak_posts_share, b.peak_views_share, b.promo_share); }
+  for (const c of L.closeups) {
+    counts.push(c.posts, c.creators, c.tiktok_posts, c.instagram_posts);
+    views.push(c.views, c.likes, c.comments);
+    if (c.er != null) percent.push(c.er);
+    for (const x of c.categories) { counts.push(x.posts); views.push(x.views); }
+    if (c.cart) { counts.push(c.cart.posts); views.push(c.cart.views); }
+    if (c.owned) { counts.push(c.owned.posts); views.push(c.owned.views); percent.push(c.owned.views_share); if (c.owned.median_views != null) views.push(c.owned.median_views); }
+    if (c.repeat_share != null) percent.push(c.repeat_share);
+    if (c.top_creator) { counts.push(c.top_creator.posts); views.push(c.top_creator.views); percent.push(c.top_creator.views_share); }
+    percent.push(c.promo_share);
+    if (c.top_post) views.push(c.top_post.views);
+  }
+  for (const p of L.patterns) {
+    counts.push(p.posts, p.accounts);
+    views.push(p.views);
+    percent.push(p.views_share);
+    if (p.median_views != null) views.push(p.median_views);
+    if (p.median_other != null) views.push(p.median_other);
+    for (const e of p.examples) views.push(e.views);
+  }
+  // the repeat-poster and pattern thresholds the slides print
+  counts.push(3, 5);
+  percent.push(40, 90);
 }

@@ -84,6 +84,8 @@ function DataObject({ obj, p }: { obj: PaneObject; p: Props }) {
   const [refine, setRefine] = useState(false);
   const [exportMenu, setExportMenu] = useState(false);
   const [hidden, setHidden] = useState<Set<string>>(new Set()); // chart series turned off
+  // a chart only when asked for (DECISIONS, 1 Oct 2026); a result that is only a chart shows it
+  const [chartOn, setChartOn] = useState(false);
   const excluded = new Set(state.excluded ?? []);
   const visible = useMemo(() => applyPaneState(rows, showExcluded ? { ...state, excluded: [] } : state, diffKey), [rows, state, showExcluded, diffKey]);
   const keyOf = (r: Record<string, unknown>) => rowKey(r, diffKey, rows.indexOf(r));
@@ -91,7 +93,7 @@ function DataObject({ obj, p }: { obj: PaneObject; p: Props }) {
   const meta = (tool.meta ?? {}) as { matched?: number; caveats?: string[]; data_window?: { from: string; to: string }; freshness?: string };
   const chart = tool.chart as ChartSpec | undefined;
   const showChart = !!chart && Array.isArray(chart.x) && chart.x.length >= 3;
-  const chartSpec = showChart && chart ? { ...chart, series: chart.series.filter((s) => !hidden.has(s.name)) } : null;
+  const chartSpec = showChart && chart && (chartOn || rows.length === 0) ? { ...chart, series: chart.series.filter((s) => !hidden.has(s.name)) } : null;
   const numeric = (k: string) => rows.some((r) => typeof r[k] === "number");
   const setState = (patch: Partial<PaneState>) => { if (runId) p.onState(runId, { ...state, ...patch }); };
   const sortBy = (k: string) => setState({ sort: state.sort?.key === k ? (state.sort.dir === "desc" ? { key: k, dir: "asc" } : null) : { key: k, dir: "desc" } });
@@ -160,6 +162,9 @@ function DataObject({ obj, p }: { obj: PaneObject; p: Props }) {
       )}
 
       <div className="pbody">
+        {showChart && rows.length > 0 && (
+          <div className="charttog"><button className="btn sm ghost" onClick={() => setChartOn((c) => !c)}>{chartOn ? "Hide chart" : "Show chart"}</button></div>
+        )}
         {chartSpec && (
           <div className="pchart">
             {hasWindow && runId && (

@@ -12,7 +12,14 @@ const KINDS: { kind: CardKind; label: string; hint: string }[] = [
   { kind: "tiers", label: "Creator tiers", hint: "Nano to mega" },
   { kind: "creators", label: "Top creators", hint: "By views or comments" },
   { kind: "content", label: "Trending content", hint: "Posts that travelled" },
+  { kind: "tier_mix", label: "Tier mix by brand", hint: "Who wins views at which tier" },
+  { kind: "products", label: "What creators push", hint: "Categories and cart products" },
+  { kind: "posting", label: "Posting pattern", hint: "Days, peaks, promo, time of day" },
+  { kind: "closeup", label: "Brand close-up", hint: "One brand in depth" },
+  { kind: "patterns", label: "Patterns", hint: "Clippers, seeding tags, affiliates" },
 ];
+
+const LANDSCAPE = new Set<CardKind>(["tier_mix", "products", "posting", "closeup", "patterns"]);
 
 export function CardEditor({ options, initial, onSave, onCancel, busy }: {
   options: Options;
@@ -33,7 +40,7 @@ export function CardEditor({ options, initial, onSave, onCancel, busy }: {
   const [by, setBy] = useState(c?.by ?? "views");
   const [limit, setLimit] = useState(c?.limit ?? 8);
   const [q, setQ] = useState(c?.q ?? "");
-  const DEFAULT_SIZE: Record<string, CardSize> = { kpi: "s", creators: "m" };
+  const DEFAULT_SIZE: Record<string, CardSize> = { kpi: "s", creators: "m", closeup: "m" };
 
   return (
     <div className="ceditor">
@@ -61,7 +68,7 @@ export function CardEditor({ options, initial, onSave, onCancel, busy }: {
         <label className="wf"><span>Size</span>
           <select value={size} onChange={(e) => setSize(e.target.value as CardSize)}><option value="s">Small (a third)</option><option value="m">Half</option><option value="l">Full width</option></select>
         </label>
-        <div className="wf wide"><span>Brands <small>(empty = all brands)</small></span><MultiSelect options={options.brands} value={brands} onChange={setBrands} placeholder="All brands" /></div>
+        <div className="wf wide"><span>{kind === "closeup" ? <>Brand <small>(one; empty = the most-posted brand)</small></> : LANDSCAPE.has(kind) ? <>Brands <small>(up to 8; empty = the 8 most-posted)</small></> : <>Brands <small>(empty = all brands)</small></>}</span><MultiSelect options={options.brands} value={brands} onChange={(ids) => setBrands(kind === "closeup" ? ids.slice(-1) : ids)} placeholder={kind === "closeup" ? "Most-posted brand" : LANDSCAPE.has(kind) ? "Most-posted brands" : "All brands"} /></div>
         {kind === "kpi" && (
           <label className="wf"><span>Number</span>
             <select value={metric} onChange={(e) => setMetric(e.target.value as CardConfig["metric"] & string)}><option value="views">Views</option><option value="posts">Content</option><option value="engagements">Engagement</option><option value="er">Engagement rate</option></select>

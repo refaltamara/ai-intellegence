@@ -20,7 +20,7 @@ import { activityDone, activityStart, workspaceCounts } from "./activity";
 import { anthropicClient, chatEffort, describeModelError } from "./client";
 import { renumberEvidence } from "./evidence";
 import { scrubMechanism } from "./leak";
-import { AnswerStream, usableFollowups, type Followup } from "./stream";
+import { AnswerStream, type Followup } from "./stream";
 import { decisionContext } from "../decisions/store";
 import { validateParams } from "../skills/params";
 import { claimAttachments, conversationAttachments, type AttachmentRow } from "./attachments";
@@ -386,8 +386,7 @@ async function runTurnBody(conversation: { id: string; workspace_id: string; dec
   const scrubbed = scrubMechanism(fullText, skillNames());
   fullText = scrubbed.text;
   if (scrubbed.leaks.length) console.warn(`mechanism_leak ${conversation.id}: ${scrubbed.leaks.join(", ")}`);
-  const followups = paneAction ? [] : usableFollowups(answer.followups, new Set(Object.keys(impls)));
-  if (followups.length && !ask) await emit({ type: "followups", items: followups });
+  // follow-up suggestions are retired (DECISIONS, 1 Oct 2026): a stray block is swallowed by the stream and never shown
 
   const evidenceMap: Record<string, Evidence> = {};
   for (const id of new Set(answer.cited)) {
@@ -399,7 +398,7 @@ async function runTurnBody(conversation: { id: string; workspace_id: string; dec
   const saved = await addMessage({
     conversationId: conversation.id,
     role: "assistant",
-    content: { text: fullText, tools: toolRecords, draft, ...(ask ? { ask } : {}), ...(followups.length && !ask ? { followups } : {}), ...(answer.hasCounter ? { has_counter: true } : {}), ...(scrubbed.leaks.length ? { mechanism_leak: scrubbed.leaks } : {}) },
+    content: { text: fullText, tools: toolRecords, draft, ...(ask ? { ask } : {}), ...(answer.hasCounter ? { has_counter: true } : {}), ...(scrubbed.leaks.length ? { mechanism_leak: scrubbed.leaks } : {}) },
     evidence: evidenceMap,
     skillRunIds: runIds,
     tokensIn,

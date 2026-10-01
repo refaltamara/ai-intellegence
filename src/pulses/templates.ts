@@ -40,6 +40,18 @@ export const TEMPLATES: Template[] = [
       { kind: "content", size: "l", title: "Posts that over-perform", config: { period: "latest-month", sort: "er", limit: 6 } },
     ],
   },
+  {
+    key: "competitor-deep-dive", name: "Competitor deep-dive", panel: true,
+    description: "The weekly report's points of view on your brands: tier mix, what creators push, posting pattern, patterns and a close-up.",
+    cards: [
+      { kind: "rankings", size: "l", config: { period: "latest-week", limit: 10 } },
+      { kind: "tier_mix", size: "l", config: { period: "latest-week" } },
+      { kind: "products", size: "l", config: { period: "latest-week" } },
+      { kind: "posting", size: "l", config: { period: "latest-week" } },
+      { kind: "patterns", size: "m", config: { period: "latest-week" } },
+      { kind: "closeup", size: "m", config: { period: "latest-week" } },
+    ],
+  },
   { key: "blank", name: "Blank", panel: false, description: "Start empty; add cards here or pin answers from Chats.", cards: [] },
 ];
 

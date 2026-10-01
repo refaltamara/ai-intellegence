@@ -1,0 +1,2 @@
+ALTER TABLE "pulse_cards" DROP CONSTRAINT "pulse_cards_kind_chk";--> statement-breakpoint
+ALTER TABLE "pulse_cards" ADD CONSTRAINT "pulse_cards_kind_chk" CHECK ("pulse_cards"."kind" in ('kpi','rankings','trend','tiers','creators','content','tier_mix','products','posting','closeup','patterns','skill'));
