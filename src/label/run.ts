@@ -11,7 +11,7 @@
  * up again. Two attempts, then it stops costing anything.
  */
 import type Anthropic from "@anthropic-ai/sdk";
-import { anthropicClient } from "../chat/client";
+import { anthropicClient, toolAnswer } from "../chat/client";
 import { modelId } from "../chat/loop";
 import { sql } from "../db/client";
 import { getWorkspace } from "../workspace/store";
@@ -119,16 +119,14 @@ export async function labelWorkspace(workspaceId: string, opts: LabelOptions = {
       const batches = chunk(rows, batch);
       const results = await Promise.all(batches.map(async (b) => {
         try {
-          const res = await callModel(client, {
+          const { use } = await toolAnswer((req) => callModel(client, req), {
             model: modelId(),
-            max_tokens: 4000,
+            max_tokens: 8000,
             output_config: { effort: "low" },
             system: [{ type: "text", text: commentSystem(subject), cache_control: { type: "ephemeral" } }],
             tools: [LABEL_COMMENTS_TOOL],
-            tool_choice: { type: "tool", name: LABEL_COMMENTS_TOOL.name },
             messages: [{ role: "user", content: commentBatchPrompt(subject, b) }],
-          });
-          const use = res.content.find((x): x is Anthropic.ToolUseBlock => x.type === "tool_use");
+          }, LABEL_COMMENTS_TOOL.name);
           return parseLabels(use?.input, b.map((r) => r.id));
         } catch (e) {
           out.calls_failed += 1;
@@ -164,16 +162,14 @@ export async function labelWorkspace(workspaceId: string, opts: LabelOptions = {
       const batches = chunk(rows, batch);
       const results = await Promise.all(batches.map(async (b) => {
         try {
-          const res = await callModel(client, {
+          const { use } = await toolAnswer((req) => callModel(client, req), {
             model: modelId(),
-            max_tokens: 4000,
+            max_tokens: 8000,
             output_config: { effort: "low" },
             system: [{ type: "text", text: stanceSystem(subject), cache_control: { type: "ephemeral" } }],
             tools: [LABEL_POSTS_TOOL],
-            tool_choice: { type: "tool", name: LABEL_POSTS_TOOL.name },
             messages: [{ role: "user", content: stanceBatchPrompt(b) }],
-          });
-          const use = res.content.find((x): x is Anthropic.ToolUseBlock => x.type === "tool_use");
+          }, LABEL_POSTS_TOOL.name);
           return parseLabels(use?.input, b.map((r) => r.id), SENTIMENTS);
         } catch (e) {
           out.calls_failed += 1;

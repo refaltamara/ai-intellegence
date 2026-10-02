@@ -148,7 +148,7 @@ async function writeWithModel(workspaceId: string, results: unknown[], noticed: 
   const suffix = BRIEF_SYSTEM.replace("{{date_human}}", dateHuman).replace("{{window}}", `${base.window.from} to ${base.window.to}`).replace("{{prior}}", `${base.prior.from} to ${base.prior.to}`).replace("{{available_skills}}", Object.keys(impls).join(", "));
   const res = await client.messages.create({
     model: modelId(),
-    max_tokens: 900,
+    max_tokens: 4000,
     output_config: { effort: "medium" },
     system: [{ type: "text", text: system, cache_control: { type: "ephemeral" } }, { type: "text", text: suffix }],
     tools: [TOOL],

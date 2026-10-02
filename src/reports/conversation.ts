@@ -8,7 +8,7 @@
  * the summary is the lead sentence of each answer.
  */
 import type Anthropic from "@anthropic-ai/sdk";
-import { anthropicClient, describeModelError } from "../chat/client";
+import { anthropicClient, describeModelError, toolAnswer } from "../chat/client";
 import { rewriteCitations } from "../chat/evidence";
 import { hasModelCredentials, modelId } from "../chat/loop";
 import { getConversation, listMessages, type MessageRow, type ToolCallRecord } from "../chat/persist";
@@ -117,12 +117,14 @@ async function writeSummary(sections: ConversationSection[], evidenceIds: Set<st
   const plain = plainSummary(sections);
   if (!hasModelCredentials()) return { title: null, ...plain, by: "fallback", problems: ["the model is not configured"] };
   const transcript = sections.map((s, i) => `Q${i + 1}: ${s.question}\nA${i + 1}: ${s.answer}${s.tools.length ? `\nResults: ${s.tools.map((t) => `${t.title} (${t.rows_total} rows; first rows ${JSON.stringify(t.rows.slice(0, 5))})`).join("; ")}` : ""}`).join("\n\n");
-  const messages: Anthropic.MessageParam[] = [{ role: "user", content: `Summarise this conversation as a report for a brand's marketing team. Use only numbers that appear in the answers or result rows, written the same way. Plain English, no filler.\n\n${transcript.slice(0, 60_000)}` }];
+  let messages: Anthropic.MessageParam[] = [{ role: "user", content: `Summarise this conversation as a report for a brand's marketing team. Use only numbers that appear in the answers or result rows, written the same way. Plain English, no filler.\n\n${transcript.slice(0, 60_000)}` }];
   let problems: string[] = [];
   try {
     for (let attempt = 0; attempt < 2; attempt++) {
-      const res = await anthropicClient().messages.create({ model: modelId(), max_tokens: 1500, tools: [TOOL], tool_choice: { type: "tool", name: TOOL.name }, messages });
-      const use = res.content.find((b): b is Anthropic.ToolUseBlock => b.type === "tool_use");
+      const client = anthropicClient();
+      const answered = await toolAnswer((req) => client.messages.create(req), { model: modelId(), max_tokens: 6000, tools: [TOOL], messages }, TOOL.name);
+      const { res, use } = answered;
+      messages = answered.messages;
       if (!use) break;
       const o = use.input as { title?: unknown; findings?: unknown; actions?: unknown };
       const clean = (a: unknown) => (Array.isArray(a) ? a.map((x) => rewriteCitations(String(x), evidenceIds).text.trim()).filter(Boolean) : []);

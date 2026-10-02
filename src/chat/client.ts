@@ -32,3 +32,28 @@ export function chatEffort(): Effort {
   const e = (process.env.ANTHROPIC_EFFORT_CHAT ?? "medium").trim().toLowerCase() as Effort;
   return EFFORTS.includes(e) ? e : "medium";
 }
+
+/**
+ * One tool's answer without forcing the tool: Claude Sonnet 5.5 rejects a forced
+ * tool_choice ("tool"/"any"), so the request runs on auto, the last user message
+ * says which tool to answer with, and a reply that skipped it gets one nudge.
+ * Returns the messages the answer was given against, so a caller that goes on
+ * (a retry after a rejected answer) keeps the history append-only.
+ */
+export async function toolAnswer(
+  call: (req: Anthropic.MessageCreateParamsNonStreaming) => Promise<Anthropic.Message>,
+  req: Anthropic.MessageCreateParamsNonStreaming,
+  tool: string,
+): Promise<{ res: Anthropic.Message; use: Anthropic.ToolUseBlock | undefined; messages: Anthropic.MessageParam[] }> {
+  const last = req.messages.length - 1;
+  let messages = req.messages.map((m, i) => (i === last && m.role === "user" && typeof m.content === "string" ? { ...m, content: `${m.content}\n\nAnswer by calling the ${tool} tool.` } : m));
+  const find = (r: Anthropic.Message) => r.content.find((b): b is Anthropic.ToolUseBlock => b.type === "tool_use" && b.name === tool);
+  let res = await call({ ...req, tool_choice: { type: "auto" }, messages });
+  let use = find(res);
+  if (!use && res.stop_reason === "end_turn") {
+    messages = [...messages, { role: "assistant", content: res.content }, { role: "user", content: `Answer now by calling the ${tool} tool.` }];
+    res = await call({ ...req, tool_choice: { type: "auto" }, messages });
+    use = find(res);
+  }
+  return { res, use, messages };
+}

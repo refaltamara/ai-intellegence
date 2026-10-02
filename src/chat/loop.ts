@@ -73,7 +73,7 @@ export type ChatTurnInput = {
 const SYSTEM_TEMPLATE = readFileSync(path.join(process.cwd(), "src/chat/system.md"), "utf8");
 
 export function modelId(): string {
-  return process.env.ANTHROPIC_MODEL_CHAT || "claude-sonnet-5";
+  return process.env.ANTHROPIC_MODEL_CHAT || "claude-sonnet-5-5";
 }
 
 export function hasModelCredentials(): boolean {
@@ -298,7 +298,7 @@ async function runTurnBody(conversation: { id: string; workspace_id: string; dec
       const callStart = Date.now();
       const stream = client.messages.stream({
         model: modelId(),
-        max_tokens: 8000,
+        max_tokens: 16000,
         output_config: { effort: chatEffort() },
         system: systemBlocks,
         tools: toolsWithCache,
