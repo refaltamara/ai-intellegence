@@ -83,7 +83,7 @@ export function DeckViewer({ deck, items, initialId, initialSlide, periods }: Pr
           </div>
         )}
       </div>
-      <Link className="btn sm ghost" href={`/decks/${deck.id}/edit`}>Edit</Link>
+      <Link className="btn sm" href={`/decks/${deck.id}/edit`} title="Choose the slides, brands, platforms and findings">Edit slides</Link>
       <details className="dmore">
         <summary className="btn sm ghost" aria-label="More">⋯</summary>
         <div className="dmenu-pop">
