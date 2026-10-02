@@ -172,6 +172,7 @@ export async function readCaptions(workspaceId: string, opts: CaptionOptions = {
     out.stopped = "error";
     out.error = (e as Error).message;
   }
+  if (out.read) await tidyNames(workspaceId).catch(() => undefined);
   out.remaining = await remainingCaptions(workspaceId, s.min_views, s.since);
   if (out.stopped === "done" && out.remaining) out.stopped = "budget";
   out.duration_ms = Date.now() - started;
@@ -183,6 +184,23 @@ export async function readCaptions(workspaceId: string, opts: CaptionOptions = {
     ).catch(() => undefined);
   }
   return out;
+}
+
+/**
+ * One spelling per name: the model writes "Payday Sale" on one post and "payday sale" on the next.
+ * Every spelling of an event or product name (ignoring case and spaces) takes the workspace's most
+ * common one, so Chats groups them as one row, as the slides already do.
+ */
+export async function tidyNames(workspaceId: string): Promise<void> {
+  for (const col of ["cap_event_name", "cap_product"]) {
+    await sql.query(
+      `update posts p set ${col} = c.name
+       from (select lower(regexp_replace(btrim(${col}), '\\s+', ' ', 'g')) as k, mode() within group (order by ${col}) as name
+             from posts where workspace_id = $1 and ${col} is not null group by 1 having count(distinct ${col}) > 1) c
+       where p.workspace_id = $1 and lower(regexp_replace(btrim(p.${col}), '\\s+', ' ', 'g')) = c.k and p.${col} <> c.name`,
+      [workspaceId],
+    );
+  }
 }
 
 /** Posts (by url) still waiting to be read. */
