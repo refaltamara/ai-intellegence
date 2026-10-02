@@ -144,7 +144,7 @@ describe("findings from Chats", () => {
 describe("slides read from captions", () => {
   const captions = {
     floor: 10_000,
-    coverage: { posts: 1200, read: 800, views: 90_000_000, read_views: 81_000_000, read_views_share: 90 },
+    coverage: { posts: 1200, read: 800, views: 90_000_000, read_views: 81_000_000, read_views_share: 90, prev_read_views_share: 80 },
     events: [
       { key: "skintific", name: "Skintific", client: false, event: "launch", event_name: "Green Cushion launch", posts: 42, creators: 30, owned_posts: 4, views: 12_400_000, first_seen: "2026-06-02", new: true, posts_prev: 0, top: { handle: "rina", url: "https://x/1", views: 2_100_000 } },
       { key: "g2g", name: "Glad2Glow", client: false, event: "sale_event", event_name: "6.6 sale", posts: 18, creators: 12, owned_posts: 6, views: 3_300_000, first_seen: "2026-05-28", new: false, posts_prev: 9, top: null },
@@ -178,5 +178,16 @@ describe("slides read from captions", () => {
     const n = { ...plainNarrative(d), campaigns: { title: "Skintific launched Green Cushion", takeaway: "42 posts and 12.4M views; Glad2Glow ran a 6.6 sale with offers in 34% of posts." }, angles: { title: "Green Cushion won on before/after", takeaway: "55% of its 15.0M views came from before/after posts." } };
     expect(checkNarrative(n, d)).toEqual([]);
     expect(checkNarrative({ ...n, angles: { title: "x", takeaway: "88.88% of its views" } }, d).some((p) => p.includes(`"88.88%"`))).toBe(true);
+  });
+  it("the Paragon weekly report carries them after the drivers when the captions name something, and not otherwise", () => {
+    const w = { ...fixture("2026-W26"), captions } as WeeklyReport;
+    expect(deckSlides(w)).toEqual(["summary", "scoreboard", "movers", "drivers", "campaigns", "angles", "tiers", "products", "posting", "closeups", "patterns", "moves", "portfolio", "evidence"]);
+    expect(deckSlides({ ...w, captions: { ...captions, events: [], products: [] } } as WeeklyReport)).toEqual(deckSlides(fixture("2026-W26")));
+    expect(deckSlides({ ...w, captions: { ...captions, products: [] } } as WeeklyReport)).not.toContain("angles");
+    const n = plainNarrative(w);
+    expect(checkNarrative(n, w)).toEqual([]);
+    expect(n.campaigns?.takeaway).toContain("Green Cushion launch");
+    expect(factSheet(w)).toContain("CAMPAIGNS AND LAUNCHES");
+    expect(slideTexts(w, n).some((t) => t.text.includes("oily skin all-day cover"))).toBe(true);
   });
 });

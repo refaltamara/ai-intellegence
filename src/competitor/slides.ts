@@ -53,9 +53,10 @@ export const LANDSCAPE_SLIDES = new Set<SlideKind>(SLIDES.filter((s) => s.landsc
 export const CAPTION_SLIDES = new Set<SlideKind>(SLIDES.filter((s) => s.captions).map((s) => s.kind));
 export const slideInfo = (k: SlideKind) => SLIDES.find((s) => s.kind === k)!;
 
-/** The weekly report's fixed set, before and after the landscape slides (1 Oct 2026). */
+/** The weekly report's fixed set, before and after the landscape slides (1 Oct 2026), and with the slides read from captions (2 Oct 2026). */
 const WEEKLY_V1: SlideKind[] = ["summary", "scoreboard", "movers", "drivers", "moves", "portfolio", "evidence"];
 const WEEKLY_V2: SlideKind[] = ["summary", "scoreboard", "movers", "drivers", "tiers", "products", "posting", "closeups", "patterns", "moves", "portfolio", "evidence"];
+const WEEKLY_V3: SlideKind[] = ["summary", "scoreboard", "movers", "drivers", "campaigns", "angles", "tiers", "products", "posting", "closeups", "patterns", "moves", "portfolio", "evidence"];
 
 /** A deck's own pick, cleaned: known kinds, deck order, the summary always first. */
 export function cleanSlides(input: unknown): SlideKind[] {
@@ -68,12 +69,19 @@ export const hasClient = (r: WeeklyReport) => r.client_brands.length > 0;
 
 /**
  * The slides this report carries, in order. The weekly report keeps its fixed
- * set (a landscape slide with nothing to show is skipped when drawn). A deck
+ * set (a landscape slide with nothing to show is skipped when drawn; the two
+ * caption slides join after the drivers when the captions read name something). A deck
  * keeps what it picked, less what it cannot show: the portfolio without a
  * client, findings without a finding, a landscape slide without its data.
  */
 export function deckSlides(r: WeeklyReport): SlideKind[] {
-  if (!r.slides) return r.landscape ? WEEKLY_V2 : WEEKLY_V1;
+  if (!r.slides) {
+    if (!r.landscape) return WEEKLY_V1;
+    // the caption slides only when the captions read name something; a week with none keeps the V2 set exactly
+    const K = r.captions;
+    if (!K?.events.length && !K?.products.length) return WEEKLY_V2;
+    return WEEKLY_V3.filter((k) => (k === "campaigns" ? K.events.length > 0 : k === "angles" ? K.products.length > 0 : true));
+  }
   const L = r.landscape;
   return cleanSlides(r.slides).filter((k) => {
     if (k === "portfolio") return hasClient(r);
