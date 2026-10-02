@@ -13,7 +13,7 @@
  * new is waiting, then left alone.
  */
 import type Anthropic from "@anthropic-ai/sdk";
-import { anthropicClient } from "../chat/client";
+import { anthropicClient, toolAnswer } from "../chat/client";
 import { modelId } from "../chat/loop";
 import { sql } from "../db/client";
 import { toJson } from "../db/json";
@@ -123,16 +123,14 @@ export async function readCaptions(workspaceId: string, opts: CaptionOptions = {
       const batches = chunk(rows.map((r, i) => ({ ...r, ref: `p${i + 1}` })), batch);
       const results = await Promise.all(batches.map(async (b) => {
         try {
-          const res = await callModel(client, {
+          const { use } = await toolAnswer((req) => callModel(client, req), {
             model: captionModel(),
-            max_tokens: 6000,
+            max_tokens: 10000,
             output_config: { effort: "low" },
             system: [{ type: "text", text: captionSystem(), cache_control: { type: "ephemeral" } }],
             tools: [READ_CAPTIONS_TOOL],
-            tool_choice: { type: "tool", name: READ_CAPTIONS_TOOL.name },
             messages: [{ role: "user", content: captionBatchPrompt(b) }],
-          });
-          const use = res.content.find((x): x is Anthropic.ToolUseBlock => x.type === "tool_use");
+          }, READ_CAPTIONS_TOOL.name);
           const { tags, missing } = parseTags(use?.input, b.map((r) => r.ref));
           const byRef = new Map(b.map((r) => [r.ref, r]));
           return { tags: tags.map((t) => ({ ...t, platform: byRef.get(t.ref)!.platform, url: byRef.get(t.ref)!.url })), missing: missing.map((ref) => byRef.get(ref)!), failed: false };

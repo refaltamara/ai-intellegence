@@ -27,7 +27,7 @@ export async function GET(req: Request) {
     const t1 = Date.now();
     const res = await client.messages.create({
       model: modelId(),
-      max_tokens: 60,
+      max_tokens: 2000,
       output_config: { effort: chatEffort() },
       system: [{ type: "text", text: system, cache_control: { type: "ephemeral" } }],
       ...(withTools ? { tools, tool_choice: { type: "auto" as const } } : {}),

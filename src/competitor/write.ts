@@ -83,7 +83,7 @@ export function factSheet(r: WeeklyReport): string {
         ]
       : ["", "CLIENT: none. This deck reports on the watchlist for the team reading it; actions are for that team (brands: [\"All brands\"])."]),
     ...(r.landscape ? ["", ...landscapeSheet(r, has)] : []),
-    ...(isDeck(r) ? deckSheet(r, has) : []),
+    ...(isDeck(r) ? deckSheet(r, has) : captionSheet(r, has)),
     "",
     "DATA NOTES",
     ...r.notes.map((n) => `- ${n.text}`),
@@ -149,6 +149,27 @@ function landscapeSheet(r: WeeklyReport, has: Set<SlideKind>): string[] {
   return out;
 }
 
+/** The slides read from captions, as the fact sheet prints them: decks and the weekly report alike. */
+function captionSheet(r: WeeklyReport, has: Set<SlideKind>): string[] {
+  const w = wordsOf(r);
+  const out: string[] = [];
+  if ((has.has("campaigns") || has.has("angles")) && r.captions) {
+    const K = r.captions;
+    out.push("", `READ FROM CAPTIONS (the model named each post's product, campaign or event, offer, hook and angle; every number is a count in the panel). Coverage: ${int(K.coverage.read)} of ${int(K.coverage.posts)} posts ${w.this} were read, ${K.coverage.read_views_share}% of their views (posts with ${compact(K.floor)}+ views and brand accounts are read).`);
+    if (has.has("campaigns")) {
+      out.push("CAMPAIGNS AND LAUNCHES (biggest first; first seen = the first post naming it among the posts read)");
+      for (const e of K.events) out.push(`- ${e.name}${e.client ? " (client)" : ""} · ${EVENT_LABEL[e.event] ?? e.event} "${e.event_name}": ${count(e.posts, "post")}${e.owned_posts ? ` (${int(e.owned_posts)} from brand accounts)` : ""}, ${count(e.creators, "creator")}, ${compact(e.views)} views; first seen ${dayMonth(e.first_seen)}${e.new ? ` (new ${w.this})` : e.new === null ? " (whether it is new is unknown: earlier posts are not read)" : ""}; ${w.last} ${count(e.posts_prev, "post")}.${e.top ? ` Top post ${e.top.handle ? "@" + e.top.handle : "brand account"}, ${compact(e.top.views)} views.` : ""}`);
+      out.push("OFFERS (share of each brand's read posts with an offer in the caption)");
+      for (const o of K.offers.filter((x) => x.read >= 5)) out.push(`- ${o.name}${o.client ? " (client)" : ""}: ${o.offer_share}% of ${count(o.read, "read post")} (${int(o.offer_posts)})${o.top_offer ? `, most often ${OFFER_LABEL[o.top_offer] ?? o.top_offer} (${count(o.top_offer_posts, "post")})` : ""}.`);
+    }
+    if (has.has("angles")) {
+      out.push("PRODUCTS AND ANGLES (products named in at least two posts, biggest first)");
+      for (const p of K.products) out.push(`- ${p.name}${p.client ? " (client)" : ""} · ${p.product}: ${count(p.posts, "post")}, ${count(p.creators, "creator")}, ${compact(p.views)} views (${w.last} ${count(p.posts_prev, "post")}); hook ${p.hook ? `${HOOK_LABEL[p.hook] ?? p.hook}, ${p.hook_views_share}% of its views` : "–"}; top post's angle ${p.angle ? `"${p.angle}"` : "–"}; offer in ${p.offer_share}% of its posts.${p.top ? ` Top post ${p.top.handle ? "@" + p.top.handle : "brand account"}, ${compact(p.top.views)} views.` : ""}`);
+    }
+  }
+  return out;
+}
+
 /** The deck-only slides' facts: trend, top creators, top content, findings from Chats. */
 function deckSheet(r: WeeklyReport, has: Set<SlideKind>): string[] {
   const w = wordsOf(r);
@@ -174,20 +195,7 @@ function deckSheet(r: WeeklyReport, has: Set<SlideKind>): string[] {
     out.push("", "TOP CONTENT (the most-viewed posts, as the slide shows them)");
     for (const p of r.content ?? []) out.push(`- ${p.ref} ${p.creator_handle ? "@" + p.creator_handle : "brand account"} for ${p.group} on ${PLATFORM_NAME[p.platform]}: ${compact(p.views)} views${p.er != null ? `, ${pct(p.er)} ER` : ""}${p.content_format ? `, ${p.content_format}` : ""}${p.has_cart ? ", yellow cart" : ""}. "${(p.caption ?? "").slice(0, 140)}"`);
   }
-  if ((has.has("campaigns") || has.has("angles")) && r.captions) {
-    const K = r.captions;
-    out.push("", `READ FROM CAPTIONS (the model named each post's product, campaign or event, offer, hook and angle; every number is a count in the panel). Coverage: ${int(K.coverage.read)} of ${int(K.coverage.posts)} posts ${w.this} were read, ${K.coverage.read_views_share}% of their views (posts with ${compact(K.floor)}+ views and brand accounts are read).`);
-    if (has.has("campaigns")) {
-      out.push("CAMPAIGNS AND LAUNCHES (biggest first; first seen = the first post naming it among the posts read)");
-      for (const e of K.events) out.push(`- ${e.name}${e.client ? " (client)" : ""} · ${EVENT_LABEL[e.event] ?? e.event} "${e.event_name}": ${count(e.posts, "post")}${e.owned_posts ? ` (${int(e.owned_posts)} from brand accounts)` : ""}, ${count(e.creators, "creator")}, ${compact(e.views)} views; first seen ${dayMonth(e.first_seen)}${e.new ? ` (new ${w.this})` : e.new === null ? " (whether it is new is unknown: earlier posts are not read)" : ""}; ${w.last} ${count(e.posts_prev, "post")}.${e.top ? ` Top post ${e.top.handle ? "@" + e.top.handle : "brand account"}, ${compact(e.top.views)} views.` : ""}`);
-      out.push("OFFERS (share of each brand's read posts with an offer in the caption)");
-      for (const o of K.offers.filter((x) => x.read >= 5)) out.push(`- ${o.name}${o.client ? " (client)" : ""}: ${o.offer_share}% of ${count(o.read, "read post")} (${int(o.offer_posts)})${o.top_offer ? `, most often ${OFFER_LABEL[o.top_offer] ?? o.top_offer} (${count(o.top_offer_posts, "post")})` : ""}.`);
-    }
-    if (has.has("angles")) {
-      out.push("PRODUCTS AND ANGLES (products named in at least two posts, biggest first)");
-      for (const p of K.products) out.push(`- ${p.name}${p.client ? " (client)" : ""} · ${p.product}: ${count(p.posts, "post")}, ${count(p.creators, "creator")}, ${compact(p.views)} views (${w.last} ${count(p.posts_prev, "post")}); hook ${p.hook ? `${HOOK_LABEL[p.hook] ?? p.hook}, ${p.hook_views_share}% of its views` : "–"}; top post's angle ${p.angle ? `"${p.angle}"` : "–"}; offer in ${p.offer_share}% of its posts.${p.top ? ` Top post ${p.top.handle ? "@" + p.top.handle : "brand account"}, ${compact(p.top.views)} views.` : ""}`);
-    }
-  }
+  out.push(...captionSheet(r, has));
   if (has.has("findings")) {
     const fs = r.findings ?? [];
     out.push("", `FINDINGS PINNED FROM CHATS (one slide each; findings[].key must be exactly, in order: ${fs.map((f) => `"${f.key}"`).join(", ")}). Each was asked in Chats and is run again for ${r.week.label}.`);
@@ -234,6 +242,22 @@ Fields and limits for the landscape (hard limits):
 
 const EXAMPLE = `Example of the voice (a different week): summary New "11.2%" / "Timephoria's share of Instagram views" / "Timephoria pushed a new skintint stick through mid-tier reviewers; the top two reviews drew 5.2M and 4.7M views." Driver why: "Mid-tier reviewers carried a new skintint stick: 125 creators posted, double last week's 62, and Instagram views rose from 81K to 34.5M. Engagement stayed at 0.2%, so the reach looks paid rather than earned." Action: "Meet the skintint stick where people buy" / "Timephoria's stick lives in Instagram reviews with no cart. A base-product review series on TikTok with cart links meets the same shopper closer to checkout."`;
 
+/** The fields of the two slides read from captions, for decks and the weekly report alike. */
+function captionFields(r: WeeklyReport, has: Set<SlideKind>): string[] {
+  const w = wordsOf(r);
+  return [
+    has.has("campaigns") ? `- campaigns: { title, takeaway } for the campaigns slide: name what each brand is running (launches, sale events, collabs) as the fact sheet names it, say which are new ${w.this}, and what it means. title max 12 words, takeaway max 28.` : "",
+    has.has("angles") ? "- angles: { title, takeaway } for the products-and-angles slide: which product drew the views and through which hook and angle, quoted as the fact sheet quotes it. title max 12 words, takeaway max 28." : "",
+  ].filter(Boolean);
+}
+
+/** The weekly report's prompt: the classic rules, the landscape when it has one, and the caption slides when it carries them (2 Oct 2026). */
+function weeklySystem(r: WeeklyReport): string {
+  if (!r.landscape) return SYSTEM;
+  const fields = captionFields(r, new Set(deckSlides(r)));
+  return `${SYSTEM}\n\n${SYSTEM_LANDSCAPE}${fields.length ? `\n\nThis report also has slides read from captions: what each brand is running and which products and angles drew the views. Every number on them is a count in the panel; quote names as the fact sheet gives them.\n\nFields and limits for those slides (hard limits):\n${fields.join("\n")}` : ""}`;
+}
+
 /** The prompt for a deck (Decks, 2 Oct 2026): the same voice and number rules, with only the fields of the slides it carries. */
 export function deckSystem(r: WeeklyReport): string {
   const w = wordsOf(r);
@@ -248,8 +272,7 @@ export function deckSystem(r: WeeklyReport): string {
     has.has("trend") ? `- trends: one per trend slide, platform exactly as given, in order. title max 12 words: the finding ("Timephoria's TikTok views tripled in three ${w.unit}s", not "Trend"); takeaway max 28 words: the ${w.over} comparison that matters, with its numbers.` : "",
     has.has("creators") ? "- creators: { title, takeaway } for the top-creators slide: who carried the views, their tiers, how many are first-timers. title max 12 words, takeaway max 28." : "",
     has.has("content") ? "- content: { title, takeaway } for the top-content slide: what the most-viewed posts share (format, product, cart, creator). title max 12 words, takeaway max 28." : "",
-    has.has("campaigns") ? `- campaigns: { title, takeaway } for the campaigns slide: name what each brand is running (launches, sale events, collabs) as the fact sheet names it, say which are new ${w.this}, and what it means. title max 12 words, takeaway max 28.` : "",
-    has.has("angles") ? "- angles: { title, takeaway } for the products-and-angles slide: which product drew the views and through which hook and angle, quoted as the fact sheet quotes it. title max 12 words, takeaway max 28." : "",
+    ...captionFields(r, has),
     ...(["tiers", "products", "posting"] as const).filter((k) => has.has(k)).map((k) => `- ${k}: { title, takeaway }. title max 12 words: the finding, not the topic. takeaway max 28 words: the one comparison that matters, with its numbers.`),
     has.has("closeups") ? `- closeups: one per close-up brand, in the given order, key exactly as given. label max 3 words naming the brand's play ("Own-channel reach", "Offer cadence", "Seeding wave"). next max 22 words: what to watch next ${w.unit}, concrete (a date, a product, a creator). closeup_titles: one per close-up slide, max 12 words.` : "",
     has.has("patterns") ? "- patterns: { title, takeaway }: what the pattern is and why it matters. title max 12 words, takeaway max 28." : "",
@@ -320,6 +343,8 @@ function deckTool(r: WeeklyReport, clientBrands: string[]): Anthropic.Tool {
 function tool(r: WeeklyReport, clientBrands: string[]): Anthropic.Tool {
   if (isDeck(r)) return deckTool(r, clientBrands);
   const keys = r.movers.map((m) => m.key);
+  const has = new Set(deckSlides(r));
+  const caps = (["campaigns", "angles"] as const).filter((k) => has.has(k));
   return {
     name: TOOL_NAME,
     description: "Write the narrative of this week's report.",
@@ -342,8 +367,9 @@ function tool(r: WeeklyReport, clientBrands: string[]): Anthropic.Tool {
         },
         portfolio_note: { type: "string" },
         ...(r.landscape ? landscapeProps(r, clientBrands) : {}),
+        ...Object.fromEntries(caps.map((k) => [k, SECTION])),
       },
-      required: ["summary", "scoreboard_title", "movers_title", "drivers", "actions", ...(r.landscape ? ["actions_title", "tiers", "products", "posting", "closeups", "closeup_titles", ...(r.landscape.patterns.length ? ["patterns"] : [])] : [])],
+      required: ["summary", "scoreboard_title", "movers_title", "drivers", "actions", ...(r.landscape ? ["actions_title", "tiers", "products", "posting", "closeups", "closeup_titles", ...(r.landscape.patterns.length ? ["patterns"] : [])] : []), ...caps],
     },
   } as Anthropic.Tool;
 }
@@ -395,11 +421,11 @@ function asNarrative(input: unknown, r: WeeklyReport): Narrative {
           ...(Array.isArray(o.trends) ? { trends: o.trends } : {}),
           ...(o.creators ? { creators: o.creators } : {}),
           ...(o.content ? { content: o.content } : {}),
-          ...(o.campaigns ? { campaigns: o.campaigns } : {}),
-          ...(o.angles ? { angles: o.angles } : {}),
           ...(Array.isArray(o.findings) ? { findings: o.findings } : {}),
         }
       : {}),
+    ...(o.campaigns ? { campaigns: o.campaigns } : {}),
+    ...(o.angles ? { angles: o.angles } : {}),
   };
 }
 
@@ -416,8 +442,8 @@ export async function writeNarrative(r: WeeklyReport, opts: { create?: Create } 
         attempts++;
         const res = await create({
           model: modelId(),
-          max_tokens: r.landscape || isDeck(r) ? 6000 : 3000,
-          system: [{ type: "text", text: isDeck(r) ? deckSystem(r) : r.landscape ? `${SYSTEM}\n\n${SYSTEM_LANDSCAPE}` : SYSTEM, cache_control: { type: "ephemeral" } }],
+          max_tokens: 16000,
+          system: [{ type: "text", text: isDeck(r) ? deckSystem(r) : weeklySystem(r), cache_control: { type: "ephemeral" } }],
           tools: [tool(r, clientBrands)],
           tool_choice: { type: "auto" },
           messages,
@@ -507,6 +533,7 @@ export function plainNarrative(r: WeeklyReport): Narrative {
   const n: Narrative = { week: r.week.iso, summary, scoreboard_title, movers_title, drivers, actions };
   if (r.landscape) plainLandscape(r, n);
   if (isDeck(r)) plainDeck(r, n);
+  else plainCaptions(r, n);
   // belt and braces: anything the check still objects to loses its number
   for (const p of checkNarrative(n, r)) {
     const m = /^summary\[(\d)\]\.(stat|text|stat_label)/.exec(p);
@@ -525,6 +552,16 @@ export function plainNarrative(r: WeeklyReport): Narrative {
     }
   }
   return n;
+}
+
+/** The caption slides' words without a model: a plain title and the biggest campaign or product. */
+function plainCaptions(r: WeeklyReport, n: Narrative) {
+  const w = wordsOf(r);
+  const has = new Set(deckSlides(r));
+  const e0 = r.captions?.events[0];
+  if (has.has("campaigns")) n.campaigns = { title: `What the brands are running ${w.this}`, takeaway: e0 ? `${e0.name}'s ${e0.event_name} led: ${count(e0.posts, "post")}, ${compact(e0.views)} views${e0.new ? `, new ${w.this}` : ""}.` : "No campaign named in the captions read." };
+  const pr0 = r.captions?.products[0];
+  if (has.has("angles")) n.angles = { title: `The products and angles that drew the views ${w.this}`, takeaway: pr0 ? `${pr0.name}'s ${pr0.product} drew ${compact(pr0.views)} views across ${count(pr0.posts, "post")}${pr0.angle ? `; the top post's angle: "${pr0.angle}"` : ""}.` : "No product named in two or more captions." };
 }
 
 /** The deck slides' words without a model: a plain title and one takeaway each, and prioritised moves when the deck has no landscape to draw them from. */
@@ -546,10 +583,7 @@ function plainDeck(r: WeeklyReport, n: Narrative) {
   if (has.has("creators")) n.creators = { title: `The creators who brought the most views ${w.this}`, takeaway: c0 ? `@${c0.handle} led with ${compact(c0.views)} views for ${c0.brands[0]}${c0.first_time ? ", posting for these brands for the first time" : ""}.` : "No creator posts in the period." };
   const p0 = r.content?.[0];
   if (has.has("content")) n.content = { title: `The posts that drew the most views ${w.this}`, takeaway: p0 ? `The top post, by ${p0.creator_handle ? "@" + p0.creator_handle : "a brand account"} for ${p0.group}, drew ${compact(p0.views)} views.` : "No posts in the period." };
-  const e0 = r.captions?.events[0];
-  if (has.has("campaigns")) n.campaigns = { title: `What the brands are running ${w.this}`, takeaway: e0 ? `${e0.name}'s ${e0.event_name} led: ${count(e0.posts, "post")}, ${compact(e0.views)} views${e0.new ? `, new ${w.this}` : ""}.` : "No campaign named in the captions read." };
-  const pr0 = r.captions?.products[0];
-  if (has.has("angles")) n.angles = { title: `The products and angles that drew the views ${w.this}`, takeaway: pr0 ? `${pr0.name}'s ${pr0.product} drew ${compact(pr0.views)} views across ${count(pr0.posts, "post")}${pr0.angle ? `; the top post's angle: "${pr0.angle}"` : ""}.` : "No product named in two or more captions." };
+  plainCaptions(r, n);
   if (has.has("findings")) n.findings = (r.findings ?? []).map((f) => ({ key: f.key, title: f.title, takeaway: f.status === "ok" ? `The analysis from Chats, run again for ${r.week.label}.` : f.message ?? "No result for this period." }));
   if (has.has("moves") && !r.landscape) {
     n.actions_title = r.client ? `What ${r.client} should do next` : "What to do next";

@@ -221,7 +221,8 @@ export async function weeklyReport(contract: WeeklyContract, week: string, opts:
   const reach = [...(withClient ? [portfolio] : []), ...coveredWatch];
   const creators = slides?.includes("creators") ? await topCreators(db, { workspaceId: ctx.workspaceId, tz, platforms, groups: reach, from, at: W, toExcl }) : undefined;
   const content = slides?.includes("content") ? await topContent(db, { workspaceId: ctx.workspaceId, tz, platforms, groups: reach, at: W, toExcl }, evidence) : undefined;
-  const captions = slides?.some((k) => CAPTION_SLIDES.has(k))
+  // the weekly report (no slides of its own) carries the caption slides too, when the captions read name something
+  const captions = !slides || slides.some((k) => CAPTION_SLIDES.has(k))
     ? { ...(await captionFacts(db, { workspaceId: ctx.workspaceId, tz, platforms, groups: reach, clientKey: withClient ? portfolio.key : null, clientName: contract.client?.name ?? "", from: W, to: toExcl, prevFrom: weeks[L - 1] })), floor: (await captionSettings(ctx.workspaceId)).min_views }
     : undefined;
   const prev = deckPeriod(grain, weeks[L - 1]);

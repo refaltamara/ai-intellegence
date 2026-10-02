@@ -58,7 +58,7 @@ export async function generateSections(result: SkillResult, diff: Diff | null, w
     };
     const response = await client.messages.create({
       model: modelId(),
-      max_tokens: 700,
+      max_tokens: 4000,
       output_config: { effort: "medium" },
       system: [{ type: "text", text: system + "\n\nYou are writing a report, not chatting: call write_report exactly once with the two sections and nothing else. No <followups> block in a report; a <counter> block is welcome when the data argues against the obvious reading.", cache_control: { type: "ephemeral" } }],
       tools: [TOOL],
