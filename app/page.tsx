@@ -1,6 +1,6 @@
 /** Chats: the default screen. Free-form; chats from the retired Decisions screen open here too. */
 import { Ask } from "@/ui/Ask";
-import { currentSession, currentWorkspaceId } from "@/auth/current";
+import { currentRole, currentSession, currentWorkspaceId } from "@/auth/current";
 import { getConversation, listMessages } from "@/chat/persist";
 import { workspaceStats } from "@/ui/stats";
 import { paneContext } from "@/ui/paneContext";
@@ -15,7 +15,7 @@ export const dynamic = "force-dynamic";
 
 export default async function ChatsPage({ searchParams }: { searchParams: Promise<{ c?: string; q?: string; ask?: string }> }) {
   const ws = await currentWorkspaceId();
-  const sp = await searchParams;
+  const [sp, role] = await Promise.all([searchParams, currentRole(ws)]);
   const session = await currentSession();
   let conversation: string | null = null;
   let messages: Awaited<ReturnType<typeof listMessages>> = [];
@@ -26,9 +26,9 @@ export default async function ChatsPage({ searchParams }: { searchParams: Promis
   // "Ask why" from the dashboard: the link names the click; the figures are read again here
   const askRef = !conversation ? decodeAsk(sp.ask) : null;
   const askContext = askRef ? await resolveAsk(ws, askRef).catch(() => null) : null;
-  const [s, client, pane, skills] = await Promise.all([workspaceStats(ws), clientBrandName(ws), paneContext(messages, ws), teamSkills(ws).catch(() => [])]);
+  const [s, client, pane, skills] = await Promise.all([workspaceStats(ws), clientBrandName(ws), paneContext(messages, ws), teamSkills(ws, role).catch(() => [])]);
   const menu = skills.map((d) => ({ name: d.name, title: d.title, description: d.description, example: d.example, group: registry.layers[d.layer]?.title ?? d.layer }));
-  const copy = await askCopy(ws, s);
+  const copy = await askCopy(ws, s, role);
   return <Ask key={conversation ?? (askContext ? `ask-${sp.ask}` : "new")} initialConversation={conversation} initialMessages={messages} prefill={sp.q ?? undefined} stats={{ brands: s.brands, platforms: s.platforms, months: s.months, freshness: s.freshness }} clientName={client} pane={pane} copy={copy} skills={menu} fromDashboard={askRef && askContext ? { ref: askRef, context: askContext } : null} />;
 }
 

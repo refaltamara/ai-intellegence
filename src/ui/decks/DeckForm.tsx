@@ -14,6 +14,7 @@ type Group = DeckSpec["watchlist"][number];
 type Initial = { id: string; name: string; spec: DeckSpec; recurring: boolean; template: string | null };
 
 const PLATFORMS = [{ id: "tiktok", name: "TikTok" }, { id: "instagram", name: "Instagram" }] as const;
+const PLATFORM_NAME: Record<string, string> = { tiktok: "TikTok", instagram: "Instagram", threads: "Threads", x: "X", youtube: "YouTube" };
 
 /** What "Add to a deck → New deck" on the Dashboard carries: the section's slide, its brands and its grain. */
 export type Prefill = { slide: string; brands: string[]; grain: "week" | "month" | null };
@@ -38,6 +39,11 @@ export function DeckForm({ options, initial, prefill }: { options: DeckOptions; 
   const [elapsed, setElapsed] = useState(0);
   const [error, setError] = useState("");
   const hasFindings = !!initial?.spec.findings?.length;
+  // a PR deck: one brand's reputation, its own slides (src/reputation/)
+  const isRep = edit ? !!initial?.spec.rep : t.family === "reputation";
+  const [focus, setFocus] = useState(initial?.spec.rep?.focus ?? options.focus ?? options.brands[0]?.id ?? "");
+  const [repPlatform, setRepPlatform] = useState(initial?.spec.rep?.platform ?? "all");
+  const [repSlides, setRepSlides] = useState<string[]>(initial?.spec.rep?.slides ?? t.rep_slides ?? ["summary"]);
 
   // a template sets the grain, the slides and whether it recurs; the brands stay as picked
   const pickTemplate = (key: string) => {
@@ -46,6 +52,7 @@ export function DeckForm({ options, initial, prefill }: { options: DeckOptions; 
     setGrain(x.grain);
     setSlides(x.slides);
     setRecurring(x.recurring);
+    if (x.rep_slides) setRepSlides(x.rep_slides);
   };
   useEffect(() => {
     if (!busy) return;
@@ -61,6 +68,7 @@ export function DeckForm({ options, initial, prefill }: { options: DeckOptions; 
   const periods = options.periods[grain];
 
   function spec(): DeckSpec {
+    if (isRep) return { title: name.trim() || t.title, grain, platforms: [], client: null, watchlist: [], slides: ["summary"], rep: { focus, platform: repPlatform, slides: repSlides as NonNullable<DeckSpec["rep"]>["slides"] } };
     return {
       title: name.trim() || t.title,
       grain,
@@ -74,8 +82,9 @@ export function DeckForm({ options, initial, prefill }: { options: DeckOptions; 
 
   async function submit(andBuild: boolean) {
     setError("");
-    if (!watch.length) { setError(t.brands === "focus" ? "Pick the brand (or brands) this deck is about." : "Pick at least one brand to watch."); return; }
-    if (!platforms.length) { setError("Pick TikTok, Instagram or both."); return; }
+    if (isRep && !focus) { setError("Pick the brand this deck is about."); return; }
+    if (!isRep && !watch.length) { setError(t.brands === "focus" ? "Pick the brand (or brands) this deck is about." : "Pick at least one brand to watch."); return; }
+    if (!isRep && !platforms.length) { setError("Pick TikTok, Instagram or both."); return; }
     setBusy(true);
     setElapsed(0);
     try {
@@ -111,7 +120,7 @@ export function DeckForm({ options, initial, prefill }: { options: DeckOptions; 
             {options.templates.map((x) => (
               <button key={x.key} type="button" className={template === x.key ? "on" : ""} onClick={() => pickTemplate(x.key)}>
                 <b>{x.name}</b><span>{x.description}</span>
-                <small>{x.grain === "month" ? "Month on month" : "Week on week"} · {x.slides.length} slide types</small>
+                <small>{x.grain === "month" ? "Month on month" : "Week on week"} · {(x.rep_slides ?? x.slides).length} slide types</small>
               </button>
             ))}
           </div>
@@ -129,14 +138,50 @@ export function DeckForm({ options, initial, prefill }: { options: DeckOptions; 
         </div>
         <div className="wf">
           <span>Platforms</span>
-          <div className="seg">
-            {PLATFORMS.map((p) => (
-              <button key={p.id} type="button" className={platforms.includes(p.id) ? "on" : ""} onClick={() => setPlatforms((x) => (x.includes(p.id) ? x.filter((y) => y !== p.id) : [...x, p.id]))}>{p.name}</button>
-            ))}
-          </div>
+          {isRep ? (
+            <div className="seg">
+              {["all", ...options.platforms].map((p) => (
+                <button key={p} type="button" className={repPlatform === p ? "on" : ""} onClick={() => setRepPlatform(p)}>{p === "all" ? "All" : PLATFORM_NAME[p] ?? p}</button>
+              ))}
+            </div>
+          ) : (
+            <div className="seg">
+              {PLATFORMS.map((p) => (
+                <button key={p.id} type="button" className={platforms.includes(p.id) ? "on" : ""} onClick={() => setPlatforms((x) => (x.includes(p.id) ? x.filter((y) => y !== p.id) : [...x, p.id]))}>{p.name}</button>
+              ))}
+            </div>
+          )}
         </div>
       </section>
 
+      {isRep && (
+        <>
+          <section className="cgrid">
+            <label className="wf"><span>The brand this deck is about</span>
+              <select value={focus} onChange={(e) => setFocus(e.target.value)}>
+                {options.brands.map((b) => <option key={b.id} value={b.id}>{b.name}{b.id === options.focus ? " (you)" : ""}</option>)}
+              </select>
+            </label>
+          </section>
+          <section>
+            <h3>Slides <small>{repSlides.length} picked; every other brand is the benchmark</small></h3>
+            <div className="slidepick">
+              {options.rep_slides.map((s) => {
+                const locked = s.kind === "summary";
+                return (
+                  <label key={s.kind} className={repSlides.includes(s.kind) ? "on" : ""}>
+                    <input type="checkbox" checked={locked || repSlides.includes(s.kind)} disabled={locked} onChange={() => setRepSlides((x) => (x.includes(s.kind) ? x.filter((y) => y !== s.kind) : [...x, s.kind]))} />
+                    <span><b>{s.title}</b><em>{s.description}</em></span>
+                  </label>
+                );
+              })}
+            </div>
+          </section>
+        </>
+      )}
+
+      {!isRep && (
+        <>
       <section>
         <h3>{t.brands === "focus" && !edit ? "The brands this deck is about" : "Brands to watch"}</h3>
         <div className="dgroups">
@@ -180,6 +225,9 @@ export function DeckForm({ options, initial, prefill }: { options: DeckOptions; 
           })}
         </div>
       </section>
+
+        </>
+      )}
 
       <section className="cgrid">
         <label className="wf">

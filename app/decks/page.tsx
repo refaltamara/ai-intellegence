@@ -6,7 +6,7 @@
  */
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { currentWorkspaceId } from "@/auth/current";
+import { currentRole, currentWorkspaceId } from "@/auth/current";
 import { listDecks } from "@/decks/store";
 import { deckTemplate } from "@/decks/templates";
 import { panelWorkspace } from "@/pulses/api";
@@ -21,7 +21,11 @@ const day = (iso: string) => new Date(iso).toLocaleDateString("en-GB", { timeZon
 export default async function DecksPage() {
   const ws = await currentWorkspaceId();
   if (!(await panelWorkspace(ws))) redirect("/pulse");
-  const [decks, weekly, pulses] = await Promise.all([listDecks(ws), weeklyItems(ws), listPulses(ws)]);
+  const [all, weekly0, pulses, role] = await Promise.all([listDecks(ws), weeklyItems(ws), listPulses(ws), currentRole(ws)]);
+  // each role keeps its own decks: PR decks are about one brand's reputation (spec.rep), the rest are Brand & KOL's
+  const pr = role.id === "pr";
+  const decks = all.filter((d) => !!d.spec?.rep === pr);
+  const weekly = pr ? [] : weekly0;
   const clients = [...new Set(weekly.map((w) => w.client))];
   const boards = pulses.filter((p) => p.cards > 0);
   return (
@@ -49,7 +53,7 @@ export default async function DecksPage() {
             error: d.last_error,
           }))} />
         ) : (
-          <div className="empty">No decks yet. <Link href="/decks/new">Start one from a template</Link>, or ask CeMO something in Chats and turn the conversation into a deck.</div>
+          <div className="empty">No decks yet. <Link href="/decks/new">Start one from a template</Link>{pr ? ": the Weekly Reputation Report is the one to send up every week." : ", or ask CeMO something in Chats and turn the conversation into a deck."}</div>
         )}
         {boards.length > 0 && (
           <div className="dold">

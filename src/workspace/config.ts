@@ -68,6 +68,8 @@ export type WorkspaceConfig = {
   commercial: Commercial;
   /** the roles this dataset is open to, first one is the default */
   roles: RoleId[];
+  /** the client brand's (or subject's) name, when one is set */
+  client_name: string | null;
   team_override?: Partial<Team>;
 };
 
@@ -132,6 +134,7 @@ export function workspaceConfig(row: WorkspaceRow, clientName: string | null = n
     hero_intro: s.hero_intro ?? d.hero_intro, // filled by the caller, which knows the counts
     suggested: (s.suggested?.length ? s.suggested : d.suggested).map((q) => fillCopy(q, vars)),
     roles: workspaceRoles(kind, s.roles),
+    client_name: clientName,
     team_override: s.team,
     commercial: {
       // A partner with no terms of its own is matched on its name, which is what an

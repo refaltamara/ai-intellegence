@@ -30,6 +30,8 @@ import { buildExport } from "../export/run";
 import { addMessage, conversationRunIds, createConversation, getConversation, getSkillRun, listMessages, logExport, setPaneState, type ToolCallRecord } from "./persist";
 import { buildTools } from "./tools";
 import { getWorkspace } from "../workspace/store";
+import { fillRole, ROLES, type RoleId } from "../roles/model";
+import { PLATFORM_LABEL } from "../skills/common";
 
 export const MAX_TOOL_CALLS = 6;
 const MAX_ROWS_IN_CONTEXT = 60;
@@ -54,6 +56,8 @@ export type Timings = { total_ms: number; model_ms: number; model_calls: number;
 
 export type ChatTurnInput = {
   workspaceId?: string;
+  /** the role the person is acting as (src/roles/model.ts); the workspace's first when absent */
+  role?: RoleId;
   conversationId?: string | null;
   userText: string;
   userId?: string | null;
@@ -85,20 +89,21 @@ const systemCache = new Map<string, { text: string; at: number }>();
 
 /** Drop the cached prompt, e.g. after the client brand changes. */
 export function invalidateSystem(workspaceId?: string): void {
-  if (workspaceId) systemCache.delete(workspaceId);
+  if (workspaceId) for (const k of [...systemCache.keys()]) { if (k.startsWith(`${workspaceId}:`)) systemCache.delete(k); }
   else systemCache.clear();
 }
 
-/** System prompt per workspace, cached for five minutes: it only changes when data is loaded or the client brand changes. */
-export async function buildSystem(workspaceId: string): Promise<string> {
-  const hit = systemCache.get(workspaceId);
+/** System prompt per workspace and role, cached for five minutes: it only changes when data is loaded or the client brand changes. */
+export async function buildSystem(workspaceId: string, role?: RoleId): Promise<string> {
+  const key = `${workspaceId}:${role ?? ""}`;
+  const hit = systemCache.get(key);
   if (hit && Date.now() - hit.at < SYSTEM_TTL_MS) return hit.text;
-  const text = await buildSystemUncached(workspaceId);
-  systemCache.set(workspaceId, { text, at: Date.now() });
+  const text = await buildSystemUncached(workspaceId, role);
+  systemCache.set(key, { text, at: Date.now() });
   return text;
 }
 
-async function buildSystemUncached(workspaceId: string): Promise<string> {
+async function buildSystemUncached(workspaceId: string, roleId?: RoleId): Promise<string> {
   const db = new SkillDb();
   const ctx = await loadContext(db, workspaceId);
   const ws = await db.one<{ name: string }>("select name from workspaces where id = $1", [workspaceId]);
@@ -107,7 +112,13 @@ async function buildSystemUncached(workspaceId: string): Promise<string> {
     [workspaceId, ctx.tz],
   );
   const client = ctx.clientBrandId ? ctx.brands.find((b) => b.id === ctx.clientBrandId) : null;
-  const [counts, cfg, comments] = await Promise.all([workspaceCounts(workspaceId, db), getWorkspace(workspaceId), db.one<{ n: number; labelled: number }>("select count(*)::int as n, count(*) filter (where sentiment is not null)::int as labelled from comments where workspace_id = $1", [workspaceId])]);
+  const [counts, cfg, comments, tracked] = await Promise.all([
+    workspaceCounts(workspaceId, db),
+    getWorkspace(workspaceId),
+    db.one<{ n: number; labelled: number }>("select count(*)::int as n, count(*) filter (where sentiment is not null)::int as labelled from comments where workspace_id = $1", [workspaceId]),
+    db.one<{ snapshots: boolean; off_topic: number }>("select exists (select 1 from post_snapshots s join posts p on p.id = s.post_id where p.workspace_id = $1) as snapshots, (select count(*) from posts where workspace_id = $1 and relevant = false)::int as off_topic", [workspaceId]),
+  ]);
+  const role = ROLES[roleId && cfg?.roles.includes(roleId) ? roleId : cfg?.roles[0] ?? "brand_kol"];
   const available = Object.keys(impls);
   const profile = cfg?.kind === "profile";
   const clientLine = profile
@@ -115,11 +126,20 @@ async function buildSystemUncached(workspaceId: string): Promise<string> {
     : client
       ? `You work for the ${client.name} team (${client.id}): "we", "us" and "our brand" mean ${client.name}, and every other tracked brand is a competitor. Take ${client.name}'s side — a good result for a competitor is a warning for us, not good news.`
       : "No client brand is set yet, so every tracked brand is a competitor and there is no \"our brand\". If the person says \"my brand\" or \"us\", ask which brand they mean (once), then continue.";
-  return SYSTEM_TEMPLATE.replace("{{persona}}", cfg?.persona ?? `You are the analyst behind Fair Intelligence for ${ws?.name ?? workspaceId}.`)
+  const voice = role.voice ? " " + fillRole(role.voice, client?.name ?? "the client") : "";
+  const names = platforms.map((p) => PLATFORM_LABEL[p.platform] ?? p.platform);
+  const platformNames = names.length > 1 ? `${names.slice(0, -1).join(", ")} and ${names.at(-1)}` : names[0] ?? "TikTok and Instagram";
+  const corpus = role.id === "pr"
+    ? `You have read every public post and comment about these brands since the data began, from ${counts.creator_count.toLocaleString("en-US")} accounts across ${platformNames}.`
+    : `You have read every public creator post about these brands since the data began, and you know ${counts.creator_count.toLocaleString("en-US")} creators across ${platformNames}.`;
+  const tracking = tracked?.snapshots ? " Posts are also tracked day by day for up to 30 days after posting." : " No day-by-day snapshots.";
+  const relevance = tracked?.off_topic ? ` ${tracked.off_topic.toLocaleString("en-US")} captured posts do not name their brand; they and their comments are left out of every analysis.` : "";
+  return SYSTEM_TEMPLATE.replace("{{persona}}", (cfg?.persona ?? `You are the analyst behind Fair Intelligence for ${ws?.name ?? workspaceId}.`) + voice)
+    .replace("{{corpus_line}}", corpus)
     .replace("{{client_line}}", clientLine)
     .replace("{{creator_count}}", counts.creator_count.toLocaleString("en-US"))
     .replace("{{available_skills}}", available.join(", "))
-    .replace("{{data_line}}", platforms.map((p) => `${p.platform} ${p.posts.toLocaleString("en-US")} posts from ${p.from} to ${p.to}`).join("; ") + (comments?.n ? `; ${comments.n.toLocaleString("en-US")} comments, ${comments.labelled === comments.n ? "all" : comments.labelled.toLocaleString("en-US")} with a sentiment label${comments.labelled < comments.n ? " so far (the rest are unlabelled, not neutral)" : ""}.` : ". No comment text.") + " No day-by-day snapshots.")
+    .replace("{{data_line}}", platforms.map((p) => `${p.platform} ${p.posts.toLocaleString("en-US")} posts from ${p.from} to ${p.to}`).join("; ") + (comments?.n ? `; ${comments.n.toLocaleString("en-US")} comments, ${comments.labelled === comments.n ? "all" : comments.labelled.toLocaleString("en-US")} with a sentiment label${comments.labelled < comments.n ? " so far (the rest are unlabelled, not neutral)" : ""}.` : ". No comment text.") + tracking + relevance)
     .replace("{{as_of}}", ctx.asOf)
     .replace("{{brands}}", ctx.brands.map((b) => `${b.id} (${b.name})`).join(", "));
 }
@@ -162,7 +182,7 @@ export async function runChatTurn(input: ChatTurnInput, emit: (e: ChatEvent) => 
   // the report's whole fact sheet rides with this turn only; history keeps the slide, not the sheet
   const extra = slide?.sheet ? `[The report's full fact sheet, every number already computed:\n${slide.sheet}]` : null;
   try {
-    await runTurnBody(conversation, userText, emit, claimed, input.followup, input.paneAction, input.userId ?? null, context, extra);
+    await runTurnBody(conversation, userText, emit, claimed, input.followup, input.paneAction, input.userId ?? null, context, extra, input.role);
   } catch (e) {
     const message = describeModelError(e);
     console.error("chat turn failed:", conversation.id, message, (e as Error).stack?.split("\n").slice(0, 3).join(" | "));
@@ -223,7 +243,7 @@ export function historyTurns(history: { role: "user" | "assistant"; content_json
   return { messages, pendingAsk, pendingNotes: notes };
 }
 
-async function runTurnBody(conversation: { id: string; workspace_id: string; decision_id?: string | null }, userText: string, emit: (e: ChatEvent) => void | Promise<void>, claimed: AttachmentRow[] = [], followup?: ChatTurnInput["followup"], paneAction?: PaneAction, userId: string | null = null, context: AskContext | null = null, extra: string | null = null): Promise<void> {
+async function runTurnBody(conversation: { id: string; workspace_id: string; decision_id?: string | null }, userText: string, emit: (e: ChatEvent) => void | Promise<void>, claimed: AttachmentRow[] = [], followup?: ChatTurnInput["followup"], paneAction?: PaneAction, userId: string | null = null, context: AskContext | null = null, extra: string | null = null, role?: RoleId): Promise<void> {
   const workspaceId = conversation.workspace_id;
   const history = await listMessages(conversation.id);
   await addMessage({
@@ -250,7 +270,7 @@ async function runTurnBody(conversation: { id: string; workspace_id: string; dec
 
   const turnStart = Date.now();
   const client = anthropicClient();
-  const [system, counts, decisionNote] = await Promise.all([buildSystem(workspaceId), workspaceCounts(workspaceId), conversation.decision_id ? decisionContext(conversation.decision_id, workspaceId).catch(() => "") : Promise.resolve("")]);
+  const [system, counts, decisionNote] = await Promise.all([buildSystem(workspaceId, role), workspaceCounts(workspaceId), conversation.decision_id ? decisionContext(conversation.decision_id, workspaceId).catch(() => "") : Promise.resolve("")]);
   const systemBlocks: Anthropic.TextBlockParam[] = [{ type: "text", text: system, cache_control: { type: "ephemeral" } }, ...(decisionNote ? [{ type: "text" as const, text: decisionNote }] : [])];
   const tools = buildTools();
   const timings: Timings = { total_ms: 0, model_ms: 0, model_calls: 0, tools_ms: 0, tool_calls: 0, setup_ms: Date.now() - turnStart, effort: chatEffort() };

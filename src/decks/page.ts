@@ -6,7 +6,9 @@ import { SkillDb } from "../skills/db";
 import { loadContext } from "../skills/params";
 import { deckPeriods } from "./generate";
 import { brandLabel, type DeckSpec } from "./spec";
-import { DECK_TEMPLATES, type DeckTemplate } from "./templates";
+import { templatesFor, type DeckTemplate } from "./templates";
+import { BRAND_KOL, type RoleModel } from "../roles/model";
+import { REP_SLIDES } from "../reputation/slides";
 
 export type DeckOptions = {
   brands: { id: string; name: string }[];
@@ -18,11 +20,15 @@ export type DeckOptions = {
   /** the Weekly Competitor Pulse's watchlist and client, when this team has one */
   starter: { label: string; client: DeckSpec["client"]; watchlist: DeckSpec["watchlist"] } | null;
   data_through: string;
+  /** PR decks: their slide library, the platforms the workspace holds, the brand they are about by default */
+  rep_slides: { kind: string; title: string; description: string }[];
+  platforms: string[];
+  focus: string | null;
 };
 
 const STARTERS: WeeklyContract[] = [paragon as WeeklyContract];
 
-export async function deckOptions(workspaceId: string): Promise<DeckOptions> {
+export async function deckOptions(workspaceId: string, role: RoleModel = BRAND_KOL): Promise<DeckOptions> {
   const ctx = await loadContext(new SkillDb(), workspaceId);
   const [week, month] = await Promise.all([deckPeriods(workspaceId, "week", 12), deckPeriods(workspaceId, "month", 6)]);
   const brands = ctx.brands.map((b) => ({ id: b.id, name: brandLabel(b.name) })).sort((a, b) => a.name.localeCompare(b.name));
@@ -31,7 +37,7 @@ export async function deckOptions(workspaceId: string): Promise<DeckOptions> {
   const known = new Set(brands.map((b) => b.id));
   return {
     brands,
-    templates: DECK_TEMPLATES,
+    templates: templatesFor(role.id),
     slides: SLIDES.map((s) => ({ kind: s.kind, title: s.title, description: s.description, pages: s.pages, ...(s.required ? { required: true } : {}), ...(s.needs ? { needs: s.needs } : {}) })),
     periods: { week: week.map((p) => ({ key: p.key, label: p.label })), month: month.map((p) => ({ key: p.key, label: p.label })) },
     client: own ? { name: own.name, brand_ids: [own.id] } : null,
@@ -43,5 +49,8 @@ export async function deckOptions(workspaceId: string): Promise<DeckOptions> {
         }
       : null,
     data_through: ctx.asOf,
+    rep_slides: REP_SLIDES,
+    platforms: (await new SkillDb().q<{ platform: string }>("select distinct platform from posts where workspace_id = $1 order by 1", [workspaceId])).map((r) => r.platform),
+    focus: ctx.clientBrandId ?? brands[0]?.id ?? null,
   };
 }

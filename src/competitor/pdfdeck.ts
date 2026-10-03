@@ -78,8 +78,13 @@ class RecordingDeck {
 
 /** The deck's slides as drawing operations. */
 export function recordDeck(r: WeeklyReport, n: Narrative, opts: DeckOptions = {}): DrawOp[][] {
+  return recordWith((pres) => buildDeck(pres, r, n, opts));
+}
+
+/** Any deck builder's slides as drawing operations (the PR decks draw through the same helpers; src/reputation/deck.ts). */
+export function recordWith(build: (pres: Parameters<typeof buildDeck>[0]) => void): DrawOp[][] {
   const rec = new RecordingDeck();
-  buildDeck(rec as unknown as Parameters<typeof buildDeck>[0], r, n, opts);
+  build(rec as unknown as Parameters<typeof buildDeck>[0]);
   return rec.slides.map((s) => s.ops);
 }
 
@@ -90,7 +95,12 @@ const runText = (runs: Run[]) => runs.map((r) => String(r.text ?? "") + (r.optio
 
 /** The deck's slides as text, in order, from the same layout the files are drawn from. */
 export function slideTexts(r: WeeklyReport, n: Narrative, opts: DeckOptions = {}): SlideText[] {
-  return recordDeck(r, n, opts).map((ops, i) => {
+  return slideTextsOf(recordDeck(r, n, opts));
+}
+
+/** Recorded slides as text: what Ask AI is told each slide shows. */
+export function slideTextsOf(slides: DrawOp[][]): SlideText[] {
+  return slides.map((ops, i) => {
     let title = "";
     let size = 0;
     const lines: string[] = [];

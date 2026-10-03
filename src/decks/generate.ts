@@ -17,6 +17,8 @@ import { loadContext } from "../skills/params";
 import { runFindings } from "./findings";
 import { specContract } from "./spec";
 import { markDeckRun, pruneVersions, type DeckRow } from "./store";
+import { reputationReport, writeRep } from "../reputation/deck";
+import { storeReputation } from "../reputation/store";
 
 export type DeckOutcome = { status: "ok" | "skipped" | "error"; message: string; report_id: string | null; period: string | null; narrative_by?: "model" | "fallback" };
 
@@ -64,6 +66,16 @@ export async function generateDeckVersion(deck: DeckRow, opts: { period?: string
     if (opts.reason === "schedule" && deck.last_period && period.key <= deck.last_period) {
       await markDeckRun(deck.id, { next_run_at: retryRun(), error: null });
       return { status: "skipped", message: `no new ${grain} of data: ${period.label} is already in the deck (data through ${ctx.asOf})`, report_id: null, period: period.key };
+    }
+    if (spec.rep) {
+      // a PR deck: one brand's reputation over the period (src/reputation/)
+      const r = await reputationReport(deck.workspace_id, { title: spec.title, grain, spec: spec.rep, period: period.key, asOf: ctx.asOf });
+      const written = await writeRep(r);
+      const stored = await storeReputation({ workspaceId: deck.workspace_id, report: r, narrative: written.narrative, by: written.by, problems: written.problems, deck: { id: deck.id, name: deck.name } });
+      await pruneVersions(deck.id, deck.workspace_id, r.period.key, stored.reportId);
+      const last = deck.last_period && deck.last_period > period.key ? deck.last_period : period.key;
+      await markDeckRun(deck.id, { last_period: last, next_run_at: deck.recurring ? nextRun(grain) : null, error: null });
+      return { status: "ok", message: `${period.label}: ${r.status.level}, ${r.issues.length} issue${r.issues.length === 1 ? "" : "s"}, words by ${written.by === "model" ? "CeMO" : "the plain template"}`, report_id: stored.reportId, period: period.key, narrative_by: written.by };
     }
     const findings = spec.findings?.length && spec.slides.includes("findings") ? await runFindings(spec.findings, deck.workspace_id, { from: period.from, to: period.to }) : undefined;
     const r = await weeklyReport(specContract(spec, deck.workspace_id), period.from, { findings });

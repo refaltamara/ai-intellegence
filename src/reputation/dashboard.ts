@@ -10,6 +10,7 @@
  * The alert rule comes from the role model (src/roles/model.ts).
  */
 import { PLATFORM_LABEL } from "../skills/common";
+import { dayMonth } from "../competitor/view";
 import { SkillDb } from "../skills/db";
 import { PR, type RoleModel } from "../roles/model";
 
@@ -17,7 +18,7 @@ export type Level = "calm" | "watch" | "issue" | "crisis" | "recovering";
 export const WINDOWS = [7, 14, 30] as const;
 export type WindowDays = (typeof WINDOWS)[number];
 
-export type PrFilters = { brand: string; days: WindowDays; platform: string };
+export type PrFilters = { brand: string; days: number; platform: string };
 export type DayPoint = { d: string; comments: number; negative: number; neg_pct: number | null; level: Level };
 export type Status = {
   level: Level;
@@ -137,7 +138,7 @@ async function settledDay(db: SkillDb, ws: string, tz: string, asOf: string, ale
   return asOf;
 }
 
-export function readPrFilters(sp: Record<string, string | string[] | undefined>, brands: string[], client: string | null): PrFilters {
+export function readPrFilters(sp: Record<string, string | string[] | undefined>, brands: string[], client: string | null): PrFilters & { days: WindowDays } {
   const one = (k: string) => (Array.isArray(sp[k]) ? sp[k]?.[0] : sp[k]) as string | undefined;
   const days = Number(one("days"));
   const brand = one("brand");
@@ -149,30 +150,51 @@ export function readPrFilters(sp: Record<string, string | string[] | undefined>,
   };
 }
 
-export async function prDashboard(ws: string, sp: Record<string, string | string[] | undefined>, role: RoleModel = PR): Promise<PrDashboardData | null> {
-  const db = new SkillDb();
-  const alert = role.alert ?? PR.alert!;
+type Basics = { tz: string; client: string | null; brands: { id: string; name: string }[]; platforms: string[]; asOf: string };
+
+async function workspaceBasics(db: SkillDb, ws: string): Promise<Basics | null> {
   const w = await db.one<{ tz: string; client: string | null }>("select tz, client_brand_id as client from workspaces where id = $1", [ws]);
   if (!w) return null;
-  const tz = w.tz;
-  const brands = await db.q<{ id: string; name: string; keywords: unknown }>("select id, name, keywords from brands where workspace_id = $1 order by name", [ws]);
+  const brands = await db.q<{ id: string; name: string }>("select id, name from brands where workspace_id = $1 order by name", [ws]);
   if (!brands.length) return null;
-  const f = readPrFilters(sp, brands.map((b) => b.id), w.client);
-  const platformsRow = await db.q<{ platform: string }>("select distinct platform from posts where workspace_id = $1 order by 1", [ws]);
-  const platforms = platformsRow.map((r) => r.platform);
-  if (f.platform !== "all" && !platforms.includes(f.platform)) f.platform = "all";
+  const platforms = (await db.q<{ platform: string }>("select distinct platform from posts where workspace_id = $1 order by 1", [ws])).map((r) => r.platform);
   const asOfRow = await db.one<{ d: string }>(
     `select to_char(greatest((select max(posted_at) from comments where workspace_id = $1), (select max(posted_at) from posts where workspace_id = $1)) at time zone $2, 'YYYY-MM-DD') as d`,
-    [ws, tz],
+    [ws, w.tz],
   );
-  const asOf = asOfRow?.d ?? new Date().toISOString().slice(0, 10);
+  return { tz: w.tz, client: w.client, brands, platforms, asOf: asOfRow?.d ?? new Date().toISOString().slice(0, 10) };
+}
+
+/** The dashboard: the window chosen in the URL, ending on the last settled day. */
+export async function prDashboard(ws: string, sp: Record<string, string | string[] | undefined>, role: RoleModel = PR): Promise<PrDashboardData | null> {
+  const db = new SkillDb();
+  const basics = await workspaceBasics(db, ws);
+  if (!basics) return null;
+  const f = readPrFilters(sp, basics.brands.map((b) => b.id), basics.client);
+  const settled = await settledDay(db, ws, basics.tz, basics.asOf, role.alert ?? PR.alert!);
+  return reputationFacts(ws, { focus: f.brand, from: addDays(settled, -(f.days - 1)), to: settled, platform: f.platform }, role, db, basics);
+}
+
+/**
+ * The reputation facts for one brand over any window (the dashboard's rolling days, a deck's week or month),
+ * against the same number of days before it. The status is read on the window's last day, or on the last
+ * settled day when the window runs past it.
+ */
+export async function reputationFacts(ws: string, win: { focus: string; from: string; to: string; platform: string; prev?: { from: string; to: string } }, role: RoleModel = PR, db: SkillDb = new SkillDb(), basics?: Basics): Promise<PrDashboardData | null> {
+  const alert = role.alert ?? PR.alert!;
+  const b0 = basics ?? (await workspaceBasics(db, ws));
+  if (!b0) return null;
+  const { tz, brands, platforms, asOf, client } = b0;
   const settled = await settledDay(db, ws, tz, asOf, alert);
-  const to = settled;
-  const from = addDays(to, -(f.days - 1));
-  const prevTo = addDays(from, -1);
-  const prevFrom = addDays(prevTo, -(f.days - 1));
-  const focus = brands.find((b) => b.id === f.brand)!;
+  const from = win.from;
+  const to = win.to;
+  const len = Math.round((Date.parse(to) - Date.parse(from)) / 86400000) + 1;
+  const prevTo = win.prev?.to ?? addDays(from, -1);
+  const prevFrom = win.prev?.from ?? addDays(prevTo, -(len - 1));
+  const focus = brands.find((b) => b.id === win.focus) ?? brands.find((b) => b.id === client) ?? brands[0];
+  const f: PrFilters = { brand: focus.id, days: len, platform: win.platform !== "all" && platforms.includes(win.platform) ? win.platform : "all" };
   const plat = f.platform === "all" ? null : f.platform;
+  const statusDay = to < settled ? to : settled;
 
   // Shared fragments. $1 workspace, $2 tz, then per query.
   const inDays = (col: string, a: string, b: string) => `${col} >= (${a}::date::timestamp at time zone $2) and ${col} < ((${b}::date + 1)::timestamp at time zone $2)`;
@@ -189,7 +211,7 @@ export async function prDashboard(ws: string, sp: Record<string, string | string
      select to_char(days.d, 'YYYY-MM-DD') as d, count(c.id)::int as comments, count(c.id) filter (where c.sentiment = 'negative')::int as negative
      from days left join (select c.id, c.sentiment, (c.posted_at at time zone $2)::date as day from ${onBrandComments.replace(platC, "and $3::text is null")} and p.brand_id = $6) c on c.day = days.d
      group by days.d order by days.d`,
-    [ws, tz, null, asOf, span, focus.id],
+    [ws, tz, null, statusDay, span, focus.id],
   );
   const withBase = daily.map((x, i) => {
     const prior = daily.slice(Math.max(0, i - alert.baseline_days), i);
@@ -197,10 +219,10 @@ export async function prDashboard(ws: string, sp: Record<string, string | string
     const pn = prior.reduce((a, r) => a + n(r.negative), 0);
     return { d: x.d, comments: n(x.comments), negative: n(x.negative), baseline_pct: prior.length >= 7 && pc >= alert.min_comments ? (pn / pc) * 100 : null };
   });
-  const hist = ladder(withBase.filter((x) => x.d <= settled), alert).slice(-30);
+  const hist = ladder(withBase.filter((x) => x.d <= statusDay), alert).slice(-30);
   const today = hist.at(-1) ?? null;
-  const lastBase = withBase.find((x) => x.d === settled);
-  const settledAt = daily.findIndex((x) => x.d === settled);
+  const lastBase = withBase.find((x) => x.d === statusDay);
+  const settledAt = daily.findIndex((x) => x.d === statusDay);
   const priorDays = daily.slice(Math.max(0, settledAt - alert.baseline_days), Math.max(0, settledAt));
   const baseComments = priorDays.reduce((a, r) => a + n(r.comments), 0);
   const { multiple } = today ? levelFor(today.negative, today.comments, lastBase?.baseline_pct ?? null, alert) : { multiple: null };
@@ -444,7 +466,7 @@ export async function prDashboard(ws: string, sp: Record<string, string | string
       negative_prev: sum((x) => x.brand_id === id && x.win === "prev" && tKey(x) === tid, "negative"),
     })).filter((x) => x.negative >= minIssue && x.negative >= Math.max(1, x.negative_prev) * 1.5).sort((a, b) => b.negative - a.negative)[0] ?? null;
     return {
-      id, name: String(r.name), is_focus: id === focus.id, is_client: id === w.client, posts: n(r.posts), posts_prev: n(r.posts_prev), sov: share(n(r.posts), totalPosts), views: n(r.views), comments: n(r.comments),
+      id, name: String(r.name), is_focus: id === focus.id, is_client: id === client, posts: n(r.posts), posts_prev: n(r.posts_prev), sov: share(n(r.posts), totalPosts), views: n(r.views), comments: n(r.comments),
       neg_pct: share(n(r.negative), n(r.labelled)), neg_pct_prev: share(n(r.negative_prev), n(r.labelled_prev)), csat: r.csat == null ? null : Math.round(Number(r.csat) * 100) / 100,
       intent_pct: share(n(r.intent), n(r.comments)), top_issue: top,
     };
@@ -460,8 +482,9 @@ export async function prDashboard(ws: string, sp: Record<string, string | string
   );
   const coverage: Coverage[] = covRows.map((r) => ({ platform: String(r.platform), first: String(r.first), last: String(r.last), posts: n(r.posts), off_topic: n(r.off_topic), comments: n(r.comments), reported_comments: n(r.reported) }));
   const notes: string[] = [];
-  if (settled < asOf) notes.push(`Comments for ${addDays(settled, 1)}${addDays(settled, 1) < asOf ? ` to ${asOf}` : ""} are still arriving (half of a post's comments come in its first 15 hours), so this view ends on ${settled}.`);
-  for (const c of coverage) if (c.first > prevFrom) notes.push(`${PLATFORM_LABEL[c.platform] ?? c.platform} has been tracked since ${c.first}, so comparisons with the previous ${f.days} days include it on one side only.`);
+  if (to === settled && settled < asOf) notes.push(`Comments for ${dayMonth(addDays(settled, 1))}${addDays(settled, 1) < asOf ? ` to ${dayMonth(asOf)}` : ""} are still arriving (half of a post's comments come in its first 15 hours), so this view ends on ${dayMonth(settled)}.`);
+  else if (to > settled) notes.push(`Comments for ${dayMonth(addDays(settled, 1))} to ${dayMonth(to)} are still arriving (half of a post's comments come in its first 15 hours); those days will grow.`);
+  for (const c of coverage) if (c.first > prevFrom) notes.push(`${PLATFORM_LABEL[c.platform] ?? c.platform} has been tracked since ${dayMonth(c.first)}, so comparisons with the previous ${f.days} days include it on one side only.`);
   const weekly = await db.q<{ wk: string; posts: number }>(
     `select to_char(date_trunc('week', p.posted_at at time zone $2), 'YYYY-MM-DD') as wk, count(*)::int as posts from posts p where p.workspace_id = $1 and p.posted_at >= (($3::date - 63)::timestamp at time zone $2) group by 1 order by 1`,
     [ws, tz, asOf],
@@ -477,13 +500,13 @@ export async function prDashboard(ws: string, sp: Record<string, string | string
   const lvl = status.level;
   const d = status.day;
   status.reason = !d || d.comments < alert.min_comments
-    ? `Not enough comments about ${focus.name} on ${d?.d ?? asOf} to judge (${d?.comments ?? 0}; the rule needs ${alert.min_comments}).`
+    ? `Not enough comments about ${focus.name} on ${dayMonth(d?.d ?? asOf)} to judge (${d?.comments ?? 0}; the rule needs ${alert.min_comments}).`
     : status.baseline.neg_pct == null
-      ? `${d.neg_pct}% of ${d.comments.toLocaleString("en-US")} comments about ${focus.name} were negative on ${d.d}; there is not yet ${alert.baseline_days} days of history to compare with.`
-      : `${d.neg_pct}% of ${d.comments.toLocaleString("en-US")} comments about ${focus.name} were negative on ${d.d}, against a ${alert.baseline_days}-day norm of ${status.baseline.neg_pct}%${status.multiple != null ? ` (${status.multiple}×)` : ""}.${lvl === "recovering" ? " Calm again after an issue in the last week." : ""}`;
+      ? `${d.neg_pct}% of ${d.comments.toLocaleString("en-US")} comments about ${focus.name} were negative on ${dayMonth(d.d)}; there is not yet ${alert.baseline_days} days of history to compare with.`
+      : `${d.neg_pct}% of ${d.comments.toLocaleString("en-US")} comments about ${focus.name} were negative on ${dayMonth(d.d)}, against a ${alert.baseline_days}-day norm of ${status.baseline.neg_pct}%${status.multiple != null ? ` (${status.multiple}×)` : ""}.${lvl === "recovering" ? " Calm again after an issue in the last week." : ""}`;
 
   return {
-    as_of: asOf, settled, tz, focus: { id: focus.id, name: focus.name, is_client: focus.id === w.client }, brands: brands.map((b) => ({ id: b.id, name: b.name })), platforms,
+    as_of: asOf, settled, tz, focus: { id: focus.id, name: focus.name, is_client: focus.id === client }, brands: brands.map((b) => ({ id: b.id, name: b.name })), platforms,
     filters: { ...f, from, to, prev_from: prevFrom, prev_to: prevTo },
     status, kpis, issues, rising, narratives, amplifiers, own, own_worst: ownWorst,
     service: { total: n(serviceCount?.n), quotes: serviceQuotes.map(toQuote) },

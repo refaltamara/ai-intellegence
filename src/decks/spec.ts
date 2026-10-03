@@ -9,6 +9,7 @@ import type { WeeklyContract } from "../competitor/contract";
 import { GRAINS, type Grain } from "../competitor/period";
 import { cleanSlides, type SlideKind } from "../competitor/slides";
 import type { Platform } from "../competitor/types";
+import { cleanRepSlides, type RepSpec } from "../reputation/slides";
 
 export const DECK_PLATFORMS: Platform[] = ["tiktok", "instagram"];
 
@@ -24,6 +25,8 @@ export type DeckSpec = {
   watchlist: { name: string; short?: string; group: "core" | "when_relevant"; brand_ids: string[] }[];
   slides: SlideKind[];
   findings?: FindingSpec[];
+  /** a PR deck (DECISIONS 3 Oct 2026): one brand's reputation; the watchlist, client and slides above stay empty */
+  rep?: RepSpec;
 };
 
 /** A brand's name as a slide prints it: "Officialhanasui" (the panel's account-style name) reads "Hanasui". */
@@ -39,6 +42,13 @@ const ids = (v: unknown, known: Set<string>) => (Array.isArray(v) ? [...new Set(
 export function cleanSpec(input: unknown, known: Set<string>): DeckSpec | { error: string } {
   const o = (input && typeof input === "object" ? input : {}) as Record<string, unknown>;
   const grain: Grain = GRAINS.includes(o.grain as Grain) ? (o.grain as Grain) : "week";
+  if (o.rep && typeof o.rep === "object") {
+    const r = o.rep as Record<string, unknown>;
+    const focus = str(r.focus, 80);
+    if (!known.has(focus)) return { error: "pick the brand this deck is about" };
+    const platform = typeof r.platform === "string" && /^[a-z]{1,12}$/.test(r.platform) ? r.platform : "all";
+    return { title: str(o.title, 60) || "Reputation Report", grain, platforms: [], client: null, watchlist: [], slides: ["summary"], rep: { focus, platform, slides: cleanRepSlides(r.slides) } };
+  }
   const platforms = Array.isArray(o.platforms) ? DECK_PLATFORMS.filter((p) => (o.platforms as unknown[]).includes(p)) : DECK_PLATFORMS;
   const watchlist = (Array.isArray(o.watchlist) ? o.watchlist : [])
     .map((w) => {
