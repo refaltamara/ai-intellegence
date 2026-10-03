@@ -18,6 +18,7 @@ import { addDays } from "../competitor/weeks";
 import { getSkill } from "../skills/registry";
 import type { Context } from "../skills/params";
 import type { ChartSpec, SkillResult } from "../skills/types";
+import type { Platform } from "../competitor/types";
 
 export { CARD_KINDS, KIND_INFO, LANDSCAPE_KINDS, METRIC_LABEL };
 export type { CardConfig, CardKind, CardRow, CardSize, Metric };
@@ -79,7 +80,7 @@ export function skillTable(result: SkillResult, limit = 8): { columns: string[];
   return { columns, rows: rows.slice(0, limit).map((r) => Object.fromEntries(columns.map((c) => [c, r[c]]))) };
 }
 
-const PLATFORM_LABEL: Record<PlatformFilter, string> = { all: "TikTok + Instagram", tiktok: "TikTok", instagram: "Instagram" };
+const PLATFORM_LABEL: Record<PlatformFilter, string> = { all: "All platforms", tiktok: "TikTok", instagram: "Instagram", threads: "Threads", x: "X", youtube: "YouTube" };
 
 /** Brands a landscape card reads when none are picked: the most-posted in the period. */
 const LANDSCAPE_TOP = 8;
@@ -89,11 +90,13 @@ const LANDSCAPE_TOP = 8;
  * in the period (one for a close-up). Cards on one page with the same settings share one read.
  */
 export async function landscapeFor(db: SkillDb, ctx: Context, f: Filters, prev: Period, single = false): Promise<Landscape> {
-  const platforms = f.platform === "all" ? (["tiktok", "instagram"] as const) : ([f.platform] as const);
+  const platforms: Platform[] = f.platform === "all"
+    ? (await db.q<{ platform: Platform }>("select distinct platform from posts where workspace_id = $1", [ctx.workspaceId])).map((r) => r.platform)
+    : [f.platform];
   let ids = f.brands.slice(0, single ? 1 : LANDSCAPE_TOP);
   if (!ids.length) {
     const top = await db.q<{ brand_id: string }>(
-      `select brand_id from posts where workspace_id = $1 and platform = any($2::text[])
+      `select brand_id from posts where workspace_id = $1 and relevant is not false and platform = any($2::text[])
          and posted_at >= ($3::date::timestamp at time zone $5) and posted_at < (($4::date + 1)::timestamp at time zone $5)
        group by 1 order by count(*) desc limit $6`,
       [ctx.workspaceId, [...platforms], f.period.from, f.period.to, ctx.tz, single ? 1 : LANDSCAPE_TOP],

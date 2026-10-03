@@ -6,8 +6,11 @@
 import { TIER_BANDS } from "../config/thresholds";
 import { parsePeriod } from "./period";
 
-export type PlatformFilter = "all" | "tiktok" | "instagram";
-export const PLATFORMS: PlatformFilter[] = ["all", "tiktok", "instagram"];
+/** "all" is every platform the workspace holds; the beauty panel holds TikTok and Instagram, listening workspaces Threads and X too. */
+export type PlatformFilter = "all" | "tiktok" | "instagram" | "threads" | "x" | "youtube";
+export const PLATFORMS: PlatformFilter[] = ["all", "tiktok", "instagram", "threads", "x", "youtube"];
+export const PLATFORM_NAME: Record<string, string> = { tiktok: "TikTok", instagram: "Instagram", threads: "Threads", x: "X", youtube: "YouTube" };
+export const PLATFORM_SHORT: Record<string, string> = { tiktok: "TT", instagram: "IG", threads: "TH", x: "X", youtube: "YT" };
 
 export type AskTarget =
   | { k: "kpi"; metric: "posts" | "views" | "engagements" | "er" }

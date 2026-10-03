@@ -14,7 +14,7 @@ describe("card settings", () => {
   });
 
   it("falls back to safe defaults", () => {
-    expect(cleanConfig("content", { platform: "x", period: "last year", sort: "drop table", limit: 999 }, known)).toEqual({ platform: "all", brands: [], period: "latest-month", sort: "views", q: "", limit: 12 });
+    expect(cleanConfig("content", { platform: "myspace", period: "last year", sort: "drop table", limit: 999 }, known)).toEqual({ platform: "all", brands: [], period: "latest-month", sort: "views", q: "", limit: 12 });
     expect(cleanConfig("creators", null, known)).toMatchObject({ by: "views", limit: 8 });
     expect(cleanConfig("trend", { metric: "er" }, known).metric).toBe("posts");
     expect(cleanConfig("closeup", { brands: ["skintific_official", "glad2glow_id"] }, known).brands).toEqual(["skintific_official"]);

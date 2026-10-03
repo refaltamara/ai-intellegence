@@ -10,7 +10,7 @@
 import PptxGenJS from "pptxgenjs";
 import type { Narrative } from "./narrative";
 import type { Cell, Flag, GroupResult, Mover, WeeklyReport } from "./types";
-import { PLATFORM_NAME, change, compact, dayMonth, flagValue, int, lensLines, metricLabel, pct, pts, wordsOf } from "./view";
+import { PLATFORM_NAME, change, listAnd, compact, dayMonth, flagValue, int, lensLines, metricLabel, pct, pts, wordsOf } from "./view";
 import { closeupSlides, movesSlide, patternsSlide, postingSlide, productsSlide, tiersSlide } from "./landscapeDeck";
 import { anglesSlide, campaignsSlide, contentSlide, creatorsSlide, findingSlides, trendSlides } from "./libraryDeck";
 import { add, arrow, C, chip, chrome, CW, FONT, M, postCard, segRuns, text, title, W, type Runs, type Slide } from "./draw";
@@ -23,7 +23,7 @@ function summarySlide(pres: PptxGenJS, r: WeeklyReport, n: Narrative, page: numb
   chrome(s, r, page, sampleLabel);
   add(s, r.title, { x: M, y: 0.7, w: 9, h: 0.4, fontSize: 16, bold: true, color: C.blue });
   add(s, r.week.label, { x: M, y: 1.08, w: 9, h: 0.8, fontSize: 40, bold: true, color: C.ink, valign: "middle" });
-  add(s, [r.client ? `Prepared for ${r.client}` : null, r.platforms.map((p) => PLATFORM_NAME[p]).join(" and "), r.grain === "month" ? `against ${r.previous_week.label}` : `week ${Number(r.week.iso.slice(-2))}`].filter(Boolean).join(" · "), { x: M, y: 1.9, w: 9, h: 0.3, fontSize: 13, color: C.ink6 });
+  add(s, [r.client ? `Prepared for ${r.client}` : null, listAnd(r.platforms.map((p) => PLATFORM_NAME[p])), r.grain === "month" ? `against ${r.previous_week.label}` : `week ${Number(r.week.iso.slice(-2))}`].filter(Boolean).join(" · "), { x: M, y: 1.9, w: 9, h: 0.3, fontSize: 13, color: C.ink6 });
 
   const gap = 0.3;
   const cw = (CW - 2 * gap) / 3;
@@ -44,7 +44,7 @@ function summarySlide(pres: PptxGenJS, r: WeeklyReport, n: Narrative, page: numb
     text(core.join(" · "), { fontSize: 10, color: C.ink6 }),
     ...(relevant.length || !isDeck(r) ? [text("      When relevant  ", { fontSize: 10, bold: true, color: C.ink6 }), text(relevant.join(" · "), { fontSize: 10, color: C.ink6 })] : []),
   ], { x: M, y: 6.15, w: CW, h: 0.28 });
-  add(s, `Highlighted = outside the brand's own ${wordsOf(r).span(r.rules.lookback_weeks)} normal. Source: Fair social listening panel, posts about Indonesian beauty brands on ${r.platforms.map((p) => PLATFORM_NAME[p]).join(" and ")}.`, { x: M, y: 6.47, w: CW, h: 0.28, fontSize: 9, color: C.ink4 });
+  add(s, `Highlighted = outside the brand's own ${wordsOf(r).span(r.rules.lookback_weeks)} normal. Source: Fair social listening panel, posts about the watched brands on ${listAnd(r.platforms.map((p) => PLATFORM_NAME[p]))}.`, { x: M, y: 6.47, w: CW, h: 0.28, fontSize: 9, color: C.ink4 });
   s.addNotes(n.summary.map((x) => `${x.label}: ${x.stat} ${x.stat_label}. ${x.text}`).join("\n"));
 }
 
@@ -117,10 +117,18 @@ function coverageLine(r: WeeklyReport): string {
   ].filter(Boolean).join(" · ") + (out.length || partial.length || swings.length ? "." : "");
 }
 
+/** The scoreboard fits two platforms a slide (posts, views and engagement rate each); more platforms take more slides. */
+function scoreboardSlides(pres: PptxGenJS, r: WeeklyReport, n: Narrative, start: number, sampleLabel?: string): number {
+  const pairs: WeeklyReport["platforms"][] = [];
+  for (let i = 0; i < r.platforms.length; i += 2) pairs.push(r.platforms.slice(i, i + 2));
+  pairs.forEach((pl, i) => scoreboardSlide(pres, { ...r, platforms: pl }, n, start + i, sampleLabel));
+  return pairs.length;
+}
+
 function scoreboardSlide(pres: PptxGenJS, r: WeeklyReport, n: Narrative, page: number, sampleLabel?: string) {
   const s = pres.addSlide();
   chrome(s, r, page, sampleLabel);
-  title(s, n.scoreboard_title, `${r.week.label} against ${r.previous_week.label} · the watchlist on ${r.platforms.map((p) => PLATFORM_NAME[p]).join(" and ")} · blue = a significant move`);
+  title(s, n.scoreboard_title, `${r.week.label} against ${r.previous_week.label} · the watchlist on ${listAnd(r.platforms.map((p) => PLATFORM_NAME[p]))} · blue = a significant move`);
   const covered = (g: GroupResult) => r.platforms.some((pl) => g.cells[pl]?.covered);
   const core = r.watchlist.filter((g) => g.group.kind === "core" && covered(g));
   const relevant = r.watchlist.filter((g) => g.group.kind === "when_relevant" && covered(g));
@@ -364,7 +372,7 @@ export function buildDeck(pres: PptxGenJS, r: WeeklyReport, n: Narrative, opts: 
   for (const k of deckSlides(r)) {
     if (k === "summary") summarySlide(pres, r, n, ++page, S);
     else if (k === "findings") page += findingSlides(pres, r, n, page + 1, S);
-    else if (k === "scoreboard") scoreboardSlide(pres, r, n, ++page, S);
+    else if (k === "scoreboard") page += scoreboardSlides(pres, r, n, page + 1, S);
     else if (k === "trend") page += trendSlides(pres, r, n, page + 1, S);
     else if (k === "movers") moversSlide(pres, r, n, ++page, S);
     else if (k === "drivers") r.movers.forEach((m) => driverSlide(pres, r, m, n.drivers.find((d) => d.key === m.key)!, ++page, S));

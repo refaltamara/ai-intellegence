@@ -5,7 +5,8 @@ import type { Landscape } from "./landscape";
 import type { Grain } from "./period";
 import type { SlideKind } from "./slides";
 
-export type Platform = "tiktok" | "instagram";
+/** TikTok and Instagram in the beauty panel; listening workspaces add Threads and X (DECISIONS 3 Oct 2026). */
+export type Platform = "tiktok" | "instagram" | "threads" | "x" | "youtube";
 export type Metric = "posts" | "views" | "er";
 
 /** A row of the report: one watched brand (or a group such as "Maybelline / L'Oréal"), a client brand, or the client's portfolio. */

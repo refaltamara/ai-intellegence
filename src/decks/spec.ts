@@ -11,7 +11,8 @@ import { cleanSlides, type SlideKind } from "../competitor/slides";
 import type { Platform } from "../competitor/types";
 import { cleanRepSlides, type RepSpec } from "../reputation/slides";
 
-export const DECK_PLATFORMS: Platform[] = ["tiktok", "instagram"];
+/** Every platform a deck can cover; a deck covers the ones its workspace holds (none picked = all of them). */
+export const DECK_PLATFORMS: Platform[] = ["tiktok", "instagram", "threads", "x", "youtube"];
 
 /** An analysis pinned from Chats: the skill and the settings it ran with; each version runs it again over the deck's period. */
 export type FindingSpec = { key: string; skill: string; params: Record<string, unknown>; question: string; title: string };
@@ -49,7 +50,7 @@ export function cleanSpec(input: unknown, known: Set<string>): DeckSpec | { erro
     const platform = typeof r.platform === "string" && /^[a-z]{1,12}$/.test(r.platform) ? r.platform : "all";
     return { title: str(o.title, 60) || "Reputation Report", grain, platforms: [], client: null, watchlist: [], slides: ["summary"], rep: { focus, platform, slides: cleanRepSlides(r.slides) } };
   }
-  const platforms = Array.isArray(o.platforms) ? DECK_PLATFORMS.filter((p) => (o.platforms as unknown[]).includes(p)) : DECK_PLATFORMS;
+  const platforms = Array.isArray(o.platforms) ? DECK_PLATFORMS.filter((p) => (o.platforms as unknown[]).includes(p)) : [];
   const watchlist = (Array.isArray(o.watchlist) ? o.watchlist : [])
     .map((w) => {
       const x = (w && typeof w === "object" ? w : {}) as Record<string, unknown>;
@@ -86,7 +87,8 @@ export function cleanSpec(input: unknown, known: Set<string>): DeckSpec | { erro
   return {
     title: str(o.title, 60) || "Deck",
     grain,
-    platforms: platforms.length ? platforms : DECK_PLATFORMS,
+    // empty = every platform the workspace holds, read when a version is made
+    platforms,
     client,
     watchlist,
     slides: cleanSlides(o.slides),

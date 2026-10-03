@@ -1367,7 +1367,9 @@ th{background:linear-gradient(180deg,#F8FAFE,#F4F7FC)}
 
 /* ---------------------------------------------------------------- PR dashboard (DECISIONS 3 Oct 2026) */
 .pf.threads,.pf.x,.pf.youtube{display:inline-grid;place-items:center;min-width:22px;height:18px;padding:0 5px;border-radius:6px;font-size:9.5px;font-weight:800;color:#fff;margin-right:5px}
-.pf.threads{background:#101010}.pf.x{background:#3A3F47}.pf.youtube{background:#E62117}
+.pf.threads{background:#101010;margin-top:0;gap:0;overflow:visible}.pf.x{background:#3A3F47}.pf.youtube{background:#E62117}
+/* .threads is also the chat thread list: a Threads badge keeps the badge shape */
+.pf.threads{display:inline-grid;place-items:center;vertical-align:baseline}
 .pr{--lv:var(--green);--lv10:var(--green-10)}
 .prstatus{display:flex;align-items:center;gap:20px;border:1px solid var(--line);border-radius:20px;background:#fff;padding:16px 20px;box-shadow:var(--shadow-xs);margin-bottom:18px;--lv:var(--green);--lv10:var(--green-10)}
 .prstatus.watch{--lv:var(--sun);--lv10:var(--sun-10)}.prstatus.issue{--lv:var(--coral);--lv10:var(--coral-10)}.prstatus.crisis{--lv:var(--red);--lv10:var(--red-10)}.prstatus.recovering{--lv:var(--blue);--lv10:var(--blue-10)}

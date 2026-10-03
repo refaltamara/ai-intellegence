@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import type { Period } from "@/dashboard/period";
+import { PLATFORM_NAME } from "@/dashboard/askref";
 import { MultiSelect } from "../MultiSelect";
 
 type F = { platform: string; brands: string[]; period: string };
@@ -15,7 +16,7 @@ function href(f: F): string {
   return `/dashboard?${q.toString()}`;
 }
 
-export function DashFilters({ platform, brands, period, months, weeks, brandOptions }: { platform: string; brands: string[]; period: string; months: Period[]; weeks: Period[]; brandOptions: { id: string; name: string }[] }) {
+export function DashFilters({ platform, brands, period, months, weeks, brandOptions, platforms }: { platform: string; brands: string[]; period: string; months: Period[]; weeks: Period[]; brandOptions: { id: string; name: string }[]; platforms: string[] }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [picked, setPicked] = useState<string[]>(brands);
@@ -24,7 +25,7 @@ export function DashFilters({ platform, brands, period, months, weeks, brandOpti
   return (
     <div className={`dfilters ${pending ? "busy" : ""}`}>
       <div className="seg" role="tablist" aria-label="Platform">
-        {[["all", "All platforms"], ["tiktok", "TikTok"], ["instagram", "Instagram"]].map(([k, label]) => (
+        {[["all", "All platforms"], ...platforms.map((p) => [p, PLATFORM_NAME[p] ?? p])].map(([k, label]) => (
           <a key={k} role="tab" aria-selected={platform === k} className={platform === k ? "on" : ""} href={href({ platform: k, brands, period })} onClick={(e) => { e.preventDefault(); go({ platform: k }); }}>{label}</a>
         ))}
       </div>

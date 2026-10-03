@@ -9,7 +9,10 @@ import { EVENT_NAME, HOOK_NAME, OFFER_NAME } from "../captions/prompt";
 import { periodWords, type Grain } from "./period";
 import type { Cell, Mover, Platform, WeekPoint, WeeklyReport } from "./types";
 
-export const PLATFORM_NAME: Record<Platform, string> = { tiktok: "TikTok", instagram: "Instagram" };
+/** "TikTok and X"; "Instagram, Threads, TikTok and X" */
+export const listAnd = (xs: string[]) => (xs.length > 1 ? `${xs.slice(0, -1).join(", ")} and ${xs[xs.length - 1]}` : xs[0] ?? "");
+
+export const PLATFORM_NAME: Record<Platform, string> = { tiktok: "TikTok", instagram: "Instagram", threads: "Threads", x: "X", youtube: "YouTube" };
 export const METRIC_NAME = { posts: "posts", views: "views", er: "engagement rate" } as const;
 export const TIER_NAME: Record<string, string> = { nano: "Nano", micro: "Micro", mid: "Mid-tier", macro: "Macro", mega: "Mega", unknown: "Unknown tier" };
 const FORMAT_NAME: Record<string, string> = {
@@ -313,12 +316,15 @@ export function closeupPicks(r: WeeklyReport): CloseUp[][] {
 export function closeupLines(c: CloseUp, posting?: PostingBrand, thisPeriod = "this week"): { label: string; text: string; muted?: boolean }[] {
   const lines: { label: string; text: string; muted?: boolean }[] = [];
   const cats = c.categories.map((x) => `${x.label} ${int(x.posts)} posts, ${compact(x.views)} views`).join("; ");
-  lines.push({ label: "Pushing", text: [cats || "No category named in most captions", c.cart ? `Cart: ${productName(c.cart.name)} (${int(c.cart.posts)} ${c.cart.posts === 1 ? "post" : "posts"}, ${compact(c.cart.views)} views)` : null].filter(Boolean).join(". ") + "." });
+  if (c.lexicon !== false) lines.push({ label: "Pushing", text: [cats || "No category named in most captions", c.cart ? `Cart: ${productName(c.cart.name)} (${int(c.cart.posts)} ${c.cart.posts === 1 ? "post" : "posts"}, ${compact(c.cart.views)} views)` : null].filter(Boolean).join(". ") + "." });
   if (c.owned) {
+    // TikTok in the beauty panel; every platform in listening workspaces
+    const on = (c.owned.platforms ?? ["tiktok"]).map((p) => PLATFORM_NAME[p] ?? p);
+    const where = on.length === 1 ? `${on[0]} ` : "";
     lines.push(c.owned.posts
-      ? { label: "Own channel", text: `${int(c.owned.posts)} TikTok posts from brand accounts brought ${compact(c.owned.views)} views, ${c.owned.views_share}% of the brand's TikTok views${c.owned.median_views != null ? `, at a ${compact(c.owned.median_views)} median` : ""}.` }
-      : { label: "Own channel", text: `No brand-account posts on TikTok ${thisPeriod}.`, muted: true });
-  } else lines.push({ label: "Own channel", text: "Brand-account posts are collected on TikTok only.", muted: true });
+      ? { label: "Own channel", text: `${int(c.owned.posts)} ${where}posts from brand accounts brought ${compact(c.owned.views)} views, ${c.owned.views_share}% of the brand's ${where}views${c.owned.median_views != null ? `, at a ${compact(c.owned.median_views)} median` : ""}.` }
+      : { label: "Own channel", text: `No brand-account posts${on.length === 1 ? ` on ${on[0]}` : ""} ${thisPeriod}.`, muted: true });
+  } else lines.push({ label: "Own channel", text: "Brand-account posts are not collected on these platforms.", muted: true });
   const t = c.top_creator;
   lines.push({
     label: "Creators",

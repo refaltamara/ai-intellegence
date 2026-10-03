@@ -12,7 +12,7 @@ import { sql } from "../db/client";
 import { getSkill } from "../skills/registry";
 import { SkillDb } from "../skills/db";
 import { loadContext } from "../skills/params";
-import { brandLabel, DECK_PLATFORMS, type DeckSpec, type FindingSpec } from "./spec";
+import { brandLabel, type DeckSpec, type FindingSpec } from "./spec";
 
 const MAX_FINDINGS = 6;
 const CHAT_SLIDES: SlideKind[] = ["summary", "findings", "scoreboard", "trend", "moves", "evidence"];
@@ -78,5 +78,5 @@ export async function chatDeckSpec(title: string, findings: FindingSpec[], works
   if (!findings.length) return { error: "Nothing to put in a deck yet: ask a question CeMO answers with an analysis first." };
   const watchlist = await findingBrands(findings, workspaceId);
   if (!watchlist.length) return { error: "No brands to build the deck on." };
-  return { title: title.slice(0, 60), grain: "week", platforms: DECK_PLATFORMS, client: null, watchlist, slides: CHAT_SLIDES, findings };
+  return { title: title.slice(0, 60), grain: "week", platforms: [], client: null, watchlist, slides: CHAT_SLIDES, findings };
 }

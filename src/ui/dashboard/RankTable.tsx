@@ -8,16 +8,16 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { change as changeText, compact, int, pct } from "@/competitor/view";
-import { askHref, type AskRef } from "@/dashboard/askref";
+import { askHref, PLATFORM_SHORT, type AskRef } from "@/dashboard/askref";
 import type { RankRow } from "@/dashboard/data";
 
 type SortKey = "views" | "posts" | "creators" | "engagements" | "er" | "comments" | "growth";
 const PAGE = 12;
-const PLATFORM_SHORT: Record<string, string> = { tiktok: "TikTok", instagram: "Instagram" };
+const PLATFORM_LONG: Record<string, string> = { tiktok: "TikTok", instagram: "Instagram", threads: "Threads", x: "X", youtube: "YouTube" };
 const METRIC: Record<string, string> = { posts: "share of content", views: "share of views", er: "engagement rate" };
 
 function flagText(r: RankRow, prevLabel: string): string {
-  return r.flags.map((f) => `${PLATFORM_SHORT[f.platform] ?? f.platform} ${METRIC[f.metric]} ${f.direction} ${f.metric === "er" ? `${Math.abs(f.change).toFixed(1)} pt` : `${Math.abs(Math.round(f.change))}%`} vs ${prevLabel}, outside its own range`).join("\n");
+  return r.flags.map((f) => `${PLATFORM_LONG[f.platform] ?? f.platform} ${METRIC[f.metric]} ${f.direction} ${f.metric === "er" ? `${Math.abs(f.change).toFixed(1)} pt` : `${Math.abs(Math.round(f.change))}%`} vs ${prevLabel}, outside its own range`).join("\n");
 }
 
 export function RankTable({ rows, base, prevLabel, erFloor }: { rows: RankRow[]; base: Omit<AskRef, "k" | "brand">; prevLabel: string; erFloor: number }) {
@@ -66,7 +66,7 @@ export function RankTable({ rows, base, prevLabel, erFloor }: { rows: RankRow[];
                     {r.flags.length > 0 && <span className="umark" title={flagText(r, prevLabel)} aria-label={flagText(r, prevLabel)} />}
                   </span>
                 </td>
-                <td><span className="pfs">{r.platforms.map((p) => <span key={p} className={`pf ${p}`}>{p === "tiktok" ? "TT" : "IG"}</span>)}</span></td>
+                <td><span className="pfs">{r.platforms.map((p) => <span key={p} className={`pf ${p}`}>{PLATFORM_SHORT[p] ?? p}</span>)}</span></td>
                 <td className="num strong">{compact(r.views)}</td>
                 <td className="num">{int(r.creators)}</td>
                 <td className="num">{int(r.posts)}</td>

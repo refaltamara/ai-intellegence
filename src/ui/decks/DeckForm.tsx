@@ -13,7 +13,6 @@ import { MultiSelect } from "../MultiSelect";
 type Group = DeckSpec["watchlist"][number];
 type Initial = { id: string; name: string; spec: DeckSpec; recurring: boolean; template: string | null };
 
-const PLATFORMS = [{ id: "tiktok", name: "TikTok" }, { id: "instagram", name: "Instagram" }] as const;
 const PLATFORM_NAME: Record<string, string> = { tiktok: "TikTok", instagram: "Instagram", threads: "Threads", x: "X", youtube: "YouTube" };
 
 /** What "Add to a deck → New deck" on the Dashboard carries: the section's slide, its brands and its grain. */
@@ -31,7 +30,7 @@ export function DeckForm({ options, initial, prefill }: { options: DeckOptions; 
   const [clientName, setClientName] = useState(initial?.spec.client?.name ?? options.client?.name ?? "");
   const [clientIds, setClientIds] = useState<string[]>(initial?.spec.client?.brands.flatMap((b) => b.brand_ids) ?? options.client?.brand_ids ?? []);
   const [grain, setGrain] = useState<"week" | "month">(initial?.spec.grain ?? prefill?.grain ?? t.grain);
-  const [platforms, setPlatforms] = useState<string[]>(initial?.spec.platforms ?? ["tiktok", "instagram"]);
+  const [platforms, setPlatforms] = useState<string[]>(initial?.spec.platforms?.length ? initial.spec.platforms : options.platforms);
   const [slides, setSlides] = useState<string[]>(initial?.spec.slides ?? (prefill ? [...new Set(["summary", prefill.slide, "moves", "evidence"])] : t.slides));
   const [period, setPeriod] = useState("");
   const [recurring, setRecurring] = useState(initial?.recurring ?? t.recurring);
@@ -84,7 +83,7 @@ export function DeckForm({ options, initial, prefill }: { options: DeckOptions; 
     setError("");
     if (isRep && !focus) { setError("Pick the brand this deck is about."); return; }
     if (!isRep && !watch.length) { setError(t.brands === "focus" ? "Pick the brand (or brands) this deck is about." : "Pick at least one brand to watch."); return; }
-    if (!isRep && !platforms.length) { setError("Pick TikTok, Instagram or both."); return; }
+    if (!isRep && !platforms.length) { setError("Pick at least one platform."); return; }
     setBusy(true);
     setElapsed(0);
     try {
@@ -146,8 +145,8 @@ export function DeckForm({ options, initial, prefill }: { options: DeckOptions; 
             </div>
           ) : (
             <div className="seg">
-              {PLATFORMS.map((p) => (
-                <button key={p.id} type="button" className={platforms.includes(p.id) ? "on" : ""} onClick={() => setPlatforms((x) => (x.includes(p.id) ? x.filter((y) => y !== p.id) : [...x, p.id]))}>{p.name}</button>
+              {options.platforms.map((p) => (
+                <button key={p} type="button" className={platforms.includes(p) ? "on" : ""} onClick={() => setPlatforms((x) => (x.includes(p) ? x.filter((y) => y !== p) : [...x, p]))}>{PLATFORM_NAME[p] ?? p}</button>
               ))}
             </div>
           )}

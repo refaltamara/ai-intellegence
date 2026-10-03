@@ -6,7 +6,7 @@
  */
 import Link from "next/link";
 import { compact, dayMonth, int, pct, pts } from "@/competitor/view";
-import { askHref, type AskRef } from "@/dashboard/askref";
+import { askHref, PLATFORM_SHORT, type AskRef } from "@/dashboard/askref";
 import { CONTENT_PAGE, ER_MIN_POSTS, ER_MIN_VIEWS, filterQuery, type ContentCard, type ContentQuery, type CreatorRow, type DashboardData } from "@/dashboard/data";
 import { DashFilters } from "./DashFilters";
 import { MentionsChart } from "./MentionsChart";
@@ -36,7 +36,7 @@ function CreatorTable({ title, rows, metric, base, names }: { title: string; row
               <span className="n">{i + 1}</span>
               <div className="who">
                 {c.profile_url ? <a href={c.profile_url} target="_blank" rel="noreferrer">@{c.handle}</a> : <b>@{c.handle}</b>}
-                <small><span className={`pf ${c.platform}`}>{c.platform === "tiktok" ? "TT" : "IG"}</span>{c.tier ? TIER_SHORT[c.tier] : "Unknown tier"}{c.followers != null ? ` · ${compact(c.followers)} followers` : ""} · {int(c.posts)} post{c.posts === 1 ? "" : "s"} · {c.brands.slice(0, 2).map((b) => names.get(b) ?? b).join(", ")}{c.brands.length > 2 ? ` +${c.brands.length - 2}` : ""}</small>
+                <small><span className={`pf ${c.platform}`}>{PLATFORM_SHORT[c.platform] ?? c.platform}</span>{c.tier ? TIER_SHORT[c.tier] : "Unknown tier"}{c.followers != null ? ` · ${compact(c.followers)} followers` : ""} · {int(c.posts)} post{c.posts === 1 ? "" : "s"} · {c.brands.slice(0, 2).map((b) => names.get(b) ?? b).join(", ")}{c.brands.length > 2 ? ` +${c.brands.length - 2}` : ""}</small>
               </div>
               <span className="v">{metric === "views" ? compact(c.views) : int(c.comments)}<small>{metric}</small></span>
               <Link className="askwhy" href={askHref({ ...base, k: "creator", creator: c.creator_id })}>Ask why</Link>
@@ -52,7 +52,7 @@ function PostCard({ c, base, names }: { c: ContentCard; base: Omit<AskRef, "k">;
   return (
     <article className="postcard">
       <header>
-        <span className={`pf ${c.platform}`}>{c.platform === "tiktok" ? "TT" : "IG"}</span>
+        <span className={`pf ${c.platform}`}>{PLATFORM_SHORT[c.platform] ?? c.platform}</span>
         <b>{c.handle ? `@${c.handle}` : "Unknown account"}</b>
         <time>{dayMonth(c.posted_at)}</time>
       </header>
@@ -78,7 +78,7 @@ export function Dashboard({ d, content, cq }: { d: DashboardData; content: { car
   const names = new Map(d.options.brands.map((b) => [b.id, b.name]));
   const prev = f.prev.short;
   const k = d.kpis;
-  const engNote = d.engagement_basis === "likes_comments" ? "Likes + comments, the measure TikTok and Instagram share" : "Platform-native engagement";
+  const engNote = d.engagement_basis === "likes_comments" ? "Likes + comments, the measure every platform shares" : "Platform-native engagement";
   const contentHref = (extra: Record<string, string | number | undefined>) => `/dashboard?${filterQuery(f, { sort: cq.sort === "views" ? undefined : cq.sort, q: cq.q || undefined, ...extra })}#content`;
   const pages = Math.ceil(content.total / CONTENT_PAGE);
   const tiles: { key: "posts" | "views" | "engagements" | "er"; label: string; value: string; sub: string; tone: string }[] = [
@@ -91,7 +91,7 @@ export function Dashboard({ d, content, cq }: { d: DashboardData; content: { car
     <section className="screen dash">
       <div className="topbar">
         <div><h1>Dashboard</h1><span className="meta">{f.period.label} vs {f.prev.label} · data through {dayMonth(d.as_of)} {d.as_of.slice(0, 4)}</span></div>
-        <DashFilters platform={f.platform} brands={f.brands} period={f.period.key} months={d.options.months} weeks={d.options.weeks} brandOptions={d.options.brands} />
+        <DashFilters platform={f.platform} brands={f.brands} period={f.period.key} months={d.options.months} weeks={d.options.weeks} brandOptions={d.options.brands} platforms={d.options.platforms} />
       </div>
       <div className="wrap wide">
         {d.caveats.length > 0 && <div className="dcaveats">{d.caveats.map((c) => <p key={c}>{c}</p>)}</div>}
