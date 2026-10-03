@@ -10,7 +10,7 @@
  * version. Pure: no data access here, so client components may import it.
  */
 
-export type RoleId = "pr" | "brand_kol";
+export type RoleId = "pr" | "brand_kol" | "social";
 export type NavKey = "dashboard" | "weekly" | "decks" | "pulse" | "chats" | "reports";
 export type Tone = "blue" | "violet" | "mint" | "coral" | "sun";
 
@@ -36,6 +36,8 @@ export type RoleModel = {
   skill_order?: string[];
   /** the alert that moves the status ladder; numbers only, applied in SQL (src/reputation/) */
   alert?: { negative_multiple: number; min_comments: number; baseline_days: number };
+  /** Social Media: when an own post needs attention (src/social/); numbers only, applied in SQL */
+  watch?: { underperform_pct: number; storm_negative: number; min_account_posts: number };
 };
 
 export const PR: RoleModel = {
@@ -80,7 +82,35 @@ export const BRAND_KOL: RoleModel = {
   deck_templates: [],
 };
 
-export const ROLES: Record<RoleId, RoleModel> = { pr: PR, brand_kol: BRAND_KOL };
+export const SOCIAL: RoleModel = {
+  id: "social",
+  version: 1,
+  label: "Social Media team",
+  short: "Social",
+  description: "Your own accounts: what you posted, what worked, which formats and times win, how the community answers, and how your channels compare with the competitors'.",
+  tone: "mint",
+  home: "/dashboard",
+  nav: ["dashboard", "decks", "chats"],
+  voice: [
+    "On this team you are the content lead for {{client}}'s own social accounts. Think in posts, formats, timing and community, not creators or reputation crises.",
+    "Judge a post against its own account's usual, not against other accounts: a photo on Instagram has no views, so read engagement there; read views where the platform reports them.",
+    "When the team asks, draft captions, a content calendar, replies to comments on {{client}}'s posts, or a brief for the next post. Use only what the data showed and put anything to confirm in [square brackets].",
+    "When a post draws complaints, say so plainly and point to customer service or PR rather than answering for them.",
+  ].join(" "),
+  hero_title: "How are {{client}}'s own accounts doing?",
+  hero_intro: "I've read every post {{client}} and its competitors published on {{platforms}}, tracked day by day, with the comments under them. Ask me what worked, which formats and times win, or what to post next; every number I give you shows its evidence.",
+  suggested: [
+    "Which of {{client}}'s posts did best this month, and why?",
+    "Which formats and posting times work for {{client}}?",
+    "How do {{client}}'s own accounts compare with the competitors'?",
+    "Draft next week's content calendar from what worked",
+  ],
+  deck_templates: ["content-monthly", "content-teardown"],
+  skill_order: ["posts", "comments"],
+  watch: { underperform_pct: 50, storm_negative: 20, min_account_posts: 5 },
+};
+
+export const ROLES: Record<RoleId, RoleModel> = { pr: PR, brand_kol: BRAND_KOL, social: SOCIAL };
 
 export function isRoleId(v: unknown): v is RoleId {
   return typeof v === "string" && v in ROLES;

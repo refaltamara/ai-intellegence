@@ -26,6 +26,7 @@ describe("role models", () => {
     expect(fillRole(PR.voice, "GoPay")).toContain("GoPay's PR team");
     expect(PR.voice).not.toMatch(/\d{2,}/);
     expect(isRoleId("pr")).toBe(true);
-    expect(isRoleId("social")).toBe(false);
+    expect(isRoleId("social")).toBe(true);
+    expect(isRoleId("investor")).toBe(false);
   });
 });

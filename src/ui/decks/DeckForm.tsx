@@ -38,11 +38,14 @@ export function DeckForm({ options, initial, prefill }: { options: DeckOptions; 
   const [elapsed, setElapsed] = useState(0);
   const [error, setError] = useState("");
   const hasFindings = !!initial?.spec.findings?.length;
-  // a PR deck: one brand's reputation, its own slides (src/reputation/)
-  const isRep = edit ? !!initial?.spec.rep : t.family === "reputation";
-  const [focus, setFocus] = useState(initial?.spec.rep?.focus ?? options.focus ?? options.brands[0]?.id ?? "");
-  const [repPlatform, setRepPlatform] = useState(initial?.spec.rep?.platform ?? "all");
-  const [repSlides, setRepSlides] = useState<string[]>(initial?.spec.rep?.slides ?? t.rep_slides ?? ["summary"]);
+  // a PR deck (one brand's reputation, src/reputation/) or a Social Media deck (one brand's own accounts, src/social/): a focus brand and the family's own slides
+  const family = edit ? (initial?.spec.rep ? "reputation" : initial?.spec.social ? "social" : null) : t.family ?? null;
+  const isRep = family != null;
+  const fam = initial?.spec.rep ?? initial?.spec.social;
+  const library = family === "social" ? options.social_slides : options.rep_slides;
+  const [focus, setFocus] = useState(fam?.focus ?? options.focus ?? options.brands[0]?.id ?? "");
+  const [repPlatform, setRepPlatform] = useState(fam?.platform ?? "all");
+  const [repSlides, setRepSlides] = useState<string[]>(fam?.slides ?? t.rep_slides ?? t.social_slides ?? ["summary"]);
 
   // a template sets the grain, the slides and whether it recurs; the brands stay as picked
   const pickTemplate = (key: string) => {
@@ -51,7 +54,7 @@ export function DeckForm({ options, initial, prefill }: { options: DeckOptions; 
     setGrain(x.grain);
     setSlides(x.slides);
     setRecurring(x.recurring);
-    if (x.rep_slides) setRepSlides(x.rep_slides);
+    if (x.rep_slides ?? x.social_slides) setRepSlides((x.rep_slides ?? x.social_slides)!);
   };
   useEffect(() => {
     if (!busy) return;
@@ -67,7 +70,8 @@ export function DeckForm({ options, initial, prefill }: { options: DeckOptions; 
   const periods = options.periods[grain];
 
   function spec(): DeckSpec {
-    if (isRep) return { title: name.trim() || t.title, grain, platforms: [], client: null, watchlist: [], slides: ["summary"], rep: { focus, platform: repPlatform, slides: repSlides as NonNullable<DeckSpec["rep"]>["slides"] } };
+    if (family === "social") return { title: name.trim() || t.title, grain, platforms: [], client: null, watchlist: [], slides: ["summary"], social: { focus, platform: repPlatform, slides: repSlides as NonNullable<DeckSpec["social"]>["slides"] } };
+    if (family === "reputation") return { title: name.trim() || t.title, grain, platforms: [], client: null, watchlist: [], slides: ["summary"], rep: { focus, platform: repPlatform, slides: repSlides as NonNullable<DeckSpec["rep"]>["slides"] } };
     return {
       title: name.trim() || t.title,
       grain,
@@ -119,7 +123,7 @@ export function DeckForm({ options, initial, prefill }: { options: DeckOptions; 
             {options.templates.map((x) => (
               <button key={x.key} type="button" className={template === x.key ? "on" : ""} onClick={() => pickTemplate(x.key)}>
                 <b>{x.name}</b><span>{x.description}</span>
-                <small>{x.grain === "month" ? "Month on month" : "Week on week"} · {(x.rep_slides ?? x.slides).length} slide types</small>
+                <small>{x.grain === "month" ? "Month on month" : "Week on week"} · {(x.rep_slides ?? x.social_slides ?? x.slides).length} slide types</small>
               </button>
             ))}
           </div>
@@ -165,7 +169,7 @@ export function DeckForm({ options, initial, prefill }: { options: DeckOptions; 
           <section>
             <h3>Slides <small>{repSlides.length} picked; every other brand is the benchmark</small></h3>
             <div className="slidepick">
-              {options.rep_slides.map((s) => {
+              {library.map((s) => {
                 const locked = s.kind === "summary";
                 return (
                   <label key={s.kind} className={repSlides.includes(s.kind) ? "on" : ""}>

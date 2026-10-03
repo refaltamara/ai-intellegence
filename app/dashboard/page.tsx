@@ -2,12 +2,14 @@
  * Dashboard (DECISIONS, 30 Sep 2026): the fixed view each team checks every day.
  * The role decides (src/roles/model.ts): Brand & KOL gets brand rankings, tiers,
  * mentions, creators and content; PR gets the reputation dashboard
- * (src/reputation/); a one-person profile keeps the crisis view that used to be Pulse.
+ * (src/reputation/); Social Media gets its own accounts (src/social/); a one-person profile keeps the crisis view that used to be Pulse.
  */
 import { redirect } from "next/navigation";
 import { currentRole, currentWorkspaceId } from "@/auth/current";
 import { prDashboard } from "@/reputation/dashboard";
 import { PrDashboard } from "@/ui/reputation/PrDashboard";
+import { socialDashboard } from "@/social/dashboard";
+import { SocialDashboard } from "@/ui/social/SocialDashboard";
 import { content, dashboardData, loadContext, readContentQuery, readFilters } from "@/dashboard/data";
 import { pulsePage } from "@/pulse/page";
 import { SkillDb } from "@/skills/db";
@@ -28,6 +30,11 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     return <PulsePage d={d} />;
   }
   const sp = await searchParams;
+  if (role.id === "social") {
+    const d = await socialDashboard(ws, sp, role);
+    if (!d) redirect("/data");
+    return <SocialDashboard d={d} client={cfg?.client_brand_id ?? null} />;
+  }
   if (role.id === "pr") {
     const d = await prDashboard(ws, sp, role);
     if (!d) redirect("/data");

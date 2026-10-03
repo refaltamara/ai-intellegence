@@ -19,6 +19,8 @@ import { specContract } from "./spec";
 import { markDeckRun, pruneVersions, type DeckRow } from "./store";
 import { reputationReport, writeRep } from "../reputation/deck";
 import { storeReputation } from "../reputation/store";
+import { socialReport, writeSocial } from "../social/deck";
+import { storeSocial } from "../social/store";
 
 export type DeckOutcome = { status: "ok" | "skipped" | "error"; message: string; report_id: string | null; period: string | null; narrative_by?: "model" | "fallback" };
 
@@ -66,6 +68,16 @@ export async function generateDeckVersion(deck: DeckRow, opts: { period?: string
     if (opts.reason === "schedule" && deck.last_period && period.key <= deck.last_period) {
       await markDeckRun(deck.id, { next_run_at: retryRun(), error: null });
       return { status: "skipped", message: `no new ${grain} of data: ${period.label} is already in the deck (data through ${ctx.asOf})`, report_id: null, period: period.key };
+    }
+    if (spec.social) {
+      // a Social Media deck: one brand's own accounts over the period (src/social/)
+      const r = await socialReport(deck.workspace_id, { title: spec.title, grain, spec: spec.social, period: period.key, asOf: ctx.asOf });
+      const written = await writeSocial(r);
+      const stored = await storeSocial({ workspaceId: deck.workspace_id, report: r, narrative: written.narrative, by: written.by, problems: written.problems, deck: { id: deck.id, name: deck.name } });
+      await pruneVersions(deck.id, deck.workspace_id, r.period.key, stored.reportId);
+      const last = deck.last_period && deck.last_period > period.key ? deck.last_period : period.key;
+      await markDeckRun(deck.id, { last_period: last, next_run_at: deck.recurring ? nextRun(grain) : null, error: null });
+      return { status: "ok", message: `${period.label}: ${r.kpis.posts.now ?? 0} own posts, words by ${written.by === "model" ? "CeMO" : "the plain template"}`, report_id: stored.reportId, period: period.key, narrative_by: written.by };
     }
     if (spec.rep) {
       // a PR deck: one brand's reputation over the period (src/reputation/)

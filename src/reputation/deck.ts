@@ -43,8 +43,15 @@ export type RepNarrative = {
   service: string;
 };
 
-/** The deck fonts carry no emoji: drop them (and their joiners) from quoted words and captions. */
-export const plainText = (t: string) => t.replace(/[\p{Extended_Pictographic}\p{Emoji_Modifier}\u{FE0F}\u{200D}\u{20E3}]/gu, "").replace(/\s+/g, " ").trim();
+/** The deck fonts carry no emoji and no CJK, Thai or Arabic glyphs: drop them from quoted words and captions. */
+export const plainText = (t: string) =>
+  t
+    // emoji, skin tones, flags (regional indicators), joiners
+    .replace(/[\p{Extended_Pictographic}\p{Emoji_Modifier}\u{1F1E6}-\u{1F1FF}\u{FE0F}\u{200D}\u{20E3}]/gu, "")
+    // scripts the deck fonts (Liberation Sans) do not carry: CJK, kana, hangul, Thai, Arabic
+    .replace(/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}\p{Script=Thai}\p{Script=Arabic}]/gu, "")
+    .replace(/\s+/g, " ")
+    .trim();
 
 const LEVEL_NAME: Record<Level, string> = { calm: "Calm", watch: "Watch", issue: "Issue", crisis: "Crisis", recovering: "Recovering" };
 const LEVEL_COLOR: Record<Level, string> = { calm: "0E9F6E", watch: "D98E04", issue: "F26B4B", crisis: "E5484D", recovering: "1E5EFF" };
@@ -261,7 +268,7 @@ export async function writeRep(r: ReputationReport, opts: { create?: Create; rol
 const cell = (o: PptxGenJS.TableCellProps = {}): PptxGenJS.TableCellProps => ({ fontFace: FONT, valign: "middle", margin: [3, 6, 3, 6], border: [{ type: "none" }, { type: "none" }, { pt: 0.75, color: C.line }, { type: "none" }], ...o });
 const headCell = (o: PptxGenJS.TableCellProps = {}) => cell({ ...o, border: [{ type: "none" }, { type: "none" }, { pt: 1, color: C.ink4 }, { type: "none" }] });
 
-function table(s: Slide, head: string[], rows: (string | PptxGenJS.TextProps[])[][], o: { x: number; y: number; w: number; colW: number[]; right?: number[]; size?: number; maxH?: number; bold?: number[]; mark?: number }) {
+export function table(s: Slide, head: string[], rows: (string | PptxGenJS.TextProps[])[][], o: { x: number; y: number; w: number; colW: number[]; right?: number[]; size?: number; maxH?: number; bold?: number[]; mark?: number }) {
   const size = o.size ?? 10;
   const align = (i: number) => (o.right?.includes(i) ? "right" : "left") as PptxGenJS.HAlign;
   const h = head.map((t, i) => ({ text: [text(t, { fontSize: size - 0.5, bold: true, color: C.ink6 })], options: headCell({ align: align(i) }) }));
@@ -274,14 +281,19 @@ function table(s: Slide, head: string[], rows: (string | PptxGenJS.TextProps[])[
 }
 
 function chrome(s: Slide, r: ReputationReport, page: number) {
-  add(s, `${r.title} · ${r.period.label}`, { x: M, y: 0.32, w: 8, h: 0.25, fontSize: 10, color: C.ink4 });
-  add(s, `Fair · prepared for ${r.focus.name}'s PR team`, { x: M, y: 7.08, w: 6, h: 0.22, fontSize: 9, color: C.ink4 });
+  frame(s, `${r.title} · ${r.period.label}`, `Fair · prepared for ${r.focus.name}'s PR team`, page);
+}
+
+/** The page frame every role deck shares: the deck and period at the top, who it is for and the page at the bottom. */
+export function frame(s: Slide, top: string, bottom: string, page: number) {
+  add(s, top, { x: M, y: 0.32, w: 8, h: 0.25, fontSize: 10, color: C.ink4 });
+  add(s, bottom, { x: M, y: 7.08, w: 6, h: 0.22, fontSize: 9, color: C.ink4 });
   add(s, String(page), { x: W - M - 1, y: 7.08, w: 1, h: 0.22, fontSize: 9, color: C.ink4, align: "right" });
 }
 
-const foot = (s: Slide, t: string) => add(s, t, { x: M, y: 6.62, w: CW, h: 0.36, fontSize: 9, color: C.ink4 });
+export const foot = (s: Slide, t: string) => add(s, t, { x: M, y: 6.62, w: CW, h: 0.36, fontSize: 9, color: C.ink4 });
 
-function quoteBox(s: Slide, q: Quote, x: number, y: number, w: number, h: number) {
+export function quoteBox(s: Slide, q: Pick<Quote, "text" | "translation" | "likes" | "platform" | "url">, x: number, y: number, w: number, h: number) {
   s.addShape("rect", { x, y, w: 0.04, h, fill: { color: C.bar }, line: { color: C.bar, width: 0 } });
   const qt = plainText(q.text), qtr = q.translation ? plainText(q.translation) : null;
   const t = qt.length > 170 ? qt.slice(0, 168) + "…" : qt;

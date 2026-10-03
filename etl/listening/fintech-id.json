@@ -8,7 +8,8 @@
     "hero_intro": "I've read every post about {{brands}} brands on TikTok, Instagram, Threads and X, and every comment under the posts we track. Ask me about creators, competitors, campaigns or what people say; every number I give you shows its evidence.",
     "roles": [
       "pr",
-      "brand_kol"
+      "brand_kol",
+      "social"
     ]
   },
   "client": "gopay",

@@ -122,7 +122,7 @@ export function ladder(days: { d: string; comments: number; negative: number; ba
  * so the newest days of any capture are thin. A day counts once it carries at least half the usual
  * daily comments (median of the 28 days before it) and the alert's minimum.
  */
-async function settledDay(db: SkillDb, ws: string, tz: string, asOf: string, alert: NonNullable<RoleModel["alert"]>): Promise<string> {
+export async function settledDay(db: SkillDb, ws: string, tz: string, asOf: string, alert: NonNullable<RoleModel["alert"]>): Promise<string> {
   const rows = await db.q<{ d: string; n: number }>(
     `with days as (select generate_series($3::date - 35, $3::date, interval '1 day')::date as d)
      select to_char(days.d, 'YYYY-MM-DD') as d, (select count(*) from comments c where c.workspace_id = $1 and c.posted_at >= (days.d::timestamp at time zone $2) and c.posted_at < ((days.d + 1)::timestamp at time zone $2))::int as n
@@ -150,9 +150,9 @@ export function readPrFilters(sp: Record<string, string | string[] | undefined>,
   };
 }
 
-type Basics = { tz: string; client: string | null; brands: { id: string; name: string }[]; platforms: string[]; asOf: string };
+export type Basics = { tz: string; client: string | null; brands: { id: string; name: string }[]; platforms: string[]; asOf: string };
 
-async function workspaceBasics(db: SkillDb, ws: string): Promise<Basics | null> {
+export async function workspaceBasics(db: SkillDb, ws: string): Promise<Basics | null> {
   const w = await db.one<{ tz: string; client: string | null }>("select tz, client_brand_id as client from workspaces where id = $1", [ws]);
   if (!w) return null;
   const brands = await db.q<{ id: string; name: string }>("select id, name from brands where workspace_id = $1 order by name", [ws]);

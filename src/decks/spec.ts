@@ -10,6 +10,7 @@ import { GRAINS, type Grain } from "../competitor/period";
 import { cleanSlides, type SlideKind } from "../competitor/slides";
 import type { Platform } from "../competitor/types";
 import { cleanRepSlides, type RepSpec } from "../reputation/slides";
+import { cleanSocialSlides, type SocialSpec } from "../social/slides";
 
 /** Every platform a deck can cover; a deck covers the ones its workspace holds (none picked = all of them). */
 export const DECK_PLATFORMS: Platform[] = ["tiktok", "instagram", "threads", "x", "youtube"];
@@ -28,6 +29,8 @@ export type DeckSpec = {
   findings?: FindingSpec[];
   /** a PR deck (DECISIONS 3 Oct 2026): one brand's reputation; the watchlist, client and slides above stay empty */
   rep?: RepSpec;
+  /** a Social Media deck (DECISIONS 3 Oct 2026): one brand's own accounts; the watchlist, client and slides above stay empty */
+  social?: SocialSpec;
 };
 
 /** A brand's name as a slide prints it: "Officialhanasui" (the panel's account-style name) reads "Hanasui". */
@@ -43,6 +46,13 @@ const ids = (v: unknown, known: Set<string>) => (Array.isArray(v) ? [...new Set(
 export function cleanSpec(input: unknown, known: Set<string>): DeckSpec | { error: string } {
   const o = (input && typeof input === "object" ? input : {}) as Record<string, unknown>;
   const grain: Grain = GRAINS.includes(o.grain as Grain) ? (o.grain as Grain) : "week";
+  if (o.social && typeof o.social === "object") {
+    const r = o.social as Record<string, unknown>;
+    const focus = str(r.focus, 80);
+    if (!known.has(focus)) return { error: "pick the brand this deck is about" };
+    const platform = typeof r.platform === "string" && /^[a-z]{1,12}$/.test(r.platform) ? r.platform : "all";
+    return { title: str(o.title, 60) || "Content Review", grain, platforms: [], client: null, watchlist: [], slides: ["summary"], social: { focus, platform, slides: cleanSocialSlides(r.slides) } };
+  }
   if (o.rep && typeof o.rep === "object") {
     const r = o.rep as Record<string, unknown>;
     const focus = str(r.focus, 80);

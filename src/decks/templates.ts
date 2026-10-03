@@ -8,6 +8,7 @@ import type { Grain } from "../competitor/period";
 import type { SlideKind } from "../competitor/slides";
 import type { RoleId } from "../roles/model";
 import type { RepSlide } from "../reputation/slides";
+import type { SocialSlide } from "../social/slides";
 
 export type DeckTemplate = {
   key: string;
@@ -22,9 +23,10 @@ export type DeckTemplate = {
   recurring: boolean;
   /** the roles that start from it (src/roles/model.ts); a PR deck is about one brand's reputation */
   roles: RoleId[];
-  /** "reputation": a PR deck, drawn from the reputation facts with its own slides (src/reputation/deck.ts) */
-  family?: "reputation";
+  /** "reputation": a PR deck (src/reputation/deck.ts); "social": a Social Media deck (src/social/deck.ts); each with its own slides */
+  family?: "reputation" | "social";
   rep_slides?: RepSlide[];
+  social_slides?: SocialSlide[];
 };
 
 export const DECK_TEMPLATES: DeckTemplate[] = [
@@ -133,6 +135,33 @@ export const DECK_TEMPLATES: DeckTemplate[] = [
     roles: ["pr"],
     family: "reputation",
     rep_slides: ["summary", "timeline", "issue_detail", "competitive", "service"],
+  },
+  // ---- Social Media (DECISIONS, 3 Oct 2026): the brand's own accounts
+  {
+    key: "content-monthly",
+    name: "Monthly Content Review",
+    title: "Monthly Content Review",
+    description: "The month on your own accounts: what worked and what did not, each account, formats and posting times, the best and weakest posts, the competitors' own channels and the community.",
+    grain: "month",
+    slides: ["summary"],
+    brands: "focus",
+    recurring: true,
+    roles: ["social"],
+    family: "social",
+    social_slides: ["summary", "accounts", "formats", "best", "competitors", "community"],
+  },
+  {
+    key: "content-teardown",
+    name: "Competitor Content Teardown",
+    title: "Competitor Content Teardown",
+    description: "One competitor's own accounts, taken apart: pick the competitor as the brand. Their formats and timing, their best and weakest posts, and what their community says.",
+    grain: "month",
+    slides: ["summary"],
+    brands: "focus",
+    recurring: false,
+    roles: ["social"],
+    family: "social",
+    social_slides: ["summary", "accounts", "formats", "best", "community"],
   },
 ];
 

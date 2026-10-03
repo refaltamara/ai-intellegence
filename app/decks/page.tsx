@@ -22,10 +22,11 @@ export default async function DecksPage() {
   const ws = await currentWorkspaceId();
   if (!(await panelWorkspace(ws))) redirect("/pulse");
   const [all, weekly0, pulses, role] = await Promise.all([listDecks(ws), weeklyItems(ws), listPulses(ws), currentRole(ws)]);
-  // each role keeps its own decks: PR decks are about one brand's reputation (spec.rep), the rest are Brand & KOL's
+  // each role keeps its own decks: PR decks are one brand's reputation (spec.rep), Social Media decks its own accounts (spec.social), the rest Brand & KOL's
   const pr = role.id === "pr";
-  const decks = all.filter((d) => !!d.spec?.rep === pr);
-  const weekly = pr ? [] : weekly0;
+  const family = (d: (typeof all)[number]) => (d.spec?.rep ? "pr" : d.spec?.social ? "social" : "brand_kol");
+  const decks = all.filter((d) => family(d) === role.id);
+  const weekly = role.id === "brand_kol" ? weekly0 : [];
   const clients = [...new Set(weekly.map((w) => w.client))];
   const boards = pulses.filter((p) => p.cards > 0);
   return (
@@ -53,7 +54,7 @@ export default async function DecksPage() {
             error: d.last_error,
           }))} />
         ) : (
-          <div className="empty">No decks yet. <Link href="/decks/new">Start one from a template</Link>{pr ? ": the Weekly Reputation Report is the one to send up every week." : ", or ask CeMO something in Chats and turn the conversation into a deck."}</div>
+          <div className="empty">No decks yet. <Link href="/decks/new">Start one from a template</Link>{pr ? ": the Weekly Reputation Report is the one to send up every week." : role.id === "social" ? ": the Monthly Content Review is the one to send up every month." : ", or ask CeMO something in Chats and turn the conversation into a deck."}</div>
         )}
         {boards.length > 0 && (
           <div className="dold">

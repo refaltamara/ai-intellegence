@@ -9,6 +9,7 @@ import { brandLabel, type DeckSpec } from "./spec";
 import { templatesFor, type DeckTemplate } from "./templates";
 import { BRAND_KOL, type RoleModel } from "../roles/model";
 import { REP_SLIDES } from "../reputation/slides";
+import { SOCIAL_SLIDES } from "../social/slides";
 
 export type DeckOptions = {
   brands: { id: string; name: string }[];
@@ -22,6 +23,7 @@ export type DeckOptions = {
   data_through: string;
   /** PR decks: their slide library, the platforms the workspace holds, the brand they are about by default */
   rep_slides: { kind: string; title: string; description: string }[];
+  social_slides: { kind: string; title: string; description: string }[];
   platforms: string[];
   focus: string | null;
 };
@@ -50,6 +52,7 @@ export async function deckOptions(workspaceId: string, role: RoleModel = BRAND_K
       : null,
     data_through: ctx.asOf,
     rep_slides: REP_SLIDES,
+    social_slides: SOCIAL_SLIDES,
     platforms: (await new SkillDb().q<{ platform: string }>("select distinct platform from posts where workspace_id = $1 order by 1", [workspaceId])).map((r) => r.platform),
     focus: ctx.clientBrandId ?? brands[0]?.id ?? null,
   };
