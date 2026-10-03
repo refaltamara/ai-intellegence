@@ -1,0 +1,30 @@
+{
+  "workspace": "fintech-id",
+  "name": "Fintech Indonesia",
+  "category": "fintech",
+  "settings": {
+    "category_label": "Fintech · Indonesia",
+    "hero_title": "What's happening in Indonesian fintech?",
+    "hero_intro": "I've read every post about {{brands}} brands on TikTok, Instagram, Threads and X, and every comment under the posts we track. Ask me about creators, competitors, campaigns or what people say; every number I give you shows its evidence."
+  },
+  "client": "gopay",
+  "note": "Fair Listening dump (one CSV per table, workspace_id 1 'FinTech Listening'). The listening 'brand' rows are per-platform handles; they group into seven brands (Refal, 3 Oct 2026: blu by BCA counts as BCA, Shopee stays apart from ShopeePay). A post is owned when its author is one of its brand's handles.",
+  "brands": {
+    "gopay": {"name": "GoPay", "handles": ["gopayindonesia", "gopaymerchant", "gopaygames"]},
+    "shopeepay": {"name": "ShopeePay", "handles": ["shopeepay_id", "Shopeepay", "ShopeePay_ID"]},
+    "shopee": {"name": "Shopee", "handles": ["shopeeid"]},
+    "dana": {"name": "DANA", "handles": ["dana.id", "dana.indonesia", "danawallet"]},
+    "ovo": {"name": "OVO", "handles": ["ovo_id", "ovo.id"]},
+    "seabank": {"name": "SeaBank", "handles": ["seabank.id", "SeaBankID"]},
+    "bca": {"name": "BCA", "handles": ["bankbca", "BankBCA", "goodlifebca", "blubybcadigital"]}
+  },
+  "sentiment_map": {
+    "excellent": "positive",
+    "good": "positive",
+    "neutral": "neutral",
+    "average": "negative",
+    "negative": "negative",
+    "unknown": null
+  },
+  "sentiment_map_note": "The listening scale is CSAT 1-5; 'average' is CSAT 2, below neutral, so it counts as negative in the three-class view (Refal, 3 Oct 2026). The five-point label and CSAT are kept on every comment."
+}

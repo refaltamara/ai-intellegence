@@ -90,3 +90,19 @@ Totals after load: 419 posts (7 owned), 5,816 comments, 3 subject replies (YouTu
 Column shapes: contents `url, platform, account_name, followers, date_posted, description, content_type, views, likes, replies/comments | replies, retweet/repost, share`; comments `post_url, comment_id, platform, author, comment_text, date, Views | views, sentiment (empty), like, reply`. Instagram and YouTube contents are date-only (read as WIB midnight); comments on every platform carry full UTC timestamps. Numbers come with thousands separators ("174,000"); `followers` on the YouTube row is the handle ("modmedia"), read as unknown. Instagram urls carry `?hl=en&img_index=1`, stray invisible characters and one `Https`; the loader canonicalises before matching.
 
 Sentiment: not in the export. `/api/cron/label` fills `comments.sentiment` (`sentiment_source = 'model'`) and `posts.stance` on earned posts after deploy; until then counts read as unlabelled, not neutral.
+
+## Fintech dump (category workspace `fintech-id`, Fair Listening "FinTech Listening", 1 Oct 2026 17:30 WIB)
+
+Thirteen CSVs, one per table of the listening database (`<table>_202610011730.csv`). Contract: `etl/listening/fintech-id.json`; loader: `etl/load_listening.py <contract> <dir>`.
+
+| table | rows in → loaded | notes |
+|---|---|---|
+| `_content_` | 13,790 → 13,275 posts | 515 duplicate captures merged (one post found by several Threads queries for one brand; the capture tracked last wins); 133 posts mention two or three brands and stay one row per brand; 467 owned |
+| `creator` | 9,087 → 9,087 | tiers recomputed from followers (same bands as the source) |
+| `content_metric_snapshot` | 120,240 → 114,633 | day 0 to 30, median 9 days per post; snapshots of merged duplicates dropped |
+| `_comment_` + `comment_sentiment` | 126,300 → 116,366 | the latest label per comment; 9,934 repeats of a comment under a merged or second-brand capture; 237 brand replies; 1,006 without text (stickers) |
+| `topic` | 8 | Transaction Issue, Promo & Cashback, QRIS & Fees, Merchant/UMKM, Comparison, Saving & Interest, Paylater, Others (catch-all) |
+
+Posts by platform: Threads 4,746, Instagram 3,794, X 3,253, TikTok 1,482. By month (WIB): June 1,244, July 715, August 2,041, September 9,275, to 24 Sep. **Coverage is uneven:** Threads and X were switched on in September (Threads 425 → 4,598 captures, X 12 → 3,267), Instagram dips in July (207 captures against about 1,150 in June and August), TikTok starts small in June (118). Week-on-week reads must be per platform or guarded, or they report collection as movement.
+
+Views: the larger of `video_view_count` and `video_play_count` (Threads and X play counts are video plays only). Comments cover 2,495 posts, about 37% of the comment counts the posts report (Threads 64,557, TikTok 28,630, Instagram 19,415, X 3,764). Sentiment (three-class, brand replies left out): neutral 58,195, positive 36,125, negative 20,537, unknown 1,272. `category`, `product_type` and `format_content` hold stray beauty values (201 "deodorant", 57 "mascara") and are not loaded.

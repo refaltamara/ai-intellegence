@@ -12,6 +12,7 @@
     "db:stats": "NODE_USE_ENV_PROXY=1 tsx scripts/db-stats.ts",
     "etl:load": "python3 etl/load.py --all",
     "etl:profile": "python3 etl/load_profile.py",
+    "etl:listening": "python3 etl/load_listening.py",
     "test": "NODE_USE_ENV_PROXY=1 vitest run",
     "smoke": "NODE_USE_ENV_PROXY=1 tsx scripts/smoke.ts",
     "skill": "NODE_USE_ENV_PROXY=1 tsx scripts/skill.ts",

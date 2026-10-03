@@ -113,6 +113,13 @@
       "when": 1790866636353,
       "tag": "0015_safe_gwen_stacy",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1790997812289,
+      "tag": "0016_bumpy_prowler",
+      "breakpoints": true
     }
   ]
 }

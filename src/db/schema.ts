@@ -219,7 +219,7 @@ export const posts = pgTable(
   ],
 );
 
-/** Day-by-day tracking (Phase 1b). Empty in v1: the exports have no snapshots. */
+/** Day-by-day tracking: listening workspaces only (etl/load_listening.py); the beauty exports carry one final capture per post. */
 export const postSnapshots = pgTable(
   "post_snapshots",
   {
@@ -229,8 +229,11 @@ export const postSnapshots = pgTable(
     views: bigint("views", { mode: "number" }),
     likes: integer("likes"),
     commentsCount: integer("comments_count"),
+    shares: integer("shares"),
+    saves: integer("saves"),
   },
-  (t) => [primaryKey({ columns: [t.postId, t.dayN] }), check("post_snapshots_day_chk", sql`${t.dayN} between 0 and 7`)],
+  // Listening workspaces track a post for up to 30 days (etl/load_listening.py).
+  (t) => [primaryKey({ columns: [t.postId, t.dayN] }), check("post_snapshots_day_chk", sql`${t.dayN} between 0 and 30`)],
 );
 
 /** Aggregated imports for months without post-level data. Skills flag reduced confidence. */
@@ -264,6 +267,10 @@ export const topics = pgTable("topics", {
   parentId: text("parent_id"),
   /** 'objection' | 'question' | 'claim' | 'general' */
   kind: text("kind").notNull().default("general"),
+  /** display order; listening workspaces bring their own taxonomy (etl/load_listening.py) */
+  sortOrder: integer("sort_order").notNull().default(0),
+  /** the catch-all bucket ("Others") */
+  isCatchAll: boolean("is_catch_all").notNull().default(false),
 });
 
 export const comments = pgTable(
@@ -290,6 +297,18 @@ export const comments = pgTable(
     /** 'model' (labelled by /api/cron/label) | 'listening' (came with the export) | 'subject' (the subject's own reply, never labelled) */
     sentimentSource: text("sentiment_source"),
     sentimentConfidence: numeric("sentiment_confidence"),
+    /**
+     * Listening workspaces arrive labelled (sentiment_source 'listening'): the five-point scale is kept here
+     * ('excellent' | 'good' | 'neutral' | 'average' | 'negative' | 'unknown') with its CSAT (1-5); `sentiment`
+     * holds the three-class view (excellent+good positive, average+negative negative; DECISIONS 3 Oct 2026).
+     */
+    sentimentDetail: text("sentiment_detail"),
+    csat: smallint("csat"),
+    /** the listening model's free-text theme ("brand praise", "missed promo"), mapped to topic_id upstream */
+    theme: text("theme"),
+    purchaseIntent: boolean("purchase_intent"),
+    /** English translation from the listening model */
+    translation: text("translation"),
     topicId: text("topic_id").references(() => topics.id),
     topicConfidence: numeric("topic_confidence"),
     classifiedAt: ts("classified_at"),
