@@ -109,7 +109,8 @@ export async function queryMetrics(input: QueryMetricsInput, workspaceId: string
       params.push(v);
       return `$${params.length}`;
     };
-    const where: string[] = [`p.workspace_id = ${add(ctx.workspaceId)}`];
+    // posts judged not about their brand (listening workspaces, DECISIONS 3 Oct 2026) never count
+    const where: string[] = [`p.workspace_id = ${add(ctx.workspaceId)}`, "p.relevant is not false"];
     const filters = { ...(input.filters ?? {}) } as Record<string, unknown>;
     // entity presets
     if (input.entity === "creators" || input.entity === "creator_brand_months") filters.earned_only = true;

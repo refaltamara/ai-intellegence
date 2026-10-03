@@ -841,6 +841,10 @@ th{background:linear-gradient(180deg,#F8FAFE,#F4F7FC)}
 .teamswitch button:hover:not(.on){color:var(--text);background:#fff}
 .teamswitch button.on{background:var(--tone);color:#fff;box-shadow:0 6px 14px -6px var(--tone)}
 .teamswitch button:disabled{cursor:default}
+.wspick{display:flex;flex-direction:column;gap:4px;margin-top:-6px}
+.wspick span{font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-3);padding-left:4px}
+.wspick select{width:100%;padding:8px 10px;border-radius:10px;border:1px solid var(--line);background:#fff;font:inherit;font-size:12.5px;font-weight:600;color:var(--text);box-shadow:var(--shadow-xs)}
+.wspick + .teamswitch{margin-top:0}
 .ws{gap:2px;flex-direction:column;align-items:flex-start}
 .connect{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:12px;font-size:12.5px;font-weight:600;color:var(--text-2);border:1px dashed var(--line-2);transition:background-color .2s var(--ease),border-color .2s var(--ease),color .2s var(--ease)}
 .connect .ic{width:24px;height:24px;border-radius:7px;display:grid;place-items:center;background:var(--violet-10);color:var(--violet);flex:none}
@@ -1360,3 +1364,59 @@ th{background:linear-gradient(180deg,#F8FAFE,#F4F7FC)}
 .deckform .seg{align-self:flex-start}
 .deckform .dcheck.wide{grid-column:1/-1}
 .slidepick b small{margin-left:4px}
+
+/* ---------------------------------------------------------------- PR dashboard (DECISIONS 3 Oct 2026) */
+.pf.threads,.pf.x,.pf.youtube{display:inline-grid;place-items:center;min-width:22px;height:18px;padding:0 5px;border-radius:6px;font-size:9.5px;font-weight:800;color:#fff;margin-right:5px}
+.pf.threads{background:#101010}.pf.x{background:#3A3F47}.pf.youtube{background:#E62117}
+.pr{--lv:var(--green);--lv10:var(--green-10)}
+.prstatus{display:flex;align-items:center;gap:20px;border:1px solid var(--line);border-radius:20px;background:#fff;padding:16px 20px;box-shadow:var(--shadow-xs);margin-bottom:18px;--lv:var(--green);--lv10:var(--green-10)}
+.prstatus.watch{--lv:var(--sun);--lv10:var(--sun-10)}.prstatus.issue{--lv:var(--coral);--lv10:var(--coral-10)}.prstatus.crisis{--lv:var(--red);--lv10:var(--red-10)}.prstatus.recovering{--lv:var(--blue);--lv10:var(--blue-10)}
+.prstatus .lv{display:flex;align-items:center;gap:12px;min-width:170px;padding:10px 16px;border-radius:14px;background:var(--lv10)}
+.prstatus .lv .dot{width:14px;height:14px;border-radius:50%;background:var(--lv);box-shadow:0 0 0 5px color-mix(in srgb,var(--lv) 22%,transparent);flex:none}
+.prstatus .lv small{display:block;font-size:11px;font-weight:700;color:var(--text-3)}
+.prstatus .lv b{font-size:24px;font-weight:800;letter-spacing:-.02em;color:var(--lv)}
+.prstatus .prwhy{flex:1;min-width:0;display:flex;flex-direction:column;gap:8px}
+.prstatus .prwhy p{font-size:13px;color:var(--text-2);line-height:1.5}
+.prstatus .prwhy p b{color:var(--text)}
+.prstatus .rule{font-size:11px;color:var(--text-3);line-height:1.45}
+.prladder{display:flex;gap:3px}
+.prladder i{flex:1;height:14px;border-radius:3px;background:var(--green);opacity:.75;max-width:22px}
+.prladder i.watch{background:var(--sun)}.prladder i.issue{background:var(--coral)}.prladder i.crisis{background:var(--red)}.prladder i.recovering{background:var(--blue);opacity:.45}
+.kpis.six{grid-template-columns:repeat(6,minmax(0,1fr))}
+.prissues{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.prissue{display:flex;flex-direction:column;gap:10px}
+.prissue>header{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.prissue>header h3{margin:0 auto 0 0;font-size:15px}
+.chip{font-size:11px;font-weight:700;padding:3px 9px;border-radius:999px;background:var(--surface,#F4F6FA);color:var(--text-2)}
+.chip.issue{background:var(--coral-10);color:var(--coral)}.chip.watch{background:var(--sun-10);color:#9A6A00}.chip.recovering{background:var(--blue-10);color:var(--blue)}
+.prissue .nums{display:grid;grid-template-columns:auto auto 1fr;gap:18px;align-items:end}
+.prissue .nums b{font-size:22px;font-weight:800;letter-spacing:-.02em;display:block}
+.prissue .nums small{font-size:11px;color:var(--text-3);line-height:1.35}
+.prbars{display:flex;align-items:flex-end;gap:2px;height:44px}
+.prbars i{flex:1;background:var(--coral);border-radius:2px 2px 0 0;opacity:.8;max-width:16px}
+.prissue .scope{font-size:12.5px;color:var(--text-2);line-height:1.5}
+.prissue .prthemes{display:flex;flex-wrap:wrap;gap:5px}
+.prissue h4,.dcard h4{font-size:11px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--text-3);margin:4px 0 0}
+.prissue>footer,.prfoot{display:flex;gap:8px;flex-wrap:wrap;margin-top:auto;padding-top:4px}
+.prq{border-left:3px solid var(--line-2);padding:2px 0 2px 10px;margin:0}
+.prq p{font-size:12.5px;line-height:1.5;color:var(--text)}
+.prq .tr{display:block;font-size:11.5px;color:var(--text-3);font-style:italic;margin-top:2px}
+.prq footer{font-size:11px;color:var(--text-3);margin-top:3px;display:flex;align-items:center;gap:2px;flex-wrap:wrap}
+.prq footer a{color:var(--blue);font-weight:600}
+.prposts{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
+.prpost{display:flex;gap:6px;align-items:flex-start}
+.prpost>div{min-width:0}
+.prpost a b{font-size:12.5px}
+.prpost .tag{margin-left:6px;font-size:10.5px;padding:1px 6px}
+.prpost p{font-size:12px;color:var(--text-2);line-height:1.45;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.prpost small{font-size:11px;color:var(--text-3)}
+.prnarr td.q{max-width:360px;font-size:12px;color:var(--text-2)}
+.prnarr td.q a{color:var(--text-2)}
+.pr td small.down,.pr td.down{color:var(--red)}.pr td small.up{color:var(--green)}
+.pr tr.me td{background:var(--blue-10)}
+.prbig{font-size:13px;color:var(--text-2);margin-bottom:10px}
+.prbig b{font-size:24px;font-weight:800;color:var(--text);margin-right:4px}
+.pr .dcard.tablewrap{padding:0;overflow:auto}
+.pr .dcard .tablewrap{border:0}
+@media (max-width:1200px){.kpis.six{grid-template-columns:repeat(3,minmax(0,1fr))}.prissues{grid-template-columns:1fr}}
+@media (max-width:720px){.kpis.six{grid-template-columns:repeat(2,minmax(0,1fr))}.prstatus{flex-direction:column;align-items:stretch}}

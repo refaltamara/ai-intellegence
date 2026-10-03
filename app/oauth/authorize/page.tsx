@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { currentSession, currentWorkspaceId } from "@/auth/current";
 import { checkAuthRequest, withParams } from "@/mcp/authorize";
-import { teamsFor } from "@/workspace/teams";
+import { teamsFor, workspacesOf } from "@/workspace/teams";
 import { TeamIcon } from "@/ui/TeamIcon";
 
 export const dynamic = "force-dynamic";
@@ -22,7 +22,8 @@ export default async function Authorize({ searchParams }: { searchParams: Promis
     );
   }
   const { client } = checked.ok;
-  const [teams, ws] = await Promise.all([teamsFor(session), currentWorkspaceId()]);
+  const [all, ws] = await Promise.all([teamsFor(session), currentWorkspaceId()]);
+  const teams = workspacesOf(all);
   const current = teams.find((t) => t.workspace_id === ws)?.workspace_id ?? teams[0]?.workspace_id;
   const app = client.client_name || "An app";
   return (
@@ -32,13 +33,13 @@ export default async function Authorize({ searchParams }: { searchParams: Promis
         <form className="card" method="post" action="/api/oauth/authorize">
           <h2>{app} wants to read your Fair Intelligence data</h2>
           <p className="d">It will be able to run the same analyses you use in the app and read their results, as <b>{session.email}</b>. It cannot change anything. Each question it asks counts toward your daily limit, and you can disconnect it any time from <b>Connect Claude / ChatGPT</b> in the sidebar.</p>
-          {teams.length > 1 && <p className="lbl">Which team&apos;s data?</p>}
+          {teams.length > 1 && <p className="lbl">Which workspace&apos;s data?</p>}
           <div className="pick">
             {teams.map((t) => (
               <label key={t.workspace_id} className="opt" data-tone={t.tone}>
                 <input type="radio" name="workspace_id" value={t.workspace_id} defaultChecked={t.workspace_id === current} />
-                <span className="ic"><TeamIcon kind={t.kind} size={16} /></span>
-                <span><b>{t.label}</b><small>{t.name}</small></span>
+                <span className="ic"><TeamIcon kind={t.role} size={16} /></span>
+                <span><b>{t.name}</b><small>{all.filter((x) => x.workspace_id === t.workspace_id).map((x) => x.label).join(" · ")}</small></span>
               </label>
             ))}
           </div>

@@ -2,7 +2,8 @@ import type { ReactNode } from "react";
 import "./globals.css";
 import { Sidebar } from "@/ui/Sidebar";
 import { listConversations } from "@/chat/persist";
-import { currentSession, currentWorkspaceId } from "@/auth/current";
+import { currentRole, currentSession, currentWorkspaceId } from "@/auth/current";
+import { BRAND_KOL } from "@/roles/model";
 import { getWorkspace } from "@/workspace/store";
 import { teamsFor } from "@/workspace/teams";
 import { headers } from "next/headers";
@@ -22,13 +23,14 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
   const session = await currentSession();
   const path = (await headers()).get("x-pathname") ?? "";
   const bare = FULL_SCREEN.some((p) => path === p || (p.endsWith("/") && path.startsWith(p)));
-  const [recent, cfg, teams] = session && !bare
+  const [recent, cfg, teams, role] = session && !bare
     ? await Promise.all([
         listConversations(ws, session.uid, 8).catch(() => []),
         getWorkspace(ws).catch(() => null),
         teamsFor(session).catch(() => []),
+        currentRole(ws),
       ])
-    : [[], null, []];
+    : [[], null, [], BRAND_KOL];
   return (
     <html lang="en">
       <head>
@@ -38,7 +40,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
       <body>
         {session && !bare ? (
           <div className="app">
-            <Sidebar recent={recent.map((c) => ({ id: c.id, title: c.title ?? "Untitled", href: `/?c=${c.id}` }))} user={{ email: session.email, role: session.role }} product={{ name: cfg?.product_name ?? "Fair Intelligence", tagline: cfg?.tagline ?? "", label: cfg?.category_label ?? ws, kind: cfg?.kind ?? "category" }} teams={teams} currentWorkspace={ws} />
+            <Sidebar recent={recent.map((c) => ({ id: c.id, title: c.title ?? "Untitled", href: `/?c=${c.id}` }))} user={{ email: session.email, role: session.role }} product={{ name: cfg?.product_name ?? "Fair Intelligence", tagline: cfg?.tagline ?? "", label: cfg?.category_label ?? ws, kind: cfg?.kind ?? "category" }} teams={teams} currentWorkspace={ws} currentRole={role.id} />
             <main className="main">{children}</main>
           </div>
         ) : (

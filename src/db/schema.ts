@@ -199,6 +199,12 @@ export const posts = pgTable(
     /** 'model' | 'model_failed' (tried once more) | 'model_failed_final' */
     capSource: text("cap_source"),
     capReadAt: ts("cap_read_at"),
+    /**
+     * Is the post about its brand (DECISIONS 3 Oct 2026)? Listening workspaces judge it at load: the brand
+     * posted it, or the caption names the brand (its terms in brands.keywords, its handles). false rows stay
+     * stored and are left out of every reputation number; null means not judged (counted).
+     */
+    relevant: boolean("relevant"),
     sourceFile: text("source_file"),
     loadId: uuid("load_id"),
     createdAt: createdAt(),

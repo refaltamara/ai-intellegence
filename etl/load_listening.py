@@ -19,16 +19,20 @@ purchase intent, topic). This loader keeps that schema as it comes:
   topic                     -> topics (the workspace's own taxonomy)
 
 Not loaded: content_sentiment_daily (rolled up from comments), content_media,
-content_audio, content_tagged_user, topic_theme_map (themes arrive mapped).
+content_audio, topic_theme_map (themes arrive mapped). content_tagged_user is read
+only to judge relevance.
 The beauty-only columns (category, product_type, format_content) are dropped.
 
 Duplicates: the same post captured by several queries for one brand is one row
 (the capture tracked last wins); a post captured for two brands is two rows.
-A post is owned when its author is one of its brand's handles. A comment by one
+A post is owned when its author is one of its brand's handles. A post is
+relevant (about its brand) when it is owned or its caption names the brand (the
+contract's terms and handles) or it tags one of the brand's accounts; the rest stay stored with relevant = false and
+are left out of every reputation number. A comment by one
 of the post's brand handles is the brand's reply (sentiment_source 'subject',
 never counted). Re-running is idempotent (upserts on the natural keys).
 """
-import argparse, glob, json, sys, time
+import argparse, glob, json, re, sys, time
 from datetime import datetime
 from pathlib import Path
 
@@ -89,6 +93,20 @@ class Contract:
         self.by_handle = {h.lower(): bid for bid, br in self.brands.items() for h in br["handles"]}
         self.handles = {bid: {h.lower() for h in br["handles"]} for bid, br in self.brands.items()}
         self.sentiment = self.raw["sentiment_map"]
+        self.terms = {bid: br.get("terms", []) for bid, br in self.brands.items()}
+        self.matchers = {bid: term_matcher(self.terms[bid] + br["handles"]) for bid, br in self.brands.items()}
+
+def term_matcher(terms):
+    """One regex per brand: a term at the start of a word, case-insensitive; a term written in capitals
+    ("DANA") matches only in capitals and as a whole word, because the lowercase word means something else."""
+    loose = [t.lower() for t in terms if not (t.isupper() and any(ch.isalpha() for ch in t))]
+    strict = [t for t in terms if t.isupper() and any(ch.isalpha() for ch in t)]
+    parts = []
+    if loose:
+        parts.append(r"(?i:(?<![a-z0-9])(?:" + "|".join(re.escape(t) for t in sorted(set(loose), key=len, reverse=True)) + "))")
+    if strict:
+        parts.append(r"(?<![A-Za-z0-9])(?:" + "|".join(re.escape(t) for t in sorted(set(strict), key=len, reverse=True)) + r")(?![A-Za-z0-9])")
+    return re.compile("|".join(parts)) if parts else None
 
 # --------------------------------------------------------------- workspace
 def ensure_workspace(db, k, dry):
@@ -113,15 +131,15 @@ def upsert_brands(db, k, seen, dry):
         owned = {p: sorted(h.lower() for h in br["handles"]) for p in ("tiktok", "instagram", "threads", "x")}
         first = lambda p: sorted(on.get(p, set()))[0].lower() if on.get(p) else None
         rows.append({"id": bid, "name": br["name"], "is_client": bid == k.client, "tiktok_handle": first("tiktok"),
-                     "instagram_handle": first("instagram"), "owned_handles": owned})
+                     "instagram_handle": first("instagram"), "owned_handles": owned, "keywords": br.get("terms", [])})
     if dry:
         return len(rows)
     db.query("""
       insert into brands (id, workspace_id, name, is_client, tiktok_handle, instagram_handle, tracked_on, owned_handles, keywords)
-      select r.id, $2, r.name, r.is_client, r.tiktok_handle, r.instagram_handle, 'both', r.owned_handles, '[]'::jsonb
-      from jsonb_to_recordset($1::jsonb) as r(id text, name text, is_client boolean, tiktok_handle text, instagram_handle text, owned_handles jsonb)
+      select r.id, $2, r.name, r.is_client, r.tiktok_handle, r.instagram_handle, 'both', r.owned_handles, r.keywords
+      from jsonb_to_recordset($1::jsonb) as r(id text, name text, is_client boolean, tiktok_handle text, instagram_handle text, owned_handles jsonb, keywords jsonb)
       on conflict (id) do update set name = excluded.name, is_client = excluded.is_client, tiktok_handle = excluded.tiktok_handle,
-        instagram_handle = excluded.instagram_handle, owned_handles = excluded.owned_handles
+        instagram_handle = excluded.instagram_handle, owned_handles = excluded.owned_handles, keywords = excluded.keywords
     """, [json.dumps(rows), k.ws])
     db.query("update workspaces set client_brand_id = $2 where id = $1", [k.ws, k.client])
     return len(rows)
@@ -164,11 +182,11 @@ def chunks(db, sql, rows, params, size=CHUNK):
 # ------------------------------------------------------------------- posts
 POST_COLS = ["platform_post_id", "creator_handle", "brand_id", "source", "collection", "posted_at", "month", "url", "caption",
              "hashtags", "is_paid", "followers_at_post", "tier", "content_type", "views", "likes", "comments_count", "shares",
-             "saves", "engagements", "engagements_lc", "captured_days", "source_file"]
+             "saves", "engagements", "engagements_lc", "captured_days", "relevant", "source_file"]
 POST_TYPES = ("platform_post_id text, creator_handle text, brand_id text, source text, collection text, posted_at timestamptz, "
               "month date, url text, caption text, hashtags text[], is_paid boolean, followers_at_post int, tier text, "
               "content_type text, views bigint, likes int, comments_count int, shares int, saves int, engagements int, "
-              "engagements_lc int, captured_days int, source_file text")
+              "engagements_lc int, captured_days int, relevant boolean, source_file text")
 POST_SQL = f"""
   insert into posts (workspace_id, platform, load_id, creator_id, {", ".join(POST_COLS)})
   select $2, r.platform, $3::uuid, c.id, {", ".join("r." + c for c in POST_COLS)}
@@ -188,7 +206,7 @@ def engagements(platform, likes, comments, shares, saves, total):
         return l + c
     return total if total is not None else l + c + sh
 
-def build_posts(k, content, creators, tags, snaps_per):
+def build_posts(k, content, creators, tags, snaps_per, tagged):
     """-> rows (one per platform+url+brand), key_of (source content id -> post key), seen handles, drops."""
     drops = {}
     def drop(reason, ex):
@@ -231,6 +249,8 @@ def build_posts(k, content, creators, tags, snaps_per):
         likes, comments, shares, saves = i(r["likes"]), i(r["comments_count"]), i(r["shares"]), i(r["saves"])
         views = max([v for v in (i(r["video_view_count"]), i(r["video_play_count"])) if v is not None], default=None)
         owned = who is not None and who in k.handles[bid]
+        m = k.matchers[bid]
+        relevant = owned or bool(tagged.get(i(r["id"]), set()) & k.handles[bid]) or bool(m and m.search(s(r["description"]) or ""))
         cid = i(r["id"])
         tag_list = tags.get(cid) or caption_hashtags(s(r["description"]))
         ct = CONTENT_TYPE.get((s(r["content_type"]) or "").lower())
@@ -243,7 +263,7 @@ def build_posts(k, content, creators, tags, snaps_per):
             "likes": likes, "comments_count": comments, "shares": shares, "saves": saves,
             "engagements": engagements(platform, likes, comments, shares, saves, i(r["engagement_total"])),
             "engagements_lc": (likes or 0) + (comments or 0), "captured_days": snaps_per.get(cid),
-            "source_file": None, "_cid": cid,
+            "relevant": relevant, "source_file": None, "_cid": cid,
         })
     return rows, key_of, seen, drops
 
@@ -396,6 +416,12 @@ def main():
     comments, f_comment = read(a.dump, "_comment_")
     labels, _ = read(a.dump, "comment_sentiment")
     topics, _ = read(a.dump, "topic")
+    tagged_df, _ = read(a.dump, "content_tagged_user")
+    tagged = {}
+    for _, r in tagged_df.iterrows():
+        h = handle(r["username"])
+        if h:
+            tagged.setdefault(i(r["content_id"]), set()).add(h)
     content = content.merge(brands[["id", "name"]].rename(columns={"id": "brand_id", "name": "brand_name"}), on="brand_id", how="left")
     missing = sorted({(s(n) or "").lower() for n in brands["name"]} - set(k.by_handle))
     if missing:
@@ -411,7 +437,7 @@ def main():
     snaps_per = snaps.groupby("content_id")["day_index"].nunique().to_dict()
 
     topic_ids, topic_rows = upsert_topics(db, k, topics, a.dry_run)
-    rows, key_of, seen, post_drops = build_posts(k, content, creators, tags, snaps_per)
+    rows, key_of, seen, post_drops = build_posts(k, content, creators, tags, snaps_per, tagged)
     n_brands = upsert_brands(db, k, seen, a.dry_run)
 
     load_id = ledger(db, k, f_content, "posts", len(content), a.dry_run)
@@ -424,7 +450,9 @@ def main():
         "rows_in": len(content), "posts": len(rows), "upserted": n_posts, "duplicates_merged": len(content) - len(rows) - sum(d["count"] for d in post_drops.values()),
         "drops": post_drops, "creators": n_creators, "by_platform": by(lambda r: r["platform"]), "by_brand": by(lambda r: r["brand_id"]),
         "owned_by_brand": dict(sorted(pd.Series([r["brand_id"] for r in rows if r["source"] == "owned"]).value_counts().to_dict().items())),
-        "by_month": by(lambda r: r["month"][:7]), "posted_span": (min(r["posted_at"] for r in rows)[:10], max(r["posted_at"] for r in rows)[:10]),
+        "by_month": by(lambda r: r["month"][:7]),
+        "not_about_brand": dict(sorted(pd.Series([r["platform"] for r in rows if not r["relevant"]]).value_counts().to_dict().items())),
+        "not_about_brand_by_brand": dict(sorted(pd.Series([r["brand_id"] for r in rows if not r["relevant"]]).value_counts().to_dict().items())), "posted_span": (min(r["posted_at"] for r in rows)[:10], max(r["posted_at"] for r in rows)[:10]),
         "views": int(sum(r["views"] or 0 for r in rows)), "brands": n_brands, "topics": [t["label"] for t in topic_rows],
     }
     close(db, load_id, len(rows), sum(d["count"] for d in post_drops.values()), post_report)

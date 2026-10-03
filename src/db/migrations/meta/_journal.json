@@ -120,6 +120,13 @@
       "when": 1790997812289,
       "tag": "0016_bumpy_prowler",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1791007606241,
+      "tag": "0017_huge_skin",
+      "breakpoints": true
     }
   ]
 }

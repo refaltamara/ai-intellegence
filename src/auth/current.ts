@@ -3,6 +3,11 @@ import { cookies } from "next/headers";
 import { SESSION_COOKIE, verifySession, type SessionPayload } from "./session";
 import { liveUser } from "./live";
 import { DEFAULT_WORKSPACE_ID } from "../config/thresholds";
+import { isRoleId, ROLES, type RoleModel } from "../roles/model";
+import { getWorkspace } from "../workspace/store";
+
+/** The role someone acts as inside the workspace (src/roles/model.ts); checked against what the workspace offers. */
+export const ROLE_COOKIE = "fi_role";
 
 /** Owners may act in another workspace; the choice lives in this cookie and is checked against the session's role. */
 export const WS_COOKIE = "fi_ws";
@@ -30,4 +35,18 @@ export async function currentWorkspaceId(): Promise<string> {
 export function wsCookieHeader(workspaceId: string | null): string {
   const secure = process.env.NODE_ENV === "production" ? "; Secure" : "";
   return workspaceId ? `${WS_COOKIE}=${workspaceId}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${30 * 86400}${secure}` : `${WS_COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`;
+}
+
+/** The role this request acts as: the chosen one when the workspace offers it, else the workspace's first. */
+export async function currentRole(workspaceId?: string): Promise<RoleModel> {
+  const jar = await cookies();
+  const ws = workspaceId ?? (await currentWorkspaceId());
+  const roles = (await getWorkspace(ws).catch(() => null))?.roles ?? ["brand_kol"];
+  const chosen = jar.get(ROLE_COOKIE)?.value;
+  return ROLES[isRoleId(chosen) && roles.includes(chosen) ? chosen : roles[0]];
+}
+
+export function roleCookieHeader(role: string | null): string {
+  const secure = process.env.NODE_ENV === "production" ? "; Secure" : "";
+  return role ? `${ROLE_COOKIE}=${role}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${30 * 86400}${secure}` : `${ROLE_COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`;
 }
