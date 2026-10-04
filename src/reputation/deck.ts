@@ -233,8 +233,8 @@ function repSystem(r: ReputationReport, role: RoleModel): string {
 type Create = (p: Anthropic.MessageCreateParamsNonStreaming) => Promise<Anthropic.Message>;
 export type RepWritten = { narrative: RepNarrative; by: "model" | "fallback"; attempts: number; problems: string[] };
 
-export async function writeRep(r: ReputationReport, opts: { create?: Create; role?: RoleModel } = {}): Promise<RepWritten> {
-  const create: Create | null = opts.create ?? (hasModelCredentials() ? (p) => anthropicClient().messages.create(p) : null);
+export async function writeRep(r: ReputationReport, opts: { create?: Create; role?: RoleModel; workspace?: string } = {}): Promise<RepWritten> {
+  const create: Create | null = opts.create ?? (hasModelCredentials() ? (p) => anthropicClient({ workspace: opts.workspace ?? null, purpose: "pr_deck" }).messages.create(p) : null);
   let problems: string[] = [];
   let attempts = 0;
   if (create) {

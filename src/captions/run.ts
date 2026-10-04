@@ -108,7 +108,7 @@ export async function readCaptions(workspaceId: string, opts: CaptionOptions = {
   const budget = opts.budgetMs ?? DEFAULT_BUDGET_MS;
   const batch = opts.batchSize ?? DEFAULT_BATCH;
   const parallel = Math.max(1, opts.parallel ?? DEFAULT_PARALLEL);
-  const client = opts.client ?? anthropicClient();
+  const client = opts.client ?? anthropicClient({ workspace: workspaceId, purpose: "caption_reading" });
   // a round is as slow as its slowest call (about a minute); one that cannot finish inside the budget is
   // not started, so the function is never cut off mid-round with paid answers unsaved
   let lastRound = 0;

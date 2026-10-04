@@ -106,7 +106,7 @@ export async function labelWorkspace(workspaceId: string, opts: LabelOptions = {
   if (!cfg || cfg.kind !== "profile") return { ...out, duration_ms: Date.now() - started };
   const subject = (await clientName(workspaceId)) ?? cfg.name;
   out.subject = subject;
-  const client = opts.client ?? anthropicClient();
+  const client = opts.client ?? anthropicClient({ workspace: workspaceId, purpose: "comment_labels" });
   const inBudget = () => Date.now() - started < budget;
 
   try {

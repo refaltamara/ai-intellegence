@@ -7,6 +7,7 @@
  * on every slide. A recurring deck looks for a new period after each one ends
  * and skips a period it already has.
  */
+import { getRole } from "../roles/store";
 import { weeklyReport } from "../competitor/facts";
 import { deckPeriod, latestComplete, type Grain } from "../competitor/period";
 import { shiftPeriod } from "../dashboard/period";
@@ -71,8 +72,10 @@ export async function generateDeckVersion(deck: DeckRow, opts: { period?: string
     }
     if (spec.social) {
       // a Social Media deck: one brand's own accounts over the period (src/social/)
-      const r = await socialReport(deck.workspace_id, { title: spec.title, grain, spec: spec.social, period: period.key, asOf: ctx.asOf });
-      const written = await writeSocial(r);
+      // the company's version of Spark: its thresholds and its voice (src/roles/store.ts)
+      const role = await getRole(deck.workspace_id, "social");
+      const r = await socialReport(deck.workspace_id, { title: spec.title, grain, spec: spec.social, period: period.key, asOf: ctx.asOf, role });
+      const written = await writeSocial(r, { role, workspace: deck.workspace_id });
       const stored = await storeSocial({ workspaceId: deck.workspace_id, report: r, narrative: written.narrative, by: written.by, problems: written.problems, deck: { id: deck.id, name: deck.name } });
       await pruneVersions(deck.id, deck.workspace_id, r.period.key, stored.reportId);
       const last = deck.last_period && deck.last_period > period.key ? deck.last_period : period.key;
@@ -81,8 +84,10 @@ export async function generateDeckVersion(deck: DeckRow, opts: { period?: string
     }
     if (spec.rep) {
       // a PR deck: one brand's reputation over the period (src/reputation/)
-      const r = await reputationReport(deck.workspace_id, { title: spec.title, grain, spec: spec.rep, period: period.key, asOf: ctx.asOf });
-      const written = await writeRep(r);
+      // the company's version of Chorus: its alert rule and its voice
+      const role = await getRole(deck.workspace_id, "pr");
+      const r = await reputationReport(deck.workspace_id, { title: spec.title, grain, spec: spec.rep, period: period.key, asOf: ctx.asOf, role });
+      const written = await writeRep(r, { role, workspace: deck.workspace_id });
       const stored = await storeReputation({ workspaceId: deck.workspace_id, report: r, narrative: written.narrative, by: written.by, problems: written.problems, deck: { id: deck.id, name: deck.name } });
       await pruneVersions(deck.id, deck.workspace_id, r.period.key, stored.reportId);
       const last = deck.last_period && deck.last_period > period.key ? deck.last_period : period.key;

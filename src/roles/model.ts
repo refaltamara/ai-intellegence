@@ -4,10 +4,11 @@
  * offers, how CeMO thinks and what it drafts. Every role gets the same three
  * features (Dashboard, Decks, Chats); the model behind them differs.
  *
- * The product team owns these definitions and versions them. A workspace offers one
- * or more roles (`settings.roles`); later the CMS edits the workspace side, and what
- * people do inside a role (decks kept, questions asked, alerts tuned) feeds the next
- * version. Pure: no data access here, so client components may import it.
+ * These constants are each role's 1.0 (Chorus, Atlas, Spark): the seed of
+ * role_versions and the fallback when the tables are empty. What a request runs on is
+ * the resolved role (src/roles/store.ts): the released Fair version, the company's
+ * changes and the person's own settings, field by field under src/roles/policy.ts.
+ * Pure: no data access here, so client components may import it.
  */
 
 export type RoleId = "pr" | "brand_kol" | "social";
@@ -16,8 +17,10 @@ export type Tone = "blue" | "violet" | "mint" | "coral" | "sun";
 
 export type RoleModel = {
   id: RoleId;
-  /** bumped whenever the product team changes the model */
-  version: number;
+  /** the name clients see on their team (DECISIONS, 4 Oct 2026): Chorus, Atlas, Spark */
+  codename: string;
+  /** major.minor; a release in role_versions carries it (src/roles/store.ts) */
+  version: string;
   label: string;
   short: string;
   description: string;
@@ -38,11 +41,16 @@ export type RoleModel = {
   alert?: { negative_multiple: number; min_comments: number; baseline_days: number };
   /** Social Media: when an own post needs attention (src/social/); numbers only, applied in SQL */
   watch?: { underperform_pct: number; storm_negative: number; min_account_posts: number };
+  /** the company's own rules for CeMO, under the product's fixed rules; set by a Builder, never by Fair's core */
+  house_rules?: string[];
+  /** a person's own defaults; a company may set them for everyone */
+  prefs?: { days?: number; answer?: "short" | "full" };
 };
 
 export const PR: RoleModel = {
   id: "pr",
-  version: 1,
+  codename: "Chorus",
+  version: "1.0",
   label: "PR team",
   short: "PR",
   description: "What people say about you and your competitors, which issues are building, who is amplifying them, and when to respond.",
@@ -71,7 +79,8 @@ export const PR: RoleModel = {
 
 export const BRAND_KOL: RoleModel = {
   id: "brand_kol",
-  version: 1,
+  codename: "Atlas",
+  version: "1.0",
   label: "Brand & KOL team",
   short: "Brand & KOL",
   description: "Competitors, creators and campaigns across the category: who is winning, with whom, and what to do next.",
@@ -84,7 +93,8 @@ export const BRAND_KOL: RoleModel = {
 
 export const SOCIAL: RoleModel = {
   id: "social",
-  version: 1,
+  codename: "Spark",
+  version: "1.0",
   label: "Social Media team",
   short: "Social",
   description: "Your own accounts: what you posted, what worked, which formats and times win, how the community answers, and how your channels compare with the competitors'.",

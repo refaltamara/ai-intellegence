@@ -870,6 +870,7 @@ th{background:linear-gradient(180deg,#F8FAFE,#F4F7FC)}
 .team .ic{width:46px;height:46px;border-radius:14px;display:grid;place-items:center;background:var(--tone-10);color:var(--tone);margin-bottom:6px;transition:background .3s var(--ease),color .3s var(--ease)}
 .team:hover .ic{background:var(--tone);color:#fff}
 .team b{font-size:20px;font-weight:900;letter-spacing:-.02em}
+.team .cn{font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--tone);margin-top:-4px}
 .team .d{font-size:14px;color:var(--text-2);line-height:1.5}
 .team .w{font-size:12px;color:var(--text-3);margin-top:4px}
 .team .go{margin-top:10px;font-size:13px;font-weight:700;color:var(--tone)}

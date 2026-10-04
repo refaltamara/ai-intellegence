@@ -712,3 +712,132 @@ export const mcpCalls = pgTable(
   },
   (t) => [index("mcp_calls_user_created_idx").on(t.userId, t.createdAt), index("mcp_calls_ws_created_idx").on(t.workspaceId, t.createdAt)],
 );
+
+// ------------------------------------------------------------ role versions
+/**
+ * Roles as products (DECISIONS, 4 Oct 2026; CMS plan). A role version is Fair's: PR is
+ * Chorus, Brand & KOL is Atlas, Social Media is Spark, each released as major.minor by
+ * Refal or Rafli. Like mcp_clients it belongs to no workspace: it is the product, not
+ * a client's data. Only one version per role is current (the latest released); a
+ * rollback marks a release rolled back and the one before it is current again.
+ */
+export const roleVersions = pgTable(
+  "role_versions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    role: text("role").notNull(),
+    codename: text("codename").notNull(),
+    version: text("version").notNull(),
+    status: text("status").notNull().default("draft"),
+    /** the whole RoleModel (src/roles/model.ts) */
+    spec: jsonb("spec").notNull(),
+    releaseNote: text("release_note"),
+    minAppVersion: text("min_app_version"),
+    proposedBy: text("proposed_by"),
+    releasedBy: text("released_by"),
+    releasedAt: ts("released_at"),
+    rolledBackBy: text("rolled_back_by"),
+    rolledBackAt: ts("rolled_back_at"),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    uniqueIndex("role_versions_role_version_uq").on(t.role, t.version),
+    index("role_versions_current_idx").on(t.role, t.status, t.releasedAt),
+    check("role_versions_status_chk", sql`${t.status} in ('draft','proposed','released','rolled_back')`),
+  ],
+);
+
+/**
+ * A client's version of a role: only what the company changed, as dotted paths
+ * (src/roles/policy.ts). One row per change set; the highest version is live. A
+ * workspace follows the latest Fair release unless base_version pins one.
+ */
+export const companyVersions = pgTable(
+  "company_versions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workspaceId: text("workspace_id").notNull().references(() => workspaces.id),
+    role: text("role").notNull(),
+    version: integer("version").notNull(),
+    baseVersion: text("base_version"),
+    overrides: jsonb("overrides").notNull().default(sql`'{}'::jsonb`),
+    author: text("author"),
+    note: text("note"),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("company_versions_uq").on(t.workspaceId, t.role, t.version)],
+);
+
+/** A person's own settings on a team; only member-editable fields (src/roles/policy.ts). */
+export const personalSettings = pgTable(
+  "personal_settings",
+  {
+    workspaceId: text("workspace_id").notNull().references(() => workspaces.id),
+    userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    role: text("role").notNull(),
+    settings: jsonb("settings").notNull().default(sql`'{}'::jsonb`),
+    updatedAt: ts("updated_at").notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.workspaceId, t.userId, t.role] })],
+);
+
+/**
+ * Every change to a role, a company version or a setting, from the CMS or the
+ * product. Append-only. workspace_id is null for a change to Fair's own roles.
+ */
+export const auditLog = pgTable(
+  "audit_log",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workspaceId: text("workspace_id"),
+    actor: text("actor").notNull(),
+    area: text("area").notNull(),
+    action: text("action").notNull(),
+    path: text("path"),
+    old: jsonb("old"),
+    new: jsonb("new"),
+    note: text("note"),
+    createdAt: createdAt(),
+  },
+  (t) => [index("audit_log_ws_created_idx").on(t.workspaceId, t.createdAt), index("audit_log_area_idx").on(t.area, t.createdAt)],
+);
+
+/** Signals for the learning loop (CMS plan): whitelisted kinds, no text people typed, no numbers from the data. */
+export const modelEvents = pgTable(
+  "model_events",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workspaceId: text("workspace_id").notNull(),
+    role: text("role").notNull(),
+    userId: uuid("user_id"),
+    roleVersion: text("role_version"),
+    companyVersion: integer("company_version"),
+    surface: text("surface").notNull(),
+    kind: text("kind").notNull(),
+    payload: jsonb("payload").notNull().default(sql`'{}'::jsonb`),
+    createdAt: createdAt(),
+  },
+  (t) => [index("model_events_ws_created_idx").on(t.workspaceId, t.createdAt), index("model_events_role_kind_idx").on(t.role, t.kind, t.createdAt)],
+);
+
+/**
+ * Every model call with its tokens, by workspace and purpose (chat, deck, caption
+ * reading, comment labelling…): the measured cost per action that credit prices will
+ * come from. workspace_id is null for Fair's own calls.
+ */
+export const modelCalls = pgTable(
+  "model_calls",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workspaceId: text("workspace_id"),
+    purpose: text("purpose").notNull(),
+    model: text("model").notNull(),
+    tokensIn: integer("tokens_in").notNull().default(0),
+    tokensOut: integer("tokens_out").notNull().default(0),
+    cacheRead: integer("cache_read").notNull().default(0),
+    cacheWrite: integer("cache_write").notNull().default(0),
+    ref: text("ref"),
+    createdAt: createdAt(),
+  },
+  (t) => [index("model_calls_ws_created_idx").on(t.workspaceId, t.createdAt), index("model_calls_purpose_idx").on(t.purpose, t.createdAt)],
+);

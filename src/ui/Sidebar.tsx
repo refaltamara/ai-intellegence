@@ -70,7 +70,7 @@ export function Sidebar({ recent, user, product, teams, currentWorkspace, curren
       {roles.length > 1 && (
         <div className="teamswitch" role="tablist" aria-label="Team">
           {roles.map((t) => (
-            <button key={t.key} role="tab" aria-selected={t.key === team?.key} className={t.key === team?.key ? "on" : ""} data-tone={t.tone} onClick={() => switchTo(t)} disabled={!!switching} title={`${t.label}: ${t.description}`}>
+            <button key={t.key} role="tab" aria-selected={t.key === team?.key} className={t.key === team?.key ? "on" : ""} data-tone={t.tone} onClick={() => switchTo(t)} disabled={!!switching} title={`${t.label} · ${t.codename} ${t.version}: ${t.description}`}>
               <TeamIcon kind={t.role} size={14} />
               {switching === t.key ? "…" : t.short}
             </button>

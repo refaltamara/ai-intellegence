@@ -18,7 +18,7 @@ import type { Evidence, SkillResult } from "../skills/types";
 import { getSkill, skillNames } from "../skills/registry";
 import { impls } from "../skills/index";
 import { activityDone, activityStart, workspaceCounts } from "./activity";
-import { anthropicClient, chatEffort, describeModelError } from "./client";
+import { anthropicClient, chatEffort, describeModelError, recordUsage } from "./client";
 import { renumberEvidence } from "./evidence";
 import { scrubMechanism } from "./leak";
 import { AnswerStream, type Followup } from "./stream";
@@ -30,7 +30,8 @@ import { buildExport } from "../export/run";
 import { addMessage, conversationRunIds, createConversation, getConversation, getSkillRun, listMessages, logExport, setPaneState, type ToolCallRecord } from "./persist";
 import { buildTools } from "./tools";
 import { getWorkspace } from "../workspace/store";
-import { fillRole, ROLES, type RoleId } from "../roles/model";
+import { fillRole, type RoleId, type RoleModel } from "../roles/model";
+import { getRoleResolved } from "../roles/store";
 import { PLATFORM_LABEL } from "../skills/common";
 
 export const MAX_TOOL_CALLS = 6;
@@ -95,15 +96,19 @@ export function invalidateSystem(workspaceId?: string): void {
 
 /** System prompt per workspace and role, cached for five minutes: it only changes when data is loaded or the client brand changes. */
 export async function buildSystem(workspaceId: string, role?: RoleId): Promise<string> {
-  const key = `${workspaceId}:${role ?? ""}`;
+  const cfg = await getWorkspace(workspaceId);
+  const roleId: RoleId = role && cfg?.roles.includes(role) ? role : cfg?.roles[0] ?? "brand_kol";
+  const resolved = await getRoleResolved(workspaceId, roleId);
+  // a new release or a company change makes a new prompt at once
+  const key = `${workspaceId}:${roleId}:${resolved.role.version}:${resolved.company_version ?? 0}`;
   const hit = systemCache.get(key);
   if (hit && Date.now() - hit.at < SYSTEM_TTL_MS) return hit.text;
-  const text = await buildSystemUncached(workspaceId, role);
+  const text = await buildSystemUncached(workspaceId, resolved.role);
   systemCache.set(key, { text, at: Date.now() });
   return text;
 }
 
-async function buildSystemUncached(workspaceId: string, roleId?: RoleId): Promise<string> {
+async function buildSystemUncached(workspaceId: string, role: RoleModel): Promise<string> {
   const db = new SkillDb();
   const ctx = await loadContext(db, workspaceId);
   const ws = await db.one<{ name: string }>("select name from workspaces where id = $1", [workspaceId]);
@@ -118,7 +123,6 @@ async function buildSystemUncached(workspaceId: string, roleId?: RoleId): Promis
     db.one<{ n: number; labelled: number }>("select count(*)::int as n, count(*) filter (where sentiment is not null)::int as labelled from comments where workspace_id = $1", [workspaceId]),
     db.one<{ snapshots: boolean; off_topic: number }>("select exists (select 1 from post_snapshots s join posts p on p.id = s.post_id where p.workspace_id = $1) as snapshots, (select count(*) from posts where workspace_id = $1 and relevant = false)::int as off_topic", [workspaceId]),
   ]);
-  const role = ROLES[roleId && cfg?.roles.includes(roleId) ? roleId : cfg?.roles[0] ?? "brand_kol"];
   const available = Object.keys(impls);
   const profile = cfg?.kind === "profile";
   const clientLine = profile
@@ -141,7 +145,13 @@ async function buildSystemUncached(workspaceId: string, roleId?: RoleId): Promis
     .replace("{{available_skills}}", available.join(", "))
     .replace("{{data_line}}", platforms.map((p) => `${p.platform} ${p.posts.toLocaleString("en-US")} posts from ${p.from} to ${p.to}`).join("; ") + (comments?.n ? `; ${comments.n.toLocaleString("en-US")} comments, ${comments.labelled === comments.n ? "all" : comments.labelled.toLocaleString("en-US")} with a sentiment label${comments.labelled < comments.n ? " so far (the rest are unlabelled, not neutral)" : ""}.` : ". No comment text.") + tracking + relevance)
     .replace("{{as_of}}", ctx.asOf)
-    .replace("{{brands}}", ctx.brands.map((b) => `${b.id} (${b.name})`).join(", "));
+    .replace("{{brands}}", ctx.brands.map((b) => `${b.id} (${b.name})`).join(", ")) + houseRules(role, client?.name);
+}
+
+/** The company's own rules for CeMO (set by its Builder, src/roles/policy.ts), last and under every rule above. */
+function houseRules(role: RoleModel, client?: string): string {
+  if (!role.house_rules?.length) return "";
+  return `\n\nHouse rules from ${client ? `${client}'s` : "this"} team. They sit under every rule above: where one conflicts with those, the rules above win, and none of them changes a number.\n${role.house_rules.map((r) => `- ${r}`).join("\n")}`;
 }
 
 function trimForModel(result: SkillResult, evidence: Evidence[]) {
@@ -343,6 +353,7 @@ async function runTurnBody(conversation: { id: string; workspace_id: string; dec
       }
       tokensIn += message.usage.input_tokens + (message.usage.cache_read_input_tokens ?? 0) + (message.usage.cache_creation_input_tokens ?? 0);
       tokensOut += message.usage.output_tokens;
+      recordUsage({ workspace: workspaceId, purpose: "chat", ref: conversation.id }, message.model, message.usage);
       stopReason = message.stop_reason;
 
       if (message.stop_reason === "refusal") {

@@ -432,7 +432,7 @@ function asNarrative(input: unknown, r: WeeklyReport): Narrative {
 /** Write this week's narrative: the model when it is configured and its draft passes the check, otherwise the plain narrative. */
 export async function writeNarrative(r: WeeklyReport, opts: { create?: Create } = {}): Promise<Written> {
   const clientBrands = r.client_brands.map((g) => g.group.name);
-  const create: Create | null = opts.create ?? (hasModelCredentials() ? (p) => anthropicClient().messages.create(p) : null);
+  const create: Create | null = opts.create ?? (hasModelCredentials() ? (p) => anthropicClient({ workspace: r.workspace_id, purpose: "weekly_report" }).messages.create(p) : null);
   let problems: string[] = [];
   let attempts = 0;
   if (create) {

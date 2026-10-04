@@ -31,6 +31,7 @@ export function TeamPicker({ teams, email, next }: { teams: TeamChoice[]; email:
             <button key={t.key} className="team" data-tone={t.tone} onClick={() => choose(t)} disabled={!!busy}>
               <span className="ic"><TeamIcon kind={t.role} /></span>
               <b>{t.label}</b>
+              <span className="cn">{t.codename} {t.version}</span>
               <span className="d">{t.description}</span>
               <span className="w">{t.name}</span>
               <span className="go">{busy === t.key ? "Opening…" : "Continue →"}</span>

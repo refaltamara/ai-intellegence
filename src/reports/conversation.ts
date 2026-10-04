@@ -113,7 +113,7 @@ const TOOL: Anthropic.Tool = {
   },
 } as Anthropic.Tool;
 
-async function writeSummary(sections: ConversationSection[], evidenceIds: Set<string>): Promise<{ title: string | null; findings: string[]; actions: string[]; by: "model" | "fallback"; problems: string[] }> {
+async function writeSummary(sections: ConversationSection[], evidenceIds: Set<string>, workspaceId: string): Promise<{ title: string | null; findings: string[]; actions: string[]; by: "model" | "fallback"; problems: string[] }> {
   const plain = plainSummary(sections);
   if (!hasModelCredentials()) return { title: null, ...plain, by: "fallback", problems: ["the model is not configured"] };
   const transcript = sections.map((s, i) => `Q${i + 1}: ${s.question}\nA${i + 1}: ${s.answer}${s.tools.length ? `\nResults: ${s.tools.map((t) => `${t.title} (${t.rows_total} rows; first rows ${JSON.stringify(t.rows.slice(0, 5))})`).join("; ")}` : ""}`).join("\n\n");
@@ -121,7 +121,7 @@ async function writeSummary(sections: ConversationSection[], evidenceIds: Set<st
   let problems: string[] = [];
   try {
     for (let attempt = 0; attempt < 2; attempt++) {
-      const client = anthropicClient();
+      const client = anthropicClient({ workspace: workspaceId, purpose: "report_conversation" });
       const answered = await toolAnswer((req) => client.messages.create(req), { model: modelId(), max_tokens: 6000, tools: [TOOL], messages }, TOOL.name);
       const { res, use } = answered;
       messages = answered.messages;
@@ -163,7 +163,7 @@ export async function createConversationReport(o: { workspaceId: string; userId:
   for (const m of messages) for (const [id, e] of Object.entries(m.evidence_json ?? {})) evidence.set(id, e);
   const cited = new Set<string>();
   for (const s of sections) for (const m of s.answer.matchAll(EV)) cited.add(m[1]);
-  const summary = await writeSummary(sections, new Set(evidence.keys()));
+  const summary = await writeSummary(sections, new Set(evidence.keys()), o.workspaceId);
   for (const t of [...summary.findings, ...summary.actions]) for (const m of t.matchAll(EV)) cited.add(m[1]);
   const windows = sections.flatMap((s) => s.tools.map((t) => t.data_window)).filter((w): w is { from: string; to: string } => !!w);
   const blocks: ConversationBlocks = {

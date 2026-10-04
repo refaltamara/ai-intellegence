@@ -162,8 +162,8 @@ function socialTool(): Anthropic.Tool {
 type Create = (p: Anthropic.MessageCreateParamsNonStreaming) => Promise<Anthropic.Message>;
 export type SocialWritten = { narrative: SocialNarrative; by: "model" | "fallback"; attempts: number; problems: string[] };
 
-export async function writeSocial(r: SocialReport, opts: { create?: Create; role?: RoleModel } = {}): Promise<SocialWritten> {
-  const create: Create | null = opts.create ?? (hasModelCredentials() ? (p) => anthropicClient().messages.create(p) : null);
+export async function writeSocial(r: SocialReport, opts: { create?: Create; role?: RoleModel; workspace?: string } = {}): Promise<SocialWritten> {
+  const create: Create | null = opts.create ?? (hasModelCredentials() ? (p) => anthropicClient({ workspace: opts.workspace ?? null, purpose: "social_deck" }).messages.create(p) : null);
   let problems: string[] = [];
   let attempts = 0;
   if (create) {

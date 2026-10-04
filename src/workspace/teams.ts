@@ -4,20 +4,23 @@
  * the product behaves on it (src/roles/model.ts).
  */
 import type { SessionPayload } from "../auth/session";
-import { ROLES, roleNav, type NavKey, type RoleId } from "../roles/model";
+import { roleNav, type NavKey, type RoleId } from "../roles/model";
+import { getRole } from "../roles/store";
 import { getWorkspace, listWorkspaces } from "./store";
 import { teamFor, type Team } from "./config";
 
-export type TeamChoice = Team & { key: string; role: RoleId; nav: NavKey[]; workspace_id: string; name: string; product_name: string; kind: string };
+export type TeamChoice = Team & { key: string; role: RoleId; nav: NavKey[]; workspace_id: string; name: string; product_name: string; kind: string; codename: string; version: string };
 
 export async function teamsFor(session: Pick<SessionPayload, "role" | "ws">): Promise<TeamChoice[]> {
   const ids = session.role === "owner" ? (await listWorkspaces()).map((w) => w.id) : [session.ws];
   const cfgs = (await Promise.all(ids.map((id) => getWorkspace(id)))).filter((c): c is NonNullable<typeof c> => c != null);
   // PR teams first, then the others; within a role, workspaces in their own order
-  return cfgs
-    .flatMap((c) => c.roles.map((r) => ({ c, r })))
-    .sort((a, b) => (a.r === b.r ? 0 : a.r === "pr" ? -1 : b.r === "pr" ? 1 : 0))
-    .map(({ c, r }) => ({ ...teamFor(c, ROLES[r]), key: `${c.id}:${r}`, role: r, nav: roleNav(ROLES[r], c.kind), workspace_id: c.id, name: c.name, product_name: c.product_name, kind: c.kind }));
+  const pairs = cfgs.flatMap((c) => c.roles.map((r) => ({ c, r }))).sort((a, b) => (a.r === b.r ? 0 : a.r === "pr" ? -1 : b.r === "pr" ? 1 : 0));
+  // each team runs its company's version of the role (src/roles/store.ts): its sidebar may be narrowed
+  return Promise.all(pairs.map(async ({ c, r }) => {
+    const role = await getRole(c.id, r);
+    return { ...teamFor(c, role), key: `${c.id}:${r}`, role: r, nav: roleNav(role, c.kind), workspace_id: c.id, name: c.name, product_name: c.product_name, kind: c.kind, codename: role.codename, version: role.version };
+  }));
 }
 
 /** One entry per workspace, for choices about data (which workspace a connector reads), not about how to act. */
