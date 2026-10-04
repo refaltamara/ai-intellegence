@@ -7,6 +7,7 @@ import { neon } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
 import { migrate } from "drizzle-orm/neon-http/migrator";
 import { databaseUrl } from "../src/db/client";
+import { migrateAccounts } from "../src/auth/accounts";
 
 function statements(sqlText: string): string[] {
   return sqlText
@@ -20,6 +21,9 @@ async function main() {
   const db = drizzle({ client });
   await migrate(db, { migrationsFolder: "src/db/migrations" });
   console.log("migrations: up to date");
+  // sign-ins from before accounts (4 Oct 2026) become accounts and memberships; a no-op once done
+  const acc = await migrateAccounts();
+  if (acc.memberships) console.log(`accounts: ${acc.accounts} created for ${acc.memberships} memberships`);
   for (const stmt of statements(readFileSync("src/db/views.sql", "utf8"))) {
     await client.query(stmt);
   }

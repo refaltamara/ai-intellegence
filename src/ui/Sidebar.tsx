@@ -27,7 +27,7 @@ const NAV: NavItem[] = [
 
 type Product = { name: string; tagline: string; label: string; kind: string };
 
-export function Sidebar({ recent, user, product, teams, currentWorkspace, currentRole }: { recent: { id: string; title: string; href: string }[]; user: { email: string; role: string }; product: Product; teams: TeamChoice[]; currentWorkspace: string; currentRole: string }) {
+export function Sidebar({ recent, user, product, teams, currentWorkspace, currentRole }: { recent: { id: string; title: string; href: string }[]; user: { email: string; role: string; team?: boolean; cms?: boolean }; product: Product; teams: TeamChoice[]; currentWorkspace: string; currentRole: string }) {
   const path = usePathname();
   const router = useRouter();
   const [switching, setSwitching] = useState<string | null>(null);
@@ -102,6 +102,16 @@ export function Sidebar({ recent, user, product, teams, currentWorkspace, curren
         <div className="user" style={{ justifyContent: "space-between" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}><div className="avatar">{initials}</div><div style={{ minWidth: 0 }}><b style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 120 }}>{user.email}</b><span>{user.role}</span></div></div>
           <span className="useracts">
+            {user.team && (
+              <Link href="/team" className={`iconbtn ${path.startsWith("/team") ? "on" : ""}`} title="Team: who is in this workspace" aria-label="Team">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="8" r="3.5" /><path d="M2.5 20c.6-3.4 3.3-5.5 6.5-5.5s5.9 2.1 6.5 5.5" /><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18.5 14.8c1.7.8 2.8 2.6 3 5.2" /></svg>
+              </Link>
+            )}
+            {user.cms && (
+              <Link href="/admin" className="iconbtn" title="CMS: Fair's side of the product" aria-label="CMS">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5" /><rect x="14" y="3" width="7" height="7" rx="1.5" /><rect x="3" y="14" width="7" height="7" rx="1.5" /><path d="M17.5 14v7M14 17.5h7" /></svg>
+              </Link>
+            )}
             <Link href="/data" className={`iconbtn ${path.startsWith("/data") ? "on" : ""}`} title="Data and settings" aria-label="Data and settings">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><ellipse cx="12" cy="6" rx="8" ry="3" /><path d="M4 6v12c0 1.7 3.6 3 8 3s8-1.3 8-3V6" /><path d="M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3" /></svg>
             </Link>

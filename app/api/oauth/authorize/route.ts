@@ -1,5 +1,5 @@
 /** The consent form's answer: issue a one-time code for the chosen team, or tell the app the person said no. */
-import { currentSession } from "@/auth/current";
+import { currentActor, currentSession } from "@/auth/current";
 import { checkAuthRequest, withParams } from "@/mcp/authorize";
 import { createCode } from "@/mcp/store";
 import { teamsFor } from "@/workspace/teams";
@@ -18,7 +18,7 @@ export async function POST(req: Request) {
   if ("redirectError" in checked) return go(withParams(checked.redirectError.uri, { error: checked.redirectError.error, state: checked.redirectError.state }));
   const { client, redirectUri, challenge, state, scope } = checked.ok;
   if (f.decision !== "allow") return go(withParams(redirectUri, { error: "access_denied", state }));
-  const team = (await teamsFor(session)).find((t) => t.workspace_id === f.workspace_id);
+  const team = (await teamsFor(await currentActor())).find((t) => t.workspace_id === f.workspace_id);
   if (!team) return go(withParams(redirectUri, { error: "access_denied", error_description: "That team is not open to this account.", state }));
   const code = await createCode({ clientId: client.client_id, userId: session.uid, workspaceId: team.workspace_id, redirectUri, challenge, scope });
   return go(withParams(redirectUri, { code, state }));

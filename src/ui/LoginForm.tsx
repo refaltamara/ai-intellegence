@@ -29,7 +29,7 @@ export function LoginForm() {
       <label>Password<input type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required /></label>
       {error && <div className="errbox">{error}</div>}
       <button className="btn pri" type="submit" disabled={busy}>{busy ? "Signing in…" : "Sign in"}</button>
-      <p>Accounts are created by the workspace owner.</p>
+      <p>No account yet? Ask your team&apos;s Builder or Fair for an invitation.</p>
     </form>
   );
 }

@@ -10,7 +10,12 @@
  */
 import { sql } from "../db/client";
 import { toJson } from "../db/json";
-import { isOwner, isRoleOwner } from "../config/staff";
+import type { Duty } from "../config/staff";
+
+/** who acts: an account's email and its Fair duties (src/auth/accounts.ts); checked like can() in src/auth/can.ts */
+export type Who = { email: string; staff: readonly Duty[] };
+const isOwner = (w: Who) => w.staff.includes("owner");
+const isRoleOwner = (w: Who) => isOwner(w) || w.staff.includes("role_owner");
 import { ROLES, isRoleId, type RoleId, type RoleModel } from "./model";
 import { resolve, sanitize, type Overrides, type Resolved } from "./policy";
 import { compareVersions, isVersion } from "./version";
@@ -123,8 +128,9 @@ export async function seedRoles(by = "seed"): Promise<RoleId[]> {
 type Result = { ok: true; version: string } | { ok: false; error: string };
 
 /** A new draft of Fair's role: a full spec, a version above every existing one. */
-export async function saveDraft(roleId: RoleId, version: string, spec: Partial<RoleModel>, by: string, note?: string): Promise<Result> {
-  if (!isRoleOwner(by)) return { ok: false, error: `${by} is not a role owner.` };
+export async function saveDraft(roleId: RoleId, version: string, spec: Partial<RoleModel>, who: Who, note?: string): Promise<Result> {
+  if (!isRoleOwner(who)) return { ok: false, error: `${who.email} is not a role owner.` };
+  const by = who.email;
   if (!isVersion(version)) return { ok: false, error: "A version reads major.minor, like 1.1." };
   const rows = (await sql.query("select version from role_versions where role = $1", [roleId])) as { version: string }[];
   if (rows.some((r) => compareVersions(r.version, version) >= 0)) return { ok: false, error: `${ROLES[roleId].codename} already has ${version} or a later version.` };
@@ -135,8 +141,9 @@ export async function saveDraft(roleId: RoleId, version: string, spec: Partial<R
 }
 
 /** Only Refal or Rafli release; the version becomes current for every client that follows the latest. */
-export async function releaseVersion(roleId: RoleId, version: string, by: string, note?: string): Promise<Result> {
-  if (!isOwner(by)) return { ok: false, error: "Only Refal or Rafli can release a version." };
+export async function releaseVersion(roleId: RoleId, version: string, who: Who, note?: string): Promise<Result> {
+  const by = who.email;
+  if (!isOwner(who)) return { ok: false, error: "Only Refal or Rafli can release a version." };
   const rows = (await sql.query(
     "update role_versions set status = 'released', released_by = $3, released_at = now(), release_note = coalesce($4, release_note) where role = $1 and version = $2 and status in ('draft','proposed') returning version",
     [roleId, version, by, note ?? null],
@@ -152,8 +159,9 @@ export async function releaseVersion(roleId: RoleId, version: string, by: string
  * their own changes intact. A role owner may do it without approval, since it only
  * returns to something already released. The first release cannot be rolled back.
  */
-export async function rollbackRole(roleId: RoleId, by: string, note?: string): Promise<Result> {
-  if (!isRoleOwner(by)) return { ok: false, error: `${by} cannot roll a role back.` };
+export async function rollbackRole(roleId: RoleId, who: Who, note?: string): Promise<Result> {
+  const by = who.email;
+  if (!isRoleOwner(who)) return { ok: false, error: `${by} cannot roll a role back.` };
   const rows = (await sql.query("select version from role_versions where role = $1 and status = 'released' order by released_at desc limit 2", [roleId])) as { version: string }[];
   if (rows.length < 2) return { ok: false, error: `${ROLES[roleId].codename} has no earlier release to return to.` };
   await sql.query("update role_versions set status = 'rolled_back', rolled_back_by = $3, rolled_back_at = now() where role = $1 and version = $2", [roleId, rows[0].version, by]);
@@ -184,8 +192,9 @@ export async function setCompanyChanges(ws: string, roleId: RoleId, changes: Ove
 }
 
 /** Pin a client to a released version, or null to follow the latest again. Only Refal or Rafli. */
-export async function pinCompany(ws: string, roleId: RoleId, version: string | null, by: string): Promise<Result> {
-  if (!isOwner(by)) return { ok: false, error: "Only Refal or Rafli can pin a client to a version." };
+export async function pinCompany(ws: string, roleId: RoleId, version: string | null, who: Who): Promise<Result> {
+  const by = who.email;
+  if (!isOwner(who)) return { ok: false, error: "Only Refal or Rafli can pin a client to a version." };
   if (version && !(await fairVersion(roleId, version))) return { ok: false, error: `${ROLES[roleId].codename} ${version} is not a released version.` };
   const prev = await companyVersion(ws, roleId);
   const next = (prev?.version ?? 0) + 1;

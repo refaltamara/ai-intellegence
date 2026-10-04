@@ -4,13 +4,15 @@ import { SESSION_COOKIE, verifySession, type SessionPayload } from "./session";
 import { liveUser } from "./live";
 import { DEFAULT_WORKSPACE_ID } from "../config/thresholds";
 import { isRoleId, type RoleModel } from "../roles/model";
+import { loadActor } from "./accounts";
+import { can, rolesFor, type Actor } from "./can";
 import { getRole } from "../roles/store";
 import { getWorkspace } from "../workspace/store";
 
 /** The role someone acts as inside the workspace (src/roles/model.ts); checked against what the workspace offers. */
 export const ROLE_COOKIE = "fi_role";
 
-/** Owners may act in another workspace; the choice lives in this cookie and is checked against the session's role. */
+/** The workspace someone switched to; honoured only where they may reach it (Fair staff everywhere, a client where it has a membership). */
 export const WS_COOKIE = "fi_ws";
 
 /** The signed-in person, with the role and home workspace the users table holds now (not what the cookie remembers). */
@@ -23,13 +25,23 @@ export async function currentSession(): Promise<SessionPayload | null> {
   return live ? { ...session, role: live.role, ws: live.workspace_id } : session;
 }
 
-/** The workspace every query in this request is scoped to: the user's own, or the one an owner switched to. */
+/** The person signed in, with their Fair duties and every workspace they belong to (src/auth/can.ts says what they may do). */
+export async function currentActor(): Promise<Actor | null> {
+  const session = await currentSession();
+  if (!session) return null;
+  return loadActor(session.uid).catch(() => null);
+}
+
+/** The workspace every query in this request is scoped to: the person's own, or one they switched to and may reach. */
 export async function currentWorkspaceId(): Promise<string> {
   const jar = await cookies();
   const session = await currentSession();
   if (!session) return DEFAULT_WORKSPACE_ID; // public paths never reach data; the proxy gates everything else
   const chosen = jar.get(WS_COOKIE)?.value;
-  if (session.role === "owner" && chosen && /^[a-z0-9-]{1,60}$/.test(chosen)) return chosen;
+  if (chosen && chosen !== session.ws && /^[a-z0-9-]{1,60}$/.test(chosen)) {
+    const actor = await loadActor(session.uid).catch(() => null);
+    if (actor && can(actor, "workspace.reach", { workspace: chosen })) return chosen;
+  }
   return session.ws || DEFAULT_WORKSPACE_ID;
 }
 
@@ -46,9 +58,13 @@ export function wsCookieHeader(workspaceId: string | null): string {
 export async function currentRole(workspaceId?: string): Promise<RoleModel> {
   const jar = await cookies();
   const ws = workspaceId ?? (await currentWorkspaceId());
-  const roles = (await getWorkspace(ws).catch(() => null))?.roles ?? ["brand_kol"];
+  const offered = (await getWorkspace(ws).catch(() => null))?.roles ?? ["brand_kol"];
   const chosen = jar.get(ROLE_COOKIE)?.value;
   const session = await currentSession();
+  const actor = session ? await loadActor(session.uid).catch(() => null) : null;
+  // only the roles this person may use here (a client's levels); the workspace's first when none is chosen
+  const allowed = actor ? rolesFor(actor, ws, offered) : offered;
+  const roles = allowed.length ? allowed : offered;
   return getRole(ws, isRoleId(chosen) && roles.includes(chosen) ? chosen : roles[0], session?.uid);
 }
 

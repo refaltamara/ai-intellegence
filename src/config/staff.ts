@@ -1,17 +1,31 @@
 /**
- * Fair's people in the CMS (DECISIONS, 4 Oct 2026). Refal and Rafli are the super
- * admins and the only ones who release a role version or pin a client to one. Audia,
- * Wega and Arneta own all three roles for now; Audia and Arneta may also change design.
- * Until accounts and memberships land (CMS plan, phase 2) a person is named by their
- * first name or the local part of their email.
+ * Fair's people (DECISIONS, 4 Oct 2026). Duties live on accounts.staff and are edited
+ * by Refal or Rafli in the CMS (People); this is only the seed applied when existing
+ * sign-ins became accounts. Refal and Rafli are the super admins. Audia, Wega and
+ * Arneta own all three roles; Audia and Arneta may also change design. Raissa and Yunni
+ * reached every workspace before (owners), so they start as data ops.
  */
-export const OWNERS = ["refal", "rafli"];
-export const ROLE_OWNERS = ["audia", "wega", "arneta"];
-export const DESIGNERS = ["audia", "arneta"];
+export const DUTIES = ["owner", "role_owner", "designer", "data_ops"] as const;
+export type Duty = (typeof DUTIES)[number];
 
-/** "Refal", "refal@fair-indonesia.com" → "refal" */
-export const staffKey = (who: string) => who.trim().toLowerCase().split("@")[0];
+export const DUTY_LABEL: Record<Duty, string> = {
+  owner: "Owner",
+  role_owner: "Role owner",
+  designer: "Design",
+  data_ops: "Data ops",
+};
 
-export const isOwner = (who: string) => OWNERS.includes(staffKey(who));
-export const isRoleOwner = (who: string) => ROLE_OWNERS.includes(staffKey(who)) || isOwner(who);
-export const canDesign = (who: string) => DESIGNERS.includes(staffKey(who)) || isOwner(who);
+/** by the local part of a fair-indonesia.com address */
+export const STAFF_SEED: Record<string, Duty[]> = {
+  refal: ["owner"],
+  rafli: ["owner"],
+  audia: ["role_owner", "designer"],
+  wega: ["role_owner"],
+  arneta: ["role_owner", "designer"],
+  raissa: ["data_ops"],
+  yunni: ["data_ops"],
+};
+
+export const STAFF_DOMAIN = "fair-indonesia.com";
+
+export const isDuty = (v: unknown): v is Duty => typeof v === "string" && (DUTIES as readonly string[]).includes(v);

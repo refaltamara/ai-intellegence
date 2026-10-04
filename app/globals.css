@@ -1445,3 +1445,68 @@ table.heat tbody th{text-align:left}
 table.heat td{text-align:center;height:30px;border-radius:6px;background:var(--surface,#F4F6FA);font-weight:700;font-variant-numeric:tabular-nums}
 table.heat td small{font-weight:500;color:var(--text-3)}
 .social .dsection>header .askwhy{margin-left:auto}
+
+/* ---------- people (Team page, CMS) ---------- */
+.people td b{display:block;font-weight:600}
+.people td small,.people th small{display:block;color:var(--text-3);font-size:11px;font-weight:500}
+.people tbody tr{cursor:default}
+.people tbody tr:hover td{background:none}
+.people select{padding:5px 8px;border:1px solid var(--line-2);border-radius:8px;background:#fff;font:inherit;font-size:12px}
+.people .muted{color:var(--text-3);font-size:12px}
+.badge{display:inline-block;margin:4px 4px 0 0;padding:1px 7px;border-radius:999px;font-size:10.5px;font-weight:700;letter-spacing:.02em}
+.badge.fair{background:var(--blue-10);color:var(--blue)}
+.btn.danger{color:var(--red)}
+.btn.danger:hover{background:var(--red-10)}
+.subh{font-size:13px;font-weight:700;color:var(--text-2);margin:24px 0 10px}
+.inviteform{display:grid;grid-template-columns:1.3fr 1fr;gap:12px 16px;padding:16px;align-items:end}
+.inviteform label{display:flex;flex-direction:column;gap:5px;font-size:12px;color:var(--text-3);font-weight:600}
+.inviteform input,.inviteform select{padding:8px 10px;border:1px solid var(--line-2);border-radius:9px;font:inherit;font-size:13px;color:var(--text);background:#fff}
+.inviteform .lv{grid-column:1/-1;display:flex;gap:16px;flex-wrap:wrap}
+.inviteform .lv label{min-width:150px}
+.inviteform .btn{justify-self:start}
+.okbox{margin-top:12px;padding:12px 16px;background:var(--green-10);color:var(--text);font-size:13px;border-radius:var(--r);display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.okbox code{background:#fff;padding:3px 8px;border-radius:6px;font-size:12px;word-break:break-all}
+.team-mgr .errbox{margin-top:12px}
+.team-mgr .hint{margin-top:12px;font-size:12px;color:var(--text-3)}
+
+/* ---------- CMS (/admin) ---------- */
+.side.admin{background:#0F1B2D;color:#C9D3E3}
+.side.admin .brand b{color:#fff}
+.side.admin .brand small,.side.admin .user span{color:#8593A8}
+.side.admin .brand .mark{background:var(--grad)}
+.side.admin .nav a{color:#C9D3E3}
+.side.admin .nav a:hover{background:rgba(255,255,255,.06);color:#fff}
+.side.admin .nav a.on{background:rgba(255,255,255,.1);color:#fff;box-shadow:none}
+.side.admin .user b{color:#fff}
+.side.admin .connect{color:#C9D3E3;border-color:rgba(255,255,255,.12);background:transparent}
+.cms .subh{margin-top:28px}
+.cmsroles{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:18px}
+.cmsrole{border:1px solid var(--line);border-radius:var(--r);background:#fff;padding:16px 18px;display:flex;flex-direction:column;gap:2px;transition:border-color .15s}
+.cmsrole:hover{border-color:var(--tone,var(--blue))}
+.cmsrole .cn,.cmsblock .cn{font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--tone,var(--blue))}
+.cmsrole b{font-size:28px;font-weight:800;letter-spacing:-.02em}
+.cmsrole span{font-size:13px;color:var(--text-2)}
+.cmsrole small{font-size:11px;color:var(--text-3)}
+.cmsblock{margin-bottom:28px}
+.cmsblock header{display:flex;align-items:baseline;gap:10px;margin-bottom:10px}
+.cmsblock h2{font-size:17px;font-weight:800}
+.st{font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;background:var(--surface);color:var(--text-2);text-transform:capitalize}
+.st.released{background:var(--green-10);color:var(--green)}
+.st.draft,.st.proposed{background:var(--amber-10);color:var(--amber)}
+.st.rolled_back{background:var(--red-10);color:var(--red)}
+.people .wrapcell{white-space:normal;max-width:320px;color:var(--text-2)}
+.people td.code{font-family:ui-monospace,monospace;font-size:11px;white-space:normal;max-width:220px;word-break:break-all}
+.people td small{display:block}
+.roleact{display:inline-flex;gap:8px;align-items:center}
+.roleact .err{color:var(--red);font-size:11px;white-space:normal;max-width:220px}
+.attn{list-style:none;display:flex;flex-direction:column;gap:6px}
+.attn li a{display:block;padding:10px 14px;border:1px solid var(--line);border-left:3px solid var(--amber);border-radius:10px;background:#fff;font-size:13px}
+.attn li a:hover{border-color:var(--amber)}
+.inviteform .tick{flex-direction:row;align-items:center;gap:6px;color:var(--text);font-weight:500;min-width:auto}
+.cmsrole[data-tone=coral],.cmsblock[data-tone=coral]{--tone:var(--coral)}
+.cmsrole[data-tone=blue],.cmsblock[data-tone=blue]{--tone:var(--blue)}
+.cmsrole[data-tone=mint],.cmsblock[data-tone=mint]{--tone:var(--mint)}
+.cms .cats{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}
+.cms .cats a{padding:6px 12px;border-radius:999px;border:1px solid var(--line-2);font-size:12px;color:var(--text-2);font-weight:600;background:#fff}
+.cms .cats a.on{border-color:var(--blue);color:var(--blue);background:var(--blue-10)}
+.cms .hint{margin-top:8px;font-size:12px;color:var(--text-3)}

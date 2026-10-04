@@ -5,7 +5,8 @@ import { loadContext } from "@/skills/params";
 import { fmtNum } from "@/ui/format";
 import { ClientBrand } from "@/ui/ClientBrand";
 import { getWorkspace } from "@/workspace/store";
-import { currentSession, currentWorkspaceId } from "@/auth/current";
+import { currentActor, currentWorkspaceId } from "@/auth/current";
+import { can } from "@/auth/can";
 import Link from "next/link";
 import { PLATFORM_LABEL } from "@/skills/common";
 import { captionStatus } from "@/captions/run";
@@ -15,7 +16,8 @@ export const dynamic = "force-dynamic";
 
 export default async function DataPage() {
   const ws = await currentWorkspaceId();
-  const [s, ctx, session, cfg] = await Promise.all([workspaceStats(ws), loadContext(new SkillDb(), ws), currentSession(), getWorkspace(ws)]);
+  const [s, ctx, actor, cfg] = await Promise.all([workspaceStats(ws), loadContext(new SkillDb(), ws), currentActor(), getWorkspace(ws)]);
+  const canEdit = !!actor && can(actor, "workspace.data", { workspace: ws });
   const captions = cfg?.kind === "profile" ? null : await captionStatus(ws);
   const pct = (a: number, b: number) => Math.round((a / b) * 100);
   return (
@@ -23,7 +25,7 @@ export default async function DataPage() {
       <div className="topbar"><div><h1>Data</h1><span className="meta">What every answer is built from</span></div><span className="pill live">Last load {s.last_load ?? "–"} WIB · data through {s.freshness}</span></div>
       <div className="wrap wide">
         <div className="cats"><span className="on">{cfg?.category_label ?? ws}</span></div>
-        <ClientBrand brands={ctx.brands.map((b) => ({ id: b.id, name: b.name }))} current={ctx.clientBrandId} canEdit={session?.role === "owner"} productName={cfg?.assistant_name ?? "CeMO"} kind={cfg?.kind ?? "category"} />
+        <ClientBrand brands={ctx.brands.map((b) => ({ id: b.id, name: b.name }))} current={ctx.clientBrandId} canEdit={canEdit} productName={cfg?.assistant_name ?? "CeMO"} kind={cfg?.kind ?? "category"} />
         <div className="stats">
           <div className="stat"><b>{s.brands}</b><span>brands tracked · {ctx.brands.filter((b) => b.tiktok_handle && b.instagram_handle).length} on both platforms</span></div>
           <div className="stat"><b>{fmtNum(s.creators)}</b><span>creators with brand history and performance</span></div>
@@ -34,7 +36,7 @@ export default async function DataPage() {
           {s.per_platform.map((p) => (
             <div className="layer" key={p.platform}><h4>{PLATFORM_LABEL[p.platform] ?? p.platform}</h4><p>{fmtNum(p.posts)} posts from {fmtNum(p.creators)} {cfg?.subject_noun ?? "creators"}, {p.first_month} to {p.last_month}. {cfg?.kind === "profile" ? "Keyword capture around the subject plus the subject's own posts." : p.platform === "tiktok" ? "Keyword capture plus owned accounts; shoppable-link flag recorded." : "Tag-based capture; no owned posts, no shares or saves."}</p><small>Powers {registry.skills.filter((k) => !k.platforms || k.platforms.includes(p.platform)).filter((k) => k.phase === 1).length} analyses</small></div>
           ))}
-          {captions && <CaptionReading status={captions} canEdit={session?.role === "owner"} />}
+          {captions && <CaptionReading status={captions} canEdit={canEdit} />}
           {s.comments ? (
             <div className="layer"><h4>Comments</h4><p>{fmtNum(s.comments)} comments under every post, {s.comments_labelled === s.comments ? "all with a sentiment label" : `${fmtNum(s.comments_labelled)} with a sentiment label so far (labelling runs in the background)`}. Powers sentiment over time, what people are saying, who is driving it and seeding detection.</p><small>Sentiment: positive, neutral, negative</small></div>
           ) : (

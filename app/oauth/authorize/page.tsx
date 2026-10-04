@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { currentSession, currentWorkspaceId } from "@/auth/current";
+import { currentActor, currentSession, currentWorkspaceId } from "@/auth/current";
 import { checkAuthRequest, withParams } from "@/mcp/authorize";
 import { teamsFor, workspacesOf } from "@/workspace/teams";
 import { TeamIcon } from "@/ui/TeamIcon";
@@ -22,7 +22,7 @@ export default async function Authorize({ searchParams }: { searchParams: Promis
     );
   }
   const { client } = checked.ok;
-  const [all, ws] = await Promise.all([teamsFor(session), currentWorkspaceId()]);
+  const [all, ws] = await Promise.all([currentActor().then(teamsFor), currentWorkspaceId()]);
   const teams = workspacesOf(all);
   const current = teams.find((t) => t.workspace_id === ws)?.workspace_id ?? teams[0]?.workspace_id;
   const app = client.client_name || "An app";

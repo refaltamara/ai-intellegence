@@ -57,6 +57,29 @@ export const workspaces = pgTable("workspaces", {
   createdAt: createdAt(),
 });
 
+/**
+ * One person (CMS plan, People and access): one sign-in for every workspace they belong
+ * to. Fair staff carry duties: owner (Refal, Rafli: release, deploy, prices), role_owner
+ * (improve the roles), designer (may change design), data_ops (set up and run
+ * workspaces). Like mcp_clients it belongs to no workspace: a person is not a
+ * workspace's data; what they may do in one lives in their membership (users).
+ */
+export const accounts = pgTable("accounts", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  email: text("email").notNull().unique(),
+  name: text("name"),
+  passwordHash: text("password_hash"),
+  staff: text("staff").array().notNull().default(sql`'{}'::text[]`),
+  lastSeenAt: ts("last_seen_at"),
+  createdAt: createdAt(),
+});
+
+/**
+ * A membership: one account in one workspace (since 4 Oct 2026; before that a row was
+ * the whole account). `levels` says which roles the person may use there and how:
+ * builder (shapes the company's version, approves, invites) or member. Everything a
+ * person makes in a workspace (chats, decks, settings) points here.
+ */
 export const users = pgTable(
   "users",
   {
@@ -67,9 +90,32 @@ export const users = pgTable(
     role: text("role").notNull().default("member"),
     passwordHash: text("password_hash"),
     whatsappE164: text("whatsapp_e164"),
+    accountId: uuid("account_id").references((): AnyPgColumn => accounts.id, { onDelete: "cascade" }),
+    levels: jsonb("levels").notNull().default(sql`'{}'::jsonb`),
+    invitedBy: text("invited_by"),
     createdAt: createdAt(),
   },
-  (t) => [uniqueIndex("users_workspace_email_uq").on(t.workspaceId, t.email)],
+  (t) => [uniqueIndex("users_workspace_email_uq").on(t.workspaceId, t.email), index("users_account_idx").on(t.accountId)],
+);
+
+/** An invitation to a workspace (a Builder or Member) or to Fair's staff; the token is stored as a SHA-256 hash. */
+export const invites = pgTable(
+  "invites",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workspaceId: text("workspace_id").notNull().references(() => workspaces.id),
+    email: text("email").notNull(),
+    name: text("name"),
+    levels: jsonb("levels").notNull().default(sql`'{}'::jsonb`),
+    staff: text("staff").array().notNull().default(sql`'{}'::text[]`),
+    tokenHash: text("token_hash").notNull().unique(),
+    invitedBy: text("invited_by").notNull(),
+    expiresAt: ts("expires_at").notNull(),
+    acceptedAt: ts("accepted_at"),
+    revokedAt: ts("revoked_at"),
+    createdAt: createdAt(),
+  },
+  (t) => [index("invites_workspace_idx").on(t.workspaceId, t.createdAt)],
 );
 
 // ------------------------------------------------------------------- brands

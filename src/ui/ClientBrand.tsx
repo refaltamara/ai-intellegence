@@ -1,5 +1,5 @@
 "use client";
-/** Which brand CeMO is on the side of. Owner sets it; everyone sees it. */
+/** Which brand CeMO is on the side of. Fair (owners or data ops) sets it; everyone sees it. */
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -36,7 +36,7 @@ export function ClientBrand({ brands, current, canEdit, productName = "CeMO", ki
           {msg && <span className="hint">{msg}</span>}
         </div>
       ) : (
-        <span className="hint">The owner can change this on this page.</span>
+        <span className="hint">Fair sets this for your team.</span>
       )}
     </div>
   );

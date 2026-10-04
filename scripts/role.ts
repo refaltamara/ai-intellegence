@@ -13,6 +13,8 @@
  */
 import { readFileSync } from "node:fs";
 import { ROLES, isRoleId, type RoleId } from "../src/roles/model";
+import { findAccountByWho } from "../src/auth/accounts";
+import type { Who } from "../src/roles/store";
 import { companyVersion, fairVersion, getRoleResolved, pinCompany, releaseVersion, roleHistory, rollbackRole, saveDraft, seedRoles, setCompanyChanges } from "../src/roles/store";
 
 const argv = process.argv.slice(2);
@@ -46,6 +48,15 @@ function done(r: { ok: boolean; error?: string; version?: string }, what: string
   console.log(`${what}: ${r.version}`);
 }
 
+/** --by names an account: an email or the part before the @ */
+async function who(): Promise<Who> {
+  const by = flag("--by");
+  if (!by) throw new Error("--by is required (an email, or the name before the @)");
+  const acc = await findAccountByWho(by);
+  if (!acc) throw new Error(`No single account matches "${by}".`);
+  return { email: acc.email, staff: acc.staff };
+}
+
 async function main() {
   const [cmd, a, b, c] = positional;
   const by = flag("--by") ?? "";
@@ -74,25 +85,24 @@ async function main() {
     }
     case "draft": {
       const spec = flag("--from") ? JSON.parse(readFileSync(flag("--from")!, "utf8")) : (await fairVersion(roleOf(a))) ?? {};
-      done(await saveDraft(roleOf(a), b, spec, by, note), "draft saved");
+      done(await saveDraft(roleOf(a), b, spec, await who(), note), "draft saved");
       break;
     }
     case "release":
-      done(await releaseVersion(roleOf(a), b, by, note), "released");
+      done(await releaseVersion(roleOf(a), b, await who(), note), "released");
       break;
     case "rollback":
-      done(await rollbackRole(roleOf(a), by, note), "rolled back; current is now");
+      done(await rollbackRole(roleOf(a), await who(), note), "rolled back; current is now");
       break;
     case "pin":
-      done(await pinCompany(a, roleOf(b), c === "latest" ? null : c, by), "pinned");
+      done(await pinCompany(a, roleOf(b), c === "latest" ? null : c, await who()), "pinned");
       break;
     case "company": {
-      if (!by) throw new Error("--by is required");
       const changes = Object.fromEntries(positional.slice(3).map((kv) => {
         const i = kv.indexOf("=");
         return [kv.slice(0, i), kv.slice(i + 1) === "" ? null : parseValue(kv.slice(i + 1))];
       }));
-      const r = await setCompanyChanges(a, roleOf(b), changes, by, note);
+      const r = await setCompanyChanges(a, roleOf(b), changes, (await who()).email, note);
       console.log(`company version ${r.version}${r.dropped.length ? `; not allowed or out of range: ${r.dropped.join(", ")}` : ""}`);
       break;
     }

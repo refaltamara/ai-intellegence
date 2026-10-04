@@ -1,4 +1,4 @@
-import { authenticate } from "@/auth/users";
+import { authenticateAccount } from "@/auth/accounts";
 import { cookieHeader, signSession } from "@/auth/session";
 
 export const runtime = "nodejs";
@@ -14,12 +14,14 @@ export async function POST(req: Request) {
   if (!email || !password) return Response.json({ error: "Email and password are required" }, { status: 400 });
   const a = attempts.get(email);
   if (a && a.n >= 8 && a.until > Date.now()) return Response.json({ error: "Too many attempts. Try again in 15 minutes." }, { status: 429 });
-  const user = await authenticate(email, password);
-  if (!user) {
+  const found = await authenticateAccount(email, password);
+  if (!found) {
     attempts.set(email, { n: (a?.n ?? 0) + 1, until: Date.now() + 15 * 60 * 1000 });
     return Response.json({ error: "Wrong email or password" }, { status: 401 });
   }
   attempts.delete(email);
-  const token = await signSession({ uid: user.id, email: user.email, role: user.role, ws: user.workspace_id });
-  return Response.json({ ok: true, user: { email: user.email, name: user.name, role: user.role } }, { headers: { "Set-Cookie": cookieHeader(token) } });
+  // the session starts in the account's first membership; Fair staff and multi-workspace people switch from the sidebar
+  const role = found.account.staff.length ? "staff" : "member";
+  const token = await signSession({ uid: found.membership.id, email: found.account.email, role, ws: found.membership.workspace_id });
+  return Response.json({ ok: true, user: { email: found.account.email, name: found.account.name, role } }, { headers: { "Set-Cookie": cookieHeader(token) } });
 }

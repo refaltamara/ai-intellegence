@@ -1,5 +1,6 @@
-/** PATCH { enabled?, since? }: the owner switches caption reading on or off, or sets the first day it reads (YYYY-MM-DD, null for all) (DECISIONS, 2 Oct 2026). */
-import { currentSession, currentWorkspaceId } from "@/auth/current";
+/** PATCH { enabled?, since? }: Fair's owners or data ops switch caption reading on or off, or sets the first day it reads (YYYY-MM-DD, null for all) (DECISIONS, 2 Oct 2026). */
+import { currentActor, currentSession, currentWorkspaceId } from "@/auth/current";
+import { can } from "@/auth/can";
 import { captionSince, captionStatus } from "@/captions/run";
 import { sql } from "@/db/client";
 import { toJson } from "@/db/json";
@@ -11,7 +12,8 @@ export async function PATCH(req: Request) {
   const ws = await currentWorkspaceId();
   const session = await currentSession();
   if (!session) return Response.json({ error: "unauthorised" }, { status: 401 });
-  if (session.role !== "owner") return Response.json({ error: "Only the owner can switch caption reading." }, { status: 403 });
+  const actor = await currentActor();
+  if (!actor || !can(actor, "workspace.data", { workspace: ws })) return Response.json({ error: "Only Fair's owners or data ops can switch caption reading." }, { status: 403 });
   const b = (await req.json().catch(() => ({}))) as { enabled?: unknown; since?: unknown };
   const patch: { enabled?: boolean; since?: string | null } = {};
   if (b.enabled !== undefined) {
