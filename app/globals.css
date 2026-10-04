@@ -1510,3 +1510,32 @@ table.heat td small{font-weight:500;color:var(--text-3)}
 .cms .cats a{padding:6px 12px;border-radius:999px;border:1px solid var(--line-2);font-size:12px;color:var(--text-2);font-weight:600;background:#fff}
 .cms .cats a.on{border-color:var(--blue);color:var(--blue);background:var(--blue-10)}
 .cms .hint{margin-top:8px;font-size:12px;color:var(--text-3)}
+.difflist{list-style:none;display:flex;flex-direction:column;gap:4px;font-size:13px}
+.difflist li{padding:6px 12px;border-left:3px solid var(--tone,var(--blue));background:#fff;border-radius:6px}
+.draftgrid{display:grid;grid-template-columns:1fr 1fr;gap:14px 18px;padding:16px}
+.draftgrid label,.propose label{display:flex;flex-direction:column;gap:5px;font-size:12px;color:var(--text-3);font-weight:600}
+.draftgrid .wide{grid-column:1/-1}
+.draftgrid textarea,.draftgrid input,.propose textarea{padding:8px 10px;border:1px solid var(--line-2);border-radius:9px;font:inherit;font-size:13px;color:var(--text);background:#fff;resize:vertical}
+.draftgrid fieldset{border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:8px}
+.draftgrid legend{font-size:12px;font-weight:700;color:var(--text-2);padding:0 4px}
+.draftgrid .tick,.propose .tick{flex-direction:row;align-items:baseline;gap:8px;color:var(--text);font-weight:500;font-size:13px}
+.draftgrid .tick small{color:var(--text-3);font-weight:500}
+.draftgrid .row{display:flex;gap:12px;align-items:center}
+.cmsblock header .btn{margin-left:auto}
+.tests{margin-bottom:10px}
+.propose{padding:16px;display:flex;flex-direction:column;gap:12px}
+.propose p{font-size:13px}
+.propose p.warn{color:var(--amber);font-weight:600}
+.propose .lv{display:flex;gap:16px;flex-wrap:wrap}
+.propose .btn{align-self:flex-start}
+.labbox{display:flex;flex-direction:column}
+.labfeed{max-height:420px;overflow:auto;padding:14px 16px;display:flex;flex-direction:column;gap:10px}
+.labmsg{max-width:85%;padding:10px 14px;border-radius:12px;font-size:13px;white-space:pre-wrap}
+.labmsg.user{align-self:flex-end;background:var(--blue-10)}
+.labmsg.assistant{align-self:flex-start;background:var(--surface)}
+.labmsg ul{margin:8px 0 0 16px;font-size:12px;color:var(--green)}
+.labex{display:flex;flex-direction:column;gap:6px}
+.labex button{text-align:left;padding:8px 12px;border:1px dashed var(--line-2);border-radius:10px;font-size:13px;color:var(--text-2);background:#fff}
+.labex button:hover:not(:disabled){border-color:var(--blue);color:var(--blue)}
+.labinput{display:flex;gap:10px;padding:12px 16px;border-top:1px solid var(--line);align-items:flex-end}
+.labinput textarea{flex:1;padding:8px 10px;border:1px solid var(--line-2);border-radius:9px;font:inherit;font-size:13px;resize:none}

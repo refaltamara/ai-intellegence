@@ -38,16 +38,20 @@ function fromRow(role: RoleId, spec: unknown, version: string): RoleModel {
 }
 
 
-/** Fair's current release of a role, or the named released version; null when none is stored. */
-export async function fairVersion(role: RoleId, version?: string | null): Promise<RoleModel | null> {
-  const key = `${role}@${version ?? "current"}`;
+/**
+ * Fair's current release of a role, or the named released version; null when none is
+ * stored. A staged release (stage_workspaces) is current only in its workspaces until it
+ * goes out to everyone; elsewhere the release before it stays current.
+ */
+export async function fairVersion(role: RoleId, version?: string | null, ws?: string | null): Promise<RoleModel | null> {
+  const key = `${role}@${version ?? "current"}@${ws ?? "*"}`;
   const hit = fairCache.get(key);
   if (hit && Date.now() - hit.at < TTL_MS) return hit.v;
   const rows = (await sql.query(
     version
       ? "select version, spec from role_versions where role = $1 and version = $2 and status = 'released'"
-      : "select version, spec from role_versions where role = $1 and status = 'released' order by released_at desc limit 1",
-    version ? [role, version] : [role],
+      : "select version, spec from role_versions where role = $1 and status = 'released' and (stage_workspaces is null or $2::text = any(stage_workspaces)) order by released_at desc limit 1",
+    version ? [role, version] : [role, ws ?? null],
   )) as { version: string; spec: unknown }[];
   const v = rows[0] ? fromRow(role, rows[0].spec, rows[0].version) : null;
   fairCache.set(key, { at: Date.now(), v });
@@ -87,7 +91,7 @@ export async function getRoleResolved(ws: string, roleId: RoleId, userId?: strin
   try {
     const company = await companyVersion(ws, roleId);
     const pinned = company?.base_version ? await fairVersion(roleId, company.base_version) : null;
-    const fair = pinned ?? (await fairVersion(roleId)) ?? base;
+    const fair = pinned ?? (await fairVersion(roleId, null, ws)) ?? base;
     const personal = userId ? await personalSettings(ws, userId, roleId) : null;
     return { ...resolve(fair, company?.overrides, personal), company_version: company?.version ?? null };
   } catch (e) {
@@ -141,16 +145,67 @@ export async function saveDraft(roleId: RoleId, version: string, spec: Partial<R
 }
 
 /** Only Refal or Rafli release; the version becomes current for every client that follows the latest. */
-export async function releaseVersion(roleId: RoleId, version: string, who: Who, note?: string): Promise<Result> {
+export async function releaseVersion(roleId: RoleId, version: string, who: Who, note?: string, stage?: string[] | null): Promise<Result> {
   const by = who.email;
   if (!isOwner(who)) return { ok: false, error: "Only Refal or Rafli can release a version." };
+  const staged = stage?.length ? [...new Set(stage)] : null;
   const rows = (await sql.query(
-    "update role_versions set status = 'released', released_by = $3, released_at = now(), release_note = coalesce($4, release_note) where role = $1 and version = $2 and status in ('draft','proposed') returning version",
-    [roleId, version, by, note ?? null],
+    "update role_versions set status = 'released', released_by = $3, released_at = now(), release_note = coalesce($4, release_note), stage_workspaces = $5::text[] where role = $1 and version = $2 and status in ('draft','proposed') returning version",
+    [roleId, version, by, note ?? null, staged],
   )) as { version: string }[];
   if (!rows.length) return { ok: false, error: `No draft ${ROLES[roleId].codename} ${version} to release.` };
-  await audit({ actor: by, area: "role", action: "release", path: `${roleId}@${version}`, note });
+  await audit({ actor: by, area: "role", action: staged ? "release_staged" : "release", path: `${roleId}@${version}`, new: staged ? { workspaces: staged } : undefined, note });
   invalidateRoles();
+  return { ok: true, version };
+}
+
+/** A staged release goes out to every client that follows the latest. Only Refal or Rafli. */
+export async function releaseToAll(roleId: RoleId, version: string, who: Who): Promise<Result> {
+  if (!isOwner(who)) return { ok: false, error: "Only Refal or Rafli can release a version." };
+  const rows = (await sql.query("update role_versions set stage_workspaces = null where role = $1 and version = $2 and status = 'released' and stage_workspaces is not null returning version", [roleId, version])) as unknown[];
+  if (!rows.length) return { ok: false, error: `${ROLES[roleId].codename} ${version} is not a staged release.` };
+  await audit({ actor: who.email, area: "role", action: "release_all", path: `${roleId}@${version}` });
+  invalidateRoles();
+  return { ok: true, version };
+}
+
+/** The next minor version after every version a role has, as a draft copied from its current release. */
+export async function newDraft(roleId: RoleId, who: Who, note?: string): Promise<Result> {
+  const rows = (await sql.query("select version from role_versions where role = $1", [roleId])) as { version: string }[];
+  const top = rows.map((r) => r.version).sort(compareVersions).at(-1) ?? "1.0";
+  const [major, minor] = top.split(".").map(Number);
+  const current = (await fairVersion(roleId)) ?? ROLES[roleId];
+  return saveDraft(roleId, `${major}.${minor + 1}`, current, who, note);
+}
+
+/** The fields of Fair's role a draft may change here (identity and nav stay with code changes). */
+export const DRAFT_FIELDS = ["voice", "hero_title", "hero_intro", "suggested", "recipes", "deck_templates", "skill_order", "alert", "watch", "description"] as const;
+export type DraftPatch = Partial<Pick<RoleModel, (typeof DRAFT_FIELDS)[number]>>;
+
+/** Change a draft (or a proposal, which goes back to draft): only the listed fields, by a role owner. */
+export async function updateDraft(roleId: RoleId, version: string, patch: DraftPatch, who: Who): Promise<Result> {
+  if (!isRoleOwner(who)) return { ok: false, error: `${who.email} is not a role owner.` };
+  const rows = (await sql.query("select spec from role_versions where role = $1 and version = $2 and status in ('draft','proposed')", [roleId, version])) as { spec: RoleModel }[];
+  if (!rows[0]) return { ok: false, error: `No draft ${ROLES[roleId].codename} ${version}.` };
+  const clean = Object.fromEntries(Object.entries(patch).filter(([k]) => (DRAFT_FIELDS as readonly string[]).includes(k)));
+  const spec = { ...rows[0].spec, ...clean };
+  await sql.query("update role_versions set spec = $3::jsonb, status = 'draft', test_summary = null, updated_at = now() where role = $1 and version = $2", [roleId, version, toJson(spec)]);
+  await audit({ actor: who.email, area: "role", action: "edit", path: `${roleId}@${version}`, new: Object.keys(clean) });
+  return { ok: true, version };
+}
+
+/** A draft's spec as stored, over the code's constant */
+export async function draftSpec(roleId: RoleId, version: string): Promise<(RoleModel & { _status: string; _updated_at: string; _note: string | null; _stage: string[] | null }) | null> {
+  const rows = (await sql.query("select spec, status, updated_at, release_note, stage_workspaces from role_versions where role = $1 and version = $2", [roleId, version])) as { spec: unknown; status: string; updated_at: string; release_note: string | null; stage_workspaces: string[] | null }[];
+  return rows[0] ? { ...fromRow(roleId, rows[0].spec, version), _status: rows[0].status, _updated_at: rows[0].updated_at, _note: rows[0].release_note, _stage: rows[0].stage_workspaces } : null;
+}
+
+/** A role owner proposes a draft for release with its test summary and release note. */
+export async function proposeVersion(roleId: RoleId, version: string, summary: unknown, note: string, who: Who): Promise<Result> {
+  if (!isRoleOwner(who)) return { ok: false, error: `${who.email} is not a role owner.` };
+  const rows = (await sql.query("update role_versions set status = 'proposed', test_summary = $3::jsonb, release_note = $4 where role = $1 and version = $2 and status = 'draft' returning version", [roleId, version, toJson(summary), note])) as unknown[];
+  if (!rows.length) return { ok: false, error: `No draft ${ROLES[roleId].codename} ${version} to propose.` };
+  await audit({ actor: who.email, area: "role", action: "propose", path: `${roleId}@${version}`, note });
   return { ok: true, version };
 }
 

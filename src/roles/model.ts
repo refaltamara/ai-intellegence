@@ -43,6 +43,8 @@ export type RoleModel = {
   watch?: { underperform_pct: number; storm_negative: number; min_account_posts: number };
   /** the company's own rules for CeMO, under the product's fixed rules; set by a Builder, never by Fair's core */
   house_rules?: string[];
+  /** Fair's recipes this role offers (src/recipes/), in order; set by Fair only */
+  recipes?: string[];
   /** a person's own defaults; a company may set them for everyone */
   prefs?: { days?: number; answer?: "short" | "full" };
 };

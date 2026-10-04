@@ -784,6 +784,12 @@ export const roleVersions = pgTable(
     releasedAt: ts("released_at"),
     rolledBackBy: text("rolled_back_by"),
     rolledBackAt: ts("rolled_back_at"),
+    /** a staged release: only these workspaces run it until it is released to everyone (null) */
+    stageWorkspaces: text("stage_workspaces").array(),
+    /** the test results the proposal carried (src/roles/tests.ts) */
+    testSummary: jsonb("test_summary"),
+    /** the last edit of a draft; tests must have run after it before it can be proposed */
+    updatedAt: ts("updated_at").notNull().defaultNow(),
     createdAt: createdAt(),
   },
   (t) => [
@@ -886,4 +892,77 @@ export const modelCalls = pgTable(
     createdAt: createdAt(),
   },
   (t) => [index("model_calls_ws_created_idx").on(t.workspaceId, t.createdAt), index("model_calls_purpose_idx").on(t.purpose, t.createdAt)],
+);
+
+
+// ------------------------------------------------------------- role lab
+/**
+ * Recipes (CMS plan, "Skills as recipes"): analyses as data over the query builder
+ * (src/recipes/). scope is "fair" for Fair's library or a workspace id for a client's
+ * own (phase 4); workspace_id is set for the latter. One row per version.
+ */
+export const recipes = pgTable(
+  "recipes",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    scope: text("scope").notNull().default("fair"),
+    workspaceId: text("workspace_id").references(() => workspaces.id),
+    key: text("key").notNull(),
+    version: integer("version").notNull().default(1),
+    spec: jsonb("spec").notNull(),
+    status: text("status").notNull().default("active"),
+    createdBy: text("created_by"),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("recipes_scope_key_version_uq").on(t.scope, t.key, t.version), check("recipes_status_chk", sql`${t.status} in ('active','retired')`)],
+);
+
+/** A role's test set (CMS plan, "What every role carries"): guards, screens and golden questions. */
+export const testCases = pgTable(
+  "test_cases",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    role: text("role").notNull(),
+    key: text("key").notNull(),
+    kind: text("kind").notNull(),
+    spec: jsonb("spec").notNull(),
+    source: text("source").notNull().default("fair"),
+    active: boolean("active").notNull().default(true),
+    createdBy: text("created_by"),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("test_cases_role_key_uq").on(t.role, t.key), check("test_cases_kind_chk", sql`${t.kind} in ('guard','screen','question')`)],
+);
+
+/** One result per case per run; a batch is one run of a role version's tests. workspace_id is the test workspace, null for guards. */
+export const testRuns = pgTable(
+  "test_runs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    batch: uuid("batch").notNull(),
+    role: text("role").notNull(),
+    roleVersion: text("role_version").notNull(),
+    caseKey: text("case_key").notNull(),
+    workspaceId: text("workspace_id"),
+    status: text("status").notNull(),
+    detail: jsonb("detail").notNull().default(sql`'{}'::jsonb`),
+    createdAt: createdAt(),
+  },
+  (t) => [index("test_runs_role_version_idx").on(t.role, t.roleVersion, t.createdAt), index("test_runs_batch_idx").on(t.batch)],
+);
+
+/** A Role Lab session: a role owner and the Lab's AI working on one draft. */
+export const labSessions = pgTable(
+  "lab_sessions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    role: text("role").notNull(),
+    draftVersion: text("draft_version").notNull(),
+    owner: text("owner").notNull(),
+    messages: jsonb("messages").notNull().default(sql`'[]'::jsonb`),
+    tokens: integer("tokens").notNull().default(0),
+    createdAt: createdAt(),
+    updatedAt: ts("updated_at").notNull().defaultNow(),
+  },
+  (t) => [index("lab_sessions_role_idx").on(t.role, t.updatedAt)],
 );

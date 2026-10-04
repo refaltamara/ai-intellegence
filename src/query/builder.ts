@@ -8,7 +8,7 @@ import { loadContext, resolveBrands, type Context } from "../skills/params";
 import { aggregateEvidence, EvidenceList } from "../skills/common";
 import type { Evidence, Row } from "../skills/types";
 
-export const ENTITIES = ["posts", "creators", "brand_weeks", "creator_brand_months"] as const;
+export const ENTITIES = ["posts", "creators", "brand_weeks", "creator_brand_months", "comments"] as const;
 export const GROUP_BY = ["brand_id", "platform", "source", "tier", "week", "month", "creator_id", "content_format", "product_category", "universe", "caption_product", "caption_event", "caption_event_name", "caption_offer", "caption_hook"] as const;
 /** Read from captions by the model (src/captions/): posts not read yet group as "not read". */
 const CAPTION_DIMS = new Set(["caption_product", "caption_event", "caption_event_name", "caption_offer", "caption_hook"]);
@@ -92,12 +92,113 @@ export type QueryMetricsResult = {
   meta: { entity: string; filters: Record<string, unknown>; group_by: string[]; metrics: string[]; matched: number; returned: number; sql_hash: string; duration_ms: number; caveats: string[] };
 };
 
+// ------------------------------------------------------------------ comments
+/**
+ * The comments entity (CMS plan, recipes): what people say under the posts, counted by
+ * brand, topic, sentiment and time. The brand's own replies never count, nor comments
+ * under a post that does not name its brand (DECISIONS 3 Oct 2026). Shares are over
+ * labelled comments; unlabelled ones are not neutral.
+ */
+export const COMMENT_GROUP_BY = ["brand_id", "platform", "source", "topic", "sentiment", "day", "week", "month"] as const;
+export const COMMENT_METRICS = ["count_comments", "count_commenters", "count_posts", "negative_pct", "positive_pct", "net_sentiment", "purchase_intent_pct", "sum_likes"] as const;
+const COMMENT_FILTERS: Record<string, (v: unknown, add: (val: unknown) => string, ctx: Context) => string | null> = {
+  brand_id: FILTERS.brand_id,
+  platform: (v, add) => `c.platform = any(${add(Array.isArray(v) ? v : [v])}::text[])`,
+  source: (v, add) => `p.source = ${add(String(v))}`,
+  date_from: (v, add, ctx) => `c.posted_at >= (${add(String(v))}::date::timestamp at time zone ${add(ctx.tz)})`,
+  date_to: (v, add, ctx) => `c.posted_at < ((${add(String(v))}::date + 1)::timestamp at time zone ${add(ctx.tz)})`,
+  sentiment: (v, add) => `c.sentiment = any(${add(list(v))}::text[])`,
+  topic: (v, add) => `(t.label ilike any(${add(list(v).map((s) => s.replace(/[%_]/g, "")))}::text[]) or c.topic_id = any(${add(list(v))}::text[]))`,
+  purchase_intent: (v) => (v ? "c.purchase_intent" : "c.purchase_intent is not true"),
+  min_likes: (v, add) => `c.likes >= ${add(Number(v))}`,
+};
+const COMMENT_DIM_SQL: Record<(typeof COMMENT_GROUP_BY)[number], (ctx: Context) => string> = {
+  brand_id: () => "p.brand_id",
+  platform: () => "c.platform",
+  source: () => "p.source",
+  topic: () => "coalesce(t.label, 'no topic')",
+  sentiment: () => "coalesce(c.sentiment, 'unlabelled')",
+  day: (ctx) => `to_char((c.posted_at at time zone '${ctx.tz}')::date, 'YYYY-MM-DD')`,
+  week: (ctx) => `to_char((date_trunc('week', c.posted_at at time zone '${ctx.tz}'))::date, 'YYYY-MM-DD')`,
+  month: (ctx) => `to_char((c.posted_at at time zone '${ctx.tz}'), 'YYYY-MM')`,
+};
+const LABELLED = "c.sentiment is not null and c.off_topic is not true";
+const COMMENT_METRIC_SQL: Record<(typeof COMMENT_METRICS)[number], string> = {
+  count_comments: "count(*)::int",
+  count_commenters: "count(distinct c.author_hash)::int",
+  count_posts: "count(distinct c.post_id)::int",
+  negative_pct: `case when count(*) filter (where ${LABELLED}) > 0 then round((count(*) filter (where c.sentiment = 'negative' and c.off_topic is not true))::numeric / count(*) filter (where ${LABELLED}) * 100, 1)::float8 end`,
+  positive_pct: `case when count(*) filter (where ${LABELLED}) > 0 then round((count(*) filter (where c.sentiment = 'positive' and c.off_topic is not true))::numeric / count(*) filter (where ${LABELLED}) * 100, 1)::float8 end`,
+  net_sentiment: `case when count(*) filter (where ${LABELLED}) > 0 then round(((count(*) filter (where c.sentiment = 'positive' and c.off_topic is not true)) - (count(*) filter (where c.sentiment = 'negative' and c.off_topic is not true)))::numeric / count(*) filter (where ${LABELLED}) * 100, 1)::float8 end`,
+  purchase_intent_pct: "case when count(*) > 0 then round((count(*) filter (where c.purchase_intent))::numeric / count(*) * 100, 1)::float8 end",
+  sum_likes: "coalesce(sum(c.likes), 0)::float8",
+};
+
+async function queryComments(input: QueryMetricsInput, workspaceId: string, db: SkillDb, started: number, fail: (m: string) => QueryMetricsResult): Promise<QueryMetricsResult> {
+  const groupBy = (input.group_by ?? []) as (typeof COMMENT_GROUP_BY)[number][];
+  for (const g of groupBy) if (!COMMENT_GROUP_BY.includes(g)) return fail(`Unknown group_by '${g}' for comments. Use one of ${COMMENT_GROUP_BY.join(", ")}.`);
+  const metrics = (input.metrics ?? []) as (typeof COMMENT_METRICS)[number][];
+  if (!metrics.length) return fail("At least one metric is required.");
+  for (const m of metrics) if (!COMMENT_METRICS.includes(m)) return fail(`Unknown metric '${m}' for comments. Use one of ${COMMENT_METRICS.join(", ")}.`);
+  const ctx = await loadContext(db, workspaceId);
+  const params: unknown[] = [];
+  const add = (v: unknown) => {
+    params.push(v);
+    return `$${params.length}`;
+  };
+  const where = [`c.workspace_id = ${add(ctx.workspaceId)}`, "p.relevant is not false", "c.sentiment_source is distinct from 'subject'", "c.posted_at is not null"];
+  const filters = { ...(input.filters ?? {}) } as Record<string, unknown>;
+  if (!filters.date_from && !filters.date_to) {
+    const d = new Date(ctx.asOf + "T00:00:00Z");
+    d.setUTCDate(d.getUTCDate() - 29);
+    filters.date_from = d.toISOString().slice(0, 10);
+    filters.date_to = ctx.asOf;
+  }
+  for (const [k, v] of Object.entries(filters)) {
+    if (v === undefined || v === null) continue;
+    const f = COMMENT_FILTERS[k];
+    if (!f) return fail(`Unknown filter '${k}' for comments. Use one of ${Object.keys(COMMENT_FILTERS).join(", ")}.`);
+    const clause = f(v, add, ctx);
+    if (clause) where.push(clause);
+  }
+  const orderRaw = (input.order_by ?? metrics[0]).trim();
+  const [orderCol, orderDir] = orderRaw.split(/\s+/);
+  if (![...metrics, ...groupBy].includes(orderCol as never)) return fail(`order_by must be one of the selected metrics or group_by dimensions, got '${orderCol}'.`);
+  const dir = (orderDir ?? "desc").toLowerCase() === "asc" ? "asc" : "desc";
+  const limit = Math.max(1, Math.min(200, Number(input.limit ?? 50) || 50));
+  const dims = groupBy.map((g) => `${COMMENT_DIM_SQL[g](ctx)} as ${g}`);
+  const mets = metrics.map((m) => `${COMMENT_METRIC_SQL[m]} as ${m}`);
+  const sql = `select ${[...dims, ...mets].join(", ")}, count(*) over() as matched
+    from comments c join posts p on p.id = c.post_id left join topics t on t.id = c.topic_id
+    where ${where.join(" and ")}
+    ${groupBy.length ? `group by ${groupBy.map((_, i) => i + 1).join(", ")}` : ""}
+    order by ${orderCol} ${dir} nulls last limit ${add(limit)}`;
+  const rows = await db.q<Row>(sql, params);
+  const matched = rows.length ? Number(rows[0].matched) : 0;
+  const ev = new EvidenceList(60);
+  for (const r of rows) {
+    delete r.matched;
+    const label = groupBy.length ? groupBy.map((g) => `${g}=${r[g]}`).join(" · ") : "all comments";
+    const id = ev.push((eid) => aggregateEvidence(eid, `comments where ${JSON.stringify(filters)} group ${label}`, label, Object.fromEntries(metrics.map((m) => [m, r[m] as number]))));
+    r.evidence_ids = id ? [id] : [];
+  }
+  return {
+    status: "ok",
+    rows,
+    evidence: ev.list,
+    meta: { entity: "comments", filters, group_by: groupBy, metrics, matched, returned: rows.length, sql_hash: db.sqlHash(), duration_ms: Date.now() - started, caveats: [
+      "Comments under the posts, without the brand's own replies; shares are over labelled comments (unlabelled ones are not neutral).",
+    ] },
+  };
+}
+
 export async function queryMetrics(input: QueryMetricsInput, workspaceId: string): Promise<QueryMetricsResult> {
   const started = Date.now();
   const db = new SkillDb();
   const fail = (message: string): QueryMetricsResult => ({ status: "error", message, rows: [], evidence: [], meta: { entity: input.entity, filters: input.filters ?? {}, group_by: input.group_by ?? [], metrics: input.metrics ?? [], matched: 0, returned: 0, sql_hash: db.sqlHash(), duration_ms: Date.now() - started, caveats: [] } });
   try {
     if (!ENTITIES.includes(input.entity)) return fail(`Unknown entity '${input.entity}'. Use one of ${ENTITIES.join(", ")}.`);
+    if (input.entity === "comments") return await queryComments(input, workspaceId, db, started, fail);
     const groupBy = (input.group_by ?? []) as (typeof GROUP_BY)[number][];
     for (const g of groupBy) if (!GROUP_BY.includes(g)) return fail(`Unknown group_by '${g}'. Use one of ${GROUP_BY.join(", ")}.`);
     const metrics = (input.metrics ?? []) as (typeof METRICS)[number][];

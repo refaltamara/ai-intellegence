@@ -19,6 +19,7 @@
     "user": "NODE_USE_ENV_PROXY=1 tsx scripts/user.ts",
     "workspace": "NODE_USE_ENV_PROXY=1 tsx scripts/workspace.ts",
     "role": "NODE_USE_ENV_PROXY=1 tsx scripts/role.ts",
+    "recipe": "NODE_USE_ENV_PROXY=1 tsx scripts/recipe.ts",
     "weekly": "NODE_USE_ENV_PROXY=1 tsx scripts/weekly.ts",
     "weekly:publish": "NODE_USE_ENV_PROXY=1 tsx scripts/weekly-publish.ts"
   },

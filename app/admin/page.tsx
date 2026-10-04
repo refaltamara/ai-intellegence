@@ -15,12 +15,14 @@ const daysAgo = (d: string | null) => (d ? Math.round((Date.now() - Date.parse(d
 export default async function AdminHome() {
   const [actor, versions, workspaces, invites, staff, recent] = await Promise.all([currentActor(), roleVersions(), workspaceStates(), listInvites(), listStaff(), auditRows({ limit: 8 })]);
   const builders = workspaces.reduce((a, w) => a + w.builders, 0);
-  const waiting = versions.filter((v) => v.status === "draft" || v.status === "proposed");
+  const waiting = versions.filter((v) => v.status === "proposed");
+  const staged = versions.filter((v) => v.status === "released" && v.stage_workspaces?.length);
   const noBuilder = workspaces.filter((w) => w.members > 0 && w.builders === 0);
   const stale = workspaces.filter((w) => (daysAgo(w.data_through) ?? 0) > 3);
   const expiring = invites.filter((i) => Date.parse(i.expires_at) - Date.now() < 2 * 86400000);
   const attention = [
-    ...waiting.map((v) => ({ key: `v${v.role}${v.version}`, text: `${ROLES[v.role].codename} ${v.version} is waiting for Refal or Rafli to release it`, href: "/admin/roles" })),
+    ...waiting.map((v) => ({ key: `v${v.role}${v.version}`, text: `${ROLES[v.role].codename} ${v.version} is proposed and waiting for Refal or Rafli to release it`, href: `/admin/roles/${v.role}/${v.version}` })),
+    ...staged.map((v) => ({ key: `s${v.role}${v.version}`, text: `${ROLES[v.role].codename} ${v.version} is staged to ${v.stage_workspaces!.length} workspace(s); release it to everyone when it holds up`, href: `/admin/roles/${v.role}/${v.version}` })),
     ...noBuilder.map((w) => ({ key: `b${w.id}`, text: `${w.name} has ${w.members} client ${w.members === 1 ? "person" : "people"} but no Builder`, href: `/admin/people?ws=${w.id}` })),
     ...expiring.map((i) => ({ key: `i${i.id}`, text: `${i.email}'s invitation to ${i.workspace_name} expires ${day(i.expires_at)}`, href: `/admin/people?ws=${i.workspace_id}` })),
     ...stale.map((w) => ({ key: `s${w.id}`, text: `${w.name}: newest post is from ${day(w.data_through)} (${daysAgo(w.data_through)} days ago)`, href: "/admin/workspaces" })),

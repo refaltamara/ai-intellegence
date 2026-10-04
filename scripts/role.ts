@@ -9,11 +9,15 @@
  *   pnpm role rollback <role> --by Wega [--note ".."]
  *   pnpm role pin <workspace> <role> <version|latest> --by Rafli
  *   pnpm role company <workspace> <role> path=value ... --by <name> [--note ".."]
+ *   pnpm role tests seed                             each role's starting test set (src/roles/tests.ts)
+ *   pnpm role test <role> [--version 1.1] [--kinds guard,screen,question]   run a version's tests (default: the current release)
  * <role> is pr | brand_kol | social, or a codename (chorus, atlas, spark).
  */
 import { readFileSync } from "node:fs";
 import { ROLES, isRoleId, type RoleId } from "../src/roles/model";
 import { findAccountByWho } from "../src/auth/accounts";
+import { runTests, seedTestCases, type TestKind } from "../src/roles/tests";
+import { sql } from "../src/db/client";
 import type { Who } from "../src/roles/store";
 import { companyVersion, fairVersion, getRoleResolved, pinCompany, releaseVersion, roleHistory, rollbackRole, saveDraft, seedRoles, setCompanyChanges } from "../src/roles/store";
 
@@ -104,6 +108,25 @@ async function main() {
       }));
       const r = await setCompanyChanges(a, roleOf(b), changes, (await who()).email, note);
       console.log(`company version ${r.version}${r.dropped.length ? `; not allowed or out of range: ${r.dropped.join(", ")}` : ""}`);
+      break;
+    }
+    case "tests": {
+      for (const r of Object.values(ROLES)) console.log(`${r.codename}: ${await seedTestCases(r.id)} cases added`);
+      break;
+    }
+    case "test": {
+      const role = roleOf(a);
+      const v = flag("--version");
+      let spec = await fairVersion(role);
+      if (v) {
+        const rows = (await sql.query("select spec from role_versions where role = $1 and version = $2", [role, v])) as { spec: object }[];
+        if (!rows[0]) throw new Error(`no ${ROLES[role].codename} ${v}`);
+        spec = { ...ROLES[role], ...rows[0].spec, id: role, version: v };
+      }
+      const kinds = flag("--kinds")?.split(",") as TestKind[] | undefined;
+      const s = await runTests(spec ?? ROLES[role], { kinds });
+      for (const r of s.results) console.log(`${r.status.padEnd(5)} ${r.kind.padEnd(8)} ${r.key.padEnd(34)} ${r.workspace ?? ""} ${JSON.stringify(r.detail).slice(0, 160)}`);
+      console.log(`${ROLES[role].codename} ${s.version}: ${s.pass} pass, ${s.fail} fail, ${s.skip} skipped, ${s.error} errors`);
       break;
     }
     default:

@@ -7,17 +7,17 @@ import { sql } from "../db/client";
 import { ROLES, type RoleId } from "../roles/model";
 import { listWorkspaces, getWorkspace } from "../workspace/store";
 
-export type VersionRow = { role: RoleId; version: string; status: string; release_note: string | null; proposed_by: string | null; released_by: string | null; released_at: string | null; rolled_back_by: string | null; rolled_back_at: string | null; created_at: string };
+export type VersionRow = { role: RoleId; version: string; status: string; stage_workspaces: string[] | null; release_note: string | null; proposed_by: string | null; released_by: string | null; released_at: string | null; rolled_back_by: string | null; rolled_back_at: string | null; created_at: string };
 
 export async function roleVersions(): Promise<VersionRow[]> {
   return (await sql.query(
-    "select role, version, status, release_note, proposed_by, released_by, released_at, rolled_back_by, rolled_back_at, created_at from role_versions order by role, created_at desc",
+    "select role, version, status, stage_workspaces, release_note, proposed_by, released_by, released_at, rolled_back_by, rolled_back_at, created_at from role_versions order by role, created_at desc",
   )) as VersionRow[];
 }
 
 /** the current release per role: the latest released */
 export function currentOf(rows: VersionRow[], role: RoleId): VersionRow | null {
-  return rows.filter((r) => r.role === role && r.status === "released").sort((a, b) => (b.released_at ?? "").localeCompare(a.released_at ?? ""))[0] ?? null;
+  return rows.filter((r) => r.role === role && r.status === "released" && !r.stage_workspaces?.length).sort((a, b) => (b.released_at ?? "").localeCompare(a.released_at ?? ""))[0] ?? null;
 }
 
 export type CompanyState = { workspace_id: string; role: RoleId; version: number; base_version: string | null; changes: number; author: string | null; created_at: string };
