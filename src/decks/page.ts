@@ -7,13 +7,15 @@ import { loadContext } from "../skills/params";
 import { deckPeriods } from "./generate";
 import { brandLabel, type DeckSpec } from "./spec";
 import { templatesFor, type DeckTemplate } from "./templates";
+import { companyTemplates } from "../company/creations";
 import { BRAND_KOL, type RoleModel } from "../roles/model";
 import { REP_SLIDES } from "../reputation/slides";
 import { SOCIAL_SLIDES } from "../social/slides";
 
 export type DeckOptions = {
   brands: { id: string; name: string }[];
-  templates: DeckTemplate[];
+  /** Fair's (badge "Fair") and the team's own (badge: the client's name; by: who made it) */
+  templates: (DeckTemplate & { badge?: string; by?: string })[];
   slides: { kind: string; title: string; description: string; pages: string; required?: boolean; needs?: string }[];
   periods: { week: { key: string; label: string }[]; month: { key: string; label: string }[] };
   /** the workspace's client brand, offered (not set) as the client */
@@ -30,7 +32,16 @@ export type DeckOptions = {
 
 const STARTERS: WeeklyContract[] = [paragon as WeeklyContract];
 
-export async function deckOptions(workspaceId: string, role: RoleModel = BRAND_KOL): Promise<DeckOptions> {
+/** The templates a team starts from: Fair's in the order its role (and company) asks, then the team's own, badged. */
+async function teamTemplates(workspaceId: string, role: RoleModel, email: string | null, client: string | null): Promise<DeckOptions["templates"]> {
+  const fair = templatesFor(role.id);
+  const order = role.deck_templates?.length ? role.deck_templates : fair.map((t) => t.key);
+  const ours = fair.filter((t) => order.includes(t.key)).sort((a, b) => order.indexOf(a.key) - order.indexOf(b.key)).map((t) => ({ ...t, badge: "Fair" }));
+  const own = await companyTemplates(workspaceId, role.id, email).catch(() => []);
+  return [...ours, ...own.map((t) => ({ ...t, badge: t._creation.status === "approved" ? client ?? "Your team" : "Yours, not shared yet", by: t._creation.maker }))];
+}
+
+export async function deckOptions(workspaceId: string, role: RoleModel = BRAND_KOL, email: string | null = null): Promise<DeckOptions> {
   const ctx = await loadContext(new SkillDb(), workspaceId);
   const [week, month] = await Promise.all([deckPeriods(workspaceId, "week", 12), deckPeriods(workspaceId, "month", 6)]);
   const brands = ctx.brands.map((b) => ({ id: b.id, name: brandLabel(b.name) })).sort((a, b) => a.name.localeCompare(b.name));
@@ -39,7 +50,7 @@ export async function deckOptions(workspaceId: string, role: RoleModel = BRAND_K
   const known = new Set(brands.map((b) => b.id));
   return {
     brands,
-    templates: templatesFor(role.id),
+    templates: await teamTemplates(workspaceId, role, email, own?.name ?? null),
     slides: SLIDES.map((s) => ({ kind: s.kind, title: s.title, description: s.description, pages: s.pages, ...(s.required ? { required: true } : {}), ...(s.needs ? { needs: s.needs } : {}) })),
     periods: { week: week.map((p) => ({ key: p.key, label: p.label })), month: month.map((p) => ({ key: p.key, label: p.label })) },
     client: own ? { name: own.name, brand_ids: [own.id] } : null,

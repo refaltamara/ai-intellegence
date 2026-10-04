@@ -33,10 +33,14 @@ export type PaneTool = {
 const SMALL_FIGURE_ROWS = 3;
 
 /** Whether a tool result opens the pane, and as what. A sentence answer stays in the thread. */
+const TEAM_TOOLS = new Set(["make_skill", "make_deck_template", "remember_for_team", "change_team"]);
+
 export function paneOf(tool: PaneTool): { kind: PaneKind; title: string } | null {
   if (tool.name === "create_agent_draft" && tool.draft) return { kind: "agent_draft", title: tool.title ?? "Watch this" };
   if (tool.name === "export_run" && tool.file) return { kind: "file", title: tool.title ?? "Spreadsheet" };
   if (tool.status !== "ok") return null;
+  // something made for the team is a card in the thread with its own buttons, never a pane tab
+  if (TEAM_TOOLS.has(tool.name)) return null;
   const rows = tool.rows ?? [];
   const chart = tool.chart as ChartSpec | undefined;
   const chartOk = !!chart && Array.isArray(chart.x) && chart.x.length >= 3;

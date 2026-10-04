@@ -95,12 +95,26 @@ const addDays = (d: string, k: number) => new Date(Date.parse(d + "T00:00:00Z") 
 const SERVICE_THEME = /payment|refund|transaction|service failure|customer (support|service)|account|balance|saldo|top ?up|withdraw|funds|app (issue|error|bug)|login|blocked|fraud|card issue|transfer/i;
 const NOT_SERVICE = /promo|voucher|discount|cashback|coin|banner|giveaway/i;
 
+/** The crisis bar: the company's own when it set one (always above the issue level), else 1.5× the issue level with the comment floor in negatives. */
+export function crisisOf(alert: NonNullable<RoleModel["alert"]>): { multiple: number; min_negative: number } {
+  const m = alert.crisis_multiple != null && alert.crisis_multiple >= alert.negative_multiple * 1.25 ? alert.crisis_multiple : alert.negative_multiple * 1.5;
+  return { multiple: Math.round(m * 100) / 100, min_negative: alert.crisis_min_negative ?? alert.min_comments };
+}
+
+/** The rule in words, for the status card and the "Why this level?" drawer. */
+export function ruleText(alert: NonNullable<RoleModel["alert"]>, who: string): string {
+  const c = crisisOf(alert);
+  const r = (x: number) => Math.round(x * 100) / 100;
+  return `Issue: a day's negative share of comments about ${who} at ${r(alert.negative_multiple)}× its ${alert.baseline_days}-day norm or more, with at least ${alert.min_comments} comments that day. Crisis: ${c.multiple}× or more with ${c.min_negative}+ negative comments. Watch: ${r(1 + (alert.negative_multiple - 1) / 2)}× or more. Recovering: calm again within 7 days of an issue.`;
+}
+
 /** The status ladder for one day, from that day's negative share against the baseline. */
 export function levelFor(neg: number, comments: number, baselinePct: number | null, alert: NonNullable<RoleModel["alert"]>): { level: Level; multiple: number | null } {
   const pctNow = comments > 0 ? (neg / comments) * 100 : null;
   const multiple = pctNow != null && baselinePct ? Math.round((pctNow / baselinePct) * 10) / 10 : null;
   if (comments < alert.min_comments || multiple == null) return { level: "calm", multiple };
-  if (multiple >= alert.negative_multiple * 1.5 && neg >= alert.min_comments) return { level: "crisis", multiple };
+  const crisis = crisisOf(alert);
+  if (multiple >= crisis.multiple && neg >= crisis.min_negative) return { level: "crisis", multiple };
   if (multiple >= alert.negative_multiple) return { level: "issue", multiple };
   if (multiple >= 1 + (alert.negative_multiple - 1) / 2) return { level: "watch", multiple };
   return { level: "calm", multiple };
@@ -233,7 +247,7 @@ export async function reputationFacts(ws: string, win: { focus: string; from: st
     baseline: { neg_pct: lastBase?.baseline_pct == null ? null : Math.round(lastBase.baseline_pct * 10) / 10, comments_per_day: priorDays.length ? Math.round(baseComments / priorDays.length) : 0, days: priorDays.length },
     multiple,
     history: hist,
-    rule: `Issue: a day's negative share of comments about ${focus.name} at ${alert.negative_multiple}× its ${alert.baseline_days}-day norm or more, with at least ${alert.min_comments} comments that day. Crisis: ${alert.negative_multiple * 1.5}× or more with ${alert.min_comments}+ negative comments. Watch: ${1 + (alert.negative_multiple - 1) / 2}× or more. Recovering: calm again within 7 days of an issue.`,
+    rule: ruleText(alert, focus.name),
   };
 
   // ---- headline numbers, now and before

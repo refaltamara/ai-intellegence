@@ -7,7 +7,8 @@
 import Link from "next/link";
 import { useEffect, useRef } from "react";
 
-export type SkillOption = { name: string; title: string; description: string; example: string; group: string };
+/** badge: whose it is ("Fair", or the client's name for what the team made); by: its maker, on hover */
+export type SkillOption = { name: string; title: string; description: string; example: string; group: string; badge?: string; by?: string };
 
 export function matchSkills(options: SkillOption[], query: string): SkillOption[] {
   const words = query.toLowerCase().split(/\s+/).filter(Boolean);
@@ -35,7 +36,7 @@ export function SlashMenu({ options, index, onPick, onHover }: { options: SkillO
               {head && <h6>{head}</h6>}
               <button type="button" role="option" aria-selected={i === index} data-i={i} className={i === index ? "on" : ""}
                 onMouseEnter={() => onHover(i)} onMouseDown={(e) => { e.preventDefault(); onPick(o); }}>
-                <b>{o.title}</b>
+                <b>{o.title}{o.badge && <i className={`badge ${o.badge === "Fair" ? "fair" : "client"}`} title={o.by ? `Made by ${o.by}` : undefined}>{o.badge}</i>}</b>
                 <span>{o.description}</span>
               </button>
             </div>

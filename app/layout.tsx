@@ -9,6 +9,7 @@ import { BRAND_KOL } from "@/roles/model";
 import { getWorkspace } from "@/workspace/store";
 import { teamsFor } from "@/workspace/teams";
 import { headers } from "next/headers";
+import { sql } from "@/db/client";
 
 /** Pages that take the whole screen: sign-in, the team question, connector consent. */
 const FULL_SCREEN = ["/login", "/persona", "/oauth/", "/invite/", "/admin", "/admin/"];
@@ -34,7 +35,10 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
       ])
     : [[], null, null, BRAND_KOL];
   const teams = actor ? await teamsFor(actor).catch(() => []) : [];
-  const user = session ? { email: session.email, role: who(actor, ws, role.id), team: !!actor && can(actor, "team.manage", { workspace: ws }), cms: !!actor && can(actor, "cms.open") } : null;
+  // "Our Chorus": the team's own version of its role; a Builder sees how many creations wait for them
+  const builder = !!actor && can(actor, "company.change", { workspace: ws, role: role.id });
+  const waiting = builder ? await waitingCount(ws, role.id).catch(() => 0) : 0;
+  const user = session ? { email: session.email, role: who(actor, ws, role.id), team: !!actor && can(actor, "team.manage", { workspace: ws }), cms: !!actor && can(actor, "cms.open"), company: { label: `Our ${role.codename}`, waiting } } : null;
   return (
     <html lang="en">
       <head>
@@ -61,4 +65,9 @@ function who(actor: Actor | null, ws: string, role: Parameters<typeof levelOf>[2
   if (actor.staff.length) return `Fair · ${actor.staff.map((d) => DUTY_LABEL[d]).join(", ")}`;
   const l = levelOf(actor, ws, role);
   return l === "builder" ? "Builder" : l === "member" ? "Member" : "";
+}
+
+async function waitingCount(ws: string, role: string): Promise<number> {
+  const r = (await sql.query("select count(*)::int as n from creations where workspace_id = $1 and role = $2 and status = 'waiting'", [ws, role])) as { n: number }[];
+  return r[0]?.n ?? 0;
 }

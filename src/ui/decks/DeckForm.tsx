@@ -122,7 +122,7 @@ export function DeckForm({ options, initial, prefill }: { options: DeckOptions; 
           <div className="tpls">
             {options.templates.map((x) => (
               <button key={x.key} type="button" className={template === x.key ? "on" : ""} onClick={() => pickTemplate(x.key)}>
-                <b>{x.name}</b><span>{x.description}</span>
+                <b>{x.name}{x.badge && <i className={`badge ${x.badge === "Fair" ? "fair" : "client"}`} title={x.by ? `Made by ${x.by}` : undefined}>{x.badge}</i>}</b><span>{x.description}</span>
                 <small>{x.grain === "month" ? "Month on month" : "Week on week"} · {(x.rep_slides ?? x.social_slides ?? x.slides).length} slide types</small>
               </button>
             ))}

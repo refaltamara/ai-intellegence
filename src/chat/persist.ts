@@ -56,6 +56,8 @@ export type ToolCallRecord = {
   file?: { url: string; filename: string; format: "csv" | "xlsx"; rows: number; run_id: string };
   /** set by a re-run from the pane: the tab this object replaces */
   replaces?: string;
+  /** something CeMO made or proposed for the team (src/company/tools.ts): the card and its buttons */
+  proposal?: unknown;
 };
 
 export async function createConversation(workspaceId: string, title: string, userId: string | null, decisionId: string | null = null): Promise<ConversationRow> {

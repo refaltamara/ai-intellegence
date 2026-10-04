@@ -12,7 +12,7 @@ import { unionSkillParamsSchema } from "./schema";
 import type { RecipeSpec } from "../recipes/spec";
 
 /** Strict-compatible schema for query_metrics filters: one property per whitelisted filter. */
-const FILTER_SCHEMA = {
+export const FILTER_SCHEMA = {
   type: "object",
   properties: {
     brand_id: { type: "array", items: { type: "string" }, description: "brand slugs, handles or names" },

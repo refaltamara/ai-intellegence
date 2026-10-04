@@ -27,7 +27,7 @@ const NAV: NavItem[] = [
 
 type Product = { name: string; tagline: string; label: string; kind: string };
 
-export function Sidebar({ recent, user, product, teams, currentWorkspace, currentRole }: { recent: { id: string; title: string; href: string }[]; user: { email: string; role: string; team?: boolean; cms?: boolean }; product: Product; teams: TeamChoice[]; currentWorkspace: string; currentRole: string }) {
+export function Sidebar({ recent, user, product, teams, currentWorkspace, currentRole }: { recent: { id: string; title: string; href: string }[]; user: { email: string; role: string; team?: boolean; cms?: boolean; company?: { label: string; waiting: number } }; product: Product; teams: TeamChoice[]; currentWorkspace: string; currentRole: string }) {
   const path = usePathname();
   const router = useRouter();
   const [switching, setSwitching] = useState<string | null>(null);
@@ -84,6 +84,13 @@ export function Sidebar({ recent, user, product, teams, currentWorkspace, curren
             {n.label}
           </Link>
         ))}
+        {user.company && (
+          <Link href="/company" className={`ours ${active("/company") ? "on" : ""}`} data-tone="violet" title="Your team's own version: what it changed, made and approved">
+            <span className="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.4 6.8 19.1l1-5.8L3.5 9.2l5.9-.9z" /></svg></span>
+            {user.company.label}
+            {user.company.waiting > 0 && <b className="count" title={`${user.company.waiting} waiting for your approval`}>{user.company.waiting}</b>}
+          </Link>
+        )}
       </nav>
       <div>
         <h6>Recent chats</h6>

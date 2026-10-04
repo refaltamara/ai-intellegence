@@ -56,6 +56,21 @@ export function DeckViewer({ deck, items, initialId, initialSlide, periods }: Pr
     router.refresh();
   }
 
+  /** "Save as template": this deck's slides and grain, for the team (a Member's waits for the Builder) */
+  async function saveTemplate() {
+    const name = window.prompt("Name the template (it shows under Decks → New deck)", `${deck.name}`);
+    if (!name?.trim()) return;
+    const r = await fetch("/api/builder/creations", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "make", from_deck: deck.id, input: { name: name.trim() }, live: true }) });
+    const o = await r.json().catch(() => ({}));
+    if (!r.ok) { setError(o.error ?? "The template could not be saved"); return; }
+    const c = o.creation as { id: string; status: string };
+    if (c.status === "draft") {
+      // a Member's template goes to the Builder
+      await fetch("/api/builder/creations", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "submit", id: c.id }) });
+      setBusy(null); setError(""); window.alert("Saved. It works for you now and goes to your Builder to add for everyone.");
+    } else window.alert("Saved for everyone on the team: it is under Decks → New deck.");
+  }
+
   async function removeVersion() {
     const item = items.find((i) => i.id === onScreen);
     if (!item || !confirm(`Delete the ${item.label} version of this deck?`)) return;
@@ -87,6 +102,7 @@ export function DeckViewer({ deck, items, initialId, initialSlide, periods }: Pr
       <details className="dmore">
         <summary className="btn sm ghost" aria-label="More">⋯</summary>
         <div className="dmenu-pop">
+          <button className="linkbtn" onClick={saveTemplate}>Save as template</button>
           {items.length > 1 && <button className="linkbtn" onClick={removeVersion}>Delete this version</button>}
           <button className="linkbtn danger" onClick={removeDeck}>Delete the deck</button>
         </div>

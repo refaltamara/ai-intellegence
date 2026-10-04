@@ -49,11 +49,13 @@ type Props = {
   skills?: SkillOption[];
   /** "Ask why" from the dashboard: the click, and the figures the server read for it */
   fromDashboard?: { ref: AskRef; context: AskContext } | null;
+  /** the team's role (its codename on cards), and whether this person may switch Builder mode on */
+  team?: { codename: string; builder: boolean } | null;
 };
 
 const DEFAULT_COPY = { hero_title: "What's happening in Indonesian beauty?", hero_intro: "", suggested: ["What were competitors doing last week?", "Which brand grew fastest this month?", "Which campaigns ran in the last 90 days with 20 or more creators?", "Find 50 nano creators competitors used on TikTok in the last 90 days"], label: "Beauty · Indonesia", kind: "category" };
 
-export function Ask({ initialConversation, initialMessages, prefill, stats, clientName, decisionId = null, basePath = "/", initialSend, topbar = true, pane, copy = DEFAULT_COPY, skills = [], fromDashboard = null }: Props) {
+export function Ask({ initialConversation, initialMessages, prefill, stats, clientName, decisionId = null, basePath = "/", initialSend, topbar = true, pane, copy = DEFAULT_COPY, skills = [], fromDashboard = null, team = null }: Props) {
   const router = useRouter();
   const [conversationId, setConversationId] = useState<string | null>(initialConversation);
   const [thread, setThread] = useState<Msg[]>(() => {
@@ -64,6 +66,12 @@ export function Ask({ initialConversation, initialMessages, prefill, stats, clie
   });
   const [text, setText] = useState(prefill ?? fromDashboard?.context.question ?? "");
   const [pendingAsk, setPendingAsk] = useState(fromDashboard);
+  // Builder mode (CMS plan, The Builder): only a Builder sees the switch; the server checks again on every turn
+  const [builderMode, setBuilderMode] = useState(false);
+  useEffect(() => { try { if (team?.builder && localStorage.getItem("fi_builder_mode") === "1") setBuilderMode(true); } catch { /* storage off */ } }, [team?.builder]);
+  function toggleBuilder() {
+    setBuilderMode((on) => { try { localStorage.setItem("fi_builder_mode", on ? "0" : "1"); } catch { /* storage off */ } return !on; });
+  }
   const [busy, setBusy] = useState(false);
   const [deckBusy, setDeckBusy] = useState(false);
   const [open, setOpen] = useState<Record<string, string[]>>({});
@@ -246,7 +254,7 @@ export function Ask({ initialConversation, initialMessages, prefill, stats, clie
     const asking = pendingAsk;
     setPendingAsk(null);
     const userMsg: Msg = { id: `u${Date.now()}`, role: "user", text: q, tools: [], evidence: {}, attachments: sending.length ? sending : undefined, context: asking?.context };
-    await turn(userMsg, { message: q, conversation_id: conversationId, decision_id: decisionId, attachment_ids: sending.map((f) => f.id), ...(followup ? { followup: { label: followup.label, skill: followup.skill, params: followup.params } } : {}), ...(asking ? { ask: asking.ref } : {}) });
+    await turn(userMsg, { message: q, conversation_id: conversationId, decision_id: decisionId, attachment_ids: sending.map((f) => f.id), ...(followup ? { followup: { label: followup.label, skill: followup.skill, params: followup.params } } : {}), ...(asking ? { ask: asking.ref } : {}), ...(builderMode && team?.builder ? { builder: true } : {}) });
   }
 
   /** A pane action is a hidden user turn; the server works out the numbers and the model phrases them. */
@@ -327,7 +335,7 @@ export function Ask({ initialConversation, initialMessages, prefill, stats, clie
                           t.name === "export_run" && t.file ? (
                             <FileChip key={t.id} tool={t} conversationId={conversationId} />
                           ) : (
-                            <ResultCard key={t.id} tool={t} evidence={m.evidence} decisionId={decisionId} onOpenEvidence={(ids) => setOpen((o) => ({ ...o, [m.id]: ids }))} onOpenPane={objects.some((o) => o.id === t.id) ? () => showObject(t.id) : undefined} />
+                            <ResultCard key={t.id} tool={t} evidence={m.evidence} decisionId={decisionId} codename={team?.codename} onOpenEvidence={(ids) => setOpen((o) => ({ ...o, [m.id]: ids }))} onOpenPane={objects.some((o) => o.id === t.id) ? () => showObject(t.id) : undefined} />
                           ),
                         )}
                         {m.ask && (
@@ -384,7 +392,8 @@ export function Ask({ initialConversation, initialMessages, prefill, stats, clie
           <div className="dock">
             <div className="wrap">
               {pendingAsk && <AskContextCard c={pendingAsk.context} onRemove={() => setPendingAsk(null)} />}
-              <div className="composer">
+              <div className={`composer ${builderMode && team?.builder ? "building" : ""}`}>
+                {builderMode && team?.builder && <div className="buildbar">Builder mode · what you change here applies to everyone on {team.codename}, after you press Apply</div>}
                 {(files.length > 0 || uploading > 0) && (
                   <div className="files">
                     {files.map((f) => (
@@ -405,6 +414,7 @@ export function Ask({ initialConversation, initialMessages, prefill, stats, clie
                     {skills.length > 0 && <button type="button" className={`plus ${menuOpen ? "on" : ""}`} onMouseDown={(e) => e.preventDefault()} onClick={toggleMenu} title="What CeMO can do" aria-label="What CeMO can do" aria-expanded={menuOpen}>+</button>}
                     <input ref={fileRef} type="file" accept="application/pdf" multiple hidden onChange={(e) => { if (e.target.files?.length) void upload(e.target.files); e.target.value = ""; }} />
                     <button className="attach" onClick={() => fileRef.current?.click()} disabled={files.length >= MAX_FILES} title={files.length >= MAX_FILES ? `Up to ${MAX_FILES} documents` : "Attach a PDF brief or deck"}>Attach PDF</button>
+                    {team?.builder && <button type="button" className={`buildswitch ${builderMode ? "on" : ""}`} onClick={toggleBuilder} role="switch" aria-checked={builderMode} title="Shape the team's version by asking CeMO">Builder mode</button>}
                     <span>Enter to send · / for what CeMO can do</span>
                   </span>
                   <button className="btn pri sm" disabled={busy || uploading > 0} onClick={() => send(text)}>{busy ? "Working…" : "Ask"}</button>

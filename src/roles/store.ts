@@ -33,6 +33,7 @@ export function invalidateRoles(): void {
 const tablesOn = () => (process.env.FI_ROLE_TABLES ?? "").trim().toLowerCase() !== "off";
 
 /** a stored spec over the code's own constant, so a field added in code after a release still has its 1.0 value */
+export const fromRowSpec = (role: RoleId, spec: unknown, version: string): RoleModel => fromRow(role, spec, version);
 function fromRow(role: RoleId, spec: unknown, version: string): RoleModel {
   return { ...ROLES[role], ...(spec as Partial<RoleModel>), id: role, codename: ROLES[role].codename, version };
 }

@@ -24,7 +24,8 @@ export async function POST(req: Request) {
   const b = (await req.json().catch(() => ({}))) as { name?: unknown; template?: unknown; spec?: unknown; recurring?: unknown; period?: unknown; source?: unknown };
   const spec = cleanSpec(b.spec, await knownBrands(ws));
   if ("error" in spec) return Response.json({ error: spec.error }, { status: 400 });
-  const t = deckTemplate(b.template);
+  // a Fair template, or one the team made (src/company/creations.ts): either way the deck keeps its key
+  const t = deckTemplate(b.template) ?? (typeof b.template === "string" && /^co-[a-z0-9-]{3,60}$/.test(b.template) ? { key: b.template, name: spec.title } : null);
   const name = typeof b.name === "string" && b.name.trim() ? b.name.trim().slice(0, 80) : t?.name ?? spec.title;
   const recurring = b.recurring === true;
   const created = await createDeck({ workspaceId: ws, userId: session?.uid ?? null, name, source: t ? "template" : "scratch", template: t?.key ?? null, spec, recurring });

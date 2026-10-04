@@ -966,3 +966,66 @@ export const labSessions = pgTable(
   },
   (t) => [index("lab_sessions_role_idx").on(t.role, t.updatedAt)],
 );
+
+// ------------------------------------------------------------- the client side
+/**
+ * Everything a client makes on a team (CMS plan, "The client side"): company skills
+ * (recipes over the query builder), deck templates, house rules, memory facts and
+ * vocabulary. A Builder's creation is live at once; a Member's works for its maker and
+ * waits for a Builder's approval before it reaches everyone. The maker and the approver
+ * give its badge. A release never touches these rows.
+ */
+export const creations = pgTable(
+  "creations",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workspaceId: text("workspace_id").notNull().references(() => workspaces.id),
+    role: text("role").notNull(),
+    kind: text("kind").notNull(),
+    /** skills and templates: the key they run under, unique among a team's live creations */
+    key: text("key"),
+    title: text("title").notNull(),
+    spec: jsonb("spec").notNull(),
+    status: text("status").notNull().default("draft"),
+    makerUserId: uuid("maker_user_id"),
+    makerEmail: text("maker_email").notNull(),
+    makerName: text("maker_name"),
+    approver: text("approver"),
+    /** the Builder's note when sending back or rejecting */
+    note: text("note"),
+    decidedAt: ts("decided_at"),
+    updatedAt: ts("updated_at").notNull().defaultNow(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index("creations_ws_role_idx").on(t.workspaceId, t.role, t.status),
+    check("creations_kind_chk", sql`${t.kind} in ('skill','deck_template','rule','fact','term')`),
+    check("creations_status_chk", sql`${t.status} in ('draft','waiting','approved','sent_back','rejected','removed')`),
+  ],
+);
+
+/** "Suggest to Fair": a client item a Builder sends to the role owners, seen in the CMS's Client creations. */
+export const fairSuggestions = pgTable(
+  "fair_suggestions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workspaceId: text("workspace_id").notNull().references(() => workspaces.id),
+    role: text("role").notNull(),
+    /** a creation (ref = its id) or a company setting (ref = its path, value = the company's value) */
+    refKind: text("ref_kind").notNull(),
+    ref: text("ref").notNull(),
+    value: jsonb("value"),
+    note: text("note"),
+    byEmail: text("by_email").notNull(),
+    status: text("status").notNull().default("new"),
+    fairNote: text("fair_note"),
+    fairBy: text("fair_by"),
+    updatedAt: ts("updated_at").notNull().defaultNow(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index("fair_suggestions_status_idx").on(t.status, t.createdAt),
+    check("fair_suggestions_ref_chk", sql`${t.refKind} in ('creation','setting')`),
+    check("fair_suggestions_status_chk", sql`${t.status} in ('new','seen','adopted','declined')`),
+  ],
+);

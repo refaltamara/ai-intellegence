@@ -36,6 +36,10 @@ import { getWorkspace } from "../workspace/store";
 import { fillRole, type RoleId, type RoleModel } from "../roles/model";
 import { getRoleResolved } from "../roles/store";
 import { PLATFORM_LABEL } from "../skills/common";
+import { can, type Actor } from "../auth/can";
+import { companyRecipes, isBuilder, teamMemory } from "../company/creations";
+import { memoryPrompt } from "../company/rules";
+import { ACTIVITY as TEAM_ACTIVITY, BUILDER_TOOLS, MAKE_TOOLS, builderPrompt, builderTools, executeTeamTool, makeTools } from "../company/tools";
 
 export const MAX_TOOL_CALLS = 6;
 const MAX_ROWS_IN_CONTEXT = 60;
@@ -78,6 +82,10 @@ export type ChatTurnInput = {
   ask?: AskRef;
   /** "Ask AI" on a weekly report slide: which report and slide; the slide and the fact sheet are read here */
   slide?: SlideRef;
+  /** the person asking (src/auth/can.ts): what CeMO may make for them, and whether Builder mode applies */
+  actor?: Actor | null;
+  /** Builder mode, switched on in Chats; honoured only for a Builder of this team */
+  builderMode?: boolean;
 };
 
 const SYSTEM_TEMPLATE = readFileSync(path.join(process.cwd(), "src/chat/system.md"), "utf8");
@@ -105,12 +113,12 @@ export async function buildSystem(workspaceId: string, role?: RoleId, spec?: Rol
   if (spec) return buildSystemUncached(workspaceId, spec);
   const cfg = await getWorkspace(workspaceId);
   const roleId: RoleId = role && cfg?.roles.includes(role) ? role : cfg?.roles[0] ?? "brand_kol";
-  const resolved = await getRoleResolved(workspaceId, roleId);
-  // a new release or a company change makes a new prompt at once
-  const key = `${workspaceId}:${roleId}:${resolved.role.version}:${resolved.company_version ?? 0}`;
+  const [resolved, memory] = await Promise.all([getRoleResolved(workspaceId, roleId), teamMemory(workspaceId, roleId).catch(() => null)]);
+  // a new release, a company change or a new house rule makes a new prompt at once
+  const key = `${workspaceId}:${roleId}:${resolved.role.version}:${resolved.company_version ?? 0}:${memory?.version ?? ""}`;
   const hit = systemCache.get(key);
   if (hit && Date.now() - hit.at < SYSTEM_TTL_MS) return hit.text;
-  const text = await buildSystemUncached(workspaceId, resolved.role);
+  const text = (await buildSystemUncached(workspaceId, resolved.role)) + (memory ? memoryPrompt(memory, await teamName(workspaceId)) : "");
   systemCache.set(key, { text, at: Date.now() });
   return text;
 }
@@ -153,6 +161,12 @@ async function buildSystemUncached(workspaceId: string, role: RoleModel): Promis
     .replace("{{data_line}}", platforms.map((p) => `${p.platform} ${p.posts.toLocaleString("en-US")} posts from ${p.from} to ${p.to}`).join("; ") + (comments?.n ? `; ${comments.n.toLocaleString("en-US")} comments, ${comments.labelled === comments.n ? "all" : comments.labelled.toLocaleString("en-US")} with a sentiment label${comments.labelled < comments.n ? " so far (the rest are unlabelled, not neutral)" : ""}.` : ". No comment text.") + tracking + relevance)
     .replace("{{as_of}}", ctx.asOf)
     .replace("{{brands}}", ctx.brands.map((b) => `${b.id} (${b.name})`).join(", ")) + houseRules(role, client?.name);
+}
+
+async function teamName(ws: string): Promise<string> {
+  const db = new SkillDb();
+  const ctx = await loadContext(db, ws);
+  return ctx.brands.find((b) => b.id === ctx.clientBrandId)?.name ?? (await getWorkspace(ws))?.name ?? "the team";
 }
 
 /** The company's own rules for CeMO (set by its Builder, src/roles/policy.ts), last and under every rule above. */
@@ -199,7 +213,7 @@ export async function runChatTurn(input: ChatTurnInput, emit: (e: ChatEvent) => 
   // the report's whole fact sheet rides with this turn only; history keeps the slide, not the sheet
   const extra = slide?.sheet ? `[The report's full fact sheet, every number already computed:\n${slide.sheet}]` : null;
   try {
-    await runTurnBody(conversation, userText, emit, claimed, input.followup, input.paneAction, input.userId ?? null, context, extra, input.role, input.roleSpec);
+    await runTurnBody(conversation, userText, emit, claimed, input.followup, input.paneAction, input.userId ?? null, context, extra, input.role, input.roleSpec, input.actor ? { actor: input.actor, builderMode: !!input.builderMode } : undefined);
   } catch (e) {
     const message = describeModelError(e);
     console.error("chat turn failed:", conversation.id, message, (e as Error).stack?.split("\n").slice(0, 3).join(" | "));
@@ -260,7 +274,7 @@ export function historyTurns(history: { role: "user" | "assistant"; content_json
   return { messages, pendingAsk, pendingNotes: notes };
 }
 
-async function runTurnBody(conversation: { id: string; workspace_id: string; decision_id?: string | null }, userText: string, emit: (e: ChatEvent) => void | Promise<void>, claimed: AttachmentRow[] = [], followup?: ChatTurnInput["followup"], paneAction?: PaneAction, userId: string | null = null, context: AskContext | null = null, extra: string | null = null, role?: RoleId, roleSpec?: RoleModel): Promise<void> {
+async function runTurnBody(conversation: { id: string; workspace_id: string; decision_id?: string | null }, userText: string, emit: (e: ChatEvent) => void | Promise<void>, claimed: AttachmentRow[] = [], followup?: ChatTurnInput["followup"], paneAction?: PaneAction, userId: string | null = null, context: AskContext | null = null, extra: string | null = null, role?: RoleId, roleSpec?: RoleModel, team?: { actor: Actor; builderMode: boolean }): Promise<void> {
   const workspaceId = conversation.workspace_id;
   const history = await listMessages(conversation.id);
   await addMessage({
@@ -288,13 +302,18 @@ async function runTurnBody(conversation: { id: string; workspace_id: string; dec
   const turnStart = Date.now();
   const client = anthropicClient();
   const [system, counts, decisionNote] = await Promise.all([buildSystem(workspaceId, role, roleSpec), workspaceCounts(workspaceId), conversation.decision_id ? decisionContext(conversation.decision_id, workspaceId).catch(() => "") : Promise.resolve("")]);
-  const systemBlocks: Anthropic.TextBlockParam[] = [{ type: "text", text: system, cache_control: { type: "ephemeral" } }, ...(decisionNote ? [{ type: "text" as const, text: decisionNote }] : [])];
-  // the recipes this team's role offers (src/recipes/), as their own tool
+  // the recipes this team's role offers (src/recipes/), then the company's own skills, as one tool
   const offered = (await getWorkspace(workspaceId))?.roles ?? ["brand_kol"];
-  const recipes = await (roleSpec ? Promise.resolve(roleSpec) : getRoleResolved(workspaceId, role && offered.includes(role) ? role : offered[0]).then((r) => r.role))
-    .then((r) => recipesFor(r.recipes))
-    .catch(() => [] as RecipeSpec[]);
-  const tools = buildTools(recipes);
+  const roleModel = roleSpec ?? (await getRoleResolved(workspaceId, role && offered.includes(role) ? role : offered[0])).role;
+  const fairList = await recipesFor(roleModel.recipes).catch(() => [] as RecipeSpec[]);
+  // a draft under test runs Fair's role alone; a person also gets the team's skills and their own drafts
+  const own = !roleSpec && team ? await companyRecipes(workspaceId, roleModel.id, team.actor.email).catch(() => []) : [];
+  const recipes: RecipeSpec[] = [...fairList, ...own.filter((r) => !fairList.some((f) => f.key === r.key))];
+  const onTeam = !roleSpec && !!team && can(team.actor, "role.use", { workspace: workspaceId, role: roleModel.id });
+  const builderMode = onTeam && team!.builderMode && isBuilder(team!.actor, workspaceId, roleModel.id);
+  const builderNote = builderMode ? await builderPrompt(workspaceId, roleModel, await teamName(workspaceId)).catch(() => "") : "";
+  const systemBlocks: Anthropic.TextBlockParam[] = [{ type: "text", text: system, cache_control: { type: "ephemeral" } }, ...(decisionNote ? [{ type: "text" as const, text: decisionNote }] : []), ...(builderNote ? [{ type: "text" as const, text: builderNote }] : [])];
+  const tools = [...buildTools(recipes), ...(onTeam ? makeTools(roleModel.id) : []), ...(builderMode ? builderTools(roleModel.id) : [])];
   const timings: Timings = { total_ms: 0, model_ms: 0, model_calls: 0, tools_ms: 0, tool_calls: 0, setup_ms: Date.now() - turnStart, effort: chatEffort() };
 
   const replay = historyTurns(history.slice(-MAX_HISTORY_MESSAGES) as Parameters<typeof historyTurns>[0]);
@@ -307,7 +326,7 @@ async function runTurnBody(conversation: { id: string; workspace_id: string; dec
   const counter = { n: 0 };
   const toolRecords: ToolCallRecord[] = [];
   const runIds: string[] = [];
-  const toolCtx: ToolContext = { recipes, conversationId: conversation.id, userId };
+  const toolCtx: ToolContext = { recipes, conversationId: conversation.id, userId, team: onTeam ? { actor: team!.actor, ws: workspaceId, role: roleModel, builderMode } : undefined };
 
   // A tapped follow-up carries the exact analysis; the person only ever sees the label.
   let modelText = followup?.skill
@@ -408,9 +427,11 @@ async function runTurnBody(conversation: { id: string; workspace_id: string; dec
         const stopActivity = use.name === "run_skill" ? startActivity(use, counts, emit) : () => undefined;
         const recipe = use.name === "run_recipe" ? recipes.find((r) => r.key === (use.input as { recipe?: string })?.recipe) : undefined;
         if (recipe) await emit({ type: "activity", tool_id: use.id, text: recipeActivity(recipe, ((use.input as { params?: RecipeInput })?.params ?? {}), null), step: 0, total: 0, done: false });
+        if (TEAM_ACTIVITY[use.name]) await emit({ type: "activity", tool_id: use.id, text: TEAM_ACTIVITY[use.name], step: 0, total: 0, done: false });
         const record = await executeTool(use, workspaceId, counter, turnEvidence, toolCtx);
         stopActivity();
         if (recipe) await emit({ type: "activity", tool_id: use.id, text: recipe.title, step: 0, total: 0, done: true });
+        if (TEAM_ACTIVITY[use.name]) await emit({ type: "activity", tool_id: use.id, text: record.record.title ?? TEAM_ACTIVITY[use.name], step: 0, total: 0, done: true });
         if (use.name === "run_skill" && record.result) {
           await emit({ type: "activity", tool_id: use.id, text: activityDone(getSkill(String((use.input as any)?.skill ?? "")), record.result, counts), step: 0, total: 0, done: true });
         }
@@ -476,7 +497,7 @@ function startActivity(use: Anthropic.ToolUseBlock, counts: Awaited<ReturnType<t
   return () => clearInterval(timer);
 }
 
-type ToolContext = { conversationId: string; userId: string | null; recipes?: RecipeSpec[] };
+type ToolContext = { conversationId: string; userId: string | null; recipes?: RecipeSpec[]; team?: { actor: Actor; ws: string; role: RoleModel; builderMode: boolean } };
 
 /** A skill result as a tool record: evidence renumbered for this turn, rows kept in full for the pane. */
 function skillRecord(base: ToolCallRecord, skill: string, result: SkillResult, counter: { n: number }, turnEvidence: Map<string, Evidence>): { record: ToolCallRecord; evidence: Evidence[]; content: string } {
@@ -535,6 +556,17 @@ async function executeTool(use: Anthropic.ToolUseBlock, workspaceId: string, cou
       const record: ToolCallRecord = { ...base, title: "The numbers", status: result.status, message: result.message, rows: re.rows, meta: result.meta, evidence_ids: re.evidence.map((e) => e.id) };
       const content = JSON.stringify({ status: result.status, message: result.message, rows: re.rows.slice(0, MAX_ROWS_IN_CONTEXT), rows_total: re.rows.length, evidence: re.evidence, meta: result.meta });
       return { record, evidence: re.evidence, content, isError: result.status === "error" };
+    }
+    if ((MAKE_TOOLS as readonly string[]).includes(use.name) || (BUILDER_TOOLS as readonly string[]).includes(use.name)) {
+      if (!ctx.team) return { record: { ...base, status: "error", message: "Not available here" }, evidence: [], content: JSON.stringify({ status: "error", message: "Making things for the team is not available in this conversation." }), isError: true };
+      const r = await executeTeamTool(use.name, input, ctx.team);
+      const re = r.rows?.length ? renumberEvidence(r.evidence ?? [], r.rows, {}, counter) : { rows: [] as Record<string, unknown>[], evidence: [] as Evidence[] };
+      for (const ev of re.evidence) turnEvidence.set(ev.id, ev);
+      // the model sees the try with this turn's evidence ids, so it can cite them
+      let content = r.content;
+      if (re.rows.length) { const c = JSON.parse(r.content); c.tried = { ...c.tried, rows: re.rows.slice(0, 10), evidence: re.evidence.slice(0, 20) }; content = JSON.stringify(c); }
+      const record: ToolCallRecord = { ...base, title: r.title, status: r.isError ? "error" : "ok", message: r.isError ? JSON.parse(r.content).message : undefined, proposal: r.proposal, ...(re.rows.length ? { rows: re.rows, meta: r.meta, evidence_ids: re.evidence.map((e) => e.id) } : {}) };
+      return { record, evidence: re.evidence, content, isError: r.isError };
     }
     if (use.name === "create_agent_draft") {
       const record: ToolCallRecord = { ...base, title: "Watch this", status: "ok", draft: input };

@@ -38,13 +38,15 @@ export type RoleModel = {
   /** skill layers shown first in the composer's menu */
   skill_order?: string[];
   /** the alert that moves the status ladder; numbers only, applied in SQL (src/reputation/) */
-  alert?: { negative_multiple: number; min_comments: number; baseline_days: number };
+  alert?: { negative_multiple: number; min_comments: number; baseline_days: number; crisis_multiple?: number; crisis_min_negative?: number };
   /** Social Media: when an own post needs attention (src/social/); numbers only, applied in SQL */
   watch?: { underperform_pct: number; storm_negative: number; min_account_posts: number };
   /** the company's own rules for CeMO, under the product's fixed rules; set by a Builder, never by Fair's core */
   house_rules?: string[];
   /** Fair's recipes this role offers (src/recipes/), in order; set by Fair only */
   recipes?: string[];
+  /** the Dashboard's sections (src/dashboard/sections.ts): hidden and renamed by a Builder, ordered by a Builder or a person */
+  tiles?: { hidden?: string[]; order?: string[]; names?: Record<string, string> };
   /** a person's own defaults; a company may set them for everyone */
   prefs?: { days?: number; answer?: "short" | "full" };
 };

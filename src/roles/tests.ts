@@ -131,7 +131,7 @@ async function guard(check: GuardCheck, spec: RoleModel): Promise<{ status: Test
         const [head, leaf] = path.split(".");
         if (!leaf || head === "prefs") continue;
         const block = (spec as Record<string, unknown>)[head] as Record<string, unknown> | undefined;
-        if (block && p.check(block[leaf], spec) === undefined) problems.push(`${path} = ${String(block[leaf])} is outside its guard rails`);
+        if (block && block[leaf] !== undefined && p.check(block[leaf], spec) === undefined) problems.push(`${path} = ${String(block[leaf])} is outside its guard rails`);
       }
       return problems.length ? { status: "fail", detail: { problems } } : { status: "pass", detail: {} };
     }
