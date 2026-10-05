@@ -22,6 +22,9 @@ export async function currentSession(): Promise<SessionPayload | null> {
   if (!session) return null;
   const live = await liveUser(session.uid).catch(() => undefined);
   if (live === null) return null;
+  // a client whose every workspace is paused or not live yet is signed out until one opens
+  const actor = await loadActor(session.uid).catch(() => undefined);
+  if (actor && !actor.staff.length && !actor.memberships.length) return null;
   return live ? { ...session, role: live.role, ws: live.workspace_id } : session;
 }
 
@@ -42,6 +45,9 @@ export async function currentWorkspaceId(): Promise<string> {
     const actor = await loadActor(session.uid).catch(() => null);
     if (actor && can(actor, "workspace.reach", { workspace: chosen })) return chosen;
   }
+  // the home workspace may have been paused since the person signed in: a client moves to one it may still reach
+  const actor = await loadActor(session.uid).catch(() => null);
+  if (actor && session.ws && !can(actor, "workspace.reach", { workspace: session.ws }) && actor.memberships[0]) return actor.memberships[0].workspace_id;
   return session.ws || DEFAULT_WORKSPACE_ID;
 }
 

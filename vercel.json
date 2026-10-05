@@ -28,6 +28,10 @@
     {
       "path": "/api/cron/jobs",
       "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/health",
+      "schedule": "10 21 * * *"
     }
   ]
 }

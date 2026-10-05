@@ -25,7 +25,8 @@ export async function getAgent(id: string, workspaceId: string): Promise<AgentRo
 }
 export async function dueAgents(workspaceId: string | null, now = new Date()): Promise<AgentRow[]> {
   return (await sql.query(
-    `select * from agents where status = 'active' and next_run_at is not null and next_run_at <= $1 ${workspaceId ? "and workspace_id = $2" : ""} order by next_run_at asc`,
+    // only live workspaces run their schedules (a paused one keeps them for later)
+    `select * from agents where status = 'active' and next_run_at is not null and next_run_at <= $1 and workspace_id in (select id from workspaces where status = 'live') ${workspaceId ? "and workspace_id = $2" : ""} order by next_run_at asc`,
     workspaceId ? [now.toISOString(), workspaceId] : [now.toISOString()],
   )) as AgentRow[];
 }

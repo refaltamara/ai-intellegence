@@ -169,6 +169,13 @@
       "when": 1791157271323,
       "tag": "0023_giant_ben_grimm",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1791158955800,
+      "tag": "0024_quick_chameleon",
+      "breakpoints": true
     }
   ]
 }

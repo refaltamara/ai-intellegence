@@ -31,7 +31,9 @@ export async function loadActor(uid: string): Promise<Actor | null> {
   if (hit && Date.now() - hit.at < TTL_MS) return hit.actor;
   const rows = (await sql.query(
     `select u.id as uid, u.workspace_id as home, a.id as account_id, a.email, a.name, a.staff,
-            (select coalesce(json_agg(json_build_object('user_id', m.id, 'workspace_id', m.workspace_id, 'levels', m.levels) order by m.created_at), '[]') from users m where m.account_id = a.id) as memberships
+            (select coalesce(json_agg(json_build_object('user_id', m.id, 'workspace_id', m.workspace_id, 'levels', m.levels) order by m.created_at), '[]') from users m join workspaces w on w.id = m.workspace_id
+               -- a client reaches only live workspaces (CMS plan, Workspace lifecycle); Fair staff reach every one
+               where m.account_id = a.id and (w.status = 'live' or cardinality(a.staff) > 0)) as memberships
        from users u join accounts a on a.id = u.account_id
       where u.id = $1 and a.password_hash is not null`,
     [uid],
@@ -57,11 +59,12 @@ export async function findAccountByWho(who: string): Promise<AccountRow | null> 
 }
 
 /** Sign-in: the account and the membership the session starts in (the first one it was given). */
-export async function authenticateAccount(email: string, password: string): Promise<{ account: AccountRow; membership: { id: string; workspace_id: string } } | null> {
+export async function authenticateAccount(email: string, password: string): Promise<{ account: AccountRow; membership: { id: string; workspace_id: string } | null } | null> {
   const account = await findAccount(email);
   if (!account || !verifyPassword(password, account.password_hash)) return null;
-  const m = (await sql.query("select id, workspace_id from users where account_id = $1 order by created_at limit 1", [account.id])) as { id: string; workspace_id: string }[];
-  if (!m[0]) return null;
+  // the first membership the person may reach: a client's workspace must be live
+  const m = (await sql.query("select u.id, u.workspace_id from users u join workspaces w on w.id = u.workspace_id where u.account_id = $1 and (w.status = 'live' or cardinality($2::text[]) > 0) order by u.created_at limit 1", [account.id, account.staff ?? []])) as { id: string; workspace_id: string }[];
+  if (!m[0]) return { account, membership: null };
   await sql.query("update accounts set last_seen_at = now() where id = $1", [account.id]).catch(() => undefined);
   return { account, membership: m[0] };
 }

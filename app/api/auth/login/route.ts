@@ -20,6 +20,7 @@ export async function POST(req: Request) {
     return Response.json({ error: "Wrong email or password" }, { status: 401 });
   }
   attempts.delete(email);
+  if (!found.membership) return Response.json({ error: "Your workspace is not open right now. Ask your Fair contact." }, { status: 403 });
   // the session starts in the account's first membership; Fair staff and multi-workspace people switch from the sidebar
   const role = found.account.staff.length ? "staff" : "member";
   const token = await signSession({ uid: found.membership.id, email: found.account.email, role, ws: found.membership.workspace_id });

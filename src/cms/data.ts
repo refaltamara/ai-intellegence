@@ -34,6 +34,8 @@ export type WorkspaceState = {
   id: string; name: string; kind: string; category: string | null; roles: RoleId[]; client: string | null;
   posts: number; comments: number; data_through: string | null; last_load: string | null;
   members: number; builders: number; invites: number; off_topic: number;
+  /** lifecycle (draft, loading, review, live, paused) and a word on its health checks */
+  status: string; health: string | null;
 };
 
 export async function workspaceStates(): Promise<WorkspaceState[]> {
@@ -46,6 +48,7 @@ export async function workspaceStates(): Promise<WorkspaceState[]> {
     sql.query("select workspace_id, count(*)::int as n from invites where accepted_at is null and revoked_at is null and expires_at > now() group by 1") as unknown as Promise<{ workspace_id: string; n: number }[]>,
   ]);
   const by = <T extends { workspace_id: string }>(rows: T[]) => new Map(rows.map((r) => [r.workspace_id, r]));
+  const st = new Map(((await sql.query("select id, status, settings->'health' as health from workspaces")) as { id: string; status: string; health: unknown }[]).map((r) => [r.id, r]));
   const [p, c, l, pe, inv] = [by(posts), by(comments), by(loads), by(people), by(invites)];
   return Promise.all(ws.map(async (w) => {
     const cfg = await getWorkspace(w.id);
@@ -53,6 +56,8 @@ export async function workspaceStates(): Promise<WorkspaceState[]> {
       id: w.id, name: w.name, kind: cfg?.kind ?? w.kind, category: cfg?.category_label ?? null, roles: cfg?.roles ?? [], client: cfg?.client_name ?? null,
       posts: p.get(w.id)?.n ?? 0, off_topic: p.get(w.id)?.off ?? 0, data_through: p.get(w.id)?.through ?? null, comments: c.get(w.id)?.n ?? 0, last_load: l.get(w.id)?.last ?? null,
       members: pe.get(w.id)?.n ?? 0, builders: pe.get(w.id)?.builders ?? 0, invites: inv.get(w.id)?.n ?? 0,
+      status: st.get(w.id)?.status ?? "live",
+      health: (() => { const h = st.get(w.id)?.health as { checks?: { status: string }[] } | null; const bad = (h?.checks ?? []).filter((c) => c.status === "warn" || c.status === "fail").length; return h?.checks ? (bad ? `${bad} to look at` : "healthy") : null; })(),
     };
   }));
 }

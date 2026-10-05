@@ -41,6 +41,7 @@ import { companyRecipes, isBuilder, teamMemory } from "../company/creations";
 import { memoryPrompt } from "../company/rules";
 import { canSpend, charge } from "../credits/ledger";
 import { liveDefs } from "../extensions/store";
+import { workspaceNotes } from "../onboard/health";
 import { CREDIT_PRICES } from "../config/credits";
 import { ACTIVITY as TEAM_ACTIVITY, BUILDER_TOOLS, MAKE_TOOLS, builderPrompt, builderTools, executeTeamTool, makeTools } from "../company/tools";
 
@@ -121,7 +122,8 @@ export async function buildSystem(workspaceId: string, role?: RoleId, spec?: Rol
   const key = `${workspaceId}:${roleId}:${resolved.role.version}:${resolved.company_version ?? 0}:${memory?.version ?? ""}`;
   const hit = systemCache.get(key);
   if (hit && Date.now() - hit.at < SYSTEM_TTL_MS) return hit.text;
-  const text = (await buildSystemUncached(workspaceId, resolved.role)) + (memory ? memoryPrompt(memory, await teamName(workspaceId)) : "");
+  const notes = await workspaceNotes(workspaceId).catch(() => [] as string[]);
+  const text = (await buildSystemUncached(workspaceId, resolved.role)) + dataNotes(notes) + (memory ? memoryPrompt(memory, await teamName(workspaceId)) : "");
   systemCache.set(key, { text, at: Date.now() });
   return text;
 }
@@ -164,6 +166,11 @@ async function buildSystemUncached(workspaceId: string, role: RoleModel): Promis
     .replace("{{data_line}}", platforms.map((p) => `${p.platform} ${p.posts.toLocaleString("en-US")} posts from ${p.from} to ${p.to}`).join("; ") + (comments?.n ? `; ${comments.n.toLocaleString("en-US")} comments, ${comments.labelled === comments.n ? "all" : comments.labelled.toLocaleString("en-US")} with a sentiment label${comments.labelled < comments.n ? " so far (the rest are unlabelled, not neutral)" : ""}.` : ". No comment text.") + tracking + relevance)
     .replace("{{as_of}}", ctx.asOf)
     .replace("{{brands}}", ctx.brands.map((b) => `${b.id} (${b.name})`).join(", ")) + houseRules(role, client?.name);
+}
+
+/** What Fair knows about gaps in this workspace's data (CMS: Health, notes): read before drawing conclusions from a gap. */
+function dataNotes(notes: string[]): string {
+  return notes.length ? `\n\nWhat Fair knows about this data (from its health checks and data team). Never read a gap below as a real drop, and say so when an answer touches it:\n${notes.map((n) => `- ${n}`).join("\n")}` : "";
 }
 
 async function teamName(ws: string): Promise<string> {

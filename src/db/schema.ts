@@ -54,6 +54,8 @@ export const workspaces = pgTable("workspaces", {
   kind: text("kind").notNull().default("category"),
   /** product_name, tagline, category_label, subject_noun, persona, hero_title, hero_intro, suggested[] — all optional, defaults per kind */
   settings: jsonb("settings").notNull().default(sql`'{}'::jsonb`),
+  /** CMS plan, Workspace lifecycle: draft → loading → review → live → paused → archived; clients only reach a live one */
+  status: text("status").notNull().default("live"),
   createdAt: createdAt(),
 });
 
@@ -200,6 +202,8 @@ export const posts = pgTable(
     caption: text("caption"),
     /** full-text form of the caption ('simple' config: no stemming, mixed Indonesian/English); drives /themes and /products keyword search */
     captionTsv: tsvector("caption_tsv").generatedAlwaysAs(sql`to_tsvector('simple', coalesce(caption, ''))`),
+    /** accounts the post tags (listening content_tagged_user), lowercased; one of the signals that it is about its brand */
+    taggedHandles: text("tagged_handles").array(),
     hashtags: text("hashtags").array(),
     isPaid: boolean("is_paid"),
     /** TikTok yc_flag: true = shoppable link, false = product tagged without link, null = nothing tagged / Instagram */
@@ -314,6 +318,10 @@ export const creatorBrandMonthImport = pgTable(
 // ---------------------------------------------------------- phase 2 tables
 export const topics = pgTable("topics", {
   id: text("id").primaryKey(),
+  /** one line: what belongs here (CMS: Topics) */
+  definition: text("definition"),
+  /** service | promo | product | reputation: what the roles read a topic as */
+  tags: text("tags").array(),
   workspaceId: text("workspace_id").notNull().references(() => workspaces.id),
   label: text("label").notNull(),
   parentId: text("parent_id"),
@@ -1123,4 +1131,60 @@ export const cmsJobs = pgTable(
     createdAt: createdAt(),
   },
   (t) => [index("cms_jobs_status_idx").on(t.status, t.createdAt), check("cms_jobs_status_chk", sql`${t.status} in ('queued','running','done','failed','cancelled')`)],
+);
+
+// ------------------------------------------------------------- onboarding
+/**
+ * A brand's accounts (CMS plan, "Brands"): per platform or any ('*'). In a listening dump
+ * the capture's brand rows are these handles, so they also decide which brand a captured
+ * post belongs to; an owned handle makes its posts the brand's own.
+ */
+export const brandHandles = pgTable(
+  "brand_handles",
+  {
+    workspaceId: text("workspace_id").notNull().references(() => workspaces.id),
+    brandId: text("brand_id").notNull().references(() => brands.id, { onDelete: "cascade" }),
+    platform: text("platform").notNull().default("*"),
+    /** lowercased, without @ */
+    handle: text("handle").notNull(),
+    owned: boolean("owned").notNull().default(true),
+    createdAt: createdAt(),
+  },
+  (t) => [primaryKey({ columns: [t.workspaceId, t.platform, t.handle] }), index("brand_handles_brand_idx").on(t.brandId)],
+);
+
+/**
+ * Relevance terms (CMS plan, "Relevance"): a post counts for its brand when the brand
+ * posted it, tags one of its accounts, or its caption names it. counts: a term at the start
+ * of a word (case-insensitive; written in capitals it matches only in capitals, as a whole
+ * word). never: a phrase that never counts ("go pay attention"), taken out before matching.
+ */
+export const brandTerms = pgTable(
+  "brand_terms",
+  {
+    workspaceId: text("workspace_id").notNull().references(() => workspaces.id),
+    brandId: text("brand_id").notNull().references(() => brands.id, { onDelete: "cascade" }),
+    term: text("term").notNull(),
+    mode: text("mode").notNull().default("counts"),
+    createdAt: createdAt(),
+  },
+  (t) => [primaryKey({ columns: [t.workspaceId, t.brandId, t.mode, t.term] }), check("brand_terms_mode_chk", sql`${t.mode} in ('counts','never')`)],
+);
+
+/**
+ * Where a workspace's data comes from (CMS plan, "Data"): a Fair Listening dump today,
+ * the daily sync later. config: the files stored (Vercel Blob or a local folder), the
+ * sentiment map, the inspect report.
+ */
+export const dataSources = pgTable(
+  "data_sources",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workspaceId: text("workspace_id").notNull().references(() => workspaces.id),
+    kind: text("kind").notNull().default("listening_dump"),
+    config: jsonb("config").notNull().default(sql`'{}'::jsonb`),
+    updatedAt: ts("updated_at").notNull().defaultNow(),
+    createdAt: createdAt(),
+  },
+  (t) => [index("data_sources_ws_idx").on(t.workspaceId)],
 );

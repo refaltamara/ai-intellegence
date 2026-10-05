@@ -10,6 +10,7 @@ import { toJson } from "../db/json";
 import { fillRules, scopeCounts, tagRows, type Tagger } from "./fill";
 import { getDef, invalidateExt } from "./store";
 import type { ExtDef } from "./spec";
+import { ONBOARD_KINDS, onboardSlice } from "../onboard/jobs";
 
 export type Job = { id: string; workspace_id: string | null; kind: string; params: Record<string, unknown>; status: string; progress: Record<string, unknown>; error: string | null; created_by: string | null };
 
@@ -40,7 +41,19 @@ async function finish(job: Job, status: "done" | "failed" | "cancelled" | "queue
 }
 
 /** One slice of a job. A test or a dry run may pass its own tagger instead of the model. */
-export async function runSlice(job: Job, tagger?: Tagger): Promise<{ status: string; detail: Record<string, unknown> }> {
+export async function runSlice(job: Job, tagger?: Tagger, budgetMs?: number): Promise<{ status: string; detail: Record<string, unknown> }> {
+  if (job.workspace_id && (ONBOARD_KINDS as readonly string[]).includes(job.kind)) {
+    // onboarding a workspace (src/onboard/): inspect, load in slices, relevance
+    try {
+      const r = await onboardSlice(job.kind, job.workspace_id, job.params, job.progress, budgetMs);
+      await finish(job, r.done ? "done" : "queued", { ...r.progress, note: r.note }, null);
+      return { status: r.done ? "done" : "running", detail: { note: r.note } };
+    } catch (e) {
+      const msg = (e as Error).message.slice(0, 500);
+      await finish(job, "failed", {}, msg);
+      return { status: "failed", detail: { error: msg } };
+    }
+  }
   if (job.kind !== "ext_fill" || !job.workspace_id) { await finish(job, "failed", {}, `unknown job ${job.kind}`); return { status: "failed", detail: {} }; }
   const def = await getDef(String(job.params.def_id ?? ""), job.workspace_id);
   if (!def) { await finish(job, "cancelled", {}, "the extension was removed"); return { status: "cancelled", detail: {} }; }
