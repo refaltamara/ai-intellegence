@@ -796,6 +796,10 @@ export const roleVersions = pgTable(
     stageWorkspaces: text("stage_workspaces").array(),
     /** the test results the proposal carried (src/roles/tests.ts) */
     testSummary: jsonb("test_summary"),
+    /** where the version came from (src/learning/outcomes.ts): insights, client creations, suggestions, as refs */
+    origins: jsonb("origins"),
+    /** the measures (src/learning/measures.ts) its before-and-after compares */
+    measures: text("measures").array(),
     /** the last edit of a draft; tests must have run after it before it can be proposed */
     updatedAt: ts("updated_at").notNull().defaultNow(),
     createdAt: createdAt(),
@@ -875,9 +879,35 @@ export const modelEvents = pgTable(
     surface: text("surface").notNull(),
     kind: text("kind").notNull(),
     payload: jsonb("payload").notNull().default(sql`'{}'::jsonb`),
+    /** Fair staff acting in a client workspace: kept on its page, left out of the roll-ups */
+    byStaff: boolean("by_staff").notNull().default(false),
     createdAt: createdAt(),
   },
   (t) => [index("model_events_ws_created_idx").on(t.workspaceId, t.createdAt), index("model_events_role_kind_idx").on(t.role, t.kind, t.createdAt)],
+);
+
+/**
+ * The nightly roll-up of signals (CMS plan, the learning loop): one sentence with its
+ * counts per role and key, recomputed each day. Like role_versions it belongs to no
+ * workspace: it holds only counts across workspaces, never a workspace's name, and a
+ * cross-client insight exists only when at least three workspaces stand behind it.
+ */
+export const modelInsights = pgTable(
+  "model_insights",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    role: text("role").notNull(),
+    roleVersion: text("role_version"),
+    /** what the insight is about, stable across days: setting:alert.crisis_multiple, tile_hidden:amplifiers, analysis:top-content… */
+    key: text("key").notNull(),
+    family: text("family").notNull(),
+    sentence: text("sentence").notNull(),
+    counts: jsonb("counts").notNull(),
+    workspaces: integer("workspaces").notNull(),
+    day: date("day").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("model_insights_uq").on(t.role, t.key, t.day), index("model_insights_role_day_idx").on(t.role, t.day)],
 );
 
 /**

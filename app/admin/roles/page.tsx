@@ -27,7 +27,7 @@ export default async function AdminRoles() {
           const clients = companies.filter((c) => c.role === r.id);
           return (
             <div key={r.id} className="cmsblock" data-tone={r.tone}>
-              <header><span className="cn">{r.codename}</span><h2>{r.label}</h2><span className="pill">current {cur?.version ?? `${r.version} (built-in)`}</span>{drafts && !rows.some((v) => v.status === "draft" || v.status === "proposed") && <RoleActions role={r.id} action="draft" label="New draft" confirmText="" />}</header>
+              <header><span className="cn">{r.codename}</span><h2>{r.label}</h2><span className="pill">current {cur?.version ?? `${r.version} (built-in)`}</span><Link className="btn sm ghost" href={`/admin/roles/${r.id}`}>Learning</Link>{drafts && !rows.some((v) => v.status === "draft" || v.status === "proposed") && <RoleActions role={r.id} action="draft" label="New draft" confirmText="" />}</header>
               <div className="tablewrap people">
                 <table>
                   <thead><tr><th>Version</th><th>Status</th><th>Note</th><th>Proposed</th><th>Released</th><th /></tr></thead>

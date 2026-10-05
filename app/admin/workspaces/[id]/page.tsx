@@ -17,11 +17,15 @@ import { TermsEditor } from "@/ui/admin/onboard/TermsEditor";
 import { TopicsEditor } from "@/ui/admin/onboard/TopicsEditor";
 import { StatusActions } from "@/ui/admin/onboard/StatusActions";
 import { NotesEditor, RunHealth } from "@/ui/admin/onboard/NotesEditor";
+import { Act } from "@/ui/company/Act";
+import { workspaceSignals } from "@/learning/views";
+import { INSIGHT_WINDOW_DAYS } from "@/config/learning";
+import { ROLES, isRoleId } from "@/roles/model";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
 
-const TABS = [["overview", "Overview"], ["source", "1 · Dump"], ["brands", "2 · Brands"], ["load", "3 · Load"], ["relevance", "Relevance"], ["topics", "Topics"], ["health", "Health"]] as const;
+const TABS = [["overview", "Overview"], ["source", "1 · Dump"], ["brands", "2 · Brands"], ["load", "3 · Load"], ["relevance", "Relevance"], ["topics", "Topics"], ["health", "Health"], ["signals", "Signals"]] as const;
 const STATUS: Record<string, string> = { draft: "Draft", loading: "Loading", review: "In review", live: "Live", paused: "Paused", archived: "Archived" };
 const n = (x: unknown) => Number(x ?? 0).toLocaleString("en-US");
 const kb = (b: number) => (b > 1024 ** 2 ? `${(b / 1024 ** 2).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1024))} KB`);
@@ -138,6 +142,29 @@ export default async function WorkspaceData({ params, searchParams }: { params: 
             <NotesEditor ws={d.id} notes={d.notes} suggestions={(d.health?.checks ?? []).map((c) => c.note).filter((x): x is string => !!x)} />
           </>
         )}
+
+        {tab === "signals" && await (async () => {
+          const sg = await workspaceSignals(d.id);
+          return (
+            <>
+              <div className="row">
+                <span>{sg.learning ? <>Learning across clients is <b>on</b>: its signals count in each role&apos;s insights, anonymously and only with two other workspaces beside it.</> : <>Learning across clients is <b>off</b> (its contract): its signals stay on this page.</>}</span>
+                <Act label={sg.learning ? "Switch learning off" : "Switch learning on"} url="/api/admin/learning" body={{ action: "learning", ws: d.id, on: !sg.learning }} className="btn sm" confirm={sg.learning ? "Keep this workspace's signals out of the roll-ups across clients?" : undefined} />
+              </div>
+              <p className="muted">Last {INSIGHT_WINDOW_DAYS} days. A signal carries ids and choices only: never a question, an answer, a post, a house rule&apos;s wording or a number from the data.{sg.last ? ` Latest ${when(sg.last)}.` : ""}</p>
+              {Object.keys(sg.byRole).length === 0 && <p className="muted">No signals yet.</p>}
+              {Object.entries(sg.byRole).map(([role, rows]) => (
+                <div key={role}>
+                  <h2 className="cmsh">{isRoleId(role) ? `${ROLES[role].codename} · ${ROLES[role].label}` : role}</h2>
+                  <div className="tablewrap people"><table>
+                    <thead><tr><th>Where</th><th>Signal</th><th className="num">Clients</th><th className="num">Fair staff</th></tr></thead>
+                    <tbody>{rows.map((k) => <tr key={k.kind}><td className="muted">{k.surface}</td><td>{k.label}</td><td className="num">{n(k.n)}</td><td className="num muted">{k.staff ? n(k.staff) : ""}</td></tr>)}</tbody>
+                  </table></div>
+                </div>
+              ))}
+            </>
+          );
+        })()}
       </div>
     </section>
   );

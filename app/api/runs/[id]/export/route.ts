@@ -5,6 +5,7 @@
  */
 import { currentSession, currentWorkspaceId } from "@/auth/current";
 import { addMessage, getConversation, getSkillRun, logExport } from "@/chat/persist";
+import { signalHere } from "@/learning/here";
 import { buildExport, toCsv, toXlsx } from "@/export/run";
 import { sql } from "@/db/client";
 
@@ -29,6 +30,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
   ]);
   const b = buildExport(run, { decisionName: decision, brandNames: brands, tz });
   await logExport({ workspaceId: ws, skillRunId: id, userId: session.uid, format, rows: b.rows_after }).catch(() => undefined);
+  await signalHere("chat.export", { format, via: "pane" });
   const c = url.searchParams.get("c");
   if (c && UUID.test(c)) {
     const conv = await getConversation(c, ws, session.uid);

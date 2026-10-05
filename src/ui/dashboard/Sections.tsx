@@ -3,8 +3,9 @@
  * hidden ones left out with a small line that says so, two half-width sections side by side.
  */
 import Link from "next/link";
-import { Fragment, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { rows, type Arranged } from "@/dashboard/sections";
+import { SeenTile } from "./SeenTile";
 
 export function Sections({ arranged, render, who, showHref }: { arranged: Arranged; render: Record<string, (title: string) => ReactNode>; who: string | null; showHref: string }) {
   const title = (k: string) => arranged.shown.find((x) => x.key === k)!.title;
@@ -13,10 +14,10 @@ export function Sections({ arranged, render, who, showHref }: { arranged: Arrang
       {rows(arranged.shown).map((row) =>
         row.length === 2 ? (
           <div className="two-eq" key={row.map((s) => s.key).join("+")}>
-            {row.map((s) => <Fragment key={s.key}>{render[s.key]?.(title(s.key))}</Fragment>)}
+            {row.map((s) => <SeenTile key={s.key} tile={s.key}>{render[s.key]?.(title(s.key))}</SeenTile>)}
           </div>
         ) : (
-          <Fragment key={row[0].key}>{render[row[0].key]?.(title(row[0].key))}</Fragment>
+          <SeenTile key={row[0].key} tile={row[0].key}>{render[row[0].key]?.(title(row[0].key))}</SeenTile>
         ),
       )}
       {arranged.hidden.length > 0 && (

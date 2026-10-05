@@ -1,5 +1,6 @@
 import { currentSession, currentWorkspaceId } from "@/auth/current";
 import { createConversationReport } from "@/reports/conversation";
+import { signalHere } from "@/learning/here";
 import { getSkillRun } from "@/chat/persist";
 import { createReport, listReports } from "@/reports/store";
 import type { SkillResult } from "@/skills/types";
@@ -25,6 +26,7 @@ export async function POST(req: Request) {
     const session = await currentSession();
     const r = await createConversationReport({ workspaceId: ws, userId: session?.uid ?? null, conversationId: body.conversation_id, title: typeof body.title === "string" ? body.title : undefined });
     if ("error" in r) return Response.json({ error: r.error }, { status: r.status });
+    await signalHere("chat.turn_into", { to: "report" });
     return Response.json(r, { status: 201 });
   }
   if (!body.skill_run_id || !/^[0-9a-f-]{36}$/.test(body.skill_run_id)) return Response.json({ error: "skill_run_id is required" }, { status: 400 });

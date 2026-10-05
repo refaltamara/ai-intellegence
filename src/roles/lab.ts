@@ -6,6 +6,8 @@
  * then Refal or Rafli). Every number it reads is counted in SQL; recipes go through the
  * whitelisted builder; its tokens are recorded under purpose "role_lab".
  */
+import { kindCounts } from "../learning/views";
+import { latestInsights } from "../learning/insights";
 import type Anthropic from "@anthropic-ai/sdk";
 import { sql } from "../db/client";
 import { toJson } from "../db/json";
@@ -77,10 +79,11 @@ async function tool(name: string, input: Record<string, unknown>, role: RoleId, 
       const [changes, runs, events, tests] = await Promise.all([
         sql.query("select k as field, count(*)::int as companies from (select distinct on (workspace_id) workspace_id, overrides from company_versions where role = $1 order by workspace_id, version desc) c, jsonb_object_keys(c.overrides) k group by 1 order by 2 desc", [role]),
         sql.query("select skill, count(*)::int as runs from skill_runs where created_at > now() - interval '30 days' group by 1 order by 2 desc limit 15"),
-        sql.query("select kind, count(*)::int as n from model_events where role = $1 and created_at > now() - interval '30 days' group by 1 order by 2 desc limit 15", [role]),
+        kindCounts({ role }).then((k) => k.map((x) => ({ signal: x.label, count: x.n, workspaces: x.workspaces }))),
         sql.query("select distinct on (case_key) case_key, status from test_runs where role = $1 and role_version = $2 order by case_key, created_at desc", [role, version]),
       ]);
-      return JSON.stringify({ client_changes: changes, analyses_run_last_30_days_all_roles: runs, role_events: events, latest_tests: tests, note: "Signals are thin until more clients use the product; say so rather than generalising." });
+      const insights = (await latestInsights(role)).map((i) => ({ insight: i.sentence, workspaces: i.workspaces, since: i.first_day }));
+      return JSON.stringify({ insights, client_changes: changes, analyses_run_last_30_days_all_roles: runs, role_signals_last_30_days: events, latest_tests: tests, note: "Insights carry three workspaces or more; signals below that are thin. Quote counts as given and say when they are thin rather than generalising." });
     }
     case "list_recipes": {
       const all = [...(await fairRecipes()).values()];

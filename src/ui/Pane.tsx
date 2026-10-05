@@ -7,6 +7,7 @@
  * the meaning of the object goes to the model as a pane action; sort and filter stay here.
  */
 import { AddToDeck } from "./AddToDeck";
+import { sendSignal } from "./signal";
 import { AddToPulse } from "./AddToPulse";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { ToolCallRecord } from "@/chat/persist";
@@ -166,7 +167,7 @@ function DataObject({ obj, p }: { obj: PaneObject; p: Props }) {
 
       <div className="pbody">
         {showChart && rows.length > 0 && (
-          <div className="charttog"><button className="btn sm ghost" onClick={() => setChartOn((c) => !c)}>{chartOn ? "Hide chart" : "Show chart"}</button></div>
+          <div className="charttog"><button className="btn sm ghost" onClick={() => { if (!chartOn) sendSignal("chat.show_chart", { where: "pane" }); setChartOn((c) => !c); }}>{chartOn ? "Hide chart" : "Show chart"}</button></div>
         )}
         {chartSpec && (
           <div className="pchart">

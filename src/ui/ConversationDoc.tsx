@@ -1,6 +1,7 @@
 "use client";
 /** A report made from a whole conversation: key findings and next steps, then each question with its answer, tables and evidence. */
 import Link from "next/link";
+import { sendSignal } from "./signal";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { ConversationBlocks, ConversationTool } from "@/reports/conversation";
@@ -24,7 +25,7 @@ function ToolTable({ t }: { t: ConversationTool }) {
       <div className="cr-th">
         <b>{t.title}</b>
         <span>{t.status === "ok" ? `${fmtNum(t.rows_total)} row${t.rows_total === 1 ? "" : "s"}` : t.status}{t.data_window ? ` · ${t.data_window.from} to ${t.data_window.to}` : ""}</span>
-        {hasChart && <button className="btn sm ghost" onClick={() => setChart((c) => !c)}>{chart ? "Hide chart" : "Show chart"}</button>}
+        {hasChart && <button className="btn sm ghost" onClick={() => { if (!chart) sendSignal("chat.show_chart", { where: "doc" }); setChart((c) => !c); }}>{chart ? "Hide chart" : "Show chart"}</button>}
       </div>
       {t.status !== "ok" && t.message && <p className="muted">{t.message}</p>}
       {hasChart && (chart || !rows.length) && <div className="chart"><Chart spec={spec!} /></div>}

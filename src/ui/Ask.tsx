@@ -8,6 +8,7 @@
  * (excluding rows, changing filters) is a message to the model.
  */
 import { useRouter } from "next/navigation";
+import { sendSignal } from "./signal";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { ChatEvent } from "@/chat/loop";
 import type { MessageRow, ToolCallRecord } from "@/chat/persist";
@@ -141,7 +142,7 @@ export function Ask({ initialConversation, initialMessages, prefill, stats, clie
     booted.current = true;
     setActiveId(objects[objects.length - 1].id);
   }, [objects]);
-  const showObject = useCallback((id: string) => { setActiveId(id); setPaneOpen(true); }, []);
+  const showObject = useCallback((id: string) => { setActiveId(id); setPaneOpen(true); sendSignal("chat.pane_open"); }, []);
   const onState = useCallback((runId: string, state: PaneState) => {
     setPaneStates((s) => ({ ...s, [runId]: state }));
     clearTimeout(saveTimer.current[runId]);
@@ -289,7 +290,7 @@ export function Ask({ initialConversation, initialMessages, prefill, stats, clie
         <div className="topbar">
           <div><h1>Chats</h1><span className="meta">{clientName ? (copy.kind === "profile" ? `About ${clientName}` : `On the side of ${clientName}`) : copy.label}</span></div>
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            {!split && objects.length > 0 && <button className="btn sm" onClick={() => setPaneOpen(true)}>Open the evidence</button>}
+            {!split && objects.length > 0 && <button className="btn sm" onClick={() => { setPaneOpen(true); sendSignal("chat.pane_open"); }}>Open the evidence</button>}
             <span className={`pill ${stats.freshness ? "live" : ""}`}>{stats.freshness ? `Data through ${stats.freshness}` : "No data loaded yet"}</span>
             <span className="pill">{copy.kind === "profile" ? `${stats.platforms} platforms · ${stats.months} months` : `${stats.brands} brands · ${stats.platforms} platforms · ${stats.months} months`}</span>
           </div>
@@ -375,7 +376,7 @@ export function Ask({ initialConversation, initialMessages, prefill, stats, clie
                                 router.push(`/decks/${j.deck.id}${j.version?.report_id ? `?v=${j.version.report_id}` : ""}`);
                               }}>{deckBusy ? "Making the deck…" : "Turn into a deck"}</button>
                             )}
-                            <button className="btn sm" onClick={() => { navigator.clipboard?.writeText(m.text.replace(/<ev id="(ev_\d+)"><\/ev>/g, "[$1]").replace(/<\/?counter>/g, "")); showToast("Copied"); }}>Copy</button>
+                            <button className="btn sm" onClick={() => { sendSignal("chat.copy"); navigator.clipboard?.writeText(m.text.replace(/<ev id="(ev_\d+)"><\/ev>/g, "[$1]").replace(/<\/?counter>/g, "")); showToast("Copied"); }}>Copy</button>
                             {m.miss ? <span className="pill" title="citations to evidence that does not exist were removed">evidence_miss {m.miss}</span> : null}
                             {m.timings && <span className="pill" title={`setup ${m.timings.setup_ms} ms · effort ${m.timings.effort}`}>{(m.timings.total_ms / 1000).toFixed(1)}s</span>}
                           </div>

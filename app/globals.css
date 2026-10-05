@@ -1698,3 +1698,13 @@ tr.warnrow td{background:#FFFBF0}
 .upl{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:6px 0 10px}
 .onbpage td{white-space:normal}.onbpage td.num,.onbpage td:has(.hst){white-space:nowrap}
 .onbpage td.num small{display:inline;margin-left:6px}
+.seen{min-width:0}
+.insights,.readings{list-style:none;display:flex;flex-direction:column;gap:6px;margin:0 0 12px}
+.insights li,.readings li{padding:9px 13px;border:1px solid var(--line);border-left:3px solid var(--tone,var(--blue));border-radius:10px;background:#fff;font-size:13px;line-height:1.45}
+.readings li{border-left-color:var(--mint)}
+.origins{display:flex;flex-direction:column;gap:12px}
+.origins fieldset{border:1px solid var(--line);border-radius:10px;padding:10px 14px;background:#fff;min-width:0}
+.origins legend{font-size:12px;font-weight:700;padding:0 4px;color:var(--text-3)}
+.origins .chk{display:flex;gap:8px;align-items:flex-start;font-size:13px;padding:3px 0;line-height:1.4}
+.origins .chk input{margin-top:3px;flex:none}
+.cmsblock header .btn{margin-left:auto}

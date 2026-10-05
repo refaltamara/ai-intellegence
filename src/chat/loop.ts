@@ -44,6 +44,8 @@ import { liveDefs } from "../extensions/store";
 import { workspaceNotes } from "../onboard/health";
 import { CREDIT_PRICES } from "../config/credits";
 import { ACTIVITY as TEAM_ACTIVITY, BUILDER_TOOLS, MAKE_TOOLS, builderPrompt, builderTools, executeTeamTool, makeTools } from "../company/tools";
+import { signal, type SignalCtx } from "../learning/signals";
+import { queryIntent, skillIntent } from "../learning/vocab";
 
 export const MAX_TOOL_CALLS = 6;
 const MAX_ROWS_IN_CONTEXT = 60;
@@ -219,6 +221,7 @@ export async function runChatTurn(input: ChatTurnInput, emit: (e: ChatEvent) => 
   // Bind any freshly uploaded documents to this conversation before the turn runs.
   const claimed = await claimAttachments(input.attachmentIds ?? [], conversation.id, workspaceId, input.userId ?? null).catch(() => [] as AttachmentRow[]);
   const slide = input.slide && !input.paneAction ? await resolveSlide(workspaceId, input.slide).catch(() => null) : null;
+  if (slide && input.slide) await signal({ ws: workspaceId, role: input.role, userId: input.userId, staff: !!input.actor?.staff.length }, "deck.slide_ask", { report: input.slide.report_id, n: input.slide.n });
   const context = slide?.context ?? (input.ask && !input.paneAction ? await resolveAsk(workspaceId, input.ask).catch(() => null) : null);
   // the report's whole fact sheet rides with this turn only; history keeps the slide, not the sheet
   const extra = slide?.sheet ? `[The report's full fact sheet, every number already computed:\n${slide.sheet}]` : null;
@@ -504,9 +507,37 @@ async function runTurnBody(conversation: { id: string; workspace_id: string; dec
     tokensIn,
     tokensOut,
   });
+  if (!roleSpec) await turnSignals({ ws: workspaceId, role: roleModel.id, userId, staff: !!team?.actor.staff.length }, { conv: conversation.id, first: !history.some((m) => m.role === "user"), builder: builderMode, from: paneAction ? "pane" : context ? "ask_why" : "typed" }, toolRecords, recipes, own, !!ask, paneAction);
   timings.total_ms = Date.now() - turnStart;
   console.log(`chat turn ${conversation.id}: ${timings.total_ms}ms total, model ${timings.model_ms}ms/${timings.model_calls} calls, tools ${timings.tools_ms}ms/${timings.tool_calls}, setup ${timings.setup_ms}ms, effort ${timings.effort}, tokens ${tokensIn}/${tokensOut}${ask ? ", ended on a question" : ""}${answer.hasCounter ? ", counter" : ""}`);
   await emit({ type: "done", message_id: saved.id, evidence: evidenceMap, evidence_miss: answer.miss.length, tokens_in: tokensIn, tokens_out: tokensOut, stop_reason: stopReason, timings });
+}
+
+/**
+ * The turn's signals for the learning loop (src/learning/): the question asked (never its
+ * text), each analysis it ran with its layer and coarse intent, a clarifying question,
+ * a pane action. A company skill travels as its creation id, never its name.
+ */
+async function turnSignals(ctx: SignalCtx, turn: { conv: string; first: boolean; builder: boolean; from: string }, records: ToolCallRecord[], recipes: RecipeSpec[], own: { key: string; _creation: { id: string } }[], asked: boolean, paneAction?: PaneAction): Promise<void> {
+  await signal(ctx, "chat.turn", turn);
+  for (const r of records) {
+    const input = (r.input ?? {}) as Record<string, unknown>;
+    const status = r.status === "ok" && Array.isArray(r.rows) && r.rows.length === 0 && r.name !== "run_skill" ? "empty" : r.status;
+    if (r.name === "run_skill") {
+      const skill = String(input.skill ?? "");
+      await signal(ctx, "chat.analysis", { layer: "skill", analysis: skill, intent: skillIntent(skill), status });
+    } else if (r.name === "run_recipe") {
+      const recipe = recipes.find((x) => x.key === input.recipe);
+      const mine = own.find((x) => x.key === input.recipe);
+      await signal(ctx, "chat.analysis", { layer: mine ? "company" : "recipe", analysis: mine ? mine._creation.id : String(input.recipe ?? ""), intent: queryIntent(recipe?.query as never), status });
+    } else if (r.name === "query_metrics") {
+      await signal(ctx, "chat.analysis", { layer: "query", intent: queryIntent(input as never), status });
+    } else if (r.name === "export_run") {
+      await signal(ctx, "chat.export", { format: input.format === "csv" ? "csv" : "xlsx", via: "chat" });
+    }
+  }
+  if (asked) await signal(ctx, "chat.clarify", { conv: turn.conv });
+  if (paneAction) await signal(ctx, "chat.pane_action", { action: paneAction.action });
 }
 
 /** Emit the skill's activity lines while it runs: start now, then one step every ~700 ms until stopped. */

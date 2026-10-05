@@ -176,6 +176,13 @@
       "when": 1791158955800,
       "tag": "0024_quick_chameleon",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1791162117396,
+      "tag": "0025_fat_carlie_cooper",
+      "breakpoints": true
     }
   ]
 }

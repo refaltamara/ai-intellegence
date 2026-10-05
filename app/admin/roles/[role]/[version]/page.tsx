@@ -15,6 +15,13 @@ import { TestPanel } from "@/ui/admin/TestPanel";
 import { ProposeRelease } from "@/ui/admin/ProposeRelease";
 import { LabChat } from "@/ui/admin/LabChat";
 import { labSession } from "@/roles/lab";
+import { latestInsights } from "@/learning/insights";
+import { measureVersion, originDetails, originPhrase } from "@/learning/outcomes";
+import { FIXED_MEASURES, measureOf, suggestMeasures } from "@/learning/measures";
+import { allCreations, KIND_LABEL } from "@/company/creations";
+import { listSuggestions } from "@/company/changes";
+import { OriginsEditor } from "@/ui/admin/OriginsEditor";
+import { Readings } from "@/ui/admin/Readings";
 
 export const dynamic = "force-dynamic";
 
@@ -28,6 +35,20 @@ export default async function RoleVersionPage({ params }: { params: Promise<{ ro
   const [results, ready] = await Promise.all([caseResults(role, version, spec._updated_at), readiness(role, version, spec._updated_at)]);
   const offering = (await Promise.all(workspaces.map(async (w) => ({ ...w, roles: (await getWorkspace(w.id))?.roles ?? [] })))).filter((w) => w.roles.includes(role));
   const editable = spec._status === "draft" || spec._status === "proposed";
+  // where it came from and what it should move (src/learning/outcomes.ts)
+  const [insights, creations, suggestions, reading] = await Promise.all([latestInsights(role), allCreations({ role, status: ["approved", "waiting"] }), listSuggestions({}), measureVersion(role, version)]);
+  const origins = reading?.origins ?? [];
+  const phrase = originPhrase(await originDetails(role, origins));
+  const titles = Object.fromEntries([...recipes.values()].map((x) => [x.key, x.title]));
+  const suggested = suggestMeasures(base, spec);
+  const measureKeys = [...new Set([...suggested, ...(spec.recipes ?? []).map((k) => `analysis:${k}`), ...FIXED_MEASURES, ...(reading?.keys ?? [])])];
+  const originItems: { kind: "insight" | "creation" | "suggestion"; ref: string; text: string; who?: string | null }[] = [
+    ...insights.filter((i) => i.family !== "outcome").map((i) => ({ kind: "insight" as const, ref: i.key, text: i.sentence })),
+    ...creations.map((c) => ({ kind: "creation" as const, ref: c.id, text: `${KIND_LABEL[c.kind]}: ${c.title}`, who: c.workspace_name })),
+    ...suggestions.filter((x) => x.role === role).map((x) => ({ kind: "suggestion" as const, ref: x.id, text: `${x.title ?? x.ref}: ${x.note ?? ""}`, who: `${x.workspace_name} · ${x.status}` })),
+  ];
+  // an origin that has since gone (an insight no longer rolled up) stays listed so it can be kept
+  for (const o of origins) if (!originItems.some((i) => i.kind === o.kind && i.ref === o.ref)) originItems.push({ kind: o.kind, ref: o.ref, text: (await originDetails(role, [o]))[0]?.text ?? o.ref });
   const r = ROLES[role];
   return (
     <section className="screen">
@@ -61,6 +82,24 @@ export default async function RoleVersionPage({ params }: { params: Promise<{ ro
           model={hasModelCredentials()}
           cases={cases.filter((c) => c.active).map((c) => ({ key: c.key, kind: c.kind, workspace: c.spec.kind === "guard" ? null : c.spec.workspace, q: c.spec.kind === "question" ? c.spec.q : null, result: results.get(c.key) ? { status: results.get(c.key)!.status, detail: results.get(c.key)!.detail } : null }))}
         />
+        <div className="cmsblock">
+          <header><h2>Where it came from</h2>{phrase && <span className="pill">{phrase}</span>}</header>
+          <OriginsEditor
+            role={role}
+            version={version}
+            editable={(editable && can(actor, "role.draft")) || can(actor, "role.release")}
+            items={originItems}
+            chosen={origins}
+            measures={measureKeys.map((k) => ({ key: k, label: measureOf(k, titles)?.label ?? k, suggested: suggested.includes(k) })).filter((m) => m.label !== m.key || m.key.includes(":"))}
+            chosenMeasures={reading?.keys ?? []}
+          />
+        </div>
+        {reading && reading.state !== "not_released" && (
+          <div className="cmsblock">
+            <header><h2>Before and after</h2></header>
+            <Readings r={reading} codename={r.codename} />
+          </div>
+        )}
         <ProposeRelease
           role={role}
           version={version}

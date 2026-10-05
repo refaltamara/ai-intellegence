@@ -3,6 +3,7 @@
  * the conversation (or the one analysis) becomes a finding, run again for each version; the first version is
  * made before the reply.
  */
+import { signalHere } from "@/learning/here";
 import { currentSession, currentWorkspaceId } from "@/auth/current";
 import { chatDeckSpec, conversationFindings, findingFromRun } from "@/decks/fromChat";
 import { generateDeckVersion } from "@/decks/generate";
@@ -35,6 +36,8 @@ export async function POST(req: Request) {
   const spec = await chatDeckSpec(typeof b.name === "string" && b.name.trim() ? b.name.trim() : title, findings, ws);
   if ("error" in spec) return Response.json({ error: spec.error }, { status: 400 });
   const deck = await createDeck({ workspaceId: ws, userId: session?.uid ?? null, name: spec.title, source: "chat", template: null, spec, recurring: false, conversationId });
+  await signalHere("chat.turn_into", { to: "deck" });
+  await signalHere("deck.template_chosen", { template: "chat", source: "chat" });
   const version = await generateDeckVersion(deck, { reason: "create" });
   return Response.json({ deck: (await getDeck(deck.id, ws)) ?? deck, version }, { status: 201 });
 }

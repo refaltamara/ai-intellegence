@@ -2,6 +2,7 @@
  * POST { slide } (from the Dashboard) or { skill_run_id, question? } (from Chats): put it in the deck. A slide
  * joins the deck's slides; an analysis becomes a finding, run again for every version from the next one on.
  */
+import { signalHere } from "@/learning/here";
 import { currentWorkspaceId } from "@/auth/current";
 import { SLIDE_KINDS, cleanSlides, type SlideKind } from "@/competitor/slides";
 import { findingFromRun } from "@/decks/fromChat";
@@ -28,6 +29,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     let n = findings.length + 1;
     while (used.has(`f${n}`)) n++;
     spec.findings = [...findings, { ...f, key: `f${n}` }];
+    await signalHere("chat.turn_into", { to: "add_to_deck" }, spec.social ? "social" : spec.rep ? "pr" : "brand_kol");
     spec.slides = cleanSlides([...spec.slides, "findings"]);
   } else return Response.json({ error: "slide or skill_run_id is required" }, { status: 400 });
   return Response.json({ deck: await updateDeck(deck.id, ws, { spec }) });

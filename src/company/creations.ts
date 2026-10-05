@@ -28,6 +28,8 @@ import { cleanRepSlides } from "../reputation/slides";
 import { cleanSocialSlides } from "../social/slides";
 import { refuseTerm, refuseText, type Memory, type Term } from "./rules";
 import { validateExt, type ExtDefInput } from "../extensions/spec";
+import { by, signal } from "../learning/signals";
+import { creationShape } from "../learning/vocab";
 
 export const CREATION_KINDS = ["skill", "deck_template", "rule", "fact", "term", "extension"] as const;
 export type CreationKind = (typeof CREATION_KINDS)[number];
@@ -164,6 +166,10 @@ export async function makeCreation(actor: Actor, o: { ws: string; role: RoleId; 
     [o.ws, o.role, o.kind, clean.key, clean.title, toJson(clean.spec), live ? "approved" : "draft", actor.memberships.some((m) => m.user_id === actor.uid && m.workspace_id === o.ws) ? actor.uid : null, actor.email, actor.name, live ? actor.email : null],
   )) as Creation[];
   await audit({ workspace_id: o.ws, actor: actor.email, area: "creation", action: live ? "add" : "draft", path: `${o.role}:${o.kind}:${rows[0].id}`, new: { title: clean.title } });
+  const level = actor.staff.length ? "fair" : isBuilder(actor, o.ws, o.role) ? "builder" : "member";
+  const shape = creationShape(o.kind, clean.spec);
+  await signal(by(actor, o.ws, o.role), "creation.made", { kind: o.kind, level, shape });
+  if (live) await signal(by(actor, o.ws, o.role), "creation.approved", { kind: o.kind, shape, own: true });
   return { ok: true, creation: rows[0] };
 }
 
@@ -195,6 +201,9 @@ export async function actOn(actor: Actor, id: string, ws: string, action: Creati
     )) as Creation[];
     await audit({ workspace_id: ws, actor: actor.email, area: "creation", action, path: `${c.role}:${c.kind}:${c.id}`, old: { status: c.status }, new: { status }, note: note ?? null });
     if (c.kind === "extension") await (await import("../extensions/store")).onCreationStatus(rows[0], status, actor);
+    const sig = { kind: c.kind, shape: creationShape(c.kind, c.spec) };
+    const kind = status === "approved" ? (action === "restore" ? "creation.restored" : "creation.approved") : status === "waiting" ? "creation.submitted" : status === "sent_back" ? "creation.sent_back" : status === "rejected" ? "creation.rejected" : "creation.removed";
+    await signal(by(actor, ws, c.role), kind, { ...sig, own: mine, live: c.status === "approved" });
     return { ok: true as const, creation: rows[0] };
   };
   switch (action) {

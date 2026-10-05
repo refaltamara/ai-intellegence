@@ -7,6 +7,7 @@
  * on every slide. A recurring deck looks for a new period after each one ends
  * and skips a period it already has.
  */
+import { signal } from "../learning/signals";
 import { getRole } from "../roles/store";
 import { weeklyReport } from "../competitor/facts";
 import { deckPeriod, latestComplete, type Grain } from "../competitor/period";
@@ -68,6 +69,7 @@ export async function generateDeckVersion(deck: DeckRow, opts: { period?: string
     return { status: "error", message: ok.message, report_id: null, period: null };
   }
   const out = await makeVersion(deck, opts);
+  if (out.status === "ok") await signal({ ws: deck.workspace_id, role: deck.spec.social ? "social" : deck.spec.rep ? "pr" : "brand_kol", userId: opts.reason === "schedule" ? null : deck.user_id }, "deck.version_made", { deck: deck.id, report: out.report_id, by: opts.reason === "schedule" ? "cron" : "person" });
   if (out.status === "ok" && out.narrative_by === "model") {
     const who = deck.user_id ? ((await sql.query("select u.email, coalesce(array_length(a.staff, 1), 0) > 0 as staff from users u left join accounts a on a.id = u.account_id where u.id = $1", [deck.user_id])) as { email: string; staff: boolean }[])[0] : undefined;
     await charge({ ws: deck.workspace_id, email: who?.email ?? null, staff: who?.staff, kind: "deck_version", credits: CREDIT_PRICES.deck_version, ref: out.report_id, note: `${deck.name}${opts.reason === "schedule" ? " (scheduled)" : ""}` });

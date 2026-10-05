@@ -14,6 +14,7 @@ import { registry } from "@/skills/registry";
 import { teamSkills } from "@/skills/team";
 import { resolveAsk } from "@/dashboard/ask";
 import { decodeAsk } from "@/dashboard/askref";
+import { by, signal } from "@/learning/signals";
 
 export const dynamic = "force-dynamic";
 
@@ -32,6 +33,7 @@ export default async function ChatsPage({ searchParams }: { searchParams: Promis
   const askContext = askRef ? await resolveAsk(ws, askRef).catch(() => null) : null;
   const [s, client, pane, skills] = await Promise.all([workspaceStats(ws), clientBrandName(ws), paneContext(messages, ws), teamSkills(ws, role).catch(() => [])]);
   const actor = await currentActor();
+  if (askRef && askContext) await signal(by(actor, ws, role.id), "dashboard.ask_why", { k: askRef.k });
   // the team's own analyses first: Fair's recipes for this role, then what the team made (its badge says whose)
   const [fairR, ownR] = await Promise.all([recipesFor(role.recipes).catch(() => []), actor ? companyRecipes(ws, role.id, actor.email).catch(() => []) : Promise.resolve([])]);
   const teamMenu: SkillOption[] = [

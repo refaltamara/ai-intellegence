@@ -11,6 +11,7 @@ import { ROLES, type RoleId, type RoleModel } from "../roles/model";
 import { POLICY_HELP, allowed, resolve, valueAt, type Overrides } from "../roles/policy";
 import { audit, companyVersion, fairVersion, setCompanyChanges } from "../roles/store";
 import { isBuilder } from "./creations";
+import { by, signal } from "../learning/signals";
 
 export type ChangeLine = { path: string; label: string; from: unknown; to: unknown };
 export type Preview = { lines: ChangeLine[]; dropped: { path: string; label: string; why: string }[]; note?: string };
@@ -62,6 +63,7 @@ export async function applyChange(actor: Actor, ws: string, role: RoleId, change
   if (!preview.lines.length) return { ok: false, error: preview.dropped.length ? preview.dropped.map((d) => `${d.label}: ${d.why}`).join(" ") : "Nothing would change." };
   const keep = Object.fromEntries(preview.lines.map((l) => [l.path, changes[l.path]]));
   const r = await setCompanyChanges(ws, role, keep, actor.email, note ?? undefined);
+  for (const l of preview.lines) await signal(by(actor, ws, role), "setting.changed", { path: l.path, value: changes[l.path], reset: changes[l.path] === null });
   return { ok: true, version: r.version, preview };
 }
 
@@ -92,6 +94,7 @@ export async function undoVersion(actor: Actor, ws: string, role: RoleId, versio
   if (!h || !h.lines.length) return { ok: false, error: "Nothing to undo there." };
   const back: Overrides = Object.fromEntries(h.lines.map((l) => [l.path, l.from]));
   const r = await setCompanyChanges(ws, role, back, actor.email, `undo v${version}`);
+  for (const l of h.lines) await signal(by(actor, ws, role), "setting.undone", { path: l.path });
   return { ok: true, version: r.version };
 }
 
@@ -133,6 +136,8 @@ export async function suggestToFair(actor: Actor, ws: string, role: RoleId, ref:
     [ws, role, ref.kind, ref.ref, ref.value === undefined ? null : toJson(ref.value), note.trim().slice(0, 500), actor.email],
   )) as { id: string }[];
   await audit({ workspace_id: ws, actor: actor.email, area: "suggestion", action: "suggest", path: `${role}:${ref.kind}:${ref.ref}`, note });
+  const kindOf = ref.kind === "creation" ? ((await sql.query("select kind from creations where id = $1", [ref.ref])) as { kind: string }[])[0]?.kind : undefined;
+  await signal(by(actor, ws, role), "suggestion.sent", { ref_kind: ref.kind, kind: kindOf, path: ref.kind === "setting" ? ref.ref : undefined });
   return { ok: true, id: rows[0].id };
 }
 

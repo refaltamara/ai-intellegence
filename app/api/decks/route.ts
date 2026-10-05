@@ -2,7 +2,8 @@
  * GET: this team's decks. POST { name, template?, spec, recurring?, period? }: a new deck and its
  * first version (the facts, the words and both files are made before the reply, so it can take a minute).
  */
-import { currentSession, currentWorkspaceId } from "@/auth/current";
+import { currentActor, currentSession, currentWorkspaceId } from "@/auth/current";
+import { by, signal } from "@/learning/signals";
 import { generateDeckVersion, nextRun } from "@/decks/generate";
 import { cleanSpec } from "@/decks/spec";
 import { createDeck, getDeck, listDecks } from "@/decks/store";
@@ -30,6 +31,8 @@ export async function POST(req: Request) {
   const recurring = b.recurring === true;
   const created = await createDeck({ workspaceId: ws, userId: session?.uid ?? null, name, source: t ? "template" : "scratch", template: t?.key ?? null, spec, recurring });
   const deck = recurring ? { ...created, next_run_at: nextRun(spec.grain) } : created;
+  const fair = deckTemplate(b.template);
+  await signal(by(await currentActor(), ws, spec.social ? "social" : spec.rep ? "pr" : "brand_kol"), "deck.template_chosen", { template: fair?.key ?? (t ? "company" : "scratch"), source: fair ? "fair" : t ? "company" : "scratch" });
   const outcome = await generateDeckVersion(deck, { reason: "create", period: typeof b.period === "string" && b.period ? b.period : undefined });
   return Response.json({ deck: (await getDeck(deck.id, ws)) ?? deck, version: outcome }, { status: 201 });
 }

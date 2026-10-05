@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import { sendSignal } from "./signal";
 import { useState } from "react";
 import type { ToolCallRecord } from "@/chat/persist";
 import type { ChartSpec, Evidence } from "@/skills/types";
@@ -63,7 +64,7 @@ function AnalysisCard({ tool, evidence, onOpenEvidence, decisionId = null, onOpe
           {isDiscovery && (
             <div className="body"><Link className="btn sm pri" href={`/skills/discovery?run=${tool.run_id}`}>Open the full list</Link> <span style={{ fontSize: 12, color: "var(--text-3)", marginLeft: 8 }}>every row, filters, CSV export</span></div>
           )}
-          {showChart && rows.length > 0 ? <div className="body"><button className="btn sm ghost" onClick={() => setChartOn((c) => !c)}>{chartOn ? "Hide chart" : "Show chart"}</button></div> : null}
+          {showChart && rows.length > 0 ? <div className="body"><button className="btn sm ghost" onClick={() => { if (!chartOn) sendSignal("chat.show_chart", { where: "card" }); setChartOn((c) => !c); }}>{chartOn ? "Hide chart" : "Show chart"}</button></div> : null}
           {showChart && (chartOn || rows.length === 0) ? <div className="chart"><Chart spec={chart} /></div> : null}
           {rows.length > 0 && (
             <div className="tablewrap">
