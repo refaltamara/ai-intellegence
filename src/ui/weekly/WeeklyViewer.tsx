@@ -8,6 +8,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import type { WeeklyItem } from "@/reports/weekly";
 import { SlideAsk } from "./SlideAsk";
+import { sendSignal } from "../signal";
 
 type PdfDoc = { numPages: number; getPage: (n: number) => Promise<PdfPage>; destroy: () => Promise<void> };
 type PdfPage = { getViewport: (o: { scale: number }) => { width: number; height: number }; render: (o: { canvasContext: CanvasRenderingContext2D; viewport: unknown }) => { promise: Promise<void>; cancel: () => void } };
@@ -83,6 +84,7 @@ type ViewerProps = {
 export function WeeklyViewer({ items, initialId, initialSlide, title = "Weekly Reports", subtitle, path = "/weekly", param = "r", actions, onPick }: ViewerProps) {
   const [id, setId] = useState(initialId);
   const [n, setN] = useState(initialSlide);
+  useEffect(() => { sendSignal("deck.version_opened", { report: id }); }, [id]);
   const [loaded, setLoaded] = useState<{ file: string; doc: PdfDoc } | null>(null);
   const [error, setError] = useState("");
   const [presenting, setPresenting] = useState(false);

@@ -50,6 +50,8 @@ export function commentWhere(ctx: Context, w: CommentWindow, platforms: Platform
     `c.posted_at >= (${p(w.from_ts)}::date::timestamp at time zone ${p(ctx.tz)})`,
     `c.posted_at < (${p(w.to_ts)}::date::timestamp at time zone ${p(ctx.tz)})`,
     `c.sentiment_source is distinct from 'subject'`,
+    // comments under a post that is not about its brand are not about the brand either (DECISIONS 3 Oct 2026)
+    `not exists (select 1 from posts rp where rp.id = c.post_id and rp.relevant = false)`,
   ];
   if (platforms) parts.push(`c.platform = any(${p(platforms)}::text[])`);
   return parts.join(" and ");

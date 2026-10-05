@@ -6,6 +6,9 @@
  */
 import type { Grain } from "../competitor/period";
 import type { SlideKind } from "../competitor/slides";
+import type { RoleId } from "../roles/model";
+import type { RepSlide } from "../reputation/slides";
+import type { SocialSlide } from "../social/slides";
 
 export type DeckTemplate = {
   key: string;
@@ -18,6 +21,12 @@ export type DeckTemplate = {
   /** what the brand picker asks for */
   brands: "watchlist" | "focus";
   recurring: boolean;
+  /** the roles that start from it (src/roles/model.ts); a PR deck is about one brand's reputation */
+  roles: RoleId[];
+  /** "reputation": a PR deck (src/reputation/deck.ts); "social": a Social Media deck (src/social/deck.ts); each with its own slides */
+  family?: "reputation" | "social";
+  rep_slides?: RepSlide[];
+  social_slides?: SocialSlide[];
 };
 
 export const DECK_TEMPLATES: DeckTemplate[] = [
@@ -30,6 +39,7 @@ export const DECK_TEMPLATES: DeckTemplate[] = [
     slides: ["summary", "scoreboard", "movers", "drivers", "campaigns", "tiers", "products", "posting", "closeups", "patterns", "moves", "portfolio", "evidence"],
     brands: "watchlist",
     recurring: true,
+    roles: ["brand_kol"],
   },
   {
     key: "monthly-review",
@@ -40,6 +50,7 @@ export const DECK_TEMPLATES: DeckTemplate[] = [
     slides: ["summary", "scoreboard", "trend", "movers", "drivers", "creators", "campaigns", "angles", "tiers", "products", "closeups", "moves", "portfolio", "evidence"],
     brands: "watchlist",
     recurring: true,
+    roles: ["brand_kol"],
   },
   {
     key: "campaign-tracker",
@@ -50,6 +61,7 @@ export const DECK_TEMPLATES: DeckTemplate[] = [
     slides: ["summary", "trend", "creators", "content", "campaigns", "angles", "posting", "patterns", "moves", "evidence"],
     brands: "focus",
     recurring: true,
+    roles: ["brand_kol"],
   },
   {
     key: "creator-scouting",
@@ -60,6 +72,7 @@ export const DECK_TEMPLATES: DeckTemplate[] = [
     slides: ["summary", "creators", "content", "angles", "tiers", "patterns", "moves", "evidence"],
     brands: "focus",
     recurring: false,
+    roles: ["brand_kol"],
   },
   {
     key: "competitor-deep-dive",
@@ -70,6 +83,7 @@ export const DECK_TEMPLATES: DeckTemplate[] = [
     slides: ["summary", "scoreboard", "trend", "content", "campaigns", "angles", "products", "posting", "closeups", "patterns", "moves", "evidence"],
     brands: "focus",
     recurring: false,
+    roles: ["brand_kol"],
   },
   {
     key: "blank",
@@ -80,7 +94,78 @@ export const DECK_TEMPLATES: DeckTemplate[] = [
     slides: ["summary", "scoreboard", "moves"],
     brands: "watchlist",
     recurring: false,
+    roles: ["brand_kol"],
+  },
+  // ---- PR (DECISIONS, 3 Oct 2026): reputation, not creators
+  {
+    key: "reputation-weekly",
+    name: "Weekly Reputation Report",
+    title: "Weekly Reputation Report",
+    description: "The week for management: status, the headline numbers, the issues and whether they are ours alone, the narratives, the competitors, who carried it, and what goes to customer service.",
+    grain: "week",
+    slides: ["summary"],
+    brands: "focus",
+    recurring: true,
+    roles: ["pr"],
+    family: "reputation",
+    rep_slides: ["summary", "timeline", "issues", "narratives", "competitive", "voices", "service"],
+  },
+  {
+    key: "reputation-monthly",
+    name: "Monthly Reputation Review",
+    title: "Monthly Reputation Review",
+    description: "The month for the board: status day by day, the issues with a slide each, the narratives and reputation against the competitors.",
+    grain: "month",
+    slides: ["summary"],
+    brands: "focus",
+    recurring: true,
+    roles: ["pr"],
+    family: "reputation",
+    rep_slides: ["summary", "timeline", "issues", "issue_detail", "narratives", "competitive", "voices"],
+  },
+  {
+    key: "issue-postmortem",
+    name: "Issue Post-mortem",
+    title: "Issue Post-mortem",
+    description: "After an issue: how it moved day by day, where it spread, what people said, whether the category saw it too, and what reached customer service.",
+    grain: "week",
+    slides: ["summary"],
+    brands: "focus",
+    recurring: false,
+    roles: ["pr"],
+    family: "reputation",
+    rep_slides: ["summary", "timeline", "issue_detail", "competitive", "service"],
+  },
+  // ---- Social Media (DECISIONS, 3 Oct 2026): the brand's own accounts
+  {
+    key: "content-monthly",
+    name: "Monthly Content Review",
+    title: "Monthly Content Review",
+    description: "The month on your own accounts: what worked and what did not, each account, formats and posting times, the best and weakest posts, the competitors' own channels and the community.",
+    grain: "month",
+    slides: ["summary"],
+    brands: "focus",
+    recurring: true,
+    roles: ["social"],
+    family: "social",
+    social_slides: ["summary", "accounts", "formats", "best", "competitors", "community"],
+  },
+  {
+    key: "content-teardown",
+    name: "Competitor Content Teardown",
+    title: "Competitor Content Teardown",
+    description: "One competitor's own accounts, taken apart: pick the competitor as the brand. Their formats and timing, their best and weakest posts, and what their community says.",
+    grain: "month",
+    slides: ["summary"],
+    brands: "focus",
+    recurring: false,
+    roles: ["social"],
+    family: "social",
+    social_slides: ["summary", "accounts", "formats", "best", "community"],
   },
 ];
+
+/** The templates a role starts from. */
+export const templatesFor = (role: RoleId) => DECK_TEMPLATES.filter((t) => t.roles.includes(role));
 
 export const deckTemplate = (key: unknown) => DECK_TEMPLATES.find((t) => t.key === key) ?? null;

@@ -19,8 +19,9 @@ export class Where {
     return this;
   }
 
+  /** the workspace, and only posts about their brand: a listening post that does not name it never counts (DECISIONS 3 Oct 2026) */
   workspace(ctx: Context): this {
-    return this.add(`${this.alias}.workspace_id = ?`, ctx.workspaceId);
+    return this.add(`${this.alias}.workspace_id = ? and ${this.alias}.relevant is not false`, ctx.workspaceId);
   }
 
   window(w: Window, ctx: Context): this {
@@ -144,6 +145,9 @@ export class EvidenceList {
     return ev.id;
   }
 }
+
+/** What the beauty export's caveats say; a listening workspace has none of these gaps, and the runner drops them there. */
+export const EXPORT_CAVEAT_STARTS = ["TikTok April 2026 has 23 of 30 days", "TikTok data starts 5 Apr 2026", "Instagram Q1 2026 covers the Beauty universe", "Instagram views are 0 for Carousel/Image posts", "No day-by-day snapshots exist", "content_format is null"];
 
 /** Data caveats that any result touching the affected slices should carry (DATA_NOTES). */
 export function windowCaveats(w: Window, platforms: Platform[] | null): string[] {

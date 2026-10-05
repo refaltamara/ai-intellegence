@@ -1,57 +1,44 @@
-/** Users: lookup, creation and password management over the Neon HTTP client. */
+/**
+ * People from the command line (`pnpm user`), over accounts and memberships
+ * (src/auth/accounts.ts). Sign-in itself is authenticateAccount.
+ */
 import { sql } from "../db/client";
 import { DEFAULT_WORKSPACE_ID } from "../config/thresholds";
-import { hashPassword, verifyPassword } from "./password";
+import type { Duty } from "../config/staff";
+import type { RoleId } from "../roles/model";
+import type { Level } from "./can";
+import { ensureMember, findAccount, removeMember, setAccountPassword, setStaff } from "./accounts";
 
-export type UserRow = { id: string; workspace_id: string; email: string; name: string | null; role: string; password_hash: string | null; created_at: string };
+export type UserListRow = { workspace_id: string; email: string; name: string | null; staff: Duty[]; levels: Partial<Record<RoleId, Level>> };
 
-/** Without a workspace, the account is looked up across workspaces (login); owners win over members when an email exists in two. */
-export async function findUserByEmail(email: string, workspaceId?: string): Promise<UserRow | null> {
-  const r = workspaceId
-    ? ((await sql.query("select * from users where workspace_id = $1 and lower(email) = lower($2)", [workspaceId, email.trim()])) as UserRow[])
-    : ((await sql.query("select * from users where lower(email) = lower($1) order by (role = 'owner') desc, created_at limit 1", [email.trim()])) as UserRow[]);
-  return r[0] ?? null;
+export async function listUsers(workspaceId?: string): Promise<UserListRow[]> {
+  return (await sql.query(
+    `select u.workspace_id, a.email, coalesce(a.name, u.name) as name, a.staff, u.levels from users u join accounts a on a.id = u.account_id
+      ${workspaceId ? "where u.workspace_id = $1" : ""} order by u.workspace_id, u.created_at`,
+    workspaceId ? [workspaceId] : [],
+  )) as UserListRow[];
 }
-export async function listUsers(workspaceId?: string): Promise<Omit<UserRow, "password_hash">[]> {
-  return workspaceId
-    ? ((await sql.query("select id, workspace_id, email, name, role, created_at from users where workspace_id = $1 order by created_at", [workspaceId])) as UserRow[])
-    : ((await sql.query("select id, workspace_id, email, name, role, created_at from users order by workspace_id, created_at")) as UserRow[]);
-}
-export async function upsertUser(u: { email: string; name?: string | null; role?: string; password: string; workspaceId?: string }): Promise<UserRow> {
+
+export async function upsertUser(u: { email: string; name?: string | null; level?: Level; password: string; workspaceId?: string }): Promise<{ email: string; workspace_id: string }> {
   const ws = u.workspaceId ?? DEFAULT_WORKSPACE_ID;
-  const r = (await sql.query(
-    `insert into users (workspace_id, email, name, role, password_hash) values ($1, lower($2), $3, $4, $5)
-     on conflict (workspace_id, email) do update set name = coalesce(excluded.name, users.name), role = excluded.role, password_hash = excluded.password_hash returning *`,
-    [ws, u.email.trim(), u.name ?? null, u.role ?? "member", hashPassword(u.password)],
-  )) as UserRow[];
-  return r[0];
-}
-export async function setPassword(email: string, password: string, workspaceId?: string): Promise<boolean> {
-  const u = await findUserByEmail(email, workspaceId);
-  if (!u) return false;
-  const r = (await sql.query("update users set password_hash = $2 where id = $1 returning id", [u.id, hashPassword(password)])) as { id: string }[];
-  return r.length > 0;
-}
-/** Owners are Fair staff: they see every workspace and get the sidebar switcher. Takes effect at the next login. */
-export async function setRole(email: string, role: "owner" | "member", workspaceId?: string): Promise<boolean> {
-  const rows = (await sql.query(
-    `update users set role = $2 where lower(email) = lower($1) ${workspaceId ? "and workspace_id = $3" : ""} returning id`,
-    workspaceId ? [email, role, workspaceId] : [email, role],
-  )) as { id: string }[];
-  return rows.length > 0;
+  const { getWorkspace } = await import("../workspace/store");
+  const roles = (await getWorkspace(ws))?.roles ?? ["brand_kol"];
+  await ensureMember({ email: u.email, name: u.name, workspaceId: ws, password: u.password, levels: Object.fromEntries(roles.map((r) => [r, u.level ?? "member"])) });
+  return { email: u.email.toLowerCase(), workspace_id: ws };
 }
 
-/** Removes the account and its sign-in. Its chats and watches stay in the workspace, detached from the person; connector tokens go with the account. */
-export async function removeUser(email: string, workspaceId?: string): Promise<boolean> {
-  const u = await findUserByEmail(email, workspaceId);
-  if (!u) return false;
-  await sql.query("update conversations set user_id = null where user_id = $1", [u.id]);
-  await sql.query("update agents set user_id = null where user_id = $1", [u.id]);
-  const r = (await sql.query("delete from users where id = $1 returning id", [u.id])) as { id: string }[];
-  return r.length > 0;
+export const setPassword = setAccountPassword;
+
+export async function setDuties(email: string, duties: Duty[]): Promise<boolean> {
+  const a = await findAccount(email);
+  return !!a && setStaff(a.id, duties);
 }
-export async function authenticate(email: string, password: string, workspaceId?: string): Promise<UserRow | null> {
-  const user = await findUserByEmail(email, workspaceId);
-  if (!user || !verifyPassword(password, user.password_hash)) return null;
-  return user;
+
+export async function removeUser(email: string, workspaceId?: string): Promise<boolean> {
+  const rows = (await sql.query(
+    `select u.id, u.workspace_id from users u join accounts a on a.id = u.account_id where a.email = lower($1) ${workspaceId ? "and u.workspace_id = $2" : ""}`,
+    workspaceId ? [email.trim(), workspaceId] : [email.trim()],
+  )) as { id: string; workspace_id: string }[];
+  for (const r of rows) await removeMember(r.workspace_id, r.id);
+  return rows.length > 0;
 }

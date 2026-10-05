@@ -23,8 +23,8 @@ import { CAPTION_SLIDES, cleanSlides, LANDSCAPE_SLIDES } from "./slides";
 import { shortDay } from "./weeks";
 import type { Cell, CreatorRow, EvidencePost, Finding, Flag, Group, GroupResult, Mover, Panel, PanelPoint, Platform, WeekPoint, WeeklyReport } from "./types";
 
-const PLATFORM_NAME: Record<Platform, string> = { tiktok: "TikTok", instagram: "Instagram" };
-/** Owned-account posts are captured on TikTok only in the current panel. */
+const PLATFORM_NAME: Record<Platform, string> = { tiktok: "TikTok", instagram: "Instagram", threads: "Threads", x: "X", youtube: "YouTube" };
+/** Owned-account posts are captured on TikTok in the beauty panel; listening workspaces capture them everywhere (a platform with any counts). */
 const OWNED_PLATFORMS: Platform[] = ["tiktok"];
 const CART_PLATFORMS: Platform[] = ["tiktok"];
 const MIN_TAG_CREATORS = 3;
@@ -50,7 +50,8 @@ export async function weeklyReport(contract: WeeklyContract, week: string, opts:
   const unit = grain === "month" ? "month" : "week";
   const words = periodWords(grain);
   const rules = weeklyRules(contract.rules, grain);
-  const platforms: Platform[] = contract.platforms?.length ? contract.platforms : ["tiktok", "instagram"];
+  // by default every platform the workspace holds (TikTok and Instagram in the beauty panel)
+  const platforms: Platform[] = contract.platforms?.length ? contract.platforms : ((await db.q<{ platform: Platform }>("select distinct platform from posts where workspace_id = $1 order by 1", [contract.workspace])).map((r) => r.platform));
   const slides = contract.slides ? cleanSlides(contract.slides) : undefined;
   const period = deckPeriod(grain, week);
   const W = period.from;
@@ -75,7 +76,7 @@ export async function weeklyReport(contract: WeeklyContract, week: string, opts:
               g.gkey, p.platform, p.url, p.source, p.creator_handle, p.views, p.engagements, p.has_cart,
               (date_trunc('${unit}', p.posted_at at time zone $4))::date as wk
        from posts p join g on g.brand_id = p.brand_id
-       where p.workspace_id = $1 and p.platform = any($5::text[])
+       where p.workspace_id = $1 and p.relevant is not false and p.platform = any($5::text[])
          and p.posted_at >= ($6::date::timestamp at time zone $4) and p.posted_at < ($7::date::timestamp at time zone $4)
        order by g.gkey, p.platform, p.url, p.views desc nulls last
      )
@@ -97,7 +98,7 @@ export async function weeklyReport(contract: WeeklyContract, week: string, opts:
     `with d as (
        select distinct on (p.platform, p.url) p.platform, p.url, p.views, (date_trunc('${unit}', p.posted_at at time zone $2))::date as wk
        from posts p
-       where p.workspace_id = $1 and p.platform = any($3::text[])
+       where p.workspace_id = $1 and p.relevant is not false and p.platform = any($3::text[])
          and p.posted_at >= ($4::date::timestamp at time zone $2) and p.posted_at < ($5::date::timestamp at time zone $2)
        order by p.platform, p.url, p.views desc nulls last
      )
@@ -184,7 +185,7 @@ export async function weeklyReport(contract: WeeklyContract, week: string, opts:
   const lastSeen = await db.q<{ gkey: string; platform: Platform; last: string | null; n: number }>(
     `with g as (select * from unnest($2::text[], $3::text[]) as t(gkey, brand_id))
      select g.gkey, p.platform, to_char(max(p.posted_at at time zone $4), 'YYYY-MM-DD') as last, count(*)::int as n
-     from posts p join g on g.brand_id = p.brand_id where p.workspace_id = $1 group by 1, 2`,
+     from posts p join g on g.brand_id = p.brand_id where p.workspace_id = $1 and p.relevant is not false group by 1, 2`,
     [ctx.workspaceId, pairs.map((p) => p[0]), pairs.map((p) => p[1]), tz],
   );
   for (const r of watch) {
@@ -208,7 +209,7 @@ export async function weeklyReport(contract: WeeklyContract, week: string, opts:
     });
     notes.push({ kind: "coverage", text: `${g.name} is outside current coverage: ${[untracked, ...parts].filter(Boolean).join("; ")}.` });
   }
-  const snapshots = await db.one<{ n: number }>("select count(*)::int as n from post_snapshots s join posts p on p.id = s.post_id where p.workspace_id = $1", [ctx.workspaceId]);
+  const snapshots = await db.one<{ n: number }>("select count(*)::int as n from post_snapshots s join posts p on p.id = s.post_id where p.workspace_id = $1 and p.relevant is not false", [ctx.workspaceId]);
   if (!snapshots?.n) notes.push({ kind: "method", text: `Views and engagement are as captured once per post, not at a fixed age, so ${words.this}'s posts have had less time to collect views than ${words.last}'s. The live collector measures every post at day 7.` });
 
   const coveredWatch = watch.filter((r) => platforms.some((pl) => r.cells[pl]?.covered)).map((r) => r.group);
@@ -281,7 +282,7 @@ async function drivers(
               p.content_format, p.has_cart, p.product_name, p.caption, p.hashtags, p.posted_at,
               to_char((date_trunc('${g8.unit}', p.posted_at at time zone $3))::date, 'YYYY-MM-DD') as wk
        from posts p
-       where p.workspace_id = $1 and p.platform = $2 and p.brand_id = any($4::text[])
+       where p.workspace_id = $1 and p.relevant is not false and p.platform = $2 and p.brand_id = any($4::text[])
          and p.posted_at >= ($5::date::timestamp at time zone $3) and p.posted_at < ($6::date::timestamp at time zone $3)
        order by p.url, p.views desc nulls last
      )`;
@@ -334,7 +335,7 @@ async function drivers(
      tot as (
        select h as tag, count(distinct p.url)::int as posts_all
        from posts p, unnest(p.hashtags) h
-       where p.workspace_id = $1 and p.platform = $2
+       where p.workspace_id = $1 and p.relevant is not false and p.platform = $2
          and p.posted_at >= ($7::date::timestamp at time zone $3) and p.posted_at < ($11::date::timestamp at time zone $3)
          and h in (select tag from agg where creators >= $10)
        group by 1
@@ -404,7 +405,7 @@ async function drivers(
       formats: formats.slice(0, 4).map((f) => ({ format: f.format, posts: f.now, share: round(pct(f.now, now.posts), 0) ?? 0, share_prev: round(pct(f.prev, prev.posts), 0) ?? 0 })),
     },
     campaign: { tags },
-    owned: OWNED_PLATFORMS.includes(platform)
+    owned: OWNED_PLATFORMS.includes(platform) || now.owned_posts > 0 || prev.owned_posts > 0
       ? { posts: { now: round(pct(now.owned_posts, now.posts), 0), prev: round(pct(prev.owned_posts, prev.posts), 0) }, views: { now: round(pct(now.owned_views, now.views), 0), prev: round(pct(prev.owned_views, prev.views), 0) } }
       : null,
     action: CART_PLATFORMS.includes(platform)
@@ -430,7 +431,7 @@ async function topCreators(db: SkillDb, o: Reach & { from: string }): Promise<Cr
      d as (
        select distinct on (p.platform, p.url, g.gkey) g.gkey, p.platform, p.url, p.creator_handle, p.tier, p.followers_at_post as followers, p.views, p.engagements, p.posted_at
        from posts p join g on g.brand_id = p.brand_id
-       where p.workspace_id = $1 and p.platform = any($5::text[]) and p.source = 'earned' and p.creator_handle is not null
+       where p.workspace_id = $1 and p.relevant is not false and p.platform = any($5::text[]) and p.source = 'earned' and p.creator_handle is not null
          and p.posted_at >= ($6::date::timestamp at time zone $4) and p.posted_at < ($8::date::timestamp at time zone $4)
        order by p.platform, p.url, g.gkey, p.views desc nulls last
      ),
@@ -477,7 +478,7 @@ async function topContent(db: SkillDb, o: Reach, evidence: EvidencePost[]): Prom
               to_char(p.posted_at at time zone $4, 'YYYY-MM-DD') as posted_at, p.views::float8 as views, p.engagements::float8 as engagements,
               p.content_format, p.has_cart, p.product_name, p.caption
        from posts p join g on g.brand_id = p.brand_id
-       where p.workspace_id = $1 and p.platform = any($5::text[])
+       where p.workspace_id = $1 and p.relevant is not false and p.platform = any($5::text[])
          and p.posted_at >= ($6::date::timestamp at time zone $4) and p.posted_at < ($7::date::timestamp at time zone $4)
        order by p.platform, p.url, p.views desc nulls last, g.gkey
      ),

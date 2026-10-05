@@ -20,6 +20,22 @@
     {
       "path": "/api/cron/captions",
       "schedule": "*/10 * * * *"
+    },
+    {
+      "path": "/api/cron/tests",
+      "schedule": "30 20 * * *"
+    },
+    {
+      "path": "/api/cron/jobs",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/health",
+      "schedule": "10 21 * * *"
+    },
+    {
+      "path": "/api/cron/insights",
+      "schedule": "40 21 * * *"
     }
   ]
 }

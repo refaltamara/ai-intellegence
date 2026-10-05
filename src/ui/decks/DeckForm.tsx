@@ -13,7 +13,7 @@ import { MultiSelect } from "../MultiSelect";
 type Group = DeckSpec["watchlist"][number];
 type Initial = { id: string; name: string; spec: DeckSpec; recurring: boolean; template: string | null };
 
-const PLATFORMS = [{ id: "tiktok", name: "TikTok" }, { id: "instagram", name: "Instagram" }] as const;
+const PLATFORM_NAME: Record<string, string> = { tiktok: "TikTok", instagram: "Instagram", threads: "Threads", x: "X", youtube: "YouTube" };
 
 /** What "Add to a deck → New deck" on the Dashboard carries: the section's slide, its brands and its grain. */
 export type Prefill = { slide: string; brands: string[]; grain: "week" | "month" | null };
@@ -30,14 +30,25 @@ export function DeckForm({ options, initial, prefill }: { options: DeckOptions; 
   const [clientName, setClientName] = useState(initial?.spec.client?.name ?? options.client?.name ?? "");
   const [clientIds, setClientIds] = useState<string[]>(initial?.spec.client?.brands.flatMap((b) => b.brand_ids) ?? options.client?.brand_ids ?? []);
   const [grain, setGrain] = useState<"week" | "month">(initial?.spec.grain ?? prefill?.grain ?? t.grain);
-  const [platforms, setPlatforms] = useState<string[]>(initial?.spec.platforms ?? ["tiktok", "instagram"]);
+  const [platforms, setPlatforms] = useState<string[]>(initial?.spec.platforms?.length ? initial.spec.platforms : options.platforms);
   const [slides, setSlides] = useState<string[]>(initial?.spec.slides ?? (prefill ? [...new Set(["summary", prefill.slide, "moves", "evidence"])] : t.slides));
   const [period, setPeriod] = useState("");
   const [recurring, setRecurring] = useState(initial?.recurring ?? t.recurring);
   const [busy, setBusy] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const [error, setError] = useState("");
-  const hasFindings = !!initial?.spec.findings?.length;
+  // the team's analyses (Fair's recipes and the team's own skills) can ride in a deck as findings, run again over each version's period
+  const [picked, setPicked] = useState<string[]>((initial?.spec.findings ?? []).filter((f) => f.skill.startsWith("recipe:")).map((f) => f.skill.slice(7)));
+  const chatFindings = (initial?.spec.findings ?? []).filter((f) => !f.skill.startsWith("recipe:"));
+  const hasFindings = chatFindings.length > 0 || picked.length > 0;
+  // a PR deck (one brand's reputation, src/reputation/) or a Social Media deck (one brand's own accounts, src/social/): a focus brand and the family's own slides
+  const family = edit ? (initial?.spec.rep ? "reputation" : initial?.spec.social ? "social" : null) : t.family ?? null;
+  const isRep = family != null;
+  const fam = initial?.spec.rep ?? initial?.spec.social;
+  const library = family === "social" ? options.social_slides : options.rep_slides;
+  const [focus, setFocus] = useState(fam?.focus ?? options.focus ?? options.brands[0]?.id ?? "");
+  const [repPlatform, setRepPlatform] = useState(fam?.platform ?? "all");
+  const [repSlides, setRepSlides] = useState<string[]>(fam?.slides ?? t.rep_slides ?? t.social_slides ?? ["summary"]);
 
   // a template sets the grain, the slides and whether it recurs; the brands stay as picked
   const pickTemplate = (key: string) => {
@@ -46,6 +57,7 @@ export function DeckForm({ options, initial, prefill }: { options: DeckOptions; 
     setGrain(x.grain);
     setSlides(x.slides);
     setRecurring(x.recurring);
+    if (x.rep_slides ?? x.social_slides) setRepSlides((x.rep_slides ?? x.social_slides)!);
   };
   useEffect(() => {
     if (!busy) return;
@@ -61,21 +73,24 @@ export function DeckForm({ options, initial, prefill }: { options: DeckOptions; 
   const periods = options.periods[grain];
 
   function spec(): DeckSpec {
+    if (family === "social") return { title: name.trim() || t.title, grain, platforms: [], client: null, watchlist: [], slides: ["summary"], social: { focus, platform: repPlatform, slides: repSlides as NonNullable<DeckSpec["social"]>["slides"] } };
+    if (family === "reputation") return { title: name.trim() || t.title, grain, platforms: [], client: null, watchlist: [], slides: ["summary"], rep: { focus, platform: repPlatform, slides: repSlides as NonNullable<DeckSpec["rep"]>["slides"] } };
     return {
       title: name.trim() || t.title,
       grain,
       platforms: platforms as DeckSpec["platforms"],
       client: clientOn && clientName.trim() && clientIds.length ? { name: clientName.trim(), brands: clientIds.map((id) => ({ name: brandName.get(id) ?? id, brand_ids: [id] })) } : null,
       watchlist: watch,
-      slides: slides as DeckSpec["slides"],
-      ...(initial?.spec.findings ? { findings: initial.spec.findings } : {}),
+      slides: (picked.length && !slides.includes("findings") ? [...slides, "findings"] : slides) as DeckSpec["slides"],
+      ...(hasFindings ? { findings: [...chatFindings, ...picked.map((k) => { const x = options.team_skills.find((y) => y.key === k); return { key: `r_${k}`.slice(0, 20), skill: `recipe:${k}`, params: {}, question: x?.description ?? k, title: x?.title ?? k }; })] } : {}),
     };
   }
 
   async function submit(andBuild: boolean) {
     setError("");
-    if (!watch.length) { setError(t.brands === "focus" ? "Pick the brand (or brands) this deck is about." : "Pick at least one brand to watch."); return; }
-    if (!platforms.length) { setError("Pick TikTok, Instagram or both."); return; }
+    if (isRep && !focus) { setError("Pick the brand this deck is about."); return; }
+    if (!isRep && !watch.length) { setError(t.brands === "focus" ? "Pick the brand (or brands) this deck is about." : "Pick at least one brand to watch."); return; }
+    if (!isRep && !platforms.length) { setError("Pick at least one platform."); return; }
     setBusy(true);
     setElapsed(0);
     try {
@@ -110,8 +125,8 @@ export function DeckForm({ options, initial, prefill }: { options: DeckOptions; 
           <div className="tpls">
             {options.templates.map((x) => (
               <button key={x.key} type="button" className={template === x.key ? "on" : ""} onClick={() => pickTemplate(x.key)}>
-                <b>{x.name}</b><span>{x.description}</span>
-                <small>{x.grain === "month" ? "Month on month" : "Week on week"} · {x.slides.length} slide types</small>
+                <b>{x.name}{x.badge && <i className={`badge ${x.badge === "Fair" ? "fair" : "client"}`} title={x.by ? `Made by ${x.by}` : undefined}>{x.badge}</i>}</b><span>{x.description}</span>
+                <small>{x.grain === "month" ? "Month on month" : "Week on week"} · {(x.rep_slides ?? x.social_slides ?? x.slides).length} slide types</small>
               </button>
             ))}
           </div>
@@ -129,14 +144,50 @@ export function DeckForm({ options, initial, prefill }: { options: DeckOptions; 
         </div>
         <div className="wf">
           <span>Platforms</span>
-          <div className="seg">
-            {PLATFORMS.map((p) => (
-              <button key={p.id} type="button" className={platforms.includes(p.id) ? "on" : ""} onClick={() => setPlatforms((x) => (x.includes(p.id) ? x.filter((y) => y !== p.id) : [...x, p.id]))}>{p.name}</button>
-            ))}
-          </div>
+          {isRep ? (
+            <div className="seg">
+              {["all", ...options.platforms].map((p) => (
+                <button key={p} type="button" className={repPlatform === p ? "on" : ""} onClick={() => setRepPlatform(p)}>{p === "all" ? "All" : PLATFORM_NAME[p] ?? p}</button>
+              ))}
+            </div>
+          ) : (
+            <div className="seg">
+              {options.platforms.map((p) => (
+                <button key={p} type="button" className={platforms.includes(p) ? "on" : ""} onClick={() => setPlatforms((x) => (x.includes(p) ? x.filter((y) => y !== p) : [...x, p]))}>{PLATFORM_NAME[p] ?? p}</button>
+              ))}
+            </div>
+          )}
         </div>
       </section>
 
+      {isRep && (
+        <>
+          <section className="cgrid">
+            <label className="wf"><span>The brand this deck is about</span>
+              <select value={focus} onChange={(e) => setFocus(e.target.value)}>
+                {options.brands.map((b) => <option key={b.id} value={b.id}>{b.name}{b.id === options.focus ? " (you)" : ""}</option>)}
+              </select>
+            </label>
+          </section>
+          <section>
+            <h3>Slides <small>{repSlides.length} picked; every other brand is the benchmark</small></h3>
+            <div className="slidepick">
+              {library.map((s) => {
+                const locked = s.kind === "summary";
+                return (
+                  <label key={s.kind} className={repSlides.includes(s.kind) ? "on" : ""}>
+                    <input type="checkbox" checked={locked || repSlides.includes(s.kind)} disabled={locked} onChange={() => setRepSlides((x) => (x.includes(s.kind) ? x.filter((y) => y !== s.kind) : [...x, s.kind]))} />
+                    <span><b>{s.title}</b><em>{s.description}</em></span>
+                  </label>
+                );
+              })}
+            </div>
+          </section>
+        </>
+      )}
+
+      {!isRep && (
+        <>
       <section>
         <h3>{t.brands === "focus" && !edit ? "The brands this deck is about" : "Brands to watch"}</h3>
         <div className="dgroups">
@@ -180,6 +231,23 @@ export function DeckForm({ options, initial, prefill }: { options: DeckOptions; 
           })}
         </div>
       </section>
+
+        </>
+      )}
+
+      {!isRep && options.team_skills.length > 0 && (
+        <section>
+          <h3>Your team&apos;s analyses <small>each runs again over every version&apos;s period, a slide each</small></h3>
+          <div className="slidepick">
+            {options.team_skills.map((x) => (
+              <label key={x.key} className={picked.includes(x.key) ? "on" : ""}>
+                <input type="checkbox" checked={picked.includes(x.key)} onChange={() => setPicked((p) => (p.includes(x.key) ? p.filter((k) => k !== x.key) : [...p, x.key].slice(0, 6)))} />
+                <span><b>{x.title}<i className={`badge ${x.badge === "Fair" ? "fair" : "client"}`} title={x.by ? `Made by ${x.by}` : undefined}>{x.badge}</i></b><em>{x.description}</em></span>
+              </label>
+            ))}
+          </div>
+        </section>
+      )}
 
       <section className="cgrid">
         <label className="wf">

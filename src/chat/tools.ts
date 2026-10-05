@@ -6,16 +6,17 @@
  */
 import type Anthropic from "@anthropic-ai/sdk";
 import { describeSkillsForTool, skillNames } from "../skills/registry";
-import { ENTITIES, FILTERS, GROUP_BY, METRICS } from "../query/builder";
+import { COMMENT_GROUP_BY, COMMENT_METRICS, ENTITIES, FILTERS, GROUP_BY, METRICS } from "../query/builder";
 import { EVENTS, HOOKS, OFFERS } from "../captions/prompt";
 import { unionSkillParamsSchema } from "./schema";
+import type { RecipeSpec } from "../recipes/spec";
 
 /** Strict-compatible schema for query_metrics filters: one property per whitelisted filter. */
-const FILTER_SCHEMA = {
+export const FILTER_SCHEMA = {
   type: "object",
   properties: {
     brand_id: { type: "array", items: { type: "string" }, description: "brand slugs, handles or names" },
-    platform: { type: "array", items: { type: "string", enum: ["tiktok", "instagram"] } },
+    platform: { type: "array", items: { type: "string", enum: ["tiktok", "instagram", "threads", "x", "youtube"] } },
     source: { type: "string", enum: ["owned", "earned"] },
     tier: { type: "array", items: { type: "string", enum: ["nano", "micro", "mid", "macro", "mega"] } },
     has_cart: { type: "boolean" },
@@ -34,6 +35,11 @@ const FILTER_SCHEMA = {
     caption_hook: { type: "array", items: { type: "string", enum: [...HOOKS] } },
     caption_product: { type: "array", items: { type: "string" }, description: "product names as written, matched loosely" },
     captions_read: { type: "boolean", description: "only posts whose caption was read" },
+    // comments entity only
+    sentiment: { type: "array", items: { type: "string", enum: ["positive", "neutral", "negative"] }, description: "comments only" },
+    topic: { type: "array", items: { type: "string" }, description: "comments only: topic labels, matched loosely" },
+    purchase_intent: { type: "boolean", description: "comments only: comments that want to buy or sign up" },
+    min_likes: { type: "integer", description: "comments only" },
   },
   required: [],
   additionalProperties: false,
@@ -79,7 +85,47 @@ export const EXPORT_RUN: Anthropic.Tool = {
   strict: false,
 } as Anthropic.Tool;
 
-export function buildTools(): Anthropic.Tool[] {
+/**
+ * run_recipe: the analyses this team's role offers as recipes (src/recipes/), listed by
+ * key with their plain description and inputs. Only present when the role has some.
+ */
+export function recipeTool(recipes: RecipeSpec[]): Anthropic.Tool {
+  return {
+    name: "run_recipe",
+    description:
+      "Run one of this team's ready-made analyses. Each returns rows counted in the database with evidence ids you must cite. Prefer one of these when it answers the question exactly; the person never sees these names, never repeat them.\n" +
+      recipes.map((r) => `- ${r.key}: ${r.description} Inputs: ${r.params.join(", ") || "none"}.`).join("\n") +
+      "\nInputs: brand (slug, handle or name; defaults to the client brand), window ({last_n_days} or {from,to} ISO dates, counting back from the newest data), platform (list), topic (list of topic labels).",
+    input_schema: {
+      type: "object",
+      properties: {
+        recipe: { type: "string", enum: recipes.map((r) => r.key) },
+        params: {
+          type: "object",
+          properties: {
+            brand: { type: "array", items: { type: "string" } },
+            window: { type: "object", properties: { last_n_days: { type: "integer" }, from: { type: "string" }, to: { type: "string" } }, additionalProperties: false },
+            platform: { type: "array", items: { type: "string" } },
+            topic: { type: "array", items: { type: "string" } },
+          },
+          additionalProperties: false,
+        },
+      },
+      required: ["recipe", "params"],
+      additionalProperties: false,
+    },
+    strict: false,
+  } as Anthropic.Tool;
+}
+
+/** a client's live extensions (src/extensions/) as query dimensions and filters, named ext_<key> */
+export type ExtDim = { key: string; name: string; target: string; values: string[] };
+
+export function buildTools(recipes: RecipeSpec[] = [], ext: ExtDim[] = []): Anthropic.Tool[] {
+  const extNames = ext.map((e) => `ext_${e.key}`);
+  const filterSchema = ext.length
+    ? { ...FILTER_SCHEMA, properties: { ...FILTER_SCHEMA.properties, ...Object.fromEntries(ext.map((e) => [`ext_${e.key}`, { type: "array", items: { type: "string", enum: [...e.values, "none"] }, description: `the team's own ${e.name} (on ${e.target}s)` }])) } }
+    : FILTER_SCHEMA;
   const runSkill: Anthropic.Tool = {
     name: "run_skill",
     description:
@@ -105,14 +151,14 @@ export function buildTools(): Anthropic.Tool[] {
   const queryMetrics: Anthropic.Tool = {
     name: "query_metrics",
     description:
-      `Query aggregated metrics from the social listening database when no skill fits. Choose an entity, filters, group_by dimensions, and metrics; the server builds and runs safe SQL and returns up to 200 rows with evidence refs. Use run_skill first when a skill exists. Entities: ${ENTITIES.join(", ")}. Filters: ${Object.keys(FILTERS).join(", ")} (dates as ISO YYYY-MM-DD; brand_id accepts a slug or a list). Metrics: ${METRICS.join(", ")}. Group_by: ${GROUP_BY.join(", ")}.`,
+      `Query aggregated metrics from the social listening database when no skill fits. Choose an entity, filters, group_by dimensions, and metrics; the server builds and runs safe SQL and returns up to 200 rows with evidence refs. Use run_skill first when a skill exists. Entities: ${ENTITIES.join(", ")}. Filters: ${Object.keys(FILTERS).join(", ")} (dates as ISO YYYY-MM-DD; brand_id accepts a slug or a list). Metrics: ${METRICS.join(", ")}. Group_by: ${GROUP_BY.join(", ")}. The comments entity counts what people say under the posts (without the brands' own replies): filters brand_id, platform, source, date_from, date_to, sentiment, topic, purchase_intent, min_likes; metrics ${COMMENT_METRICS.join(", ")}; group_by ${COMMENT_GROUP_BY.join(", ")}; defaults to the last 30 days.${ext.length ? ` The team's own data, as group_by and filters on either entity: ${ext.map((e) => `ext_${e.key} (${e.name} on ${e.target}s: ${e.values.join(", ")}; "none" when read and nothing fits, "not tagged" when not read yet)`).join("; ")}.` : ""}`,
     input_schema: {
       type: "object",
       properties: {
         entity: { type: "string", enum: [...ENTITIES] },
-        filters: FILTER_SCHEMA,
-        group_by: { type: "array", items: { type: "string", enum: [...GROUP_BY] } },
-        metrics: { type: "array", items: { type: "string", enum: [...METRICS] } },
+        filters: filterSchema,
+        group_by: { type: "array", items: { type: "string", enum: [...new Set([...GROUP_BY, ...COMMENT_GROUP_BY, ...extNames])] } },
+        metrics: { type: "array", items: { type: "string", enum: [...METRICS, ...COMMENT_METRICS] } },
         order_by: { type: "string", description: "metric or dimension name, optionally followed by ' desc' or ' asc'" },
         limit: { type: "integer", description: "at most 200" },
       },
@@ -155,5 +201,5 @@ export function buildTools(): Anthropic.Tool[] {
     strict: false, // same reason as run_skill; validated by agentFromBody
   } as Anthropic.Tool;
 
-  return [runSkill, queryMetrics, createAgentDraft, ASK_USER, EXPORT_RUN];
+  return [runSkill, ...(recipes.length ? [recipeTool(recipes)] : []), queryMetrics, createAgentDraft, ASK_USER, EXPORT_RUN];
 }

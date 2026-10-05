@@ -12,7 +12,7 @@ import { sql } from "../db/client";
 import { getSkill } from "../skills/registry";
 import { SkillDb } from "../skills/db";
 import { loadContext } from "../skills/params";
-import { brandLabel, DECK_PLATFORMS, type DeckSpec, type FindingSpec } from "./spec";
+import { brandLabel, type DeckSpec, type FindingSpec } from "./spec";
 
 const MAX_FINDINGS = 6;
 const CHAT_SLIDES: SlideKind[] = ["summary", "findings", "scoreboard", "trend", "moves", "evidence"];
@@ -43,6 +43,17 @@ export async function conversationFindings(conversationId: string, workspaceId: 
       continue;
     }
     for (const t of (c.tools ?? []) as ToolCallRecord[]) {
+      // the team's analyses (recipes) come along too, with the inputs they ran with
+      if (t.name === "run_recipe" && t.status === "ok" && t.rows?.length) {
+        const inp = (t.input ?? {}) as { recipe?: string; params?: Record<string, unknown> };
+        const { window: _w, ...params } = inp.params ?? {};
+        const f: FindingSpec = { key: "", skill: `recipe:${inp.recipe}`, params, question: question || t.title || "", title: t.title ?? String(inp.recipe) };
+        const sig = `${f.skill}|${JSON.stringify(f.params)}`;
+        if (!inp.recipe || seen.has(sig)) continue;
+        seen.add(sig);
+        out.push({ ...f, key: `f${out.length + 1}` });
+        continue;
+      }
       if (t.name !== "run_skill" || t.status !== "ok" || !t.run_id || !(t.rows?.length)) continue;
       const f = await findingFromRun(t.run_id, workspaceId, question);
       if (!f) continue;
@@ -78,5 +89,5 @@ export async function chatDeckSpec(title: string, findings: FindingSpec[], works
   if (!findings.length) return { error: "Nothing to put in a deck yet: ask a question CeMO answers with an analysis first." };
   const watchlist = await findingBrands(findings, workspaceId);
   if (!watchlist.length) return { error: "No brands to build the deck on." };
-  return { title: title.slice(0, 60), grain: "week", platforms: DECK_PLATFORMS, client: null, watchlist, slides: CHAT_SLIDES, findings };
+  return { title: title.slice(0, 60), grain: "week", platforms: [], client: null, watchlist, slides: CHAT_SLIDES, findings };
 }

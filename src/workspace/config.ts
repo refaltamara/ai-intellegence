@@ -6,6 +6,7 @@
  * on an empty screen. Everything here is pure: defaults per kind, overridable per
  * workspace through `workspaces.settings`.
  */
+import { workspaceRoles, type RoleId, type RoleModel } from "../roles/model";
 export type WorkspaceKind = "category" | "profile";
 
 export type WorkspaceSettings = {
@@ -24,17 +25,23 @@ export type WorkspaceSettings = {
   suggested?: string[];
   /** what a reputation problem costs: the subject's commercial partners, and the words a boycott uses */
   commercial?: CommercialSettings;
-  /** the team this workspace serves, as people pick it when they sign in */
+  /** the team this workspace serves, as people pick it when they sign in (applies to every role it offers) */
   team?: Partial<Team>;
+  /** the roles this dataset is open to (src/roles/model.ts); default one by kind */
+  roles?: RoleId[];
 };
 
 /** Who a workspace is for: people choose a team when they sign in, and the team decides the data and the first screen. */
 export type Team = { label: string; short: string; description: string; home: string; tone: "blue" | "violet" | "mint" | "coral" | "sun" };
 
-const TEAM_DEFAULTS: Record<WorkspaceKind, Team> = {
-  profile: { label: "PR team", short: "PR", description: "What people say about the person or brand you protect, how fast it is moving, and when it turns into a crisis.", home: "/dashboard", tone: "coral" },
-  category: { label: "Brand & KOL team", short: "Brand & KOL", description: "Competitors, creators and campaigns across the category: who is winning, with whom, and what to do next.", home: "/dashboard", tone: "blue" },
-};
+/** A profile's PR team protects one person; the words say so. */
+const PROFILE_PR_DESCRIPTION = "What people say about the person or brand you protect, how fast it is moving, and when it turns into a crisis.";
+
+/** The team card for one role on one workspace. */
+export function teamFor(cfg: Pick<WorkspaceConfig, "kind"> & { team_override?: Partial<Team> }, role: RoleModel): Team {
+  const base: Team = { label: role.label, short: role.short, description: role.id === "pr" && cfg.kind === "profile" ? PROFILE_PR_DESCRIPTION : role.description, home: role.home, tone: role.tone };
+  return { ...base, ...(cfg.team_override ?? {}) };
+}
 
 /** Partner brands are per subject and never guessed: an owner sets them, and Pulse counts only what is listed. */
 export type Partner = { name: string; terms?: string[] };
@@ -59,7 +66,11 @@ export type WorkspaceConfig = {
   hero_intro: string;
   suggested: string[];
   commercial: Commercial;
-  team: Team;
+  /** the roles this dataset is open to, first one is the default */
+  roles: RoleId[];
+  /** the client brand's (or subject's) name, when one is set */
+  client_name: string | null;
+  team_override?: Partial<Team>;
 };
 
 /** One platform name everywhere; CeMO is the assistant you talk to in Chats, on every team. */
@@ -122,7 +133,9 @@ export function workspaceConfig(row: WorkspaceRow, clientName: string | null = n
     hero_title: fillCopy(s.hero_title ?? d.hero_title, vars),
     hero_intro: s.hero_intro ?? d.hero_intro, // filled by the caller, which knows the counts
     suggested: (s.suggested?.length ? s.suggested : d.suggested).map((q) => fillCopy(q, vars)),
-    team: { ...TEAM_DEFAULTS[kind], ...(s.team ?? {}) },
+    roles: workspaceRoles(kind, s.roles),
+    client_name: clientName,
+    team_override: s.team,
     commercial: {
       // A partner with no terms of its own is matched on its name, which is what an
       // owner typing "Oatside" into the Data page expects.

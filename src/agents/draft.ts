@@ -18,7 +18,7 @@ import { DEFAULT_CRON, DEFAULT_TZ, humanize, validateCron } from "./schedule";
 export async function draftFromText(text: string, workspaceId: string, opts: { email?: string } = {}): Promise<{ draft: AgentDraft } | { error: string }> {
   if (!hasModelCredentials()) return { error: "The chat model is not configured (ANTHROPIC_API_KEY is missing). Create the agent from a skill run instead: run a skill in Ask or /discovery and use 'Run this weekly'." };
   const ctx = await loadContext(new SkillDb(), workspaceId);
-  const client = anthropicClient();
+  const client = anthropicClient({ workspace: workspaceId, purpose: "agent_draft" });
   const tool = buildTools().find((t) => t.name === "create_agent_draft")!;
   let response: Anthropic.Message;
   try {

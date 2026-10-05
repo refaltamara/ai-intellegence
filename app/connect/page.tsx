@@ -1,5 +1,5 @@
 import { headers } from "next/headers";
-import { currentSession } from "@/auth/current";
+import { currentActor, currentSession } from "@/auth/current";
 import { MCP_LIMITS } from "@/config/mcp";
 import { originOf } from "@/mcp/oauth";
 import { listConnections, usage } from "@/mcp/store";
@@ -12,8 +12,8 @@ export default async function ConnectPage() {
   const session = (await currentSession())!;
   const origin = originOf(await headers());
   const url = `${origin}/api/mcp`;
-  const [connections, teams, used] = await Promise.all([listConnections(session.uid), teamsFor(session), usage(session.uid, session.ws)]);
-  const teamName = Object.fromEntries(teams.map((t) => [t.workspace_id, t.label]));
+  const [connections, teams, used] = await Promise.all([listConnections(session.uid), currentActor().then(teamsFor), usage(session.uid, session.ws)]);
+  const teamName = Object.fromEntries(teams.map((t) => [t.workspace_id, t.name]));
   return (
     <section className="screen">
       <div className="topbar"><div><h1>Connect Claude or ChatGPT</h1><span className="meta">Use Fair Intelligence from your own AI assistant</span></div><span className="pill">{used.user_day} of {MCP_LIMITS.per_user_per_day} analyses used today</span></div>

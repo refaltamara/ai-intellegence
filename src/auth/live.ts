@@ -1,9 +1,13 @@
 /**
- * Is this account still there, and what may it do now? A signed cookie proves who
- * someone was when they signed in; this checks the users table so a removed account
- * or a changed role takes effect within half a minute, not when the cookie expires.
+ * Is this membership still there, and its account? A signed cookie proves who someone
+ * was when they signed in; this checks users and accounts so a removed person or a
+ * changed duty takes effect within half a minute, not when the cookie expires.
+ * role is "staff" for Fair staff, else "member"; what a person may do is can() (src/auth/can.ts).
+ * A client with no membership in a live workspace (all paused, or none opened yet) is not
+ * live either: the request gate signs them out rather than falling back to any workspace.
  */
 import { sql } from "../db/client";
+import { forgetActors } from "./accounts";
 
 export type LiveUser = { id: string; email: string; role: string; workspace_id: string };
 
@@ -14,7 +18,7 @@ export async function liveUser(uid: string): Promise<LiveUser | null> {
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(uid)) return null;
   const hit = cache.get(uid);
   if (hit && Date.now() - hit.at < TTL_MS) return hit.user;
-  const rows = (await sql.query("select id, email, role, workspace_id from users where id = $1 and password_hash is not null", [uid])) as LiveUser[];
+  const rows = (await sql.query("select u.id, a.email, case when cardinality(a.staff) > 0 then 'staff' else 'member' end as role, u.workspace_id from users u join accounts a on a.id = u.account_id where u.id = $1 and a.password_hash is not null and (cardinality(a.staff) > 0 or exists (select 1 from users m join workspaces w on w.id = m.workspace_id where m.account_id = a.id and w.status = 'live'))", [uid])) as LiveUser[];
   const user = rows[0] ?? null;
   cache.set(uid, { at: Date.now(), user });
   return user;
@@ -32,4 +36,5 @@ export async function stillActive(uid: string): Promise<boolean> {
 export function forgetUser(uid?: string): void {
   if (uid) cache.delete(uid);
   else cache.clear();
+  forgetActors();
 }

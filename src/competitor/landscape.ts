@@ -75,9 +75,11 @@ export type CloseUp = LandscapeBrand & {
   tiktok_posts: number;
   instagram_posts: number;
   categories: { label: string; posts: number; views: number }[];
+  /** false where the product lexicon does not apply (a non-beauty workspace): no "pushing" line */
+  lexicon: boolean;
   cart: { name: string; posts: number; views: number } | null;
   /** brand accounts, TikTok only */
-  owned: { posts: number; views: number; views_share: number; median_views: number | null } | null;
+  owned: { posts: number; views: number; views_share: number; median_views: number | null; platforms: Platform[] } | null;
   /** % of creator posts that come from creators posting 3+ times this week */
   repeat_share: number | null;
   top_creator: { handle: string; posts: number; views: number; views_share: number; url: string | null } | null;
@@ -145,7 +147,7 @@ export async function landscape(
               (p.posted_at at time zone $4) as local_at,
               (p.posted_at >= ($8::date::timestamp at time zone $4)) as cur
        from posts p join g on g.brand_id = p.brand_id
-       where p.workspace_id = $1 and p.platform = any($5::text[])
+       where p.workspace_id = $1 and p.relevant is not false and p.platform = any($5::text[])
          and p.posted_at >= ($6::date::timestamp at time zone $4) and p.posted_at < ($7::date::timestamp at time zone $4)
        order by g.gkey, p.platform, p.url, p.views desc nulls last
      ),
@@ -187,15 +189,18 @@ export async function landscape(
   });
 
   // ------------------------------------------------------------- products
+  // the product lexicon (src/config/categories.ts) is beauty's: other categories of workspace get no product read
+  const wsCategory = (await db.one<{ category: string | null }>("select category from workspaces where id = $1", [o.workspaceId]))?.category ?? null;
+  const lexicon = wsCategory == null || wsCategory === "beauty";
   const catArgs = [...args, CATEGORIES.map((c) => c.key), CATEGORIES.map(categoryQuery)];
-  const cats = await db.q<{ gkey: string; key: string; posts: number; views: number }>(
+  const cats = !lexicon ? [] : await db.q<{ gkey: string; key: string; posts: number; views: number }>(
     `${base}
      select d.gkey, c.key, count(*)::int as posts, sum(d.views)::float8 as views
      from d join unnest($9::text[], $10::text[]) as c(key, q) on d.tsv @@ to_tsquery('simple', c.q)
      where d.cur group by 1, 2`,
     catArgs,
   );
-  const named = await db.q<{ gkey: string; posts: number; unnamed: number }>(
+  const named = !lexicon ? [] : await db.q<{ gkey: string; posts: number; unnamed: number }>(
     `${base}
      select gkey, count(*)::int as posts, count(*) filter (where not (tsv @@ to_tsquery('simple', $9)))::int as unnamed
      from d where cur group by 1`,
@@ -307,7 +312,10 @@ export async function landscape(
   };
 
   // ------------------------------------------------------------- close-ups
-  const stats = await db.q<{ gkey: string; posts: number; views: number; likes: number; comments: number; creators: number; rated_views: number; rated_eng: number; tiktok_posts: number; instagram_posts: number; owned_posts: number; owned_views: number; owned_median: number | null; tiktok_views: number; promo_posts: number }>(
+  // owned accounts are captured on TikTok in the beauty panel and on every platform in listening workspaces:
+  // a brand's own share is of the views on the platforms where own accounts are captured at all
+  const ownedPlatforms = (await db.q<{ platform: Platform }>("select distinct platform from posts where workspace_id = $1 and source = 'owned'", [o.workspaceId])).map((r) => r.platform);
+  const stats = await db.q<{ gkey: string; posts: number; views: number; likes: number; comments: number; creators: number; rated_views: number; rated_eng: number; tiktok_posts: number; instagram_posts: number; owned_posts: number; owned_views: number; owned_median: number | null; owned_base_views: number; owned_base_posts: number; promo_posts: number }>(
     `${base}
      select gkey, count(*)::int as posts, sum(views)::float8 as views, sum(likes)::float8 as likes, sum(comments)::float8 as comments,
             count(distinct creator_handle) filter (where source = 'earned')::int as creators,
@@ -318,10 +326,11 @@ export async function landscape(
             count(*) filter (where source = 'owned')::int as owned_posts,
             coalesce(sum(views) filter (where source = 'owned'), 0)::float8 as owned_views,
             (percentile_cont(0.5) within group (order by views) filter (where source = 'owned'))::float8 as owned_median,
-            coalesce(sum(views) filter (where platform = 'tiktok'), 0)::float8 as tiktok_views,
+            coalesce(sum(views) filter (where platform = any($10::text[])), 0)::float8 as owned_base_views,
+            count(*) filter (where platform = any($10::text[]))::int as owned_base_posts,
             count(*) filter (where tsv @@ to_tsquery('simple', $9))::int as promo_posts
      from d where cur group by 1`,
-    [...args, promoQ],
+    [...args, promoQ, ownedPlatforms],
   );
   const creatorRows = await db.q<{ gkey: string; handle: string; posts: number; views: number; url: string | null; rn: number }>(
     `${base}
@@ -338,7 +347,7 @@ export async function landscape(
      select distinct on (gkey) gkey, creator_handle as handle, url, views, platform from d where cur order by gkey, views desc`,
     args,
   );
-  const ownedOn = o.platforms.includes("tiktok");
+  const ownedOn = ownedPlatforms.some((p) => o.platforms.includes(p));
   const closeups: CloseUp[] = brands
     .map((b) => {
       const s = stats.find((x) => x.gkey === b.key);
@@ -360,8 +369,9 @@ export async function landscape(
         tiktok_posts: s.tiktok_posts,
         instagram_posts: s.instagram_posts,
         categories: (prod?.categories ?? []).slice(0, 2).map(({ key: _k, ...c }) => c),
+        lexicon,
         cart: prod?.cart[0] ?? null,
-        owned: ownedOn && s.tiktok_posts > 0 ? { posts: s.owned_posts, views: s.owned_views, views_share: pct0(s.owned_views, s.tiktok_views), median_views: s.owned_median } : null,
+        owned: ownedOn && s.owned_base_posts > 0 ? { posts: s.owned_posts, views: s.owned_views, views_share: pct0(s.owned_views, s.owned_base_views), median_views: s.owned_median, platforms: ownedPlatforms.filter((p) => o.platforms.includes(p)) } : null,
         repeat_share: earnedPosts ? pct0(repeatPosts, earnedPosts) : null,
         top_creator: top ? { handle: top.handle, posts: top.posts, views: top.views, views_share: pct0(top.views, s.views), url: top.url } : null,
         promo_share: pct0(s.promo_posts, s.posts),
@@ -433,7 +443,7 @@ export async function landscape(
      ),
      tot as (
        select h as tag, count(distinct p.url)::int as posts_all from posts p, unnest(p.hashtags) h
-       where p.workspace_id = $1 and p.platform = any($5::text[])
+       where p.workspace_id = $1 and p.relevant is not false and p.platform = any($5::text[])
          and p.posted_at >= ($8::date::timestamp at time zone $4) and p.posted_at < ($7::date::timestamp at time zone $4)
          and h in (select tag from agg) group by 1
      )

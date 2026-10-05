@@ -142,7 +142,7 @@ export async function generateBrief(workspaceId: string, key: string): Promise<B
 }
 
 async function writeWithModel(workspaceId: string, results: unknown[], noticed: NoticedItem[], base: Pick<BriefContent, "window" | "prior" | "client" | "brands" | "noticed">, known: Set<string>, tz: string): Promise<BriefContent> {
-  const client = anthropicClient();
+  const client = anthropicClient({ workspace: workspaceId, purpose: "brief" });
   const system = await buildSystem(workspaceId);
   const dateHuman = new Date().toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", timeZone: tz });
   const suffix = BRIEF_SYSTEM.replace("{{date_human}}", dateHuman).replace("{{window}}", `${base.window.from} to ${base.window.to}`).replace("{{prior}}", `${base.prior.from} to ${base.prior.to}`).replace("{{available_skills}}", Object.keys(impls).join(", "));

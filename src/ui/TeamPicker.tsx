@@ -9,9 +9,9 @@ export function TeamPicker({ teams, email, next }: { teams: TeamChoice[]; email:
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState("");
   async function choose(t: TeamChoice) {
-    setBusy(t.workspace_id);
+    setBusy(t.key);
     setError("");
-    const r = await fetch("/api/workspace/switch", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ workspace_id: t.workspace_id }) });
+    const r = await fetch("/api/workspace/switch", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ workspace_id: t.workspace_id, role: t.role }) });
     if (!r.ok) {
       setBusy(null);
       setError((await r.json().catch(() => ({}))).error ?? "Could not switch");
@@ -28,12 +28,13 @@ export function TeamPicker({ teams, email, next }: { teams: TeamChoice[]; email:
         <p className="sub">Pick the team you are working as. You can switch any time from the top of the sidebar.</p>
         <div className="teams">
           {teams.map((t) => (
-            <button key={t.workspace_id} className="team" data-tone={t.tone} onClick={() => choose(t)} disabled={!!busy}>
-              <span className="ic"><TeamIcon kind={t.kind} /></span>
+            <button key={t.key} className="team" data-tone={t.tone} onClick={() => choose(t)} disabled={!!busy}>
+              <span className="ic"><TeamIcon kind={t.role} /></span>
               <b>{t.label}</b>
+              <span className="cn">{t.codename} {t.version}</span>
               <span className="d">{t.description}</span>
               <span className="w">{t.name}</span>
-              <span className="go">{busy === t.workspace_id ? "Opening…" : "Continue →"}</span>
+              <span className="go">{busy === t.key ? "Opening…" : "Continue →"}</span>
             </button>
           ))}
         </div>

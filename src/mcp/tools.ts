@@ -12,6 +12,7 @@ import { runSkill } from "../skills/runner";
 import { teamSkills } from "../skills/team";
 import type { Evidence } from "../skills/types";
 import { getWorkspace } from "../workspace/store";
+import { ROLES } from "../roles/model";
 
 export type McpTool = { name: string; title?: string; description: string; inputSchema: Record<string, unknown>; annotations?: Record<string, unknown> };
 export type ToolOutcome = { status: "ok" | "unavailable" | "error"; payload: Record<string, unknown>; error?: string };
@@ -113,9 +114,9 @@ async function overview(workspaceId: string): Promise<Record<string, unknown>> {
   ]);
   const c = (comments as { n: number; last: string | null }[])[0];
   return {
-    team: cfg?.team.label,
+    teams: cfg ? cfg.roles.map((r) => ROLES[r].label) : [],
     workspace: cfg?.name,
-    kind: cfg?.kind === "profile" ? "one subject (a person or brand), for reputation and PR" : "a category of competing brands, for brand and KOL marketing",
+    kind: cfg?.kind === "profile" ? "one subject (a person or brand), for reputation and PR" : "a category of competing brands",
     subject_or_client: cfg?.client_brand_id ?? null,
     platforms,
     brands: cfg?.kind === "category" ? (brands as { id: string; name: string }[]).map((b) => b.name) : undefined,

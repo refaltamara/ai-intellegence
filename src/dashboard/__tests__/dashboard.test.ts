@@ -41,7 +41,7 @@ describe("filters", () => {
     expect(f.period.key).toBe("2026-06");
   });
   it("drops unknown brands and platforms", () => {
-    const f = readFilters({ platform: "x", brands: "skintific_official,nope", period: "2026-W26" }, ctx);
+    const f = readFilters({ platform: "myspace", brands: "skintific_official,nope", period: "2026-W26" }, ctx);
     expect(f.platform).toBe("all");
     expect(f.brands).toEqual(["skintific_official"]);
     expect(filterQuery(f)).toBe("brands=skintific_official&period=2026-W26");
@@ -86,7 +86,8 @@ describe("Ask why references", () => {
     expect(decodeAsk("not base64!")).toBeNull();
     expect(validAsk({ ...ref, k: "sql" })).toBeNull();
     expect(validAsk({ ...ref, period: "2026-13" })).toBeNull();
-    expect(validAsk({ ...ref, platform: "x" })).toBeNull();
+    expect(validAsk({ ...ref, platform: "myspace" })).toBeNull();
+    expect(validAsk({ ...ref, platform: "x" })?.platform).toBe("x"); // X and Threads are real platforms in listening workspaces
     expect(validAsk({ k: "tier", tier: "giant", platform: "all", brands: [], period: "2026-06" })).toBeNull();
     expect(validAsk({ k: "creator", creator: "1; drop", platform: "all", brands: [], period: "2026-06" })).toBeNull();
     expect(validAsk({ k: "post", url: "javascript:alert(1)", platform: "all", brands: [], period: "2026-06" })).toBeNull();

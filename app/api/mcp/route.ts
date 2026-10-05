@@ -35,7 +35,7 @@ export async function POST(req: Request) {
   }
   const cfg = await getWorkspace(grant.workspace_id);
   const deps = {
-    workspaceLabel: cfg ? `${cfg.name} (${cfg.team.label})` : grant.workspace_id,
+    workspaceLabel: cfg?.name ?? grant.workspace_id,
     listTools: () => listTools(grant.workspace_id),
     callTool: (name: string, args: Record<string, unknown>) => callTool(grant.workspace_id, grant.user_id, name, args),
     checkLimit: async () => limitHit(await usage(grant.user_id, grant.workspace_id)),

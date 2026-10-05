@@ -10,6 +10,10 @@ import { loadContext } from "../skills/params";
 import { getSkill } from "../skills/registry";
 import { runSkill } from "../skills/runner";
 import { brandLabel, type FindingSpec } from "./spec";
+import { fairRecipes } from "../recipes/store";
+import { runRecipe } from "../recipes/run";
+import type { RecipeInput } from "../recipes/spec";
+import { companyRecipeByKey } from "../company/creations";
 
 /** Keys that are ids, lists or long text: kept in the rows, never shown as a column. */
 const HIDE = new Set(["evidence_ids", "evidence_id", "post_id", "creator_id", "creator_key", "top_creator_ids", "used_by", "shared_list", "months_active_list", "top_posts", "caption", "hashtags", "top_topics", "top_questions", "topics", "brand_ids", "platform_post_id", "rank", "pair_id", "campaign_id", "product_id", "product_url"]);
@@ -33,7 +37,7 @@ function formatOf(key: string, sample: unknown): FindingColumn["format"] {
   return Number.isInteger(sample) ? "int" : "num";
 }
 
-const label = (key: string) => LABELS[key] ?? (key.replace(/_pct$/, "").replace(/_/g, " ").trim().replace(/^./, (c) => c.toUpperCase()));
+const label = (key: string) => LABELS[key] ?? (key.startsWith("ext_") ? key.slice(4).replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase()) : null) ?? (key.replace(/_pct$/, "").replace(/_/g, " ").trim().replace(/^./, (c) => c.toUpperCase()));
 
 /** The columns a slide shows: what each row is about, its measures, a date when there is room, the link last. */
 export function findingColumns(rows: Record<string, unknown>[]): FindingColumn[] {
@@ -77,6 +81,17 @@ export async function runFindings(specs: FindingSpec[], workspaceId: string, per
   const brands = new Map((await loadContext(new SkillDb(), workspaceId)).brands.map((b) => [b.id, brandLabel(b.name)]));
   for (const f of specs) {
     const base = { key: f.key, title: f.title, question: f.question, columns: [] as FindingColumn[], rows: [] as Record<string, unknown>[], rows_total: 0, data_window: { from: period.from, to: period.to } };
+    if (f.skill.startsWith("recipe:")) {
+      // one of Fair's recipes or the team's own skills, over the deck's period
+      const key = f.skill.slice("recipe:".length);
+      const recipe = (await fairRecipes()).get(key) ?? (await companyRecipeByKey(workspaceId, key));
+      if (!recipe) { out.push({ ...base, status: "unavailable", message: "This analysis is no longer available." }); continue; }
+      const res = await runRecipe(recipe, { ...(f.params as RecipeInput), window: { from: period.from, to: period.to } }, workspaceId);
+      const status: Finding["status"] = res.status === "ok" ? (res.rows.length ? "ok" : "empty") : "error";
+      const rows = readable(res.rows.slice(0, ROWS_KEPT), brands);
+      out.push({ ...base, status, ...(status !== "ok" ? { message: status === "empty" ? `No rows for ${period.from} to ${period.to}.` : res.message ?? "The analysis could not run for this period." } : {}), columns: findingColumns(rows), rows, rows_total: res.rows.length });
+      continue;
+    }
     if (!getSkill(f.skill)) {
       out.push({ ...base, status: "unavailable", message: "This analysis is no longer available." });
       continue;

@@ -1,5 +1,5 @@
 import { runChatTurn, type ChatEvent } from "@/chat/loop";
-import { currentSession, currentWorkspaceId } from "@/auth/current";
+import { currentActor, currentRole, currentSession, currentWorkspaceId } from "@/auth/current";
 import { validAsk } from "@/dashboard/askref";
 import { validSlideRef } from "@/reports/slideAsk";
 
@@ -9,8 +9,9 @@ export const maxDuration = 120;
 
 /** POST { message, conversation_id?, ask?, slide? } -> SSE stream of ChatEvent */
 export async function POST(req: Request) {
-  const body = (await req.json().catch(() => ({}))) as { message?: string; conversation_id?: string | null; attachment_ids?: string[]; followup?: { label: string; skill: string; params?: Record<string, unknown> }; decision_id?: string | null; pane_action?: { run_id?: string; action?: string; ids?: unknown; params?: unknown; human?: string }; ask?: unknown; slide?: unknown };
-  const [session, ws] = await Promise.all([currentSession(), currentWorkspaceId()]);
+  const body = (await req.json().catch(() => ({}))) as { message?: string; conversation_id?: string | null; attachment_ids?: string[]; followup?: { label: string; skill: string; params?: Record<string, unknown> }; decision_id?: string | null; pane_action?: { run_id?: string; action?: string; ids?: unknown; params?: unknown; human?: string }; ask?: unknown; slide?: unknown; builder?: unknown };
+  const [session, ws, actor] = await Promise.all([currentSession(), currentWorkspaceId(), currentActor()]);
+  const role = await currentRole(ws);
   const encoder = new TextEncoder();
   const pa = body.pane_action;
   const ACTIONS = ["exclude_rows", "include_rows", "clear_exclusions", "set_params"] as const;
@@ -21,7 +22,7 @@ export async function POST(req: Request) {
     async start(controller) {
       const send = (e: ChatEvent) => controller.enqueue(encoder.encode(`event: ${e.type}\ndata: ${JSON.stringify(e)}\n\n`));
       try {
-        await runChatTurn({ workspaceId: ws, userText: body.message ?? "", conversationId: body.conversation_id ?? null, userId: session?.uid ?? null, attachmentIds: Array.isArray(body.attachment_ids) ? body.attachment_ids : [], followup: body.followup && typeof body.followup === "object" ? body.followup : undefined, decisionId: body.decision_id && /^[0-9a-f-]{36}$/.test(body.decision_id) ? body.decision_id : null, paneAction, ask: validAsk(body.ask) ?? undefined, slide: validSlideRef(body.slide) ?? undefined }, send);
+        await runChatTurn({ workspaceId: ws, role: role.id, userText: body.message ?? "", conversationId: body.conversation_id ?? null, userId: session?.uid ?? null, attachmentIds: Array.isArray(body.attachment_ids) ? body.attachment_ids : [], followup: body.followup && typeof body.followup === "object" ? body.followup : undefined, decisionId: body.decision_id && /^[0-9a-f-]{36}$/.test(body.decision_id) ? body.decision_id : null, paneAction, ask: validAsk(body.ask) ?? undefined, slide: validSlideRef(body.slide) ?? undefined, actor, builderMode: body.builder === true }, send);
       } catch (e) {
         send({ type: "error", message: (e as Error).message });
       } finally {

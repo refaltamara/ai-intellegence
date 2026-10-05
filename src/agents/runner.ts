@@ -12,6 +12,7 @@ import { diffResults, shouldDeliver, type Diff } from "./diff";
 import { nextRunAt } from "./schedule";
 import { finishRun, insertRun, lastSuccessfulRun, updateAgent, type AgentRow, type AgentRunRow } from "./store";
 import { runWeekly } from "../competitor/scheduled";
+import { signal } from "../learning/signals";
 
 export type AgentRunOutcome = { run: AgentRunRow; diff: Diff | null; delivered: { channel: string; ok: boolean; detail: string }[]; result_status: string; report_id: string | null; message?: string };
 
@@ -42,6 +43,7 @@ export async function runAgent(agent: AgentRow, opts: { reason?: "schedule" | "m
       const failed = delivered.filter((d) => !d.ok && d.channel !== "in_app");
       deliveryError = failed.length ? failed.map((d) => `${d.channel}: ${d.detail}`).join("; ") : null;
       deliveredAt = delivered.some((d) => d.ok && d.channel !== "in_app") ? new Date().toISOString() : null;
+      if (deliveredAt) await signal({ ws: agent.workspace_id, role: null }, "alert.sent", { kind: agent.skill });
     } else {
       delivered = [{ channel: "in_app", ok: true, detail: "no changes; delivery skipped (only_if_changed)" }];
     }

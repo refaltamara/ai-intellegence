@@ -1,9 +1,10 @@
 /**
  * Workspace settings. For now: the client brand — the brand CeMO is on the side of.
- * Default none; the owner sets it. Discovery's default exclusion, the "for you"
+ * Default none; Fair's owners or data ops set it (src/auth/can.ts, workspace.data). Discovery's default exclusion, the "for you"
  * column and the analyst's stance all follow from it.
  */
-import { currentSession, currentWorkspaceId } from "@/auth/current";
+import { currentActor, currentSession, currentWorkspaceId } from "@/auth/current";
+import { can } from "@/auth/can";
 import { sql } from "@/db/client";
 import { invalidateSystem } from "@/chat/loop";
 
@@ -22,7 +23,8 @@ export async function PATCH(req: Request) {
   const ws = await currentWorkspaceId();
   const session = await currentSession();
   if (!session) return Response.json({ error: "unauthorised" }, { status: 401 });
-  if (session.role !== "owner") return Response.json({ error: "Only the owner can change the client brand." }, { status: 403 });
+  const actor = await currentActor();
+  if (!actor || !can(actor, "workspace.data", { workspace: ws })) return Response.json({ error: "Only Fair's owners or data ops can change the client brand." }, { status: 403 });
   const body = (await req.json().catch(() => ({}))) as { client_brand_id?: string | null };
   const id = body.client_brand_id ? String(body.client_brand_id).trim() : null;
   if (id) {

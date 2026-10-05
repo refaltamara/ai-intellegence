@@ -5,7 +5,7 @@
  * and logged so the prompt can be fixed, because blanket word bans mangle real
  * sentences ("in the long run", "TikTok/Instagram").
  */
-const TOOL_WORDS = /\b(run_skill|query_metrics|create_agent_draft|ask_user|input_schema|tool_use|SQL)\b/g;
+const TOOL_WORDS = /\b(run_skill|run_recipe|query_metrics|create_agent_draft|ask_user|make_skill|make_deck_template|remember_for_team|change_team|make_extension|input_schema|tool_use|SQL)\b/g;
 
 export function scrubMechanism(text: string, skillNames: string[]): { text: string; leaks: string[] } {
   const leaks: string[] = [];

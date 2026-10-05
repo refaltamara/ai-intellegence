@@ -21,7 +21,7 @@ import { weeklyRules } from "../config/weekly";
 import { TIER_BANDS, tierForFollowers } from "../config/thresholds";
 import { SkillDb } from "../skills/db";
 import { loadContext, type Context } from "../skills/params";
-import { PLATFORMS, type PlatformFilter } from "./askref";
+import { PLATFORMS, PLATFORM_NAME, type PlatformFilter } from "./askref";
 import { daysCovered, monthOf, parsePeriod, periodOptions, shiftPeriod, type Grain, type Period } from "./period";
 
 export type ContentSort = "views" | "engagement" | "er";
@@ -55,7 +55,7 @@ export type ContentCard = { url: string; platform: string; handle: string | null
 
 export type DashboardData = {
   filters: { platform: PlatformFilter; brands: string[]; period: Period; prev: Period };
-  options: { months: Period[]; weeks: Period[]; brands: { id: string; name: string }[] };
+  options: { months: Period[]; weeks: Period[]; brands: { id: string; name: string }[]; platforms: string[] };
   as_of: string;
   coverage: { days: number; of: number };
   engagement_basis: "native" | "likes_comments";
@@ -111,9 +111,10 @@ export class Params {
   }
 }
 
+/** The workspace, the platform (all = every platform the workspace holds), and only posts about their brand (DECISIONS 3 Oct 2026). */
 export function scope(ws: string, f: { platform: PlatformFilter }, P: Params, alias = "p"): string {
-  const platforms = f.platform === "all" ? ["tiktok", "instagram"] : [f.platform];
-  return `${alias}.workspace_id = ${P.add(ws)} and ${alias}.platform = any(${P.add(platforms)}::text[])`;
+  const platform = f.platform === "all" ? "" : ` and ${alias}.platform = ${P.add(f.platform)}`;
+  return `${alias}.workspace_id = ${P.add(ws)}${platform} and ${alias}.relevant is not false`;
 }
 export function inWindow(from: string, to: string, tz: string, P: Params, alias = "p"): string {
   const t = P.add(tz);
@@ -348,7 +349,7 @@ export function unescapeUnicode(s: string): string {
 function profileUrl(platform: string, handle: string | null): string | null {
   if (!handle) return null;
   const h = handle.replace(/^@/, "");
-  return platform === "tiktok" ? `https://www.tiktok.com/@${h}` : platform === "instagram" ? `https://www.instagram.com/${h}/` : null;
+  return platform === "tiktok" ? `https://www.tiktok.com/@${h}` : platform === "instagram" ? `https://www.instagram.com/${h}/` : platform === "threads" ? `https://www.threads.com/@${h}` : platform === "x" ? `https://x.com/${h}` : null;
 }
 
 type CreatorSql = { k: string; creator_id: string; platform: string; handle: string; followers: number | null; posts: number; views: number; comments: number; eng: number; brands_csv: string | null };
@@ -448,7 +449,6 @@ async function capture(db: SkillDb, ctx: Context, f: Filters, prev: Period): Pro
   return rows.map((r) => ({ ...r, days: num(r.days), brands: num(r.brands) }));
 }
 
-const PLATFORM_NAME: Record<string, string> = { tiktok: "TikTok", instagram: "Instagram" };
 
 export function caveatsFor(cap: { platform: string; bucket: string; days: number; brands: number }[], period: Period, prev: Period, cover: { days: number; of: number }): string[] {
   const out: string[] = [];
@@ -471,12 +471,13 @@ export async function dashboardData(workspaceId: string, sp: Record<string, stri
   const f = readFilters(sp, ctx);
   const prev = shiftPeriod(f.period, -1);
   const names = new Map(ctx.brands.map((b) => [b.id, { name: b.name, is_client: b.is_client }]));
-  const [{ rows, periods }, kpis, tierCards, cap, handles] = await Promise.all([
+  const [{ rows, periods }, kpis, tierCards, cap, handles, plats] = await Promise.all([
     buckets(db, ctx, f),
     totals(db, ctx, f, prev),
     tiers(db, ctx, f),
     capture(db, ctx, f, prev),
     brandHandles(db, workspaceId),
+    db.q<{ platform: string }>("select distinct platform from posts where workspace_id = $1 order by 1", [workspaceId]),
   ]);
   const ranked = rankings(rows, periods, f, names);
   const [tr, creators] = await Promise.all([trend(db, ctx, f, ranked, names), topCreators(db, ctx, f, handles)]);
@@ -484,7 +485,7 @@ export async function dashboardData(workspaceId: string, sp: Record<string, stri
   const opts = periodOptions(ctx.earliest, ctx.asOf);
   return {
     filters: { platform: f.platform, brands: f.brands, period: f.period, prev },
-    options: { months: opts.months, weeks: opts.weeks, brands: ctx.brands.map((b) => ({ id: b.id, name: b.name })).sort((a, b) => a.name.localeCompare(b.name)) },
+    options: { months: opts.months, weeks: opts.weeks, brands: ctx.brands.map((b) => ({ id: b.id, name: b.name })).sort((a, b) => a.name.localeCompare(b.name)), platforms: plats.map((r) => r.platform) },
     as_of: ctx.asOf,
     coverage: cover,
     engagement_basis: f.platform === "all" ? "likes_comments" : "native",

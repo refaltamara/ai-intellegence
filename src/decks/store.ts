@@ -114,5 +114,5 @@ export async function pruneVersions(deckId: string, workspaceId: string, iso: st
 
 /** Recurring decks whose next look is due. */
 export async function dueDecks(limit = 2): Promise<DeckRow[]> {
-  return (await sql.query("select * from decks where recurring and next_run_at is not null and next_run_at <= now() order by next_run_at limit $1", [limit])) as DeckRow[];
+  return (await sql.query("select * from decks where recurring and next_run_at is not null and next_run_at <= now() and workspace_id in (select id from workspaces where status = 'live') order by next_run_at limit $1", [limit])) as DeckRow[];
 }

@@ -7,6 +7,8 @@
  * on every slide. A recurring deck looks for a new period after each one ends
  * and skips a period it already has.
  */
+import { signal } from "../learning/signals";
+import { getRole } from "../roles/store";
 import { weeklyReport } from "../competitor/facts";
 import { deckPeriod, latestComplete, type Grain } from "../competitor/period";
 import { shiftPeriod } from "../dashboard/period";
@@ -15,8 +17,15 @@ import { writeNarrative } from "../competitor/write";
 import { SkillDb } from "../skills/db";
 import { loadContext } from "../skills/params";
 import { runFindings } from "./findings";
+import { canSpend, charge } from "../credits/ledger";
+import { CREDIT_PRICES } from "../config/credits";
+import { sql } from "../db/client";
 import { specContract } from "./spec";
 import { markDeckRun, pruneVersions, type DeckRow } from "./store";
+import { reputationReport, writeRep } from "../reputation/deck";
+import { storeReputation } from "../reputation/store";
+import { socialReport, writeSocial } from "../social/deck";
+import { storeSocial } from "../social/store";
 
 export type DeckOutcome = { status: "ok" | "skipped" | "error"; message: string; report_id: string | null; period: string | null; narrative_by?: "model" | "fallback" };
 
@@ -53,6 +62,22 @@ export async function deckPeriods(workspaceId: string, grain: Grain, n = 12): Pr
  * a period the deck already has.
  */
 export async function generateDeckVersion(deck: DeckRow, opts: { period?: string; reason: "create" | "manual" | "schedule" }): Promise<DeckOutcome> {
+  // a version the model writes costs credits (src/credits/ledger.ts); at the cap it waits, the deck's earlier versions stay
+  const ok = await canSpend(deck.workspace_id, CREDIT_PRICES.deck_version);
+  if (!ok.ok) {
+    await markDeckRun(deck.id, { next_run_at: deck.recurring ? retryRun() : null, error: ok.message.slice(0, 500) }).catch(() => undefined);
+    return { status: "error", message: ok.message, report_id: null, period: null };
+  }
+  const out = await makeVersion(deck, opts);
+  if (out.status === "ok") await signal({ ws: deck.workspace_id, role: deck.spec.social ? "social" : deck.spec.rep ? "pr" : "brand_kol", userId: opts.reason === "schedule" ? null : deck.user_id }, "deck.version_made", { deck: deck.id, report: out.report_id, by: opts.reason === "schedule" ? "cron" : "person" });
+  if (out.status === "ok" && out.narrative_by === "model") {
+    const who = deck.user_id ? ((await sql.query("select u.email, coalesce(array_length(a.staff, 1), 0) > 0 as staff from users u left join accounts a on a.id = u.account_id where u.id = $1", [deck.user_id])) as { email: string; staff: boolean }[])[0] : undefined;
+    await charge({ ws: deck.workspace_id, email: who?.email ?? null, staff: who?.staff, kind: "deck_version", credits: CREDIT_PRICES.deck_version, ref: out.report_id, note: `${deck.name}${opts.reason === "schedule" ? " (scheduled)" : ""}` });
+  }
+  return out;
+}
+
+async function makeVersion(deck: DeckRow, opts: { period?: string; reason: "create" | "manual" | "schedule" }): Promise<DeckOutcome> {
   const spec = deck.spec;
   const grain = spec.grain;
   let key: string | null = null;
@@ -64,6 +89,30 @@ export async function generateDeckVersion(deck: DeckRow, opts: { period?: string
     if (opts.reason === "schedule" && deck.last_period && period.key <= deck.last_period) {
       await markDeckRun(deck.id, { next_run_at: retryRun(), error: null });
       return { status: "skipped", message: `no new ${grain} of data: ${period.label} is already in the deck (data through ${ctx.asOf})`, report_id: null, period: period.key };
+    }
+    if (spec.social) {
+      // a Social Media deck: one brand's own accounts over the period (src/social/)
+      // the company's version of Spark: its thresholds and its voice (src/roles/store.ts)
+      const role = await getRole(deck.workspace_id, "social");
+      const r = await socialReport(deck.workspace_id, { title: spec.title, grain, spec: spec.social, period: period.key, asOf: ctx.asOf, role });
+      const written = await writeSocial(r, { role, workspace: deck.workspace_id });
+      const stored = await storeSocial({ workspaceId: deck.workspace_id, report: r, narrative: written.narrative, by: written.by, problems: written.problems, deck: { id: deck.id, name: deck.name } });
+      await pruneVersions(deck.id, deck.workspace_id, r.period.key, stored.reportId);
+      const last = deck.last_period && deck.last_period > period.key ? deck.last_period : period.key;
+      await markDeckRun(deck.id, { last_period: last, next_run_at: deck.recurring ? nextRun(grain) : null, error: null });
+      return { status: "ok", message: `${period.label}: ${r.kpis.posts.now ?? 0} own posts, words by ${written.by === "model" ? "CeMO" : "the plain template"}`, report_id: stored.reportId, period: period.key, narrative_by: written.by };
+    }
+    if (spec.rep) {
+      // a PR deck: one brand's reputation over the period (src/reputation/)
+      // the company's version of Chorus: its alert rule and its voice
+      const role = await getRole(deck.workspace_id, "pr");
+      const r = await reputationReport(deck.workspace_id, { title: spec.title, grain, spec: spec.rep, period: period.key, asOf: ctx.asOf, role });
+      const written = await writeRep(r, { role, workspace: deck.workspace_id });
+      const stored = await storeReputation({ workspaceId: deck.workspace_id, report: r, narrative: written.narrative, by: written.by, problems: written.problems, deck: { id: deck.id, name: deck.name } });
+      await pruneVersions(deck.id, deck.workspace_id, r.period.key, stored.reportId);
+      const last = deck.last_period && deck.last_period > period.key ? deck.last_period : period.key;
+      await markDeckRun(deck.id, { last_period: last, next_run_at: deck.recurring ? nextRun(grain) : null, error: null });
+      return { status: "ok", message: `${period.label}: ${r.status.level}, ${r.issues.length} issue${r.issues.length === 1 ? "" : "s"}, words by ${written.by === "model" ? "CeMO" : "the plain template"}`, report_id: stored.reportId, period: period.key, narrative_by: written.by };
     }
     const findings = spec.findings?.length && spec.slides.includes("findings") ? await runFindings(spec.findings, deck.workspace_id, { from: period.from, to: period.to }) : undefined;
     const r = await weeklyReport(specContract(spec, deck.workspace_id), period.from, { findings });

@@ -3,6 +3,7 @@
  * data layers a skill requires, runs it, enforces the evidence rule, fills meta,
  * and persists the run to skill_runs.
  */
+import { EXPORT_CAVEAT_STARTS } from "./common";
 import { DEFAULT_WORKSPACE_ID } from "../config/thresholds";
 import { SkillDb } from "./db";
 import { impls } from "./index";
@@ -49,6 +50,22 @@ async function layerCountsUncached(db: SkillDb, workspaceId: string): Promise<Re
 async function platformsPresentUncached(db: SkillDb, workspaceId: string): Promise<string[]> {
   const rows = await db.q<{ platform: string }>("select distinct platform from posts where workspace_id = $1", [workspaceId]);
   return rows.map((r) => r.platform);
+}
+
+/**
+ * The beauty export's caveats (DATA_NOTES) describe that export; a listening workspace (DECISIONS 3 Oct 2026),
+ * loaded from the complete schema with daily tracking, has none of those gaps, so they are dropped there.
+ */
+const listeningCache = new Map<string, { at: number; v: boolean }>();
+async function workspaceCaveats(db: SkillDb, workspaceId: string, caveats: string[]): Promise<string[]> {
+  if (!caveats.length) return caveats;
+  let hit = listeningCache.get(workspaceId);
+  if (!hit || Date.now() - hit.at > 5 * 60_000) {
+    const r = await db.one<{ l: boolean }>("select exists (select 1 from posts where workspace_id = $1 and relevant is not null) as l", [workspaceId]);
+    hit = { at: Date.now(), v: !!r?.l };
+    listeningCache.set(workspaceId, hit);
+  }
+  return hit.v ? caveats.filter((c) => !EXPORT_CAVEAT_STARTS.some((s) => c.startsWith(s))) : caveats;
 }
 
 export async function runSkill(req: SkillRequest): Promise<SkillResult> {
@@ -124,7 +141,7 @@ export async function runSkill(req: SkillRequest): Promise<SkillResult> {
         returned: out.rows.length,
         data_window: out.data_window ?? { from: ctx.earliest, to: ctx.asOf },
         freshness: ctx.freshness,
-        caveats: out.caveats ?? [],
+        caveats: await workspaceCaveats(db, workspaceId, out.caveats ?? []),
         sql_hash: db.sqlHash(),
         duration_ms: Date.now() - started,
       },

@@ -11,7 +11,7 @@ import type { CloseUp, TierName } from "./landscape";
 import type { Narrative } from "./narrative";
 import { hasClient } from "./slides";
 import type { WeeklyReport } from "./types";
-import { categoryCell, closeupLines, closeupPicks, compact, dayMonth, hourLabel, int, PATTERN_NAME, patternHow, patternSignal, postingBehind, productName, TIER_NAME, tierLegend, wordsOf } from "./view";
+import { categoryCell, closeupLines, closeupPicks, compact, dayMonth, hourLabel, int, listAnd, PATTERN_NAME, patternHow, PLATFORM_NAME, patternSignal, postingBehind, productName, TIER_NAME, tierLegend, wordsOf } from "./view";
 
 const TIER_COLOR: Record<TierName, string> = { nano: "D5DBE4", micro: "94A3B8", mid: "475569", macro: "0F172A", mega: "2563EB", unknown: "E2E8F0" };
 const LABEL = { fontSize: 10, color: C.ink4, bold: true, charSpacing: 1 } as const;
@@ -202,7 +202,7 @@ export function closeupSlides(pres: PptxGenJS, r: WeeklyReport, n: Narrative, st
   picks.forEach((pair, i) => {
     const s = pres.addSlide();
     chrome(s, r, startPage + i, sampleLabel);
-    title(s, n.closeup_titles?.[i] ?? `${pair.map((c) => c.name).join(" and ")}: a closer look`, `Competitor close-up · ${r.week.label} · TikTok and Instagram together`);
+    title(s, n.closeup_titles?.[i] ?? `${pair.map((c) => c.name).join(" and ")}: a closer look`, `Competitor close-up · ${r.week.label} · ${listAnd(r.platforms.map((p) => PLATFORM_NAME[p]))} together`);
     const gap = 0.55;
     const w = pair.length === 1 ? CW : (CW - gap) / 2;
     pair.forEach((c, j) => {
@@ -210,7 +210,8 @@ export function closeupSlides(pres: PptxGenJS, r: WeeklyReport, n: Narrative, st
       closeupColumn(s, r, c, n.closeups?.find((k) => k.key === c.key), x, w);
       if (j === 1) s.addShape("line", { x: x - gap / 2, y: 1.75, w: 0, h: 4.85, line: { color: C.line, width: 0.75 } });
     });
-    footnote(s, "Eng. rate = likes + comments ÷ views, both platforms together. Own channel = the brand's TikTok accounts. Promo language = discount, sale, voucher, flash sale, cashback.", 6.72);
+    const ownOn = [...new Set(pair.flatMap((c) => c.owned?.platforms ?? []))].map((p) => PLATFORM_NAME[p] ?? p);
+    footnote(s, `Eng. rate = likes + comments ÷ views, ${r.platforms.length === 2 ? "both platforms" : "all platforms"} together.${ownOn.length ? ` Own channel = the brand's ${listAnd(ownOn)} accounts.` : ""} Promo language = discount, sale, voucher, flash sale, cashback.`, 6.72);
     s.addNotes(pair.map((c) => `${c.name}: ${n.closeups?.find((k) => k.key === c.key)?.next ?? ""}`).join("\n"));
   });
   return picks.length;

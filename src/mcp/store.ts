@@ -1,7 +1,8 @@
 /** The connector's clients, codes, tokens and call log. Secrets are stored as SHA-256 hashes only. */
 import { sql } from "../db/client";
 import { toJson } from "../db/json";
-import { liveUser } from "../auth/live";
+import { loadActor } from "../auth/accounts";
+import { can } from "../auth/can";
 import { MCP_LIMITS, MCP_TOKENS } from "../config/mcp";
 import { sha256, token } from "./oauth";
 
@@ -62,10 +63,10 @@ export async function refreshTokens(refresh: string, clientId: string): Promise<
   return issueTokens({ clientId, userId: rows[0].user_id, workspaceId: rows[0].workspace_id });
 }
 
-/** A person may act in a workspace while their account exists and it is theirs (members) or they are an owner. */
+/** A person may act in a workspace while their account exists and they may reach it (a membership there, or Fair staff). */
 export async function mayReach(userId: string, workspaceId: string): Promise<boolean> {
-  const u = await liveUser(userId);
-  return !!u && (u.role === "owner" || u.workspace_id === workspaceId);
+  const actor = await loadActor(userId);
+  return !!actor && can(actor, "workspace.reach", { workspace: workspaceId });
 }
 
 export async function grantFromBearer(authorization: string | null): Promise<Grant | null> {

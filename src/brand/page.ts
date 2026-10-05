@@ -81,7 +81,7 @@ export async function brandPage(brandId: string, period: Period, workspaceId = D
 
   const [meta, cov, months, capture, tiers, weeksRaw, wsWeeks, growthRaw, creators, tagsCur, tagsPrev, tagTotal] = await Promise.all([
     db.one<{ tracked_since: string | null; last_load: string | null }>(
-      `select (select to_char(min(posted_at at time zone $3), 'DD Mon YYYY') from posts where workspace_id = $1 and brand_id = $2) as tracked_since,
+      `select (select to_char(min(posted_at at time zone $3), 'DD Mon YYYY') from posts where workspace_id = $1 and relevant is not false and brand_id = $2) as tracked_since,
               (select to_char(max(finished_at) at time zone $3, 'DD Mon YYYY HH24:MI') from data_loads where workspace_id = $1) as last_load`,
       [workspaceId, brandId, tz],
     ),
@@ -89,24 +89,24 @@ export async function brandPage(brandId: string, period: Period, workspaceId = D
       `select platform, count(*)::int as posts, count(distinct creator_id)::int as creators,
               count(*) filter (where source = 'owned')::int as owned, count(*) filter (where source = 'earned')::int as earned,
               to_char(min(posted_at at time zone $3), 'DD Mon YYYY') as first, to_char(max(posted_at at time zone $3), 'DD Mon YYYY') as last
-       from posts where workspace_id = $1 and brand_id = $2 group by 1 order by 1`,
+       from posts where workspace_id = $1 and relevant is not false and brand_id = $2 group by 1 order by 1`,
       [workspaceId, brandId, tz],
     ),
     db.q<{ platform: string; month: string; posts: number }>(
-      "select platform, to_char(month, 'YYYY-MM') as month, count(*)::int as posts from posts where workspace_id = $1 and brand_id = $2 group by 1, 2 order by 1, 2",
+      "select platform, to_char(month, 'YYYY-MM') as month, count(*)::int as posts from posts where workspace_id = $1 and relevant is not false and brand_id = $2 group by 1, 2 order by 1, 2",
       [workspaceId, brandId],
     ),
     db.q<{ platform: string; month: string; days: number; days_in_month: number }>(
       `select platform, to_char(month, 'YYYY-MM') as month, count(distinct (posted_at at time zone $2)::date)::int as days,
               extract(day from (month + interval '1 month - 1 day'))::int as days_in_month
-       from posts where workspace_id = $1 group by platform, month`,
+       from posts where workspace_id = $1 and relevant is not false group by platform, month`,
       [workspaceId, tz],
     ),
     db.q<{ tier: string | null; creators: number; posts: number; views: number; median_views: number | null; engagements: number; tt_posts: number; cart_posts: number }>(
       `select tier, count(distinct creator_id)::int as creators, count(*)::int as posts, coalesce(sum(views), 0)::float8 as views,
               percentile_cont(0.5) within group (order by views)::float8 as median_views, coalesce(sum(engagements), 0)::float8 as engagements,
               count(*) filter (where platform = 'tiktok')::int as tt_posts, count(*) filter (where platform = 'tiktok' and has_cart)::int as cart_posts
-       from posts p where p.workspace_id = $1 and p.brand_id = $2 and p.source = 'earned' and p.creator_id is not null and ${win("p", window, 3)}
+       from posts p where p.workspace_id = $1 and p.relevant is not false and p.brand_id = $2 and p.source = 'earned' and p.creator_id is not null and ${win("p", window, 3)}
        group by tier`,
       [workspaceId, brandId, window.from, window.to, tz],
     ),
@@ -121,23 +121,23 @@ export async function brandPage(brandId: string, period: Period, workspaceId = D
     db.q<{ platform: string; posts: number; views: number; prev_posts: number; prev_views: number; ws_prev_posts: number }>(
       prior
         ? `select pl.platform,
-                  (select count(*)::int from posts p where p.workspace_id = $1 and p.brand_id = $2 and p.platform = pl.platform and ${win("p", window, 3)}) as posts,
-                  (select coalesce(sum(views), 0)::float8 from posts p where p.workspace_id = $1 and p.brand_id = $2 and p.platform = pl.platform and ${win("p", window, 3)}) as views,
-                  (select count(*)::int from posts p where p.workspace_id = $1 and p.brand_id = $2 and p.platform = pl.platform and ${win("p", prior, 6)}) as prev_posts,
-                  (select coalesce(sum(views), 0)::float8 from posts p where p.workspace_id = $1 and p.brand_id = $2 and p.platform = pl.platform and ${win("p", prior, 6)}) as prev_views,
-                  (select count(*)::int from posts p where p.workspace_id = $1 and p.platform = pl.platform and ${win("p", prior, 6)}) as ws_prev_posts
-           from (select distinct platform from posts where workspace_id = $1 and brand_id = $2) pl order by 1`
+                  (select count(*)::int from posts p where p.workspace_id = $1 and p.relevant is not false and p.brand_id = $2 and p.platform = pl.platform and ${win("p", window, 3)}) as posts,
+                  (select coalesce(sum(views), 0)::float8 from posts p where p.workspace_id = $1 and p.relevant is not false and p.brand_id = $2 and p.platform = pl.platform and ${win("p", window, 3)}) as views,
+                  (select count(*)::int from posts p where p.workspace_id = $1 and p.relevant is not false and p.brand_id = $2 and p.platform = pl.platform and ${win("p", prior, 6)}) as prev_posts,
+                  (select coalesce(sum(views), 0)::float8 from posts p where p.workspace_id = $1 and p.relevant is not false and p.brand_id = $2 and p.platform = pl.platform and ${win("p", prior, 6)}) as prev_views,
+                  (select count(*)::int from posts p where p.workspace_id = $1 and p.relevant is not false and p.platform = pl.platform and ${win("p", prior, 6)}) as ws_prev_posts
+           from (select distinct platform from posts where workspace_id = $1 and relevant is not false and brand_id = $2) pl order by 1`
         : `select pl.platform,
-                  (select count(*)::int from posts p where p.workspace_id = $1 and p.brand_id = $2 and p.platform = pl.platform and ${win("p", window, 3)}) as posts,
-                  (select coalesce(sum(views), 0)::float8 from posts p where p.workspace_id = $1 and p.brand_id = $2 and p.platform = pl.platform and ${win("p", window, 3)}) as views,
+                  (select count(*)::int from posts p where p.workspace_id = $1 and p.relevant is not false and p.brand_id = $2 and p.platform = pl.platform and ${win("p", window, 3)}) as posts,
+                  (select coalesce(sum(views), 0)::float8 from posts p where p.workspace_id = $1 and p.relevant is not false and p.brand_id = $2 and p.platform = pl.platform and ${win("p", window, 3)}) as views,
                   0::int as prev_posts, 0::float8 as prev_views, 0::int as ws_prev_posts
-           from (select distinct platform from posts where workspace_id = $1 and brand_id = $2) pl order by 1`,
+           from (select distinct platform from posts where workspace_id = $1 and relevant is not false and brand_id = $2) pl order by 1`,
       prior ? [workspaceId, brandId, window.from, window.to, tz, prior.from, prior.to, tz] : [workspaceId, brandId, window.from, window.to, tz],
     ),
     db.q<CreatorRow>(
       `with base as (
          select p.creator_id, p.platform, p.views, p.engagements, p.has_cart, p.url
-         from posts p where p.workspace_id = $1 and p.brand_id = $2 and p.source = 'earned' and p.creator_id is not null and ${win("p", window, 3)}
+         from posts p where p.workspace_id = $1 and p.relevant is not false and p.brand_id = $2 and p.source = 'earned' and p.creator_id is not null and ${win("p", window, 3)}
        ), agg as (
          select creator_id, count(*)::int as posts, coalesce(sum(views), 0)::float8 as views,
                 case when sum(views) > 0 then round((sum(engagements)::numeric / sum(views) * 100), 2)::float8 end as er_pct,
@@ -146,8 +146,8 @@ export async function brandPage(brandId: string, period: Period, workspaceId = D
          from base group by creator_id
        )
        select c.id as creator_id, c.handle, c.platform, c.tier_latest as tier, c.followers_latest as followers, a.posts, a.views, a.er_pct, a.cart_pct, a.sample_url,
-              coalesce((select array_agg(distinct x.brand_id order by x.brand_id) from posts x where x.workspace_id = $1 and x.creator_id = c.id and x.brand_id <> $2 and ${win("x", window, 3)}), '{}') as worked_for,
-              ${client ? `(select to_char(max(x.posted_at at time zone $5), 'DD Mon YYYY') from posts x where x.workspace_id = $1 and x.creator_id = c.id and x.brand_id = $6)` : "null"} as for_client
+              coalesce((select array_agg(distinct x.brand_id order by x.brand_id) from posts x where x.workspace_id = $1 and x.relevant is not false and x.creator_id = c.id and x.brand_id <> $2 and ${win("x", window, 3)}), '{}') as worked_for,
+              ${client ? `(select to_char(max(x.posted_at at time zone $5), 'DD Mon YYYY') from posts x where x.workspace_id = $1 and x.relevant is not false and x.creator_id = c.id and x.brand_id = $6)` : "null"} as for_client
        from agg a join creators c on c.id = a.creator_id
        order by a.views desc nulls last, a.posts desc limit 100`,
       client ? [workspaceId, brandId, window.from, window.to, tz, client.id] : [workspaceId, brandId, window.from, window.to, tz],
@@ -155,7 +155,7 @@ export async function brandPage(brandId: string, period: Period, workspaceId = D
     db.q<{ hashtag: string; posts: number; creators: number; views: number }>(
       `with px as (
          select distinct on (p.platform, p.url) p.platform, p.url, p.creator_id, p.views, p.hashtags
-         from posts p where p.workspace_id = $1 and p.brand_id = $2 and p.hashtags is not null and cardinality(p.hashtags) > 0 and ${win("p", window, 3)}
+         from posts p where p.workspace_id = $1 and p.relevant is not false and p.brand_id = $2 and p.hashtags is not null and cardinality(p.hashtags) > 0 and ${win("p", window, 3)}
          order by p.platform, p.url
        )
        select h as hashtag, count(*)::int as posts, count(distinct creator_id)::int as creators, coalesce(sum(views), 0)::float8 as views
@@ -166,7 +166,7 @@ export async function brandPage(brandId: string, period: Period, workspaceId = D
       ? db.q<{ hashtag: string; posts: number }>(
           `with px as (
              select distinct on (p.platform, p.url) p.platform, p.url, p.hashtags
-             from posts p where p.workspace_id = $1 and p.brand_id = $2 and p.hashtags is not null and cardinality(p.hashtags) > 0 and ${win("p", prior, 3)}
+             from posts p where p.workspace_id = $1 and p.relevant is not false and p.brand_id = $2 and p.hashtags is not null and cardinality(p.hashtags) > 0 and ${win("p", prior, 3)}
              order by p.platform, p.url
            )
            select h as hashtag, count(*)::int as posts from px, unnest(px.hashtags) h group by h`,
@@ -174,7 +174,7 @@ export async function brandPage(brandId: string, period: Period, workspaceId = D
         )
       : Promise.resolve([] as { hashtag: string; posts: number }[]),
     db.one<{ views: number }>(
-      `select coalesce(sum(views), 0)::float8 as views from (select distinct on (p.platform, p.url) p.views from posts p where p.workspace_id = $1 and p.brand_id = $2 and ${win("p", window, 3)} order by p.platform, p.url) x`,
+      `select coalesce(sum(views), 0)::float8 as views from (select distinct on (p.platform, p.url) p.views from posts p where p.workspace_id = $1 and p.relevant is not false and p.brand_id = $2 and ${win("p", window, 3)} order by p.platform, p.url) x`,
       [workspaceId, brandId, window.from, window.to, tz],
     ),
   ]);

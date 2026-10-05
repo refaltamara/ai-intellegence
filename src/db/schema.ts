@@ -54,9 +54,34 @@ export const workspaces = pgTable("workspaces", {
   kind: text("kind").notNull().default("category"),
   /** product_name, tagline, category_label, subject_noun, persona, hero_title, hero_intro, suggested[] — all optional, defaults per kind */
   settings: jsonb("settings").notNull().default(sql`'{}'::jsonb`),
+  /** CMS plan, Workspace lifecycle: draft → loading → review → live → paused → archived; clients only reach a live one */
+  status: text("status").notNull().default("live"),
   createdAt: createdAt(),
 });
 
+/**
+ * One person (CMS plan, People and access): one sign-in for every workspace they belong
+ * to. Fair staff carry duties: owner (Refal, Rafli: release, deploy, prices), role_owner
+ * (improve the roles), designer (may change design), data_ops (set up and run
+ * workspaces). Like mcp_clients it belongs to no workspace: a person is not a
+ * workspace's data; what they may do in one lives in their membership (users).
+ */
+export const accounts = pgTable("accounts", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  email: text("email").notNull().unique(),
+  name: text("name"),
+  passwordHash: text("password_hash"),
+  staff: text("staff").array().notNull().default(sql`'{}'::text[]`),
+  lastSeenAt: ts("last_seen_at"),
+  createdAt: createdAt(),
+});
+
+/**
+ * A membership: one account in one workspace (since 4 Oct 2026; before that a row was
+ * the whole account). `levels` says which roles the person may use there and how:
+ * builder (shapes the company's version, approves, invites) or member. Everything a
+ * person makes in a workspace (chats, decks, settings) points here.
+ */
 export const users = pgTable(
   "users",
   {
@@ -67,9 +92,32 @@ export const users = pgTable(
     role: text("role").notNull().default("member"),
     passwordHash: text("password_hash"),
     whatsappE164: text("whatsapp_e164"),
+    accountId: uuid("account_id").references((): AnyPgColumn => accounts.id, { onDelete: "cascade" }),
+    levels: jsonb("levels").notNull().default(sql`'{}'::jsonb`),
+    invitedBy: text("invited_by"),
     createdAt: createdAt(),
   },
-  (t) => [uniqueIndex("users_workspace_email_uq").on(t.workspaceId, t.email)],
+  (t) => [uniqueIndex("users_workspace_email_uq").on(t.workspaceId, t.email), index("users_account_idx").on(t.accountId)],
+);
+
+/** An invitation to a workspace (a Builder or Member) or to Fair's staff; the token is stored as a SHA-256 hash. */
+export const invites = pgTable(
+  "invites",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workspaceId: text("workspace_id").notNull().references(() => workspaces.id),
+    email: text("email").notNull(),
+    name: text("name"),
+    levels: jsonb("levels").notNull().default(sql`'{}'::jsonb`),
+    staff: text("staff").array().notNull().default(sql`'{}'::text[]`),
+    tokenHash: text("token_hash").notNull().unique(),
+    invitedBy: text("invited_by").notNull(),
+    expiresAt: ts("expires_at").notNull(),
+    acceptedAt: ts("accepted_at"),
+    revokedAt: ts("revoked_at"),
+    createdAt: createdAt(),
+  },
+  (t) => [index("invites_workspace_idx").on(t.workspaceId, t.createdAt)],
 );
 
 // ------------------------------------------------------------------- brands
@@ -154,6 +202,8 @@ export const posts = pgTable(
     caption: text("caption"),
     /** full-text form of the caption ('simple' config: no stemming, mixed Indonesian/English); drives /themes and /products keyword search */
     captionTsv: tsvector("caption_tsv").generatedAlwaysAs(sql`to_tsvector('simple', coalesce(caption, ''))`),
+    /** accounts the post tags (listening content_tagged_user), lowercased; one of the signals that it is about its brand */
+    taggedHandles: text("tagged_handles").array(),
     hashtags: text("hashtags").array(),
     isPaid: boolean("is_paid"),
     /** TikTok yc_flag: true = shoppable link, false = product tagged without link, null = nothing tagged / Instagram */
@@ -199,6 +249,12 @@ export const posts = pgTable(
     /** 'model' | 'model_failed' (tried once more) | 'model_failed_final' */
     capSource: text("cap_source"),
     capReadAt: ts("cap_read_at"),
+    /**
+     * Is the post about its brand (DECISIONS 3 Oct 2026)? Listening workspaces judge it at load: the brand
+     * posted it, or the caption names the brand (its terms in brands.keywords, its handles). false rows stay
+     * stored and are left out of every reputation number; null means not judged (counted).
+     */
+    relevant: boolean("relevant"),
     sourceFile: text("source_file"),
     loadId: uuid("load_id"),
     createdAt: createdAt(),
@@ -219,7 +275,7 @@ export const posts = pgTable(
   ],
 );
 
-/** Day-by-day tracking (Phase 1b). Empty in v1: the exports have no snapshots. */
+/** Day-by-day tracking: listening workspaces only (etl/load_listening.py); the beauty exports carry one final capture per post. */
 export const postSnapshots = pgTable(
   "post_snapshots",
   {
@@ -229,8 +285,11 @@ export const postSnapshots = pgTable(
     views: bigint("views", { mode: "number" }),
     likes: integer("likes"),
     commentsCount: integer("comments_count"),
+    shares: integer("shares"),
+    saves: integer("saves"),
   },
-  (t) => [primaryKey({ columns: [t.postId, t.dayN] }), check("post_snapshots_day_chk", sql`${t.dayN} between 0 and 7`)],
+  // Listening workspaces track a post for up to 30 days (etl/load_listening.py).
+  (t) => [primaryKey({ columns: [t.postId, t.dayN] }), check("post_snapshots_day_chk", sql`${t.dayN} between 0 and 30`)],
 );
 
 /** Aggregated imports for months without post-level data. Skills flag reduced confidence. */
@@ -259,11 +318,19 @@ export const creatorBrandMonthImport = pgTable(
 // ---------------------------------------------------------- phase 2 tables
 export const topics = pgTable("topics", {
   id: text("id").primaryKey(),
+  /** one line: what belongs here (CMS: Topics) */
+  definition: text("definition"),
+  /** service | promo | product | reputation: what the roles read a topic as */
+  tags: text("tags").array(),
   workspaceId: text("workspace_id").notNull().references(() => workspaces.id),
   label: text("label").notNull(),
   parentId: text("parent_id"),
   /** 'objection' | 'question' | 'claim' | 'general' */
   kind: text("kind").notNull().default("general"),
+  /** display order; listening workspaces bring their own taxonomy (etl/load_listening.py) */
+  sortOrder: integer("sort_order").notNull().default(0),
+  /** the catch-all bucket ("Others") */
+  isCatchAll: boolean("is_catch_all").notNull().default(false),
 });
 
 export const comments = pgTable(
@@ -290,6 +357,18 @@ export const comments = pgTable(
     /** 'model' (labelled by /api/cron/label) | 'listening' (came with the export) | 'subject' (the subject's own reply, never labelled) */
     sentimentSource: text("sentiment_source"),
     sentimentConfidence: numeric("sentiment_confidence"),
+    /**
+     * Listening workspaces arrive labelled (sentiment_source 'listening'): the five-point scale is kept here
+     * ('excellent' | 'good' | 'neutral' | 'average' | 'negative' | 'unknown') with its CSAT (1-5); `sentiment`
+     * holds the three-class view (excellent+good positive, average+negative negative; DECISIONS 3 Oct 2026).
+     */
+    sentimentDetail: text("sentiment_detail"),
+    csat: smallint("csat"),
+    /** the listening model's free-text theme ("brand praise", "missed promo"), mapped to topic_id upstream */
+    theme: text("theme"),
+    purchaseIntent: boolean("purchase_intent"),
+    /** English translation from the listening model */
+    translation: text("translation"),
     topicId: text("topic_id").references(() => topics.id),
     topicConfidence: numeric("topic_confidence"),
     classifiedAt: ts("classified_at"),
@@ -686,4 +765,456 @@ export const mcpCalls = pgTable(
     createdAt: createdAt(),
   },
   (t) => [index("mcp_calls_user_created_idx").on(t.userId, t.createdAt), index("mcp_calls_ws_created_idx").on(t.workspaceId, t.createdAt)],
+);
+
+// ------------------------------------------------------------ role versions
+/**
+ * Roles as products (DECISIONS, 4 Oct 2026; CMS plan). A role version is Fair's: PR is
+ * Chorus, Brand & KOL is Atlas, Social Media is Spark, each released as major.minor by
+ * Refal or Rafli. Like mcp_clients it belongs to no workspace: it is the product, not
+ * a client's data. Only one version per role is current (the latest released); a
+ * rollback marks a release rolled back and the one before it is current again.
+ */
+export const roleVersions = pgTable(
+  "role_versions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    role: text("role").notNull(),
+    codename: text("codename").notNull(),
+    version: text("version").notNull(),
+    status: text("status").notNull().default("draft"),
+    /** the whole RoleModel (src/roles/model.ts) */
+    spec: jsonb("spec").notNull(),
+    releaseNote: text("release_note"),
+    minAppVersion: text("min_app_version"),
+    proposedBy: text("proposed_by"),
+    releasedBy: text("released_by"),
+    releasedAt: ts("released_at"),
+    rolledBackBy: text("rolled_back_by"),
+    rolledBackAt: ts("rolled_back_at"),
+    /** a staged release: only these workspaces run it until it is released to everyone (null) */
+    stageWorkspaces: text("stage_workspaces").array(),
+    /** the test results the proposal carried (src/roles/tests.ts) */
+    testSummary: jsonb("test_summary"),
+    /** where the version came from (src/learning/outcomes.ts): insights, client creations, suggestions, as refs */
+    origins: jsonb("origins"),
+    /** the measures (src/learning/measures.ts) its before-and-after compares */
+    measures: text("measures").array(),
+    /** the last edit of a draft; tests must have run after it before it can be proposed */
+    updatedAt: ts("updated_at").notNull().defaultNow(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    uniqueIndex("role_versions_role_version_uq").on(t.role, t.version),
+    index("role_versions_current_idx").on(t.role, t.status, t.releasedAt),
+    check("role_versions_status_chk", sql`${t.status} in ('draft','proposed','released','rolled_back')`),
+  ],
+);
+
+/**
+ * A client's version of a role: only what the company changed, as dotted paths
+ * (src/roles/policy.ts). One row per change set; the highest version is live. A
+ * workspace follows the latest Fair release unless base_version pins one.
+ */
+export const companyVersions = pgTable(
+  "company_versions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workspaceId: text("workspace_id").notNull().references(() => workspaces.id),
+    role: text("role").notNull(),
+    version: integer("version").notNull(),
+    baseVersion: text("base_version"),
+    overrides: jsonb("overrides").notNull().default(sql`'{}'::jsonb`),
+    author: text("author"),
+    note: text("note"),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("company_versions_uq").on(t.workspaceId, t.role, t.version)],
+);
+
+/** A person's own settings on a team; only member-editable fields (src/roles/policy.ts). */
+export const personalSettings = pgTable(
+  "personal_settings",
+  {
+    workspaceId: text("workspace_id").notNull().references(() => workspaces.id),
+    userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    role: text("role").notNull(),
+    settings: jsonb("settings").notNull().default(sql`'{}'::jsonb`),
+    updatedAt: ts("updated_at").notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.workspaceId, t.userId, t.role] })],
+);
+
+/**
+ * Every change to a role, a company version or a setting, from the CMS or the
+ * product. Append-only. workspace_id is null for a change to Fair's own roles.
+ */
+export const auditLog = pgTable(
+  "audit_log",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workspaceId: text("workspace_id"),
+    actor: text("actor").notNull(),
+    area: text("area").notNull(),
+    action: text("action").notNull(),
+    path: text("path"),
+    old: jsonb("old"),
+    new: jsonb("new"),
+    note: text("note"),
+    createdAt: createdAt(),
+  },
+  (t) => [index("audit_log_ws_created_idx").on(t.workspaceId, t.createdAt), index("audit_log_area_idx").on(t.area, t.createdAt)],
+);
+
+/** Signals for the learning loop (CMS plan): whitelisted kinds, no text people typed, no numbers from the data. */
+export const modelEvents = pgTable(
+  "model_events",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workspaceId: text("workspace_id").notNull(),
+    role: text("role").notNull(),
+    userId: uuid("user_id"),
+    roleVersion: text("role_version"),
+    companyVersion: integer("company_version"),
+    surface: text("surface").notNull(),
+    kind: text("kind").notNull(),
+    payload: jsonb("payload").notNull().default(sql`'{}'::jsonb`),
+    /** Fair staff acting in a client workspace: kept on its page, left out of the roll-ups */
+    byStaff: boolean("by_staff").notNull().default(false),
+    createdAt: createdAt(),
+  },
+  (t) => [index("model_events_ws_created_idx").on(t.workspaceId, t.createdAt), index("model_events_role_kind_idx").on(t.role, t.kind, t.createdAt)],
+);
+
+/**
+ * The nightly roll-up of signals (CMS plan, the learning loop): one sentence with its
+ * counts per role and key, recomputed each day. Like role_versions it belongs to no
+ * workspace: it holds only counts across workspaces, never a workspace's name, and a
+ * cross-client insight exists only when at least three workspaces stand behind it.
+ */
+export const modelInsights = pgTable(
+  "model_insights",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    role: text("role").notNull(),
+    roleVersion: text("role_version"),
+    /** what the insight is about, stable across days: setting:alert.crisis_multiple, tile_hidden:amplifiers, analysis:top-content… */
+    key: text("key").notNull(),
+    family: text("family").notNull(),
+    sentence: text("sentence").notNull(),
+    counts: jsonb("counts").notNull(),
+    workspaces: integer("workspaces").notNull(),
+    day: date("day").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("model_insights_uq").on(t.role, t.key, t.day), index("model_insights_role_day_idx").on(t.role, t.day)],
+);
+
+/**
+ * Every model call with its tokens, by workspace and purpose (chat, deck, caption
+ * reading, comment labelling…): the measured cost per action that credit prices will
+ * come from. workspace_id is null for Fair's own calls.
+ */
+export const modelCalls = pgTable(
+  "model_calls",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workspaceId: text("workspace_id"),
+    purpose: text("purpose").notNull(),
+    model: text("model").notNull(),
+    tokensIn: integer("tokens_in").notNull().default(0),
+    tokensOut: integer("tokens_out").notNull().default(0),
+    cacheRead: integer("cache_read").notNull().default(0),
+    cacheWrite: integer("cache_write").notNull().default(0),
+    ref: text("ref"),
+    createdAt: createdAt(),
+  },
+  (t) => [index("model_calls_ws_created_idx").on(t.workspaceId, t.createdAt), index("model_calls_purpose_idx").on(t.purpose, t.createdAt)],
+);
+
+
+// ------------------------------------------------------------- role lab
+/**
+ * Recipes (CMS plan, "Skills as recipes"): analyses as data over the query builder
+ * (src/recipes/). scope is "fair" for Fair's library or a workspace id for a client's
+ * own (phase 4); workspace_id is set for the latter. One row per version.
+ */
+export const recipes = pgTable(
+  "recipes",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    scope: text("scope").notNull().default("fair"),
+    workspaceId: text("workspace_id").references(() => workspaces.id),
+    key: text("key").notNull(),
+    version: integer("version").notNull().default(1),
+    spec: jsonb("spec").notNull(),
+    status: text("status").notNull().default("active"),
+    createdBy: text("created_by"),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("recipes_scope_key_version_uq").on(t.scope, t.key, t.version), check("recipes_status_chk", sql`${t.status} in ('active','retired')`)],
+);
+
+/** A role's test set (CMS plan, "What every role carries"): guards, screens and golden questions. */
+export const testCases = pgTable(
+  "test_cases",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    role: text("role").notNull(),
+    key: text("key").notNull(),
+    kind: text("kind").notNull(),
+    spec: jsonb("spec").notNull(),
+    source: text("source").notNull().default("fair"),
+    active: boolean("active").notNull().default(true),
+    createdBy: text("created_by"),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("test_cases_role_key_uq").on(t.role, t.key), check("test_cases_kind_chk", sql`${t.kind} in ('guard','screen','question')`)],
+);
+
+/** One result per case per run; a batch is one run of a role version's tests. workspace_id is the test workspace, null for guards. */
+export const testRuns = pgTable(
+  "test_runs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    batch: uuid("batch").notNull(),
+    role: text("role").notNull(),
+    roleVersion: text("role_version").notNull(),
+    caseKey: text("case_key").notNull(),
+    workspaceId: text("workspace_id"),
+    status: text("status").notNull(),
+    detail: jsonb("detail").notNull().default(sql`'{}'::jsonb`),
+    createdAt: createdAt(),
+  },
+  (t) => [index("test_runs_role_version_idx").on(t.role, t.roleVersion, t.createdAt), index("test_runs_batch_idx").on(t.batch)],
+);
+
+/** A Role Lab session: a role owner and the Lab's AI working on one draft. */
+export const labSessions = pgTable(
+  "lab_sessions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    role: text("role").notNull(),
+    draftVersion: text("draft_version").notNull(),
+    owner: text("owner").notNull(),
+    messages: jsonb("messages").notNull().default(sql`'[]'::jsonb`),
+    tokens: integer("tokens").notNull().default(0),
+    createdAt: createdAt(),
+    updatedAt: ts("updated_at").notNull().defaultNow(),
+  },
+  (t) => [index("lab_sessions_role_idx").on(t.role, t.updatedAt)],
+);
+
+// ------------------------------------------------------------- the client side
+/**
+ * Everything a client makes on a team (CMS plan, "The client side"): company skills
+ * (recipes over the query builder), deck templates, house rules, memory facts and
+ * vocabulary. A Builder's creation is live at once; a Member's works for its maker and
+ * waits for a Builder's approval before it reaches everyone. The maker and the approver
+ * give its badge. A release never touches these rows.
+ */
+export const creations = pgTable(
+  "creations",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workspaceId: text("workspace_id").notNull().references(() => workspaces.id),
+    role: text("role").notNull(),
+    kind: text("kind").notNull(),
+    /** skills and templates: the key they run under, unique among a team's live creations */
+    key: text("key"),
+    title: text("title").notNull(),
+    spec: jsonb("spec").notNull(),
+    status: text("status").notNull().default("draft"),
+    makerUserId: uuid("maker_user_id"),
+    makerEmail: text("maker_email").notNull(),
+    makerName: text("maker_name"),
+    approver: text("approver"),
+    /** the Builder's note when sending back or rejecting */
+    note: text("note"),
+    decidedAt: ts("decided_at"),
+    updatedAt: ts("updated_at").notNull().defaultNow(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index("creations_ws_role_idx").on(t.workspaceId, t.role, t.status),
+    check("creations_kind_chk", sql`${t.kind} in ('skill','deck_template','rule','fact','term','extension')`),
+    check("creations_status_chk", sql`${t.status} in ('draft','waiting','approved','sent_back','rejected','removed')`),
+  ],
+);
+
+/** "Suggest to Fair": a client item a Builder sends to the role owners, seen in the CMS's Client creations. */
+export const fairSuggestions = pgTable(
+  "fair_suggestions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workspaceId: text("workspace_id").notNull().references(() => workspaces.id),
+    role: text("role").notNull(),
+    /** a creation (ref = its id) or a company setting (ref = its path, value = the company's value) */
+    refKind: text("ref_kind").notNull(),
+    ref: text("ref").notNull(),
+    value: jsonb("value"),
+    note: text("note"),
+    byEmail: text("by_email").notNull(),
+    status: text("status").notNull().default("new"),
+    fairNote: text("fair_note"),
+    fairBy: text("fair_by"),
+    updatedAt: ts("updated_at").notNull().defaultNow(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index("fair_suggestions_status_idx").on(t.status, t.createdAt),
+    check("fair_suggestions_ref_chk", sql`${t.refKind} in ('creation','setting')`),
+    check("fair_suggestions_status_chk", sql`${t.status} in ('new','seen','adopted','declined')`),
+  ],
+);
+
+// ------------------------------------------------------------- extensions and credits
+/**
+ * A client's own data on top of the core (CMS plan, "Client extensions"): a field on
+ * creators, posts or comments with the values it may take (a Persona table: each persona
+ * with what it means and how to recognise one). Values come from a file, keyword rules
+ * computed in SQL, or CeMO reading each row. One workspace only; the core tables never change.
+ */
+export const extDefs = pgTable(
+  "ext_defs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workspaceId: text("workspace_id").notNull().references(() => workspaces.id),
+    /** a-z, 0-9 and _; queries name it ext_<key> */
+    key: text("key").notNull(),
+    name: text("name").notNull(),
+    target: text("target").notNull(),
+    /** [{ name, description?, hint? }] */
+    values: jsonb("values").notNull(),
+    source: text("source").notNull(),
+    /** rule: { rules: [{ value, terms }] }; cemo: { guide, scope }; file: {} */
+    spec: jsonb("spec").notNull().default(sql`'{}'::jsonb`),
+    status: text("status").notNull().default("draft"),
+    /** the creation that carries its approval and badge (src/company/creations.ts) */
+    creationId: uuid("creation_id"),
+    makerEmail: text("maker_email").notNull(),
+    approver: text("approver"),
+    /** rows in scope, credits to fill them now and a day after, from the sample */
+    estimate: jsonb("estimate"),
+    /** { done, total, credits } while filling */
+    progress: jsonb("progress"),
+    updatedAt: ts("updated_at").notNull().defaultNow(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    uniqueIndex("ext_defs_ws_key_uq").on(t.workspaceId, t.key),
+    check("ext_defs_target_chk", sql`${t.target} in ('creator','post','comment')`),
+    check("ext_defs_source_chk", sql`${t.source} in ('rule','file','cemo')`),
+    check("ext_defs_status_chk", sql`${t.status} in ('draft','approved','filling','live','paused','removed')`),
+  ],
+);
+
+/** One value per extension and core row (row_ref: the creator, post or comment id); value null = read, none fits. */
+export const extValues = pgTable(
+  "ext_values",
+  {
+    defId: uuid("def_id").notNull().references(() => extDefs.id, { onDelete: "cascade" }),
+    workspaceId: text("workspace_id").notNull().references(() => workspaces.id),
+    rowRef: text("row_ref").notNull(),
+    value: text("value"),
+    source: text("source").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [primaryKey({ columns: [t.defId, t.rowRef] }), index("ext_values_def_value_idx").on(t.defId, t.value)],
+);
+
+/**
+ * Every credit spent or added (CMS plan, "Credits and billing"): spends are negative, pools
+ * and top-ups positive. Fair's real cost per workspace comes from model_calls; prices are
+ * placeholders in src/config/credits.ts until a month of measured cost per action.
+ */
+export const creditLedger = pgTable(
+  "credit_ledger",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workspaceId: text("workspace_id").notNull().references(() => workspaces.id),
+    accountEmail: text("account_email"),
+    kind: text("kind").notNull(),
+    credits: numeric("credits", { precision: 12, scale: 2 }).notNull(),
+    ref: text("ref"),
+    note: text("note"),
+    createdAt: createdAt(),
+  },
+  (t) => [index("credit_ledger_ws_created_idx").on(t.workspaceId, t.createdAt)],
+);
+
+/** Long work in slices (CMS plan, "Jobs without pg-boss"): /api/cron/jobs claims one with locked_until and saves progress between slices. */
+export const cmsJobs = pgTable(
+  "cms_jobs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workspaceId: text("workspace_id").references(() => workspaces.id),
+    kind: text("kind").notNull(),
+    params: jsonb("params").notNull().default(sql`'{}'::jsonb`),
+    status: text("status").notNull().default("queued"),
+    progress: jsonb("progress").notNull().default(sql`'{}'::jsonb`),
+    error: text("error"),
+    lockedUntil: ts("locked_until"),
+    createdBy: text("created_by"),
+    finishedAt: ts("finished_at"),
+    updatedAt: ts("updated_at").notNull().defaultNow(),
+    createdAt: createdAt(),
+  },
+  (t) => [index("cms_jobs_status_idx").on(t.status, t.createdAt), check("cms_jobs_status_chk", sql`${t.status} in ('queued','running','done','failed','cancelled')`)],
+);
+
+// ------------------------------------------------------------- onboarding
+/**
+ * A brand's accounts (CMS plan, "Brands"): per platform or any ('*'). In a listening dump
+ * the capture's brand rows are these handles, so they also decide which brand a captured
+ * post belongs to; an owned handle makes its posts the brand's own.
+ */
+export const brandHandles = pgTable(
+  "brand_handles",
+  {
+    workspaceId: text("workspace_id").notNull().references(() => workspaces.id),
+    brandId: text("brand_id").notNull().references(() => brands.id, { onDelete: "cascade" }),
+    platform: text("platform").notNull().default("*"),
+    /** lowercased, without @ */
+    handle: text("handle").notNull(),
+    owned: boolean("owned").notNull().default(true),
+    createdAt: createdAt(),
+  },
+  (t) => [primaryKey({ columns: [t.workspaceId, t.platform, t.handle] }), index("brand_handles_brand_idx").on(t.brandId)],
+);
+
+/**
+ * Relevance terms (CMS plan, "Relevance"): a post counts for its brand when the brand
+ * posted it, tags one of its accounts, or its caption names it. counts: a term at the start
+ * of a word (case-insensitive; written in capitals it matches only in capitals, as a whole
+ * word). never: a phrase that never counts ("go pay attention"), taken out before matching.
+ */
+export const brandTerms = pgTable(
+  "brand_terms",
+  {
+    workspaceId: text("workspace_id").notNull().references(() => workspaces.id),
+    brandId: text("brand_id").notNull().references(() => brands.id, { onDelete: "cascade" }),
+    term: text("term").notNull(),
+    mode: text("mode").notNull().default("counts"),
+    createdAt: createdAt(),
+  },
+  (t) => [primaryKey({ columns: [t.workspaceId, t.brandId, t.mode, t.term] }), check("brand_terms_mode_chk", sql`${t.mode} in ('counts','never')`)],
+);
+
+/**
+ * Where a workspace's data comes from (CMS plan, "Data"): a Fair Listening dump today,
+ * the daily sync later. config: the files stored (Vercel Blob or a local folder), the
+ * sentiment map, the inspect report.
+ */
+export const dataSources = pgTable(
+  "data_sources",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workspaceId: text("workspace_id").notNull().references(() => workspaces.id),
+    kind: text("kind").notNull().default("listening_dump"),
+    config: jsonb("config").notNull().default(sql`'{}'::jsonb`),
+    updatedAt: ts("updated_at").notNull().defaultNow(),
+    createdAt: createdAt(),
+  },
+  (t) => [index("data_sources_ws_idx").on(t.workspaceId)],
 );

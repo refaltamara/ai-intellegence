@@ -113,6 +113,76 @@
       "when": 1790866636353,
       "tag": "0015_safe_gwen_stacy",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1790997812289,
+      "tag": "0016_bumpy_prowler",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1791007606241,
+      "tag": "0017_huge_skin",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1791123338067,
+      "tag": "0018_early_mesmero",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1791151298467,
+      "tag": "0019_calm_miracleman",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1791152693143,
+      "tag": "0020_dizzy_captain_flint",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1791152942240,
+      "tag": "0021_foamy_norman_osborn",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1791155201542,
+      "tag": "0022_regular_zarek",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1791157271323,
+      "tag": "0023_giant_ben_grimm",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1791158955800,
+      "tag": "0024_quick_chameleon",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1791162117396,
+      "tag": "0025_fat_carlie_cooper",
+      "breakpoints": true
     }
   ]
 }

@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { currentSession } from "@/auth/current";
+import { currentActor, currentSession } from "@/auth/current";
 import { safeNext, teamsFor } from "@/workspace/teams";
 import { TeamPicker } from "@/ui/TeamPicker";
 
@@ -12,7 +12,7 @@ export default async function PersonaPage({ searchParams }: { searchParams: Prom
   const next = safeNext((await searchParams).next);
   // connecting Claude or ChatGPT picks its team on the consent screen instead
   if (next?.startsWith("/oauth/")) redirect(next);
-  const teams = await teamsFor(session);
+  const teams = await teamsFor(await currentActor());
   if (teams.length <= 1) redirect(next ?? teams[0]?.home ?? "/");
   return <TeamPicker teams={teams} email={session.email} next={next} />;
 }

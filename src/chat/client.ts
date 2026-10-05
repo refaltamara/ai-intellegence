@@ -6,9 +6,36 @@
  */
 import Anthropic from "@anthropic-ai/sdk";
 
-export function anthropicClient(): Anthropic {
+/** what a model call was for and whose it was: every call is recorded with its tokens in model_calls */
+export type Meter = { workspace: string | null; purpose: string; ref?: string | null };
+
+export function anthropicClient(meter?: Meter): Anthropic {
   const workspaceId = process.env.ANTHROPIC_WORKSPACE_ID?.trim();
-  return new Anthropic(workspaceId ? { defaultHeaders: { "anthropic-workspace-id": workspaceId } } : {});
+  const client = new Anthropic(workspaceId ? { defaultHeaders: { "anthropic-workspace-id": workspaceId } } : {});
+  if (!meter) return client;
+  // record the tokens of every non-streaming call; a streamed turn records its own (src/chat/loop.ts)
+  const create = client.messages.create.bind(client.messages) as (body: Anthropic.MessageCreateParams, options?: unknown) => Promise<unknown>;
+  (client.messages as unknown as { create: typeof create }).create = (body, options) => {
+    const p = create(body, options);
+    if (!body.stream) p.then((r) => recordUsage(meter, body.model, (r as Anthropic.Message).usage), () => undefined);
+    return p;
+  };
+  return client;
+}
+
+/**
+ * One row in model_calls: the measured cost per action that credit prices will come
+ * from (CMS plan, Credits). Never fails the call it measures.
+ */
+export function recordUsage(meter: Meter, model: string, usage: Anthropic.Usage | null | undefined): void {
+  if (!usage) return;
+  void import("../db/client")
+    .then(({ sql }) =>
+      sql.query("insert into model_calls (workspace_id, purpose, model, tokens_in, tokens_out, cache_read, cache_write, ref) values ($1, $2, $3, $4, $5, $6, $7, $8)", [
+        meter.workspace, meter.purpose, model, usage.input_tokens ?? 0, usage.output_tokens ?? 0, usage.cache_read_input_tokens ?? 0, usage.cache_creation_input_tokens ?? 0, meter.ref ?? null,
+      ]),
+    )
+    .catch((e) => console.error("[model_calls] not recorded:", (e as Error).message));
 }
 
 /** Turns API errors into a sentence the UI can show; names the missing setting for the workspace case. */

@@ -11,10 +11,11 @@ import { TIER_BANDS } from "../config/thresholds";
 import { SkillDb } from "../skills/db";
 import { loadContext, type Context } from "../skills/params";
 import type { AskContext, AskRef, Fact, PlatformFilter } from "./askref";
+import { PLATFORM_NAME } from "./askref";
 import { brandHandles, brandFilter, buckets, content, filterQuery, inWindow, Params, rankings, scope, tiers, topCreators, totals, type Filters } from "./data";
 import { parsePeriod, shiftPeriod, weekOf, type Period } from "./period";
 
-const PLATFORM_LABEL: Record<PlatformFilter, string> = { all: "TikTok + Instagram", tiktok: "TikTok", instagram: "Instagram" };
+const PLATFORM_LABEL: Record<PlatformFilter, string> = { all: "All platforms", tiktok: "TikTok", instagram: "Instagram", threads: "Threads", x: "X", youtube: "YouTube" };
 const METRIC_LABEL = { posts: "content", views: "views", engagements: "engagement", er: "engagement rate" } as const;
 
 const up = (n: number | null | undefined) => (n == null ? "moved" : n >= 0 ? "rise" : "fall");
@@ -65,11 +66,11 @@ export async function resolveAsk(workspaceId: string, ref: AskRef): Promise<AskC
         { label: "Creators", value: int(row.creators) },
         { label: "Engagement rate", value: pct(row.er, 2) },
       ];
-      for (const fl of row.flags) facts.push({ label: "Unusual", value: `${fl.platform === "tiktok" ? "TikTok" : "Instagram"} ${fl.metric === "er" ? "engagement rate" : fl.metric === "posts" ? "share of content" : "share of views"} ${fl.direction} ${fl.metric === "er" ? `${Math.abs(fl.change).toFixed(1)} pt` : `${Math.abs(Math.round(fl.change))}%`} vs ${prev.label}, outside its own range` });
+      for (const fl of row.flags) facts.push({ label: "Unusual", value: `${PLATFORM_NAME[fl.platform] ?? fl.platform} ${fl.metric === "er" ? "engagement rate" : fl.metric === "posts" ? "share of content" : "share of views"} ${fl.direction} ${fl.metric === "er" ? `${Math.abs(fl.change).toFixed(1)} pt` : `${Math.abs(Math.round(fl.change))}%`} vs ${prev.label}, outside its own range` });
       const lead = row.flags[0];
       const d = row.views_change?.pct;
       const question = lead
-        ? `Why is ${row.name}'s ${lead.platform === "tiktok" ? "TikTok" : "Instagram"} ${lead.metric === "er" ? "engagement rate" : lead.metric === "posts" ? "content" : "views"} ${lead.direction === "up" ? "up" : "down"} so sharply in ${period.label}? What's driving it?`
+        ? `Why is ${row.name}'s ${PLATFORM_NAME[lead.platform] ?? lead.platform} ${lead.metric === "er" ? "engagement rate" : lead.metric === "posts" ? "content" : "views"} ${lead.direction === "up" ? "up" : "down"} so sharply in ${period.label}? What's driving it?`
         : `Why did ${row.name}'s views ${up(d)} ${d == null ? "" : `${Math.abs(Math.round(d))}% `}in ${period.label}? What's driving it?`;
       return make(row.name, facts, question);
     }

@@ -44,7 +44,7 @@ export function fallbackHeadline(result: SkillResult, diff: Diff | null): Report
 export async function generateSections(result: SkillResult, diff: Diff | null, workspaceId: string, evidence: Evidence[] = result.evidence): Promise<ReportSections> {
   if (!hasModelCredentials() || result.status !== "ok") return fallbackHeadline(result, diff);
   try {
-    const client = anthropicClient();
+    const client = anthropicClient({ workspace: workspaceId, purpose: "report_headline" });
     const system = await buildSystem(workspaceId);
     const payload = {
       skill: result.skill,
