@@ -999,7 +999,7 @@ export const creations = pgTable(
   },
   (t) => [
     index("creations_ws_role_idx").on(t.workspaceId, t.role, t.status),
-    check("creations_kind_chk", sql`${t.kind} in ('skill','deck_template','rule','fact','term')`),
+    check("creations_kind_chk", sql`${t.kind} in ('skill','deck_template','rule','fact','term','extension')`),
     check("creations_status_chk", sql`${t.status} in ('draft','waiting','approved','sent_back','rejected','removed')`),
   ],
 );
@@ -1028,4 +1028,99 @@ export const fairSuggestions = pgTable(
     check("fair_suggestions_ref_chk", sql`${t.refKind} in ('creation','setting')`),
     check("fair_suggestions_status_chk", sql`${t.status} in ('new','seen','adopted','declined')`),
   ],
+);
+
+// ------------------------------------------------------------- extensions and credits
+/**
+ * A client's own data on top of the core (CMS plan, "Client extensions"): a field on
+ * creators, posts or comments with the values it may take (a Persona table: each persona
+ * with what it means and how to recognise one). Values come from a file, keyword rules
+ * computed in SQL, or CeMO reading each row. One workspace only; the core tables never change.
+ */
+export const extDefs = pgTable(
+  "ext_defs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workspaceId: text("workspace_id").notNull().references(() => workspaces.id),
+    /** a-z, 0-9 and _; queries name it ext_<key> */
+    key: text("key").notNull(),
+    name: text("name").notNull(),
+    target: text("target").notNull(),
+    /** [{ name, description?, hint? }] */
+    values: jsonb("values").notNull(),
+    source: text("source").notNull(),
+    /** rule: { rules: [{ value, terms }] }; cemo: { guide, scope }; file: {} */
+    spec: jsonb("spec").notNull().default(sql`'{}'::jsonb`),
+    status: text("status").notNull().default("draft"),
+    /** the creation that carries its approval and badge (src/company/creations.ts) */
+    creationId: uuid("creation_id"),
+    makerEmail: text("maker_email").notNull(),
+    approver: text("approver"),
+    /** rows in scope, credits to fill them now and a day after, from the sample */
+    estimate: jsonb("estimate"),
+    /** { done, total, credits } while filling */
+    progress: jsonb("progress"),
+    updatedAt: ts("updated_at").notNull().defaultNow(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    uniqueIndex("ext_defs_ws_key_uq").on(t.workspaceId, t.key),
+    check("ext_defs_target_chk", sql`${t.target} in ('creator','post','comment')`),
+    check("ext_defs_source_chk", sql`${t.source} in ('rule','file','cemo')`),
+    check("ext_defs_status_chk", sql`${t.status} in ('draft','approved','filling','live','paused','removed')`),
+  ],
+);
+
+/** One value per extension and core row (row_ref: the creator, post or comment id); value null = read, none fits. */
+export const extValues = pgTable(
+  "ext_values",
+  {
+    defId: uuid("def_id").notNull().references(() => extDefs.id, { onDelete: "cascade" }),
+    workspaceId: text("workspace_id").notNull().references(() => workspaces.id),
+    rowRef: text("row_ref").notNull(),
+    value: text("value"),
+    source: text("source").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [primaryKey({ columns: [t.defId, t.rowRef] }), index("ext_values_def_value_idx").on(t.defId, t.value)],
+);
+
+/**
+ * Every credit spent or added (CMS plan, "Credits and billing"): spends are negative, pools
+ * and top-ups positive. Fair's real cost per workspace comes from model_calls; prices are
+ * placeholders in src/config/credits.ts until a month of measured cost per action.
+ */
+export const creditLedger = pgTable(
+  "credit_ledger",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workspaceId: text("workspace_id").notNull().references(() => workspaces.id),
+    accountEmail: text("account_email"),
+    kind: text("kind").notNull(),
+    credits: numeric("credits", { precision: 12, scale: 2 }).notNull(),
+    ref: text("ref"),
+    note: text("note"),
+    createdAt: createdAt(),
+  },
+  (t) => [index("credit_ledger_ws_created_idx").on(t.workspaceId, t.createdAt)],
+);
+
+/** Long work in slices (CMS plan, "Jobs without pg-boss"): /api/cron/jobs claims one with locked_until and saves progress between slices. */
+export const cmsJobs = pgTable(
+  "cms_jobs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workspaceId: text("workspace_id").references(() => workspaces.id),
+    kind: text("kind").notNull(),
+    params: jsonb("params").notNull().default(sql`'{}'::jsonb`),
+    status: text("status").notNull().default("queued"),
+    progress: jsonb("progress").notNull().default(sql`'{}'::jsonb`),
+    error: text("error"),
+    lockedUntil: ts("locked_until"),
+    createdBy: text("created_by"),
+    finishedAt: ts("finished_at"),
+    updatedAt: ts("updated_at").notNull().defaultNow(),
+    createdAt: createdAt(),
+  },
+  (t) => [index("cms_jobs_status_idx").on(t.status, t.createdAt), check("cms_jobs_status_chk", sql`${t.status} in ('queued','running','done','failed','cancelled')`)],
 );

@@ -118,7 +118,14 @@ export function recipeTool(recipes: RecipeSpec[]): Anthropic.Tool {
   } as Anthropic.Tool;
 }
 
-export function buildTools(recipes: RecipeSpec[] = []): Anthropic.Tool[] {
+/** a client's live extensions (src/extensions/) as query dimensions and filters, named ext_<key> */
+export type ExtDim = { key: string; name: string; target: string; values: string[] };
+
+export function buildTools(recipes: RecipeSpec[] = [], ext: ExtDim[] = []): Anthropic.Tool[] {
+  const extNames = ext.map((e) => `ext_${e.key}`);
+  const filterSchema = ext.length
+    ? { ...FILTER_SCHEMA, properties: { ...FILTER_SCHEMA.properties, ...Object.fromEntries(ext.map((e) => [`ext_${e.key}`, { type: "array", items: { type: "string", enum: [...e.values, "none"] }, description: `the team's own ${e.name} (on ${e.target}s)` }])) } }
+    : FILTER_SCHEMA;
   const runSkill: Anthropic.Tool = {
     name: "run_skill",
     description:
@@ -144,13 +151,13 @@ export function buildTools(recipes: RecipeSpec[] = []): Anthropic.Tool[] {
   const queryMetrics: Anthropic.Tool = {
     name: "query_metrics",
     description:
-      `Query aggregated metrics from the social listening database when no skill fits. Choose an entity, filters, group_by dimensions, and metrics; the server builds and runs safe SQL and returns up to 200 rows with evidence refs. Use run_skill first when a skill exists. Entities: ${ENTITIES.join(", ")}. Filters: ${Object.keys(FILTERS).join(", ")} (dates as ISO YYYY-MM-DD; brand_id accepts a slug or a list). Metrics: ${METRICS.join(", ")}. Group_by: ${GROUP_BY.join(", ")}. The comments entity counts what people say under the posts (without the brands' own replies): filters brand_id, platform, source, date_from, date_to, sentiment, topic, purchase_intent, min_likes; metrics ${COMMENT_METRICS.join(", ")}; group_by ${COMMENT_GROUP_BY.join(", ")}; defaults to the last 30 days.`,
+      `Query aggregated metrics from the social listening database when no skill fits. Choose an entity, filters, group_by dimensions, and metrics; the server builds and runs safe SQL and returns up to 200 rows with evidence refs. Use run_skill first when a skill exists. Entities: ${ENTITIES.join(", ")}. Filters: ${Object.keys(FILTERS).join(", ")} (dates as ISO YYYY-MM-DD; brand_id accepts a slug or a list). Metrics: ${METRICS.join(", ")}. Group_by: ${GROUP_BY.join(", ")}. The comments entity counts what people say under the posts (without the brands' own replies): filters brand_id, platform, source, date_from, date_to, sentiment, topic, purchase_intent, min_likes; metrics ${COMMENT_METRICS.join(", ")}; group_by ${COMMENT_GROUP_BY.join(", ")}; defaults to the last 30 days.${ext.length ? ` The team's own data, as group_by and filters on either entity: ${ext.map((e) => `ext_${e.key} (${e.name} on ${e.target}s: ${e.values.join(", ")}; "none" when read and nothing fits, "not tagged" when not read yet)`).join("; ")}.` : ""}`,
     input_schema: {
       type: "object",
       properties: {
         entity: { type: "string", enum: [...ENTITIES] },
-        filters: FILTER_SCHEMA,
-        group_by: { type: "array", items: { type: "string", enum: [...new Set([...GROUP_BY, ...COMMENT_GROUP_BY])] } },
+        filters: filterSchema,
+        group_by: { type: "array", items: { type: "string", enum: [...new Set([...GROUP_BY, ...COMMENT_GROUP_BY, ...extNames])] } },
         metrics: { type: "array", items: { type: "string", enum: [...METRICS, ...COMMENT_METRICS] } },
         order_by: { type: "string", description: "metric or dimension name, optionally followed by ' desc' or ' asc'" },
         limit: { type: "integer", description: "at most 200" },

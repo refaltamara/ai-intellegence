@@ -14,6 +14,7 @@ import { sql } from "@/db/client";
 import { POLICY_HELP } from "@/roles/policy";
 import { Act } from "@/ui/company/Act";
 import { MemoryForm } from "@/ui/company/MemoryForm";
+import { UploadValues } from "@/ui/company/UploadValues";
 import { cellOf, columnsOf } from "@/ui/table";
 
 export const dynamic = "force-dynamic";
@@ -30,6 +31,10 @@ function what(c: Creation): string {
   if (c.kind === "skill") return String(s.description ?? "");
   if (c.kind === "deck_template") return `${s.grain === "week" ? "Weekly" : "Monthly"} · ${((s.rep_slides ?? s.social_slides ?? s.slides) as string[]).length} slides${s.description ? ` · ${s.description}` : ""}`;
   if (c.kind === "term") return c.title;
+  if (c.kind === "extension") {
+    const est = (c as Creation & { estimate?: { credits_now: number } }).estimate;
+    return `On ${s.target}s: ${((s.values ?? []) as { name: string }[]).map((v) => v.name).join(", ")} · ${s.source === "cemo" ? "CeMO reads each" : s.source === "rule" ? "keyword rules" : "from a file"}${est ? ` · about ${Math.round(est.credits_now).toLocaleString("en-US")} credits to fill` : ""}`;
+  }
   return String(s.text ?? "");
 }
 
@@ -65,6 +70,7 @@ export default async function CompanyPage() {
     <section className="screen company">
       <div className="topbar">
         <div><h1>Our {role.codename}</h1><span className="meta">{client}&apos;s {role.codename} ({role.label}) · on Fair&apos;s {role.codename} {d.fair_version} · {d.follows}</span></div>
+        {d.builder && <Link className="credline" href="/credits" title="Credits this month">{Math.round(d.credits.spent).toLocaleString("en-US")} of {d.credits.limit.toLocaleString("en-US")} credits this month</Link>}
         <span className="badgekey"><i className="badge fair">Fair</i> came with the role <i className="badge client">{client}</i> your team made</span>
       </div>
       <div className="wrap">
@@ -82,7 +88,7 @@ export default async function CompanyPage() {
             <header><h2>Waiting for you</h2><span>What Members made. It works for its maker now; once you approve it, it is there for everyone on the team.</span></header>
             {d.waiting.length === 0 ? <div className="dcard empty">Nothing waiting.</div> : (
               <ul className="clist">
-                {d.waiting.map((c) => (
+                {d.waiting.map((c) => ({ ...c, estimate: d.extensions.find((x) => x.creation_id === c.id)?.estimate ?? undefined })).map((c) => (
                   <li key={c.id} className="crow wait">
                     <div>
                       <b>{c.title}</b><span className="kind">{KIND_LABEL[c.kind]}</span>
@@ -132,6 +138,30 @@ export default async function CompanyPage() {
         <div className="dsection">
           <header><h2>Deck templates</h2><span>Under Decks → New deck, after Fair&apos;s. Save one from any deck (⋯ → Save as template).</span></header>
           {live(["deck_template"]).length === 0 ? <div className="dcard empty">None yet.</div> : <ul className="clist">{live(["deck_template"]).map((c) => row(c))}</ul>}
+        </div>
+
+        <div className="dsection" id="extensions">
+          <header><h2>Data extensions</h2><span>Your own data on top of Fair&apos;s, for this workspace only: grouped and filtered as ext_name in analyses, skills and decks. The core data never changes. Ask CeMO: &quot;add a Persona table&quot;.</span></header>
+          {d.extensions.filter((x) => x.status !== "draft").length === 0 ? <div className="dcard empty">None yet.</div> : (
+            <ul className="clist">{d.extensions.filter((x) => x.status !== "draft").map((x) => {
+              const total = x.counts.reduce((a, c) => a + c.n, 0);
+              const c = d.creations.find((y) => y.id === x.creation_id);
+              return (
+                <li key={x.id} className="crow">
+                  <div>
+                    <b>{x.name}</b><i className="badge client" title={`Made by ${x.maker_name ?? x.maker_email}${x.approver ? `, approved by ${x.approver}` : ""}`}>{client}</i><span className="kind">ext_{x.key} · on {x.target}s · {x.source === "cemo" ? "CeMO reads each" : x.source === "rule" ? "keyword rules, daily" : "from a file"}</span>
+                    <p>{x.status === "filling" ? `Filling: ${(x.progress?.done ?? 0).toLocaleString("en-US")} of ${(x.progress?.total ?? 0).toLocaleString("en-US")} read` : x.status === "approved" ? "Approved; filling starts within minutes" : `${total.toLocaleString("en-US")} ${x.target}s read`}{x.progress?.credits ? ` · ${Math.round(Number(x.progress.credits)).toLocaleString("en-US")} credits so far` : ""}</p>
+                    {x.counts.length > 0 && <div className="extcounts">{x.counts.map((k) => <span key={k.value} className="tag">{k.value} · {k.n.toLocaleString("en-US")}</span>)}</div>}
+                    {x.progress?.error && <p className="pnote">{String(x.progress.error)}</p>}
+                  </div>
+                  <span className="acts">
+                    {d.builder && x.source === "file" && <UploadValues defId={x.id} />}
+                    {d.builder && c && c.status === "approved" && <Act label="Remove" url={C} body={{ action: "remove", id: c.id }} confirm={`Remove ${x.name} and delete its values for everyone? Skills that use it will say it is gone.`} />}
+                  </span>
+                </li>
+              );
+            })}</ul>
+          )}
         </div>
 
         <div className="dsection">

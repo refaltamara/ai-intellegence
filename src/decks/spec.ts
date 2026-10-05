@@ -16,6 +16,7 @@ import { cleanSocialSlides, type SocialSpec } from "../social/slides";
 export const DECK_PLATFORMS: Platform[] = ["tiktok", "instagram", "threads", "x", "youtube"];
 
 /** An analysis pinned from Chats: the skill and the settings it ran with; each version runs it again over the deck's period. */
+/** skill: a skill name, or "recipe:<key>" for one of Fair's or the team's recipes (src/recipes/) */
 export type FindingSpec = { key: string; skill: string; params: Record<string, unknown>; question: string; title: string };
 
 export type DeckSpec = {
@@ -92,7 +93,8 @@ export function cleanSpec(input: unknown, known: Set<string>): DeckSpec | { erro
       const x = (f && typeof f === "object" ? f : {}) as Record<string, unknown>;
       return { key: str(x.key, 20) || `f${i + 1}`, skill: str(x.skill, 60), params: (x.params && typeof x.params === "object" ? x.params : {}) as Record<string, unknown>, question: str(x.question, 300), title: str(x.title, 80) || "Finding" };
     })
-    .filter((f) => /^[a-z][a-z-]*$/.test(f.skill))
+    // a skill, or one of the team's analyses written as a recipe ("recipe:<key>", src/recipes/)
+    .filter((f) => /^[a-z][a-z-]*$/.test(f.skill) || /^recipe:[a-z0-9][a-z0-9-]{2,48}$/.test(f.skill))
     .slice(0, 6);
   return {
     title: str(o.title, 60) || "Deck",

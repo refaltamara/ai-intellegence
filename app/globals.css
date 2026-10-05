@@ -1637,3 +1637,23 @@ table.changes.counts th{font-size:11px;color:var(--text-3);text-align:left;font-
 .crow .badge{margin:0 0 0 8px}
 .company .tablewrap td{white-space:normal;vertical-align:top}
 .company .tablewrap td.acts{white-space:nowrap}
+.extcounts{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:6px 0}
+.extcounts small{font-size:12px}
+ul.extex{list-style:none;font-size:12.5px;margin:6px 0;display:flex;flex-direction:column;gap:3px}
+ul.extex b{display:inline-block;min-width:90px}
+.extcost{font-size:13px!important;color:var(--text)!important;background:var(--surface);border-radius:8px;padding:8px 10px;margin-top:8px}
+.credline{font-size:12px;color:var(--violet);font-weight:600;margin-right:14px;white-space:nowrap}
+.credhero .big{display:flex;align-items:baseline;gap:10px}
+.credhero .big b{font-size:34px}
+.credhero .big span{color:var(--text-2)}
+.credhero .bar{height:10px;border-radius:999px;background:var(--surface);margin:10px 0;overflow:hidden}
+.credhero .bar i{display:block;height:100%;background:var(--violet);border-radius:999px}
+.credhero .bar.warn i{background:var(--amber)}.credhero .bar.full i{background:var(--red)}
+.credhero p{font-size:13px}
+.acts.left{justify-content:flex-start;margin-top:10px}
+.credays{display:flex;align-items:flex-end;gap:3px;height:90px}
+.credays i{flex:1;max-width:22px;background:var(--violet);opacity:.75;border-radius:3px 3px 0 0}
+.credits .foot{font-size:12px;margin:18px 0}
+.credits .muted{color:var(--text-3)}
+.credits .dsection{margin-top:18px}
+.cms>p.muted{margin:10px 0 0;font-size:12.5px}

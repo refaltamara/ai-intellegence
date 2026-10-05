@@ -37,7 +37,10 @@ export function DeckForm({ options, initial, prefill }: { options: DeckOptions; 
   const [busy, setBusy] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const [error, setError] = useState("");
-  const hasFindings = !!initial?.spec.findings?.length;
+  // the team's analyses (Fair's recipes and the team's own skills) can ride in a deck as findings, run again over each version's period
+  const [picked, setPicked] = useState<string[]>((initial?.spec.findings ?? []).filter((f) => f.skill.startsWith("recipe:")).map((f) => f.skill.slice(7)));
+  const chatFindings = (initial?.spec.findings ?? []).filter((f) => !f.skill.startsWith("recipe:"));
+  const hasFindings = chatFindings.length > 0 || picked.length > 0;
   // a PR deck (one brand's reputation, src/reputation/) or a Social Media deck (one brand's own accounts, src/social/): a focus brand and the family's own slides
   const family = edit ? (initial?.spec.rep ? "reputation" : initial?.spec.social ? "social" : null) : t.family ?? null;
   const isRep = family != null;
@@ -78,8 +81,8 @@ export function DeckForm({ options, initial, prefill }: { options: DeckOptions; 
       platforms: platforms as DeckSpec["platforms"],
       client: clientOn && clientName.trim() && clientIds.length ? { name: clientName.trim(), brands: clientIds.map((id) => ({ name: brandName.get(id) ?? id, brand_ids: [id] })) } : null,
       watchlist: watch,
-      slides: slides as DeckSpec["slides"],
-      ...(initial?.spec.findings ? { findings: initial.spec.findings } : {}),
+      slides: (picked.length && !slides.includes("findings") ? [...slides, "findings"] : slides) as DeckSpec["slides"],
+      ...(hasFindings ? { findings: [...chatFindings, ...picked.map((k) => { const x = options.team_skills.find((y) => y.key === k); return { key: `r_${k}`.slice(0, 20), skill: `recipe:${k}`, params: {}, question: x?.description ?? k, title: x?.title ?? k }; })] } : {}),
     };
   }
 
@@ -230,6 +233,20 @@ export function DeckForm({ options, initial, prefill }: { options: DeckOptions; 
       </section>
 
         </>
+      )}
+
+      {!isRep && options.team_skills.length > 0 && (
+        <section>
+          <h3>Your team&apos;s analyses <small>each runs again over every version&apos;s period, a slide each</small></h3>
+          <div className="slidepick">
+            {options.team_skills.map((x) => (
+              <label key={x.key} className={picked.includes(x.key) ? "on" : ""}>
+                <input type="checkbox" checked={picked.includes(x.key)} onChange={() => setPicked((p) => (p.includes(x.key) ? p.filter((k) => k !== x.key) : [...p, x.key].slice(0, 6)))} />
+                <span><b>{x.title}<i className={`badge ${x.badge === "Fair" ? "fair" : "client"}`} title={x.by ? `Made by ${x.by}` : undefined}>{x.badge}</i></b><em>{x.description}</em></span>
+              </label>
+            ))}
+          </div>
+        </section>
       )}
 
       <section className="cgrid">

@@ -39,6 +39,9 @@ import { PLATFORM_LABEL } from "../skills/common";
 import { can, type Actor } from "../auth/can";
 import { companyRecipes, isBuilder, teamMemory } from "../company/creations";
 import { memoryPrompt } from "../company/rules";
+import { canSpend, charge } from "../credits/ledger";
+import { liveDefs } from "../extensions/store";
+import { CREDIT_PRICES } from "../config/credits";
 import { ACTIVITY as TEAM_ACTIVITY, BUILDER_TOOLS, MAKE_TOOLS, builderPrompt, builderTools, executeTeamTool, makeTools } from "../company/tools";
 
 export const MAX_TOOL_CALLS = 6;
@@ -212,8 +215,22 @@ export async function runChatTurn(input: ChatTurnInput, emit: (e: ChatEvent) => 
   const context = slide?.context ?? (input.ask && !input.paneAction ? await resolveAsk(workspaceId, input.ask).catch(() => null) : null);
   // the report's whole fact sheet rides with this turn only; history keeps the slide, not the sheet
   const extra = slide?.sheet ? `[The report's full fact sheet, every number already computed:\n${slide.sheet}]` : null;
+  // a turn costs credits (src/config/credits.ts): a question, or more in Builder mode; at the cap CeMO says so and nothing else stops
+  const roleId: RoleId | undefined = input.role;
+  const building = !!input.actor && !!input.builderMode && !!roleId && isBuilder(input.actor, workspaceId, roleId);
+  const price = building ? CREDIT_PRICES.builder_turn : CREDIT_PRICES.question;
+  if (input.actor && !input.roleSpec && hasModelCredentials()) {
+    const ok = await canSpend(workspaceId, price);
+    if (!ok.ok) {
+      await addMessage({ conversationId: conversation.id, role: "user", content: { text: userText } });
+      await addMessage({ conversationId: conversation.id, role: "assistant", content: { text: ok.message, error: "credits" } });
+      await emit({ type: "error", message: ok.message });
+      return;
+    }
+  }
   try {
     await runTurnBody(conversation, userText, emit, claimed, input.followup, input.paneAction, input.userId ?? null, context, extra, input.role, input.roleSpec, input.actor ? { actor: input.actor, builderMode: !!input.builderMode } : undefined);
+    if (input.actor && !input.roleSpec && hasModelCredentials()) await charge({ ws: workspaceId, email: input.actor.email, staff: input.actor.staff.length > 0, kind: building ? "builder_turn" : "question", credits: price, ref: conversation.id });
   } catch (e) {
     const message = describeModelError(e);
     console.error("chat turn failed:", conversation.id, message, (e as Error).stack?.split("\n").slice(0, 3).join(" | "));
@@ -313,7 +330,10 @@ async function runTurnBody(conversation: { id: string; workspace_id: string; dec
   const builderMode = onTeam && team!.builderMode && isBuilder(team!.actor, workspaceId, roleModel.id);
   const builderNote = builderMode ? await builderPrompt(workspaceId, roleModel, await teamName(workspaceId)).catch(() => "") : "";
   const systemBlocks: Anthropic.TextBlockParam[] = [{ type: "text", text: system, cache_control: { type: "ephemeral" } }, ...(decisionNote ? [{ type: "text" as const, text: decisionNote }] : []), ...(builderNote ? [{ type: "text" as const, text: builderNote }] : [])];
-  const tools = [...buildTools(recipes), ...(onTeam ? makeTools(roleModel.id) : []), ...(builderMode ? builderTools(roleModel.id) : [])];
+  // the workspace's own extensions, as dimensions CeMO may group and filter by (src/extensions/)
+  const ext = roleSpec ? [] : await liveDefs(workspaceId).catch(() => []);
+  const extDims = ext.map((d) => ({ key: d.key, name: d.name, target: d.target, values: d.values.map((v) => v.name) }));
+  const tools = [...buildTools(recipes, extDims), ...(onTeam ? makeTools(roleModel.id, ext) : []), ...(builderMode ? builderTools(roleModel.id) : [])];
   const timings: Timings = { total_ms: 0, model_ms: 0, model_calls: 0, tools_ms: 0, tool_calls: 0, setup_ms: Date.now() - turnStart, effort: chatEffort() };
 
   const replay = historyTurns(history.slice(-MAX_HISTORY_MESSAGES) as Parameters<typeof historyTurns>[0]);

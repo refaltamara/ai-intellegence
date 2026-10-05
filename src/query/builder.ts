@@ -7,6 +7,46 @@ import { SkillDb } from "../skills/db";
 import { loadContext, resolveBrands, type Context } from "../skills/params";
 import { aggregateEvidence, EvidenceList } from "../skills/common";
 import type { Evidence, Row } from "../skills/types";
+import { liveDefs } from "../extensions/store";
+import { NONE, NOT_TAGGED, isExtDim, keyOf, matchValue, type ExtDef } from "../extensions/spec";
+
+/**
+ * A client's extensions (src/extensions/) as dimensions and filters named ext_<key>: only
+ * live definitions of this workspace, joined by id. A row not read yet groups as "not
+ * tagged"; read with no value fitting, as "none".
+ */
+async function extJoins(ws: string, entity: "posts" | "comments", groupBy: string[], filters: Record<string, unknown>, add: (v: unknown) => string): Promise<{ error?: string; joins: string[]; dims: Map<string, string>; where: string[]; caveats: string[] }> {
+  const used = [...new Set([...groupBy.filter(isExtDim), ...Object.keys(filters).filter(isExtDim)])];
+  const out = { joins: [] as string[], dims: new Map<string, string>(), where: [] as string[], caveats: [] as string[] };
+  if (!used.length) return out;
+  const defs = await liveDefs(ws);
+  for (const [i, name] of used.entries()) {
+    const def = defs.find((d) => d.key === keyOf(name));
+    if (!def) return { ...out, error: `'${name}' is not one of this workspace's extensions${defs.length ? ` (${defs.map((d) => `ext_${d.key}`).join(", ")})` : ""}.` };
+    const ref = refOf(def, entity);
+    if (!ref) return { ...out, error: `'${name}' describes ${def.target}s, which the ${entity} query cannot reach.` };
+    const a = `e${i}`;
+    out.joins.push(`left join ext_values ${a} on ${a}.def_id = ${add(def.id)}::uuid and ${a}.row_ref = ${ref}`);
+    out.dims.set(name, `case when ${a}.row_ref is null then '${NOT_TAGGED}' else coalesce(${a}.value, '${NONE}') end`);
+    const f = filters[name];
+    if (f != null) {
+      const want = (Array.isArray(f) ? f : [f]).map(String);
+      const named = want.map((w) => matchValue(def.values, w)).filter((x): x is string => !!x);
+      const none = want.some((w) => w.toLowerCase() === NONE);
+      if (!named.length && !none) return { ...out, error: `'${name}' takes ${def.values.map((v) => v.name).join(", ")} or none.` };
+      out.where.push(`(${[...(named.length ? [`${a}.value = any(${add(named)}::text[])`] : []), ...(none ? [`(${a}.row_ref is not null and ${a}.value is null)`] : [])].join(" or ")})`);
+    }
+    const p = def.progress;
+    out.caveats.push(`${def.name} is the team's own data (${def.source === "cemo" ? "read by CeMO" : def.source === "rule" ? "keyword rules" : "uploaded"})${p?.total ? `: ${Number(p.done ?? 0).toLocaleString("en-US")} of ${Number(p.total).toLocaleString("en-US")} ${def.target}s read` : ""}${def.status === "filling" ? ", still filling" : ""}.`);
+  }
+  return out;
+}
+
+function refOf(def: ExtDef, entity: "posts" | "comments"): string | null {
+  if (def.target === "post") return "p.id::text";
+  if (def.target === "creator") return "p.creator_id::text";
+  return entity === "comments" ? "c.id::text" : null;
+}
 
 export const ENTITIES = ["posts", "creators", "brand_weeks", "creator_brand_months", "comments"] as const;
 export const GROUP_BY = ["brand_id", "platform", "source", "tier", "week", "month", "creator_id", "content_format", "product_category", "universe", "caption_product", "caption_event", "caption_event_name", "caption_offer", "caption_hook"] as const;
@@ -136,7 +176,7 @@ const COMMENT_METRIC_SQL: Record<(typeof COMMENT_METRICS)[number], string> = {
 
 async function queryComments(input: QueryMetricsInput, workspaceId: string, db: SkillDb, started: number, fail: (m: string) => QueryMetricsResult): Promise<QueryMetricsResult> {
   const groupBy = (input.group_by ?? []) as (typeof COMMENT_GROUP_BY)[number][];
-  for (const g of groupBy) if (!COMMENT_GROUP_BY.includes(g)) return fail(`Unknown group_by '${g}' for comments. Use one of ${COMMENT_GROUP_BY.join(", ")}.`);
+  for (const g of groupBy) if (!COMMENT_GROUP_BY.includes(g) && !isExtDim(g)) return fail(`Unknown group_by '${g}' for comments. Use one of ${COMMENT_GROUP_BY.join(", ")}.`);
   const metrics = (input.metrics ?? []) as (typeof COMMENT_METRICS)[number][];
   if (!metrics.length) return fail("At least one metric is required.");
   for (const m of metrics) if (!COMMENT_METRICS.includes(m)) return fail(`Unknown metric '${m}' for comments. Use one of ${COMMENT_METRICS.join(", ")}.`);
@@ -154,8 +194,11 @@ async function queryComments(input: QueryMetricsInput, workspaceId: string, db: 
     filters.date_from = d.toISOString().slice(0, 10);
     filters.date_to = ctx.asOf;
   }
+  const ext = await extJoins(workspaceId, "comments", groupBy, filters, add);
+  if (ext.error) return fail(ext.error);
+  where.push(...ext.where);
   for (const [k, v] of Object.entries(filters)) {
-    if (v === undefined || v === null) continue;
+    if (v === undefined || v === null || isExtDim(k)) continue;
     const f = COMMENT_FILTERS[k];
     if (!f) return fail(`Unknown filter '${k}' for comments. Use one of ${Object.keys(COMMENT_FILTERS).join(", ")}.`);
     const clause = f(v, add, ctx);
@@ -166,10 +209,10 @@ async function queryComments(input: QueryMetricsInput, workspaceId: string, db: 
   if (![...metrics, ...groupBy].includes(orderCol as never)) return fail(`order_by must be one of the selected metrics or group_by dimensions, got '${orderCol}'.`);
   const dir = (orderDir ?? "desc").toLowerCase() === "asc" ? "asc" : "desc";
   const limit = Math.max(1, Math.min(200, Number(input.limit ?? 50) || 50));
-  const dims = groupBy.map((g) => `${COMMENT_DIM_SQL[g](ctx)} as ${g}`);
+  const dims = groupBy.map((g) => `${ext.dims.get(g) ?? COMMENT_DIM_SQL[g](ctx)} as ${g}`);
   const mets = metrics.map((m) => `${COMMENT_METRIC_SQL[m]} as ${m}`);
   const sql = `select ${[...dims, ...mets].join(", ")}, count(*) over() as matched
-    from comments c join posts p on p.id = c.post_id left join topics t on t.id = c.topic_id
+    from comments c join posts p on p.id = c.post_id left join topics t on t.id = c.topic_id ${ext.joins.join(" ")}
     where ${where.join(" and ")}
     ${groupBy.length ? `group by ${groupBy.map((_, i) => i + 1).join(", ")}` : ""}
     order by ${orderCol} ${dir} nulls last limit ${add(limit)}`;
@@ -188,6 +231,7 @@ async function queryComments(input: QueryMetricsInput, workspaceId: string, db: 
     evidence: ev.list,
     meta: { entity: "comments", filters, group_by: groupBy, metrics, matched, returned: rows.length, sql_hash: db.sqlHash(), duration_ms: Date.now() - started, caveats: [
       "Comments under the posts, without the brand's own replies; shares are over labelled comments (unlabelled ones are not neutral).",
+      ...ext.caveats,
     ] },
   };
 }
@@ -200,7 +244,7 @@ export async function queryMetrics(input: QueryMetricsInput, workspaceId: string
     if (!ENTITIES.includes(input.entity)) return fail(`Unknown entity '${input.entity}'. Use one of ${ENTITIES.join(", ")}.`);
     if (input.entity === "comments") return await queryComments(input, workspaceId, db, started, fail);
     const groupBy = (input.group_by ?? []) as (typeof GROUP_BY)[number][];
-    for (const g of groupBy) if (!GROUP_BY.includes(g)) return fail(`Unknown group_by '${g}'. Use one of ${GROUP_BY.join(", ")}.`);
+    for (const g of groupBy) if (!GROUP_BY.includes(g) && !isExtDim(g)) return fail(`Unknown group_by '${g}'. Use one of ${GROUP_BY.join(", ")}.`);
     const metrics = (input.metrics ?? []) as (typeof METRICS)[number][];
     if (!metrics.length) return fail("At least one metric is required.");
     for (const m of metrics) if (!METRICS.includes(m)) return fail(`Unknown metric '${m}'. Use one of ${METRICS.join(", ")}.`);
@@ -229,14 +273,17 @@ export async function queryMetrics(input: QueryMetricsInput, workspaceId: string
       filters.date_from = d.toISOString().slice(0, 10);
       filters.date_to = to;
     }
+    const ext = await extJoins(workspaceId, "posts", groupBy, filters, add);
+    if (ext.error) return fail(ext.error);
+    where.push(...ext.where);
     for (const [k, v] of Object.entries(filters)) {
-      if (v === undefined || v === null) continue;
+      if (v === undefined || v === null || isExtDim(k)) continue;
       const f = FILTERS[k];
       if (!f) return fail(`Unknown filter '${k}'. Use one of ${Object.keys(FILTERS).join(", ")}.`);
       const clause = f(v, add, ctx);
       if (clause) where.push(clause);
     }
-    const dims = groupBy.map((g) => `${DIM_SQL[g](ctx)} as ${g}`);
+    const dims = groupBy.map((g) => `${ext.dims.get(g) ?? DIM_SQL[g](ctx)} as ${g}`);
     const mets = metrics.map((m) => `${METRIC_SQL[m]} as ${m}`);
     const orderRaw = (input.order_by ?? metrics[0]).trim();
     const [orderCol, orderDir] = orderRaw.split(/\s+/);
@@ -244,7 +291,7 @@ export async function queryMetrics(input: QueryMetricsInput, workspaceId: string
     const dir = (orderDir ?? "desc").toLowerCase() === "asc" ? "asc" : "desc";
     const limit = Math.max(1, Math.min(200, Number(input.limit ?? 50) || 50));
     const sql = `select ${[...dims, ...mets].join(", ")}, count(*) over() as matched
-      from posts p where ${where.join(" and ")}
+      from posts p ${ext.joins.join(" ")} where ${where.join(" and ")}
       ${groupBy.length ? `group by ${groupBy.map((_, i) => i + 1).join(", ")}` : ""}
       order by ${orderCol} ${dir} nulls last limit ${add(limit)}`;
     const rows = await db.q<Row>(sql, params);
@@ -263,6 +310,7 @@ export async function queryMetrics(input: QueryMetricsInput, workspaceId: string
       meta: { entity: input.entity, filters, group_by: groupBy, metrics, matched, returned: rows.length, sql_hash: db.sqlHash(), duration_ms: Date.now() - started, caveats: [
         "Aggregates over posts; owned-account posts are included unless earned_only or source=earned is set.",
         ...(groupBy.some((g) => CAPTION_DIMS.has(g)) || Object.keys(filters).some((f) => f.startsWith("caption")) ? ["Products, campaigns, offers and hooks are read from captions by the model, for posts with 10K+ views and brand-account posts; other posts show as \"not read\"."] : []),
+        ...ext.caveats,
       ] },
     };
   } catch (e) {

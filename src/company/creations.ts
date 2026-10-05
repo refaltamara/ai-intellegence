@@ -27,13 +27,14 @@ import { cleanSlides } from "../competitor/slides";
 import { cleanRepSlides } from "../reputation/slides";
 import { cleanSocialSlides } from "../social/slides";
 import { refuseTerm, refuseText, type Memory, type Term } from "./rules";
+import { validateExt, type ExtDefInput } from "../extensions/spec";
 
-export const CREATION_KINDS = ["skill", "deck_template", "rule", "fact", "term"] as const;
+export const CREATION_KINDS = ["skill", "deck_template", "rule", "fact", "term", "extension"] as const;
 export type CreationKind = (typeof CREATION_KINDS)[number];
 export type CreationStatus = "draft" | "waiting" | "approved" | "sent_back" | "rejected" | "removed";
 export const isCreationKind = (v: unknown): v is CreationKind => (CREATION_KINDS as readonly string[]).includes(v as string);
 
-export const KIND_LABEL: Record<CreationKind, string> = { skill: "Skill", deck_template: "Deck template", rule: "House rule", fact: "Memory", term: "Vocabulary" };
+export const KIND_LABEL: Record<CreationKind, string> = { skill: "Skill", deck_template: "Deck template", rule: "House rule", fact: "Memory", term: "Vocabulary", extension: "Data extension" };
 
 export type Creation = {
   id: string;
@@ -100,6 +101,11 @@ export async function cleanCreation(kind: CreationKind, role: RoleId, input: Rec
     const t = { say: String(input.say ?? "").trim(), not: String(input.not ?? "").trim() } as Term;
     const why = refuseTerm(t);
     return why ? { error: why } : { title: `"${t.say}", not "${t.not}"`, key: null, spec: t };
+  }
+  if (kind === "extension") {
+    // the definition rides on the creation, so a removed extension can be brought back (src/extensions/)
+    const v = validateExt(input as Partial<ExtDefInput>);
+    return v.ok ? { title: v.def.name, key: v.def.key, spec: v.def as unknown as Record<string, unknown> } : { error: v.errors.join(" ") };
   }
   if (kind === "skill") {
     const title = String(input.title ?? "").trim();
@@ -174,6 +180,11 @@ export async function actOn(actor: Actor, id: string, ws: string, action: Creati
   const builder = isBuilder(actor, ws, c.role);
   const mine = c.maker_email === actor.email;
   const go = async (status: CreationStatus, decided: boolean) => {
+    // an extension is filled once approved: refused when the month cannot cover its estimate
+    if (c.kind === "extension" && status === "approved") {
+      const block = await (await import("../extensions/store")).approvalBlock(c.id);
+      if (block) return { ok: false as const, error: block };
+    }
     if (c.key && status === "approved") {
       const taken = (await sql.query("select 1 from creations where workspace_id = $1 and role = $2 and key = $3 and status = 'approved' and id <> $4", [ws, c.role, c.key, c.id])) as unknown[];
       if (taken.length) return { ok: false as const, error: "Your team already has a live one with that name." };
@@ -183,6 +194,7 @@ export async function actOn(actor: Actor, id: string, ws: string, action: Creati
       decided ? [c.id, status, note ?? null, actor.email] : [c.id, status, note ?? c.note],
     )) as Creation[];
     await audit({ workspace_id: ws, actor: actor.email, area: "creation", action, path: `${c.role}:${c.kind}:${c.id}`, old: { status: c.status }, new: { status }, note: note ?? null });
+    if (c.kind === "extension") await (await import("../extensions/store")).onCreationStatus(rows[0], status, actor);
     return { ok: true as const, creation: rows[0] };
   };
   switch (action) {
@@ -205,6 +217,13 @@ export async function actOn(actor: Actor, id: string, ws: string, action: Creati
       return go("removed", c.status === "approved");
     case "restore":
       if (!builder || c.status !== "removed" || !c.approver) return { ok: false, error: "Only a Builder brings back something that was live." };
+      if (c.kind === "extension") {
+        // its values were deleted with it: bring the definition back, estimate again, then approve
+        const x = await import("../extensions/store");
+        const made = await x.createDraftDef(ws, c.spec as Partial<ExtDefInput>, c.maker_email, c.id);
+        if (!made.ok) return { ok: false, error: made.error };
+        await x.estimateDef(made.def, { email: actor.email, staff: actor.staff.length > 0 });
+      }
       return go("approved", true);
     case "discard":
       if (!mine || !["draft", "sent_back"].includes(c.status)) return { ok: false, error: "Only its maker can discard a draft." };
@@ -268,4 +287,10 @@ export async function teamMemory(ws: string, role: RoleId): Promise<Memory & { v
 export async function waitingFor(actor: Actor, ws: string): Promise<Creation[]> {
   const rows = await listCreations(ws, { status: ["waiting"] });
   return rows.filter((c) => isBuilder(actor, ws, c.role));
+}
+
+/** A live company skill by key, on any team of the workspace (decks run them as findings). */
+export async function companyRecipeByKey(ws: string, key: string): Promise<RecipeSpec | null> {
+  const rows = (await sql.query("select key, spec, role from creations where workspace_id = $1 and kind = 'skill' and status = 'approved' and key = $2 limit 1", [ws, key])) as { key: string; spec: RecipeSpec; role: RoleId }[];
+  return rows[0] ? { ...rows[0].spec, key: rows[0].key } : null;
 }

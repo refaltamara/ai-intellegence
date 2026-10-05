@@ -7,7 +7,8 @@ import { loadContext } from "../skills/params";
 import { deckPeriods } from "./generate";
 import { brandLabel, type DeckSpec } from "./spec";
 import { templatesFor, type DeckTemplate } from "./templates";
-import { companyTemplates } from "../company/creations";
+import { companyRecipes, companyTemplates } from "../company/creations";
+import { recipesFor } from "../recipes/store";
 import { BRAND_KOL, type RoleModel } from "../roles/model";
 import { REP_SLIDES } from "../reputation/slides";
 import { SOCIAL_SLIDES } from "../social/slides";
@@ -28,6 +29,8 @@ export type DeckOptions = {
   social_slides: { kind: string; title: string; description: string }[];
   platforms: string[];
   focus: string | null;
+  /** analyses a Brand & KOL deck can carry as findings: Fair's recipes for the role, then the team's own skills */
+  team_skills: { key: string; title: string; description: string; badge: string; by?: string }[];
 };
 
 const STARTERS: WeeklyContract[] = [paragon as WeeklyContract];
@@ -66,5 +69,9 @@ export async function deckOptions(workspaceId: string, role: RoleModel = BRAND_K
     social_slides: SOCIAL_SLIDES,
     platforms: (await new SkillDb().q<{ platform: string }>("select distinct platform from posts where workspace_id = $1 order by 1", [workspaceId])).map((r) => r.platform),
     focus: ctx.clientBrandId ?? brands[0]?.id ?? null,
+    team_skills: [
+      ...(await recipesFor(role.recipes).catch(() => [])).map((r) => ({ key: r.key, title: r.title, description: r.description, badge: "Fair" })),
+      ...(await companyRecipes(workspaceId, role.id, email).catch(() => [])).filter((r) => r._creation.status === "approved").map((r) => ({ key: r.key, title: r.title, description: r.description, badge: own?.name ?? "Your team", by: r._creation.maker })),
+    ],
   };
 }

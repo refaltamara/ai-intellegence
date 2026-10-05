@@ -8,6 +8,7 @@
  */
 import { COMMENT_GROUP_BY, COMMENT_METRICS, ENTITIES, GROUP_BY, METRICS, type QueryMetricsInput } from "../query/builder";
 import { isRoleId, type RoleId } from "../roles/model";
+import { isExtDim } from "../extensions/spec";
 
 export const RECIPE_PARAMS = ["brand", "window", "platform", "topic"] as const;
 export type RecipeParam = (typeof RECIPE_PARAMS)[number];
@@ -57,7 +58,8 @@ export function validateRecipe(r: Partial<RecipeSpec>): string[] {
     const dims: readonly string[] = comments ? COMMENT_GROUP_BY : GROUP_BY;
     const mets: readonly string[] = comments ? COMMENT_METRICS : METRICS;
     if (!Array.isArray(q.metrics) || !q.metrics.length || !q.metrics.every((m) => mets.includes(m))) errors.push(`query.metrics: one or more of ${mets.join(", ")}.`);
-    if (q.group_by && !q.group_by.every((g) => dims.includes(g))) errors.push(`query.group_by: any of ${dims.join(", ")}.`);
+    // a team's own extensions (ext_<key>) are checked against the workspace when the recipe runs
+    if (q.group_by && !q.group_by.every((g) => dims.includes(g) || isExtDim(g))) errors.push(`query.group_by: any of ${dims.join(", ")}, or one of the team's extensions (ext_<key>).`);
     if (q.limit != null && (!Number.isInteger(q.limit) || q.limit < 1 || q.limit > 200)) errors.push("query.limit: 1 to 200.");
     if (r.params?.includes("topic") && !comments) errors.push("params: topic only works on comments.");
     if (q.filters && ("date_from" in q.filters || "date_to" in q.filters)) errors.push("query.filters: leave dates out; the window input sets them.");

@@ -33,6 +33,8 @@ export type Action =
   | "role.release"
   | "role.pin"
   | "staff.manage"
+  /** set a workspace's credit pool and billing, add top-ups, see Fair's real cost */
+  | "billing.manage"
   /** draft a role version, roll one back */
   | "role.draft"
   | "role.rollback"
@@ -65,6 +67,7 @@ export function can(a: Actor, action: Action, ctx: Ctx = {}): boolean {
     case "role.release":
     case "role.pin":
     case "staff.manage":
+    case "billing.manage":
       return has(a, "owner");
     case "role.draft":
     case "role.rollback":

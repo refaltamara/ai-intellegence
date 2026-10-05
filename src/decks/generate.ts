@@ -16,6 +16,9 @@ import { writeNarrative } from "../competitor/write";
 import { SkillDb } from "../skills/db";
 import { loadContext } from "../skills/params";
 import { runFindings } from "./findings";
+import { canSpend, charge } from "../credits/ledger";
+import { CREDIT_PRICES } from "../config/credits";
+import { sql } from "../db/client";
 import { specContract } from "./spec";
 import { markDeckRun, pruneVersions, type DeckRow } from "./store";
 import { reputationReport, writeRep } from "../reputation/deck";
@@ -58,6 +61,21 @@ export async function deckPeriods(workspaceId: string, grain: Grain, n = 12): Pr
  * a period the deck already has.
  */
 export async function generateDeckVersion(deck: DeckRow, opts: { period?: string; reason: "create" | "manual" | "schedule" }): Promise<DeckOutcome> {
+  // a version the model writes costs credits (src/credits/ledger.ts); at the cap it waits, the deck's earlier versions stay
+  const ok = await canSpend(deck.workspace_id, CREDIT_PRICES.deck_version);
+  if (!ok.ok) {
+    await markDeckRun(deck.id, { next_run_at: deck.recurring ? retryRun() : null, error: ok.message.slice(0, 500) }).catch(() => undefined);
+    return { status: "error", message: ok.message, report_id: null, period: null };
+  }
+  const out = await makeVersion(deck, opts);
+  if (out.status === "ok" && out.narrative_by === "model") {
+    const who = deck.user_id ? ((await sql.query("select u.email, coalesce(array_length(a.staff, 1), 0) > 0 as staff from users u left join accounts a on a.id = u.account_id where u.id = $1", [deck.user_id])) as { email: string; staff: boolean }[])[0] : undefined;
+    await charge({ ws: deck.workspace_id, email: who?.email ?? null, staff: who?.staff, kind: "deck_version", credits: CREDIT_PRICES.deck_version, ref: out.report_id, note: `${deck.name}${opts.reason === "schedule" ? " (scheduled)" : ""}` });
+  }
+  return out;
+}
+
+async function makeVersion(deck: DeckRow, opts: { period?: string; reason: "create" | "manual" | "schedule" }): Promise<DeckOutcome> {
   const spec = deck.spec;
   const grain = spec.grain;
   let key: string | null = null;

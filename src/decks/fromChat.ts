@@ -43,6 +43,17 @@ export async function conversationFindings(conversationId: string, workspaceId: 
       continue;
     }
     for (const t of (c.tools ?? []) as ToolCallRecord[]) {
+      // the team's analyses (recipes) come along too, with the inputs they ran with
+      if (t.name === "run_recipe" && t.status === "ok" && t.rows?.length) {
+        const inp = (t.input ?? {}) as { recipe?: string; params?: Record<string, unknown> };
+        const { window: _w, ...params } = inp.params ?? {};
+        const f: FindingSpec = { key: "", skill: `recipe:${inp.recipe}`, params, question: question || t.title || "", title: t.title ?? String(inp.recipe) };
+        const sig = `${f.skill}|${JSON.stringify(f.params)}`;
+        if (!inp.recipe || seen.has(sig)) continue;
+        seen.add(sig);
+        out.push({ ...f, key: `f${out.length + 1}` });
+        continue;
+      }
       if (t.name !== "run_skill" || t.status !== "ok" || !t.run_id || !(t.rows?.length)) continue;
       const f = await findingFromRun(t.run_id, workspaceId, question);
       if (!f) continue;

@@ -11,7 +11,8 @@ import type { ToolCallRecord } from "@/chat/persist";
 import type { Proposal } from "@/company/tools";
 import { cellOf, columnsOf } from "./table";
 
-const KIND: Record<string, string> = { skill: "Skill", deck_template: "Deck template", rule: "House rule", fact: "Memory", term: "Vocabulary" };
+const KIND: Record<string, string> = { skill: "Skill", deck_template: "Deck template", rule: "House rule", fact: "Memory", term: "Vocabulary", extension: "Data extension" };
+const n = (x: number) => Math.round(x).toLocaleString("en-US");
 const STATUS: Record<string, string> = {
   draft: "Draft · works for you only",
   waiting: "Waiting for your Builder",
@@ -31,6 +32,7 @@ async function post(url: string, body: unknown): Promise<{ ok: boolean; error?: 
 export function ProposalCard({ tool, codename }: { tool: ToolCallRecord; codename?: string }) {
   const p = tool.proposal as Proposal;
   if (p.type === "change") return <ChangeCard p={p} codename={codename} />;
+  if (p.type === "extension") return <ExtensionCard p={p} codename={codename} />;
   return <CreationCard p={p} tool={tool} codename={codename} />;
 }
 
@@ -110,6 +112,56 @@ function ChangeCard({ p, codename }: { p: Extract<Proposal, { type: "change" }>;
         {p.builder && !state.applied && <button className="btn pri sm" disabled={state.busy} onClick={apply}>Apply for everyone</button>}
         {state.applied && !state.undone && <button className="btn sm ghost" disabled={state.busy} onClick={undo}>Undo</button>}
         {state.applied && <Link className="btn sm ghost" href="/company">Our {codename ?? "team"}</Link>}
+      </footer>
+    </div>
+  );
+}
+
+const SOURCE: Record<string, string> = { rule: "keyword rules, counted in the database", cemo: "CeMO reading each", file: "a file you upload" };
+
+/** A data extension: the sample, what filling costs now and a day after; a Builder approves it to fill it. */
+function ExtensionCard({ p, codename }: { p: Extract<Proposal, { type: "extension" }>; codename?: string }) {
+  const [status, setStatus] = useState(p.status);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState("");
+  useEffect(() => {
+    void fetch(`/api/builder/creations?id=${p.id}`).then((r) => (r.ok ? r.json() : null)).then((j) => { if (j?.creation) setStatus(j.creation.status); });
+  }, [p.id]);
+  async function act(action: string) {
+    setBusy(true); setMsg("");
+    const r = await post("/api/builder/creations", { action, id: p.id });
+    setBusy(false);
+    if (!r.ok) { setMsg(r.error ?? "That did not work."); return; }
+    setStatus((r.creation as { status: typeof status }).status);
+  }
+  const e = p.estimate;
+  const total = Object.values(e.counts).reduce((a, b) => a + b, 0);
+  const open = status === "draft" || status === "sent_back";
+  return (
+    <div className="card proposal">
+      <h4><span><i className="badge client">Data extension</i>{p.title} on {p.target}s</span><span className={`pstatus ${status}`}>{status === "approved" ? "Approved · filling" : STATUS[status] ?? status}</span></h4>
+      <div className="body">
+        <p>Values: {p.values.join(", ")} · from {SOURCE[p.source] ?? p.source}{p.source === "cemo" ? ` ${p.target}` : ""}.</p>
+        {total > 0 && (
+          <div className="extcounts">
+            {Object.entries(e.counts).sort((a, b) => b[1] - a[1]).map(([k, v]) => <span key={k} className="tag">{k} · {n(v)}</span>)}
+            <small className="muted">{p.source === "cemo" ? `in a sample of ${n(total)} ${p.target}s` : `over all ${n(total)} ${p.target}s`}</small>
+          </div>
+        )}
+        {e.examples.length > 0 && <ul className="extex">{e.examples.slice(0, 4).map((x) => <li key={x.ref}><b>{x.value ?? "none"}</b> {x.label} · <span className="muted">{x.text.slice(0, 110)}</span></li>)}</ul>}
+        <p className="extcost">
+          {p.source === "cemo"
+            ? <>Filling it: about <b>{n(e.credits_now)} credits</b> for {n(Math.max(0, e.rows - e.done))} {p.target}s, then about <b>{n(e.credits_per_day)} a day</b> for new ones ({n(e.new_rows_per_day)} a day lately). The sample used {n(e.sample_credits)}.</>
+            : p.source === "rule" ? <>Filling it costs no credits: the rules run in the database over {n(e.rows)} {p.target}s, again every day.</> : <>Upload the file on Our {codename ?? "team"} once it is approved.</>}
+        </p>
+        {p.stopped && <p className="pnote">{p.stopped}</p>}
+      </div>
+      <footer>
+        {msg && <span className="err">{msg}</span>}
+        {open && p.builder && <button className="btn pri sm" disabled={busy} onClick={() => act("add")}>{p.source === "cemo" ? `Approve and fill (~${n(e.credits_now)} credits)` : "Approve and fill"}</button>}
+        {open && !p.builder && <button className="btn pri sm" disabled={busy} onClick={() => act("submit")}>Send to your Builder</button>}
+        {open && <button className="btn sm ghost" disabled={busy} onClick={() => act("discard")}>Discard</button>}
+        {status !== "draft" && <Link className="btn sm ghost" href="/company#extensions">Our {codename ?? "team"}</Link>}
       </footer>
     </div>
   );
