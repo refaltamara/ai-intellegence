@@ -106,3 +106,27 @@ Thirteen CSVs, one per table of the listening database (`<table>_202610011730.cs
 Posts by platform: Threads 4,746, Instagram 3,794, X 3,253, TikTok 1,482. By month (WIB): June 1,244, July 715, August 2,041, September 9,275, to 24 Sep. **Coverage is uneven:** Threads and X were switched on in September (Threads 425 → 4,598 captures, X 12 → 3,267), Instagram dips in July (207 captures against about 1,150 in June and August), TikTok starts small in June (118). Week-on-week reads must be per platform or guarded, or they report collection as movement.
 
 Views: the larger of `video_view_count` and `video_play_count` (Threads and X play counts are video plays only). Comments cover 2,495 posts, about 37% of the comment counts the posts report (Threads 64,557, TikTok 28,630, Instagram 19,415, X 3,764). Sentiment (three-class, brand replies left out): neutral 58,195, positive 36,125, negative 20,537, unknown 1,272. `category`, `product_type` and `format_content` hold stray beauty values (201 "deodorant", 57 "mascara") and are not loaded.
+
+## Indonesian Beauty Q3 2026 (Fair's scraper, from 6 Oct 2026; in progress)
+
+Templates for the dump: `Indonesian_Beauty_Q3_2026_{TikTok,Instagram}_template.xlsx` (sent to Refal on 6 Oct). The headers follow `etl/contracts/posts_*.json`; tier, the engagement totals and month are worked out at load.
+
+**Instagram, first file (loaded 6 Oct).** The export goes through `etl/quarterly/convert_instagram.py`, then `etl/load.py --platform instagram`.
+- Loaded: 73,327 rows, 68,358 posts, 71 brands, every day of July to September, nothing rejected.
+- Corrections the converter makes:
+  - 693 TikTok links in the file are left out; they belong to the TikTok batch.
+  - A blank post type with views is a Reel, without views a Carousel (Refal).
+  - Followers of 0 are read as unknown.
+- **A post that tags several brands counts for each brand** (Refal, 6 Oct): it is earned content for every brand it names.
+  - Every row of the same post carries one set of numbers: the highest views, likes and comments seen for it, the highest followers, the earliest date.
+  - Platform totals count the post once.
+  - 3,765 posts tag several brands; 291 tag five or more, many from shops such as `mutiaracosmetics_id`.
+- **Still to come from Refal:**
+  - the 20 Q2 brands with no Q3 posts yet;
+  - followers for 4,896 rows (3,596 creators);
+  - the product category column (Q2 had it on only 26% of posts);
+  - TikTok, in batches.
+- Loading again upserts on (platform, url, brand), so a corrected file replaces the rows.
+- Caveats:
+  - Dates have no time of day (daily and monthly views are fine).
+  - Q3 has far fewer zero-like posts than Q2 (4% against 34%; median likes 25 against 5). That points to a change in collection, so Q2 against Q3 comparisons on likes need that said.
