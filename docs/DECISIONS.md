@@ -388,3 +388,40 @@ Followers 0 or null → tier null, excluded from per-1k metrics. Discovery keeps
     - The outcome insight read "…Started from creations in three fintech workspaces."
     - The browser endpoint dropped a copied answer's text, a kind the browser may not send and an extra field, and refused calls without a session.
     - Dashboards record each section seen, with their layout unchanged.
+
+## Early-access listening pricing (Refal, 6 Oct 2026; to revisit)
+Offered only to selected early clients, not yet a public product. Licences are yearly; prices in rupiah, PPN included.
+
+| | Growth | Premium |
+|---|---|---|
+| Brands | 3 | 10 |
+| Price per year | Rp 21M (Rp 7M a brand) | Rp 56M (10 × Rp 7M, less 20%) |
+| Extra brand | Rp 6M a year | Rp 5M a year |
+
+Both packages carry the same benefits:
+- **Platforms:** Instagram, TikTok, Threads and X.
+- **Own accounts:** each brand's own accounts on all four platforms.
+- **Keywords:** Instagram all tagged posts, plus 3 keywords or hashtags per platform on TikTok, Threads and X.
+- **Tracking:** content fetched daily and each post tracked for 7 days.
+- **Comments and sentiment:** all comments, with sentiment on each.
+- **Topics:** set up by Fair's team.
+- **Brand swaps:** one per brand per quarter, as written.
+- **Roles:** PR, Social Media, and Brand & KOL.
+- **Users:** no seat limit.
+- **CeMO credits:** included, with no number stated.
+- **Connector:** the Claude/ChatGPT MCP connector, free.
+
+Internal only, not in the offer:
+- A volume cap on comments exists for later; early clients are not capped.
+- Swaps are written as one per quarter but not enforced for early clients.
+- How CeMO credits are sold is still open (the credit system supports pools and caps per workspace; nothing is enforced until `settings.credits.enforce`).
+- Fair's cost per brand is not measured yet; read it in CMS → Credits once a month of model calls is recorded.
+
+Market check, 6 Oct 2026, at Rp 17,900 per USD:
+- **Local:** Netray Rp 24M a year for all channels with 4 keywords each.
+- **Brand24:** from about Rp 43M a year.
+- **YouScan:** about Rp 107M a year for 3 topics.
+- **Talkwalker:** Rp 161M a year and up.
+- **Brandwatch, Meltwater, Sprinklr:** Rp 170M to 900M a year and up.
+
+Claude's recommendation was Rp 42M for Growth. Rp 21M is kept as early-access pricing and revisited before the product goes public.
