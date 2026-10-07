@@ -62,6 +62,13 @@
       "platform": "threads",
       "file": "kahf/comments_threads_1007a.csv",
       "note": "first comments batch, 7 Oct (times carry Z: UTC)"
+    },
+    {
+      "kind": "comments",
+      "platform": "threads",
+      "file": "kahf/comments_threads_1007b.csv",
+      "naive_tz": "Asia/Jakarta",
+      "note": "comments_structured.xlsx (comments sheet), 7 Oct; times without zone are Jakarta time: read so, each post's first comment lands 0 to 9 minutes after it"
     }
   ]
 }

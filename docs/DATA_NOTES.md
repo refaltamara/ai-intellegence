@@ -161,4 +161,11 @@ One contents file, `data/raw/kahf/contents_threads.csv` (posts only; comments to
   - Times carry a `Z` and are read as UTC, unlike the posts file.
   - The column is `source_post_url` (the loader now accepts it). There are no comment ids, so ids are hashed. 33 rows have a blank platform; the contract says Threads.
   - More batches to come; loading again upserts.
+- **Comments, big batch** (`comments_structured.xlsx`, 7 Oct; the comments sheet is `kahf/comments_threads_1007b.csv`, the posts sheet `kahf/post_stats_1007b.csv`):
+  - 10,509 in → 9,408 loaded, on 40 posts, none of them in the first batch. Real Threads comment ids.
+  - Dropped: 749 under the two posts the contract drops (the June cake festival, the 2025 "which Kahf scent" post). Both have been pulled into the case, but only one comment on each is from the case; the rest predate it. Also dropped: 269 with no text, 83 emoji only.
+  - One is Kahf's own reply.
+  - **Times are Jakarta time**, without a zone, unlike the posts file (UTC) and the first comments file (Z). Read that way, each post's first comment lands 0 to 9 minutes after it. As UTC every post would wait 7 hours for its first comment, and as Malaysian time 35 of 40 posts would get comments before they went up. The contract now takes a zone per file (`naive_tz`).
+  - **Copy-paste accounts:** 22 accounts posted the same text under three posts or more. The most active is one account pasting "Korang support brand badlab ni…" under 15 posts. Pulse's coordinated-pattern card reads these.
+  - The posts sheet carries views, likes, comments and shares for these 40 posts (Threads views are not in the posts export). These are not loaded yet: views on 40 of 577 posts would make reach look complete when it is not.
 
