@@ -153,4 +153,11 @@ One contents file, `data/raw/kahf/contents_threads.csv` (posts only; comments to
   - Some Indonesians answer back.
   - A few early posts in the file are not about the case (a fun run, Watsons, Cosmoderm). The labeller sets these aside as `relevant = false`.
 - **Labelling:** sentiment, stance, topic and voice come from `/api/cron/label` once deployed. Until then the 577 earned posts carry `stance_source = 'awaiting_context'`.
+- **Comments, first batch** (`kahf/comments_threads_1007a.csv`, 7 Oct):
+  - 1,079 in → 992 loaded, on 86 of the posts. Every comment's post is already loaded; none needed a stub.
+  - Dropped: 72 with no text (stickers and images), 15 emoji only.
+  - One is Kahf's own reply.
+  - Times carry a `Z` and are read as UTC, unlike the posts file.
+  - The column is `source_post_url` (the loader now accepts it). There are no comment ids, so ids are hashed. 33 rows have a blank platform; the contract says Threads.
+  - More batches to come; loading again upserts.
 
