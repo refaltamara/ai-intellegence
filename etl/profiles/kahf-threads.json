@@ -61,6 +61,10 @@
     {
       "url": "https://threads.com/@kamuandri/post/DeL5j79CQne",
       "reason": "a reply, already loaded as a comment under @syed_event_supplier DeLqXIrlK82"
+    },
+    {
+      "url": "https://threads.com/@kahfcommunities/post/DXw1Royk5NN",
+      "reason": "April 2026, a Kahf community call for collaborations: before the case"
     }
   ],
   "files": [
@@ -128,6 +132,12 @@
       "platform": "threads",
       "file": "kahf/contents_threads_1007i.csv",
       "note": "kahf_threads_recent - kahf_threads_recent.csv, 7 Oct (same epoch export as 1007h): 1,085 posts; the 723 already loaded were left out of this file as asked (their numbers stay as loaded); 362 written here, the July Watsons post among them (dropped by drop_urls). Comments to follow as one big batch"
+    },
+    {
+      "kind": "contents",
+      "platform": "threads",
+      "file": "kahf/contents_threads_1008a.csv",
+      "note": "kahf_threads_recent.csv, 8 Oct (same epoch export, now with search_keyword = kahf): 1,555 posts; 1,084 already loaded as posts and 2 already loaded as comments (the two replies, kept as comments) left out of this file as asked; 469 written here, 7 Oct to 8 Oct 06:00 WIB; the July Watsons and April kahfcommunities posts are dropped as before the case"
     }
   ]
 }
