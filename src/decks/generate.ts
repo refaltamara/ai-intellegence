@@ -48,9 +48,10 @@ export function retryRun(now = new Date()): string {
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()) + DAY).toISOString();
 }
 
-/** The last day the workspace's data reaches (the latest a chosen range may end). */
-export async function dataAsOf(workspaceId: string): Promise<string> {
-  return (await loadContext(new SkillDb(), workspaceId)).asOf.slice(0, 10);
+/** The days the workspace's data starts and ends: the bounds a chosen day or range may take. */
+export async function dataSpan(workspaceId: string): Promise<{ first: string; asOf: string }> {
+  const ctx = await loadContext(new SkillDb(), workspaceId);
+  return { first: ctx.earliest.slice(0, 10), asOf: ctx.asOf.slice(0, 10) };
 }
 
 /** The periods a version can be made for: those the data fully covers, newest first. */
@@ -107,6 +108,7 @@ async function makeVersion(deck: DeckRow, opts: { period?: string; reason: "crea
     // chosen days are for PR decks (a case moves faster than a week); the other decks keep their weeks and months
     if (isRange(period) && !spec.rep) throw new Error("chosen dates work for PR decks; pick a week or a month for this deck");
     if (period.from > ctx.asOf) throw new Error(`the data runs to ${ctx.asOf}; ${period.label} has not started in it yet`);
+    if (period.to < ctx.earliest.slice(0, 10)) throw new Error(`the data starts on ${ctx.earliest.slice(0, 10)}; ${period.label} is before it`);
     if (opts.reason === "schedule" && deck.last_period && !RANGE_RE.test(deck.last_period) && period.key <= deck.last_period) {
       await markDeckRun(deck.id, { next_run_at: retryRun(), error: null });
       return { status: "skipped", message: `no new ${grain} of data: ${period.label} is already in the deck (data through ${ctx.asOf})`, report_id: null, period: period.key };

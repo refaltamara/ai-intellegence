@@ -18,10 +18,11 @@ type Props = {
   initialSlide: number;
   periods: { key: string; label: string }[];
   /** chosen days (PR decks): the last day the data reaches */
-  range?: { asOf: string } | null;
+  range?: { asOf: string; first?: string } | null;
+  day?: boolean;
 };
 
-export function DeckViewer({ deck, items, initialId, initialSlide, periods, range }: Props) {
+export function DeckViewer({ deck, items, initialId, initialSlide, periods, range, day }: Props) {
   const router = useRouter();
   const [recurring, setRecurring] = useState(deck.recurring);
   const [menu, setMenu] = useState(false);
@@ -96,7 +97,7 @@ export function DeckViewer({ deck, items, initialId, initialSlide, periods, rang
         <button className="btn sm" onClick={() => setMenu((m) => !m)} disabled={!!busy}>New version ▾</button>
         {menu && (
           <div className="dmenu-pop">
-            <label>For<PeriodPick periods={periods} value={period} onChange={setPeriod} range={range} replaced={(k) => items.some((i) => i.iso === k)} /></label>
+            <label>For<PeriodPick periods={periods} value={period} onChange={setPeriod} range={range} day={day} replaced={(k) => items.some((i) => i.iso === k)} /></label>
             <button className="btn pri sm" onClick={makeVersion} disabled={!period}>Make it</button>
           </div>
         )}

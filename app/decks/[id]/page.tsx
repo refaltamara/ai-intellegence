@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { currentWorkspaceId } from "@/auth/current";
-import { dataAsOf, deckPeriods } from "@/decks/generate";
+import { dataSpan, deckPeriods } from "@/decks/generate";
 import { deckVersions, getDeck } from "@/decks/store";
 import { DeckFirst } from "@/ui/decks/DeckFirst";
 import { DeckViewer } from "@/ui/decks/DeckViewer";
@@ -16,12 +16,12 @@ export default async function DeckPage({ params, searchParams }: { params: Promi
   if (!deck) notFound();
   const [versions, periods] = await Promise.all([deckVersions(deck.id, ws), deckPeriods(ws, deck.spec.grain, deck.spec.grain === "month" ? 6 : deck.spec.grain === "day" ? 14 : 12)]);
   // PR decks may cover days picked by hand (a case moves faster than a week)
-  const range = deck.spec.rep ? { asOf: await dataAsOf(ws) } : null;
+  const range = deck.spec.rep ? await dataSpan(ws) : null;
   if (!versions.length) {
     return (
       <section className="screen">
         <div className="topbar"><div><h1>{deck.name}</h1><span className="meta"><Link href="/decks">Decks</Link> · no version yet</span></div></div>
-        <div className="wrap"><DeckFirst deckId={deck.id} error={deck.last_error} periods={periods} range={range} /></div>
+        <div className="wrap"><DeckFirst deckId={deck.id} error={deck.last_error} periods={periods} range={range} day={deck.spec.grain === "day"} /></div>
       </section>
     );
   }
@@ -35,6 +35,7 @@ export default async function DeckPage({ params, searchParams }: { params: Promi
       initialSlide={slide}
       periods={periods}
       range={range}
+      day={deck.spec.grain === "day"}
     />
   );
 }

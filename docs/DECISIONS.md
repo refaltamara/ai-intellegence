@@ -529,7 +529,7 @@ Refal asked for the Chorus (PR) dashboard and PR decks on `kahf-threads`, becaus
 
 **Daily PR decks (Refal, 7 Oct 2026).**
 - "Day on day" is a third comparison for PR decks: one day against the day before (`DeckGrain = Grain | "day"`, `dayPeriod`, key `YYYY-MM-DD`). Brand & KOL and Social decks keep weeks and months; the dashboard's periods are untouched.
-- Picking a day: the list runs newest first, the newest marked "(so far)" while the data may still be filling it.
+- Picking a day: the list runs newest first, the newest marked "(so far)" while the data may still be filling it. Below the last 14 days, "Pick a day…" opens a calendar for any one day the data covers (first post to latest; `dataSpan`), on the new-deck form, the first-version card and "New version"; "Choose dates…" stays for a run of days. A day before the data starts is refused with a plain message.
 - Repeating: a daily deck runs each morning at 07:00 WIB for the day before, once the data has moved past it. A day already made is skipped, so a "(so far)" version is redone by hand ("New version" → the day → replace).
 - A PR template's name follows the comparison ("Daily Reputation Report").
 

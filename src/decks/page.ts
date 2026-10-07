@@ -24,6 +24,8 @@ export type DeckOptions = {
   /** the Weekly Competitor Pulse's watchlist and client, when this team has one */
   starter: { label: string; client: DeckSpec["client"]; watchlist: DeckSpec["watchlist"] } | null;
   data_through: string;
+  /** the first day the data covers (the earliest a chosen day may be) */
+  data_from: string;
   /** PR decks: their slide library, the platforms the workspace holds, the brand they are about by default */
   rep_slides: { kind: string; title: string; description: string }[];
   social_slides: { kind: string; title: string; description: string }[];
@@ -65,6 +67,7 @@ export async function deckOptions(workspaceId: string, role: RoleModel = BRAND_K
         }
       : null,
     data_through: ctx.asOf,
+    data_from: ctx.earliest.slice(0, 10),
     rep_slides: REP_SLIDES,
     social_slides: SOCIAL_SLIDES,
     platforms: (await new SkillDb().q<{ platform: string }>("select distinct platform from posts where workspace_id = $1 order by 1", [workspaceId])).map((r) => r.platform),
