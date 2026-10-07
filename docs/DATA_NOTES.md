@@ -189,6 +189,7 @@ One contents file, `data/raw/kahf/contents_threads.csv` (posts only; comments to
 - **Recent posts at 21:38** (`Kahf_717_contnt_7_oct_21_38 - kahf_threads_recent.csv`, 7 Oct; `kahf/contents_threads_1007h.csv`):
   - A different export: Threads' own columns (code, username, followers, verified, epoch `timestamp`, like/reply/repost/quote counts). Epoch times need no zone; the 35 posts already loaded carry exactly the times we had read as Jakarta time (716 of 716 agree to the second).
   - 717 posts: the 35 already loaded were left out of the file, as Refal asked, and keep their numbers; 682 written in the usual columns (quote_count as reshare, repost_count as repost); one July Watsons post (fraud warning) dropped as before the case. 681 loaded, 1,440 posts in all, nearly all on 7 Oct.
+- **Recent posts, second pull** (`kahf_threads_recent - kahf_threads_recent.csv`, 7 Oct; `kahf/contents_threads_1007i.csv`): the same export. 1,085 posts; the 723 already loaded left out of the file, as asked; 362 written, the July Watsons post dropped again; 361 loaded, 1,801 posts in all. Comments for them come later as one batch.
   - Jakarta time: the post went up at 02:03 WIB and the first comment came at 02:23.
 - **All comments labelled by 12:30 WIB on 7 Oct**: 8,965 on posts about the case (off-topic left out). Labelling moved to every 5 minutes the same day.
 

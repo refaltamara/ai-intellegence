@@ -114,6 +114,12 @@
       "platform": "threads",
       "file": "kahf/contents_threads_1007h.csv",
       "note": "Kahf_717_contnt_7_oct_21_38 - kahf_threads_recent.csv (a different export: epoch timestamps, so no zone to guess), 7 Oct 21:38: 717 posts; the 35 already loaded were left out of this file as asked (their numbers stay as loaded), 682 written here in the usual columns (quote_count as reshare, repost_count as repost). One July post (Watsons, fraud warning) is in drop_urls"
+    },
+    {
+      "kind": "contents",
+      "platform": "threads",
+      "file": "kahf/contents_threads_1007i.csv",
+      "note": "kahf_threads_recent - kahf_threads_recent.csv, 7 Oct (same epoch export as 1007h): 1,085 posts; the 723 already loaded were left out of this file as asked (their numbers stay as loaded); 362 written here, the July Watsons post among them (dropped by drop_urls). Comments to follow as one big batch"
     }
   ]
 }
