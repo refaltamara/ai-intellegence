@@ -56,6 +56,12 @@
       "kind": "contents",
       "platform": "threads",
       "file": "kahf/contents_threads.csv"
+    },
+    {
+      "kind": "comments",
+      "platform": "threads",
+      "file": "kahf/comments_threads_1007a.csv",
+      "note": "first comments batch, 7 Oct (times carry Z: UTC)"
     }
   ]
 }

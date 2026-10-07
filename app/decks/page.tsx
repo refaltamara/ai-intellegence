@@ -9,7 +9,7 @@ import { redirect } from "next/navigation";
 import { currentRole, currentWorkspaceId } from "@/auth/current";
 import { listDecks } from "@/decks/store";
 import { deckTemplate } from "@/decks/templates";
-import { panelWorkspace } from "@/pulses/api";
+import { deckWorkspace } from "@/pulses/api";
 import { listPulses } from "@/pulses/store";
 import { weeklyItems } from "@/reports/weekly";
 import { DeckList } from "@/ui/decks/DeckList";
@@ -20,7 +20,7 @@ const day = (iso: string) => new Date(iso).toLocaleDateString("en-GB", { timeZon
 
 export default async function DecksPage() {
   const ws = await currentWorkspaceId();
-  if (!(await panelWorkspace(ws))) redirect("/pulse");
+  if (!(await deckWorkspace(ws))) redirect("/pulse");
   const [all, weekly0, pulses, role] = await Promise.all([listDecks(ws), weeklyItems(ws), listPulses(ws), currentRole(ws)]);
   // each role keeps its own decks: PR decks are one brand's reputation (spec.rep), Social Media decks its own accounts (spec.social), the rest Brand & KOL's
   const pr = role.id === "pr";

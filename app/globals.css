@@ -1377,7 +1377,7 @@ th{background:linear-gradient(180deg,#F8FAFE,#F4F7FC)}
 .pf.threads{display:inline-grid;place-items:center;vertical-align:baseline}
 .pr{--lv:var(--green);--lv10:var(--green-10)}
 .prstatus{display:flex;align-items:center;gap:20px;border:1px solid var(--line);border-radius:20px;background:#fff;padding:16px 20px;box-shadow:var(--shadow-xs);margin-bottom:18px;--lv:var(--green);--lv10:var(--green-10)}
-.prstatus.watch{--lv:var(--sun);--lv10:var(--sun-10)}.prstatus.issue{--lv:var(--coral);--lv10:var(--coral-10)}.prstatus.crisis{--lv:var(--red);--lv10:var(--red-10)}.prstatus.recovering{--lv:var(--blue);--lv10:var(--blue-10)}
+.prstatus.nonorm{--lv:var(--text-3);--lv10:var(--surface-2,#f1f3f7)}.prstatus.watch{--lv:var(--sun);--lv10:var(--sun-10)}.prstatus.issue{--lv:var(--coral);--lv10:var(--coral-10)}.prstatus.crisis{--lv:var(--red);--lv10:var(--red-10)}.prstatus.recovering{--lv:var(--blue);--lv10:var(--blue-10)}
 .prstatus .lv{display:flex;align-items:center;gap:12px;min-width:170px;padding:10px 16px;border-radius:14px;background:var(--lv10)}
 .prstatus .lv .dot{width:14px;height:14px;border-radius:50%;background:var(--lv);box-shadow:0 0 0 5px color-mix(in srgb,var(--lv) 22%,transparent);flex:none}
 .prstatus .lv small{display:block;font-size:11px;font-weight:700;color:var(--text-3)}
@@ -1388,7 +1388,7 @@ th{background:linear-gradient(180deg,#F8FAFE,#F4F7FC)}
 .prstatus .rule{font-size:11px;color:var(--text-3);line-height:1.45}
 .prladder{display:flex;gap:3px}
 .prladder i{flex:1;height:14px;border-radius:3px;background:var(--green);opacity:.75;max-width:22px}
-.prladder i.watch{background:var(--sun)}.prladder i.issue{background:var(--coral)}.prladder i.crisis{background:var(--red)}.prladder i.recovering{background:var(--blue);opacity:.45}
+.prladder i.none{background:var(--line);opacity:1}.prladder i.watch{background:var(--sun)}.prladder i.issue{background:var(--coral)}.prladder i.crisis{background:var(--red)}.prladder i.recovering{background:var(--blue);opacity:.45}
 .kpis.six{grid-template-columns:repeat(6,minmax(0,1fr))}
 .prissues{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
 .prissue{display:flex;flex-direction:column;gap:10px}

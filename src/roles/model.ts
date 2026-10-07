@@ -140,9 +140,13 @@ export function workspaceRoles(kind: string, configured?: unknown): RoleId[] {
   return kind === "profile" ? ["pr"] : ["brand_kol"];
 }
 
+/** A profile on the reputation dashboard keeps its crisis view as Pulse, beside the decks. */
+const PROFILE_REPUTATION_NAV: NavKey[] = ["dashboard", "pulse", "decks", "chats"];
+
 /** The sidebar for a role on a workspace. */
-export function roleNav(role: RoleModel, kind: string): NavKey[] {
-  return role.id === "pr" && kind === "profile" ? PROFILE_NAV : role.nav;
+export function roleNav(role: RoleModel, kind: string, reputation = kind !== "profile"): NavKey[] {
+  if (role.id === "pr" && kind === "profile") return reputation ? PROFILE_REPUTATION_NAV : PROFILE_NAV;
+  return role.nav;
 }
 
 export function fillRole(t: string, client: string): string {

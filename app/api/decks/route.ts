@@ -8,7 +8,7 @@ import { generateDeckVersion, nextRun } from "@/decks/generate";
 import { cleanSpec } from "@/decks/spec";
 import { createDeck, getDeck, listDecks } from "@/decks/store";
 import { deckTemplate } from "@/decks/templates";
-import { knownBrands, panelWorkspace } from "@/pulses/api";
+import { knownBrands, deckWorkspace } from "@/pulses/api";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -21,7 +21,7 @@ export async function GET() {
 
 export async function POST(req: Request) {
   const [ws, session] = await Promise.all([currentWorkspaceId(), currentSession()]);
-  if (!(await panelWorkspace(ws))) return Response.json({ error: "decks need a brand panel; this team has one subject" }, { status: 400 });
+  if (!(await deckWorkspace(ws))) return Response.json({ error: "decks need the reputation dashboard or a brand panel" }, { status: 400 });
   const b = (await req.json().catch(() => ({}))) as { name?: unknown; template?: unknown; spec?: unknown; recurring?: unknown; period?: unknown; source?: unknown };
   const spec = cleanSpec(b.spec, await knownBrands(ws));
   if ("error" in spec) return Response.json({ error: spec.error }, { status: 400 });

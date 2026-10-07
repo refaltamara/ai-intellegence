@@ -18,7 +18,7 @@ const when = (s: string | null, dayOnly = false) => {
   return dayOnly || !m[4] ? day : `${day} ${m[4]}:${m[5]}`;
 };
 
-export function PulsePage({ d }: { d: PulseData }) {
+export function PulsePage({ d, title = "Dashboard" }: { d: PulseData; title?: string }) {
   const t = d.totals;
   // Shares are taken on the comments that are about the subject. Folding in the thread
   // noise — sellers, memes, strangers arguing with each other — halves the number and
@@ -34,7 +34,7 @@ export function PulsePage({ d }: { d: PulseData }) {
   return (
     <section className="screen">
       <div className="topbar">
-        <div><h1>Dashboard</h1><span className="meta">What is being said about {d.subject}, across {t.platforms} platforms</span></div>
+        <div><h1>{title}</h1><span className="meta">What is being said about {d.subject}, hour by hour, across {t.platforms} platform{t.platforms === 1 ? "" : "s"}</span></div>
         <span className="pill live">Posts through {d.postsAsOf} · comments through {d.asOf} WIB</span>
       </div>
       <div className="wrap wide">
@@ -86,8 +86,10 @@ export function PulsePage({ d }: { d: PulseData }) {
             />
             {d.posts_daily.series.length > 0 && <><p className="quiet" style={{ margin: "14px 0 4px", fontWeight: 600 }}>And per day, since the wave started</p><Chart spec={{ type: "stacked_bar", x: d.posts_daily.x.map((h) => h.slice(5)), series: d.posts_daily.series, y_label: "posts" }} /></>}
           </div>
-          <div className="caveats">The density of the conversation itself: new Threads, tweets and videos about {d.subject}. Instagram and YouTube capture {d.subject}&apos;s own posts only, so nothing earned appears there.</div>
+          <div className="caveats">The density of the conversation itself: new posts about {d.subject} by other accounts{d.posts_daily.series.length ? ` on ${d.posts_daily.series.map((x) => x.name).join(", ")}` : ""}. A platform where only {d.subject}&apos;s own posts are captured shows nothing here.</div>
         </div>
+
+        {(d.sides.voices.length > 0 || d.sides.topics.length > 0) && <Sides d={d} />}
 
         <Watchlist d={d} />
 
@@ -103,7 +105,7 @@ export function PulsePage({ d }: { d: PulseData }) {
           <div className="card">
             <h4>Comments per day, since the wave started <span>by platform</span></h4>
             <div className="body">{d.daily.x.length >= 3 ? <Chart spec={{ type: "stacked_bar", x: d.daily.x.map((h) => h.slice(5)), series: d.daily.series, y_label: "comments" }} /> : <p className="quiet">Not enough days of data yet.</p>}</div>
-            {d.root && <div className="caveats">YouTube comment times older than a day come rounded from the export (“3 weeks ago”), so early days are approximate.</div>}
+            {d.daily.series.some((x) => /youtube/i.test(x.name)) && <div className="caveats">YouTube comment times older than a day come rounded from the export (“3 weeks ago”), so early days are approximate.</div>}
           </div>
         </div>
 
@@ -291,7 +293,7 @@ function Now({ d }: { d: PulseData }) {
         <p className="quiet" style={{ marginTop: 2 }}>
           {fmtNum(s.now6.comments)} comments and {fmtNum(s.now6.posts)} posts in the last six hours — {fmtNum(per(s.now6.comments, 6))} comments an hour, against {fmtNum(per(s.prev6.comments, 6))} in the six before and {fmtNum(per(s.prev_day.comments, 24))} across the day before that.
           {s.now6.negative_pct != null && ` Of the comments about ${d.subject} in those hours, ${s.now6.negative_pct}% were negative and ${s.now6.positive_pct ?? 0}% defended ${d.subject}.`}
-          {d.trend.peak && s.hours_since_peak != null && ` The busiest hour of the whole crisis was ${when(d.trend.peak.h)} WIB with ${fmtNum(d.trend.peak.comments)} comments, ${s.hours_since_peak} hours ago.`}
+          {d.trend.peak && d.trend.peak.comments > 0 && s.hours_since_peak != null && ` The busiest hour of the whole crisis was ${when(d.trend.peak.h)} WIB with ${fmtNum(d.trend.peak.comments)} comments, ${s.hours_since_peak} hours ago.`}
         </p>
         <div className="steps">
           <Step label="Comments an hour" value={fmtNum(per(s.now6.comments, 6))} step={cStep} suffix="%" good="down" sub={`${fmtNum(per(s.prev6.comments, 6))} in the previous six hours`} />
@@ -451,6 +453,47 @@ function Exposure({ d }: { d: PulseData }) {
         )}
       </div>
       <div className="caveats">A boycott call is a post or comment using one of the workspace&apos;s boycott words; a partner is named when one of its words appears. Both are matched on text, so a mention is not the same as a threat — read the posts before you brief anyone.</div>
+    </div>
+  );
+}
+
+/**
+ * Who is talking and about what (the labeller's voice and topic). In a cross-border pile-on, which side
+ * a post is written from matters as much as how angry it is; the topics say what each side is on about.
+ */
+function Sides({ d }: { d: PulseData }) {
+  const anyComments = [...d.sides.voices, ...d.sides.topics].some((r) => r.c_labelled > 0);
+  const table = (rows: PulseData["sides"]["voices"], head: string) => (
+    <div className="tablewrap still" style={{ border: 0 }}>
+      <table>
+        <thead><tr><th>{head}</th><th className="num">Posts</th><th className="num">Against</th><th className="num">Defending</th>{anyComments && <><th className="num">Comments</th><th className="num">Negative</th></>}</tr></thead>
+        <tbody>{rows.map((r) => (
+          <tr key={r.key}>
+            <td>{r.label}</td><td className="num">{fmtNum(r.posts)}</td>
+            <td className="num" style={{ color: r.stanced && r.against / r.stanced >= 0.5 ? "var(--red)" : undefined, fontWeight: 600 }}>{r.stanced ? `${pct(r.against, r.stanced)}%` : "–"}</td>
+            <td className="num">{r.stanced ? `${pct(r.for_, r.stanced)}%` : "–"}</td>
+            {anyComments && <><td className="num">{fmtNum(r.comments)}</td><td className="num">{r.c_labelled ? `${pct(r.c_negative, r.c_labelled)}%` : "–"}</td></>}
+          </tr>
+        ))}</tbody>
+      </table>
+    </div>
+  );
+  return (
+    <div className="pulse-grid" style={d.sides.voices.length && d.sides.topics.length ? undefined : { gridTemplateColumns: "1fr" }}>
+      {d.sides.voices.length > 0 && (
+        <div className="card">
+          <h4>Who is talking <span>which side each post{anyComments ? " and comment" : ""} is written from, and how it leans</span></h4>
+          {table(d.sides.voices, "Voice")}
+          <div className="caveats">Read by the labeller from the words people use, flags and how they name themselves; “not clear” when it cannot tell (often English, or too short). Shares are of the posts with a stance.</div>
+        </div>
+      )}
+      {d.sides.topics.length > 0 && (
+        <div className="card">
+          <h4>What it is about <span>the workspace&apos;s topics, and how each leans</span></h4>
+          {table(d.sides.topics, "Topic")}
+          <div className="caveats">Each post{anyComments ? " and comment" : ""} carries one topic; the catch-all is last.</div>
+        </div>
+      )}
     </div>
   );
 }

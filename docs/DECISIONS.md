@@ -467,3 +467,37 @@ They come from reading the 582 posts. Refal agreed to four topics plus Others.
 - No root is claimed without comments.
 - Kahf's own posts during the wave (the apology) are on the timeline.
 - The copy names the subject instead of "her".
+
+## Kahf on the Chorus dashboard; posts as voices; Pulse kept (Refal, 7 Oct 2026)
+
+Refal asked for the Chorus (PR) dashboard and PR decks on `kahf-threads`, because its topics fit the case. Pulse stays.
+
+**Moving a profile onto the reputation dashboard.** `settings.dashboard = "reputation"` on a profile workspace (`WorkspaceConfig.reputation`):
+- `/dashboard` becomes the Chorus dashboard.
+- The crisis view (Pulse, hour by hour) moves to `/pulse`.
+- Decks open.
+- The sidebar reads Dashboard, Pulse, Decks, Chats.
+- Other profiles (Maudy) are unchanged until the setting is made.
+
+**Posts count as voices.** In `src/reputation/dashboard.ts`, `VOICES` adds earned posts that the labeller gave a stance to the comments:
+- A post stands in as its own comment: its stance is the sentiment, its topic the topic, its caption the quote.
+- Around one subject the posts are the conversation, and the comments come later.
+- Panels carry no stance on posts, so Fintech and Beauty read exactly as before. Fintech's fact sheet was checked word for word.
+- Where posts count, the words say "posts and comments" (`voice_posts`).
+
+**What a one-brand case changes:**
+- **Status.** A norm needs seven earlier days that carried talk. A capture that starts with the crisis shows "No norm yet" instead of judging the crisis against itself and calling it calm. Days with no norm are grey on the strip.
+- **Reach.** "Not reported" where no post has views (Threads).
+- **Ranking.** Rising now and the amplifiers rank by likes when views are missing, and show each post's own stance.
+- **CSAT and purchase intent.** Blank where nothing is scored, not 0.
+- **Hidden sections.** The scope chips and the competitive section are hidden with one brand. The customer-service section is hidden where comments carry no themes.
+- **Decks.** The competitor and service slides are dropped the same way.
+- **Issue stage.** It is read only on days the data has reached, so a week that runs past today is not "fading".
+
+**Pulse, improved and kept:**
+- Posts and comments per hour stay.
+- New **Who is talking** card: voice by stance, with the comments' negative share once comments are loaded.
+- New **What it is about** card: the workspace's topics by stance.
+- Daily charts cut days in the workspace's time zone, not UTC.
+- Copy left over from the Maudy case is now generic (the YouTube caveat only where there is YouTube).
+- The busiest-hour line only appears when comments exist.

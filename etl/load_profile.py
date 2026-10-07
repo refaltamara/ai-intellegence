@@ -430,7 +430,7 @@ def normalise_comments(df, platform, prof, known_urls, dropped_urls, source_file
     """-> rows (comment dicts), drops (Tally), stubs (url -> stub post dict)."""
     drops, rows, stubs, seen_ids = Tally(), [], {}, set()
     # exports differ in their column names; accept every shape Fair Listening has sent
-    urls = col(df, "post_url", "source_url", "url"); ids = col(df, "comment_id", "id")
+    urls = col(df, "post_url", "source_post_url", "source_url", "url"); ids = col(df, "comment_id", "id")
     authors = col(df, "author", "author_username", "account_name")
     texts = col(df, "comment_text", "text"); dates = col(df, "date", "timestamp", "date_posted"); views = col(df, "views")
     likes = col(df, "like", "like_count", "likes"); replies = col(df, "reply", "reply_count", "replies"); sents = col(df, "sentiment")

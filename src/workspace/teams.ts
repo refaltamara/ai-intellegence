@@ -21,7 +21,7 @@ export async function teamsFor(actor: Actor | null): Promise<TeamChoice[]> {
   // each team runs its company's version of the role (src/roles/store.ts): its sidebar may be narrowed
   return Promise.all(pairs.map(async ({ c, r }) => {
     const role = await getRole(c.id, r);
-    return { ...teamFor(c, role), key: `${c.id}:${r}`, role: r, nav: roleNav(role, c.kind), workspace_id: c.id, name: c.name, product_name: c.product_name, kind: c.kind, codename: role.codename, version: role.version };
+    return { ...teamFor(c, role), key: `${c.id}:${r}`, role: r, nav: roleNav(role, c.kind, c.reputation), workspace_id: c.id, name: c.name, product_name: c.product_name, kind: c.kind, codename: role.codename, version: role.version };
   }));
 }
 
