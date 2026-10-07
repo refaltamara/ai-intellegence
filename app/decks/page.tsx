@@ -49,7 +49,7 @@ export default async function DecksPage() {
             name: d.name,
             kind: deckTemplate(d.template)?.name ?? (d.source === "chat" ? "From Chats" : d.source === "pulse" ? "From a Pulse board" : "Deck"),
             latest: d.latest?.label ?? null,
-            meta: `${d.spec.grain === "month" ? "Month on month" : "Week on week"} · ${d.spec.watchlist.map((w) => w.name).slice(0, 4).join(", ")}${d.spec.watchlist.length > 4 ? ` +${d.spec.watchlist.length - 4}` : ""} · ${d.versions} version${d.versions === 1 ? "" : "s"} · updated ${day(d.updated_at)}`,
+            meta: `${d.spec.grain === "month" ? "Month on month" : d.spec.grain === "day" ? "Day on day" : "Week on week"} · ${d.spec.watchlist.map((w) => w.name).slice(0, 4).join(", ")}${d.spec.watchlist.length > 4 ? ` +${d.spec.watchlist.length - 4}` : ""} · ${d.versions} version${d.versions === 1 ? "" : "s"} · updated ${day(d.updated_at)}`,
             recurring: d.recurring ? `A new version every ${d.spec.grain}` : null,
             error: d.last_error,
           }))} />

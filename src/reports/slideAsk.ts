@@ -29,7 +29,7 @@ export async function resolveSlide(workspaceId: string, ref: SlideRef): Promise<
     source: "slide",
     title: slide.title,
     scope: [b.title, b.client || null, b.week.label, `slide ${slide.n} of ${b.slides.length}`].filter(Boolean).join(" · "),
-    facts: [{ label: "Slide", value: `${slide.n} of ${b.slides.length}` }, { label: b.grain === "month" ? "Month" : "Week", value: `${b.week.label} vs ${b.previous_week}` }],
+    facts: [{ label: "Slide", value: `${slide.n} of ${b.slides.length}` }, { label: b.grain === "month" ? "Month" : (b.grain as string | undefined) === "day" ? "Day" : "Week", value: `${b.week.label} vs ${b.previous_week}` }],
     back: b.kind === "deck" && b.deck_id ? `/decks/${b.deck_id}?v=${report.id}&s=${slide.n}` : `/weekly?r=${report.id}&s=${slide.n}`,
     question: "",
     slide: { report_id: report.id, n: slide.n, total: b.slides.length, deck: b.client ? `${b.title} for ${b.client}` : b.title, week: { from: b.week.from, to: b.week.to, label: b.week.label, previous: b.previous_week }, text: slide.text },

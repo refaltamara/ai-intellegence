@@ -10,6 +10,9 @@ import { addDays, isoWeek, weekStart } from "./weeks";
 
 export type { Grain, Period };
 export const GRAINS: Grain[] = ["week", "month"];
+/** A deck may also go day by day (PR decks, for a case that moves by the hour). */
+export type DeckGrain = Grain | "day";
+export const DECK_GRAINS: DeckGrain[] = ["day", "week", "month"];
 
 const SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const dm = (d: string) => `${Number(d.slice(8, 10))} ${SHORT[Number(d.slice(5, 7)) - 1]}`;
@@ -28,17 +31,28 @@ export function rangePeriod(from: string, to: string): Period {
   return { key: `${from}..${to}`, grain: "week", from, to, label, short: from === to ? dm(from) : `${dm(from)}–${dm(to)}` };
 }
 
-/** The period just before: the week or month before, or as many days right before a range. */
+/** One day ("2026-10-07"): a daily deck's period. */
+export function dayPeriod(d: string): Period {
+  return { ...rangePeriod(d, d), key: d };
+}
+export const isDay = (p: Pick<Period, "key">) => /^\d{4}-\d{2}-\d{2}$/.test(p.key);
+
+/** The period just before: the day, week or month before, or as many days right before a range. */
 export function previousPeriod(p: Period): Period {
+  if (isDay(p)) return dayPeriod(addDays(p.from, -1));
   if (!isRange(p)) return shiftPeriod(p, -1);
   const days = Math.round((Date.parse(p.to) - Date.parse(p.from)) / 86_400_000) + 1;
   return rangePeriod(addDays(p.from, -days), addDays(p.from, -1));
 }
 
 /** "2026-W26" or any day in it for a week; "2026-06" or any day in it for a month; "YYYY-MM-DD..YYYY-MM-DD" for chosen days. */
-export function deckPeriod(grain: Grain, raw: string): Period {
+export function deckPeriod(grain: DeckGrain, raw: string): Period {
   const r = RANGE_RE.exec(raw);
   if (r) return rangePeriod(r[1], r[2]);
+  if (grain === "day") {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) throw new Error(`a day must be YYYY-MM-DD, got ${raw}`);
+    return dayPeriod(raw);
+  }
   if (grain === "week") return /^\d{4}-\d{2}-\d{2}$/.test(raw) ? weekOf(raw) : parsePeriod(isoWeek(weekStart(raw)))!;
   const m = /^(\d{4})-(\d{2})(-\d{2})?$/.exec(raw);
   const p = m ? parsePeriod(`${m[1]}-${m[2]}`) : null;
@@ -55,7 +69,9 @@ export function stepFrom(grain: Grain, from: string, n: number): string {
 export const nextStart = (p: Period) => addDays(p.to, 1);
 
 /** The latest period the data fully covers: the week before unless `asOf` is a Sunday; the month before unless `asOf` is its last day. */
-export function latestComplete(grain: Grain, asOf: string): Period {
+export function latestComplete(grain: DeckGrain, asOf: string): Period {
+  // a day is complete once the data has moved past it
+  if (grain === "day") return dayPeriod(addDays(asOf.slice(0, 10), -1));
   if (grain === "week") return weekOf(latestCompleteWeek(asOf));
   const m = monthOf(asOf);
   return m.to === asOf ? m : shiftPeriod(m, -1);

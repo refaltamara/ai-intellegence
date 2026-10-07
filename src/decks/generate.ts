@@ -10,7 +10,7 @@
 import { signal } from "../learning/signals";
 import { getRole } from "../roles/store";
 import { weeklyReport } from "../competitor/facts";
-import { RANGE_RE, deckPeriod, isRange, latestComplete, type Grain } from "../competitor/period";
+import { RANGE_RE, dayPeriod, deckPeriod, isRange, latestComplete, type DeckGrain, type Grain } from "../competitor/period";
 import { shiftPeriod } from "../dashboard/period";
 import { FORMATS, storeWeekly } from "../competitor/scheduled";
 import { writeNarrative } from "../competitor/write";
@@ -30,10 +30,14 @@ import { storeSocial } from "../social/store";
 export type DeckOutcome = { status: "ok" | "skipped" | "error"; message: string; report_id: string | null; period: string | null; narrative_by?: "model" | "fallback" };
 
 const DAY = 86_400_000;
+const addDays = (d: string, n: number) => new Date(Date.parse(d + "T00:00:00Z") + n * DAY).toISOString().slice(0, 10);
+/** the weekly and monthly decks never go by day (cleanSpec allows it for PR decks only) */
+const weekly = (g: DeckGrain): Grain => (g === "day" ? "week" : g);
 
-/** When a recurring deck looks again: 07:00 WIB (00:00 UTC) on the next Monday, or on the 1st of next month. */
-export function nextRun(grain: Grain, now = new Date()): string {
+/** When a recurring deck looks again: 07:00 WIB (00:00 UTC) tomorrow for a daily deck, on the next Monday, or on the 1st of next month. */
+export function nextRun(grain: DeckGrain, now = new Date()): string {
   const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  if (grain === "day") return new Date(d.getTime() + DAY).toISOString();
   if (grain === "month") return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1)).toISOString();
   const ahead = ((8 - d.getUTCDay()) % 7) || 7;
   return new Date(d.getTime() + ahead * DAY).toISOString();
@@ -50,9 +54,19 @@ export async function dataAsOf(workspaceId: string): Promise<string> {
 }
 
 /** The periods a version can be made for: those the data fully covers, newest first. */
-export async function deckPeriods(workspaceId: string, grain: Grain, n = 12): Promise<{ key: string; label: string; from: string }[]> {
+export async function deckPeriods(workspaceId: string, grain: DeckGrain, n = 12): Promise<{ key: string; label: string; from: string }[]> {
   const ctx = await loadContext(new SkillDb(), workspaceId);
   const out: { key: string; label: string; from: string }[] = [];
+  if (grain === "day") {
+    // the newest day first, marked while the data may still be filling it; then the days before
+    const last = ctx.asOf.slice(0, 10);
+    for (let i = 0; i < n; i++) {
+      const p = dayPeriod(addDays(last, -i));
+      if (p.from < ctx.earliest.slice(0, 10)) break;
+      out.push({ key: p.key, label: i === 0 ? `${p.label} (so far)` : p.label, from: p.from });
+    }
+    return out;
+  }
   let p = latestComplete(grain, ctx.asOf);
   while (out.length < n && p.to >= ctx.earliest.slice(0, 10)) {
     out.push({ key: p.key, label: p.label, from: p.from });
@@ -101,7 +115,7 @@ async function makeVersion(deck: DeckRow, opts: { period?: string; reason: "crea
       // a Social Media deck: one brand's own accounts over the period (src/social/)
       // the company's version of Spark: its thresholds and its voice (src/roles/store.ts)
       const role = await getRole(deck.workspace_id, "social");
-      const r = await socialReport(deck.workspace_id, { title: spec.title, grain, spec: spec.social, period: period.key, asOf: ctx.asOf, role });
+      const r = await socialReport(deck.workspace_id, { title: spec.title, grain: weekly(grain), spec: spec.social, period: period.key, asOf: ctx.asOf, role });
       const written = await writeSocial(r, { role, workspace: deck.workspace_id });
       const stored = await storeSocial({ workspaceId: deck.workspace_id, report: r, narrative: written.narrative, by: written.by, problems: written.problems, deck: { id: deck.id, name: deck.name } });
       await pruneVersions(deck.id, deck.workspace_id, r.period.key, stored.reportId);
@@ -122,6 +136,7 @@ async function makeVersion(deck: DeckRow, opts: { period?: string; reason: "crea
       await markDeckRun(deck.id, { last_period: last, next_run_at: deck.recurring ? nextRun(grain) : null, error: null });
       return { status: "ok", message: `${period.label}: ${r.status.level}, ${r.issues.length} issue${r.issues.length === 1 ? "" : "s"}, words by ${written.by === "model" ? "CeMO" : "the plain template"}`, report_id: stored.reportId, period: period.key, narrative_by: written.by };
     }
+    if (grain === "day") throw new Error("a day-by-day deck is a PR deck; pick a week or a month for this one");
     const findings = spec.findings?.length && spec.slides.includes("findings") ? await runFindings(spec.findings, deck.workspace_id, { from: period.from, to: period.to }) : undefined;
     const r = await weeklyReport(specContract(spec, deck.workspace_id), period.from, { findings });
     const written = await writeNarrative(r);

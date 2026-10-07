@@ -29,10 +29,10 @@ export function DeckForm({ options, initial, prefill }: { options: DeckOptions; 
   const [clientOn, setClientOn] = useState(!!initial?.spec.client);
   const [clientName, setClientName] = useState(initial?.spec.client?.name ?? options.client?.name ?? "");
   const [clientIds, setClientIds] = useState<string[]>(initial?.spec.client?.brands.flatMap((b) => b.brand_ids) ?? options.client?.brand_ids ?? []);
-  const [grain, setGrain] = useState<"week" | "month">(initial?.spec.grain ?? prefill?.grain ?? t.grain);
+  const [grain, setGrain] = useState<"day" | "week" | "month">(initial?.spec.grain ?? prefill?.grain ?? t.grain);
   const [platforms, setPlatforms] = useState<string[]>(initial?.spec.platforms?.length ? initial.spec.platforms : options.platforms);
   const [slides, setSlides] = useState<string[]>(initial?.spec.slides ?? (prefill ? [...new Set(["summary", prefill.slide, "moves", "evidence"])] : t.slides));
-  const [period, setPeriod] = useState("");
+  const [period, setPeriod] = useState(initial?.spec.grain === "day" ? (options.periods.day[0]?.key ?? "") : "");
   const [recurring, setRecurring] = useState(initial?.recurring ?? t.recurring);
   const [busy, setBusy] = useState(false);
   const [elapsed, setElapsed] = useState(0);
@@ -71,10 +71,13 @@ export function DeckForm({ options, initial, prefill }: { options: DeckOptions; 
   const addBrands = (ids: string[]) => setWatch((w) => [...w, ...ids.filter((id) => !taken.has(id)).map((id) => ({ name: brandName.get(id) ?? id, group: "core" as const, brand_ids: [id] }))]);
   const toggleSlide = (k: string) => setSlides((s) => (s.includes(k) ? s.filter((x) => x !== k) : [...s, k]));
   const periods = options.periods[grain];
+  // a template's name follows the comparison picked: "Weekly Reputation Report" becomes "Daily Reputation Report" day by day
+  const byGrain = (x: string) => (grain === "day" ? x.replace(/^(Weekly|Monthly)\b/, "Daily") : grain === "week" ? x.replace(/^Monthly\b/, "Weekly") : x.replace(/^Weekly\b/, "Monthly"));
+  const tTitle = byGrain(t.title), tName = byGrain(t.name);
 
   function spec(): DeckSpec {
     if (family === "social") return { title: name.trim() || t.title, grain, platforms: [], client: null, watchlist: [], slides: ["summary"], social: { focus, platform: repPlatform, slides: repSlides as NonNullable<DeckSpec["social"]>["slides"] } };
-    if (family === "reputation") return { title: name.trim() || t.title, grain, platforms: [], client: null, watchlist: [], slides: ["summary"], rep: { focus, platform: repPlatform, slides: repSlides as NonNullable<DeckSpec["rep"]>["slides"] } };
+    if (family === "reputation") return { title: name.trim() || tTitle, grain, platforms: [], client: null, watchlist: [], slides: ["summary"], rep: { focus, platform: repPlatform, slides: repSlides as NonNullable<DeckSpec["rep"]>["slides"] } };
     return {
       title: name.trim() || t.title,
       grain,
@@ -95,7 +98,7 @@ export function DeckForm({ options, initial, prefill }: { options: DeckOptions; 
     setElapsed(0);
     try {
       if (!edit) {
-        const r = await fetch("/api/decks", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: name.trim() || t.name, template, spec: spec(), recurring, period: period || undefined }) });
+        const r = await fetch("/api/decks", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: name.trim() || (family === "reputation" ? tName : t.name), template, spec: spec(), recurring, period: period || undefined }) });
         const j = await r.json().catch(() => ({}));
         if (!r.ok || !j.deck) throw new Error(j.error ?? "Could not make the deck");
         router.push(`/decks/${j.deck.id}${j.version?.report_id ? `?v=${j.version.report_id}` : ""}`);
@@ -134,12 +137,13 @@ export function DeckForm({ options, initial, prefill }: { options: DeckOptions; 
       )}
 
       <section className="cgrid">
-        <label className="wf"><span>Name</span><input value={name} onChange={(e) => setName(e.target.value)} placeholder={initial?.name ?? t.title} maxLength={80} /></label>
+        <label className="wf"><span>Name</span><input value={name} onChange={(e) => setName(e.target.value)} placeholder={initial?.name ?? (family === "reputation" ? tTitle : t.title)} maxLength={80} /></label>
         <div className="wf">
           <span>Compare</span>
           <div className="seg">
-            <button type="button" className={grain === "week" ? "on" : ""} onClick={() => setGrain("week")}>Week on week</button>
-            <button type="button" className={grain === "month" ? "on" : ""} onClick={() => setGrain("month")}>Month on month</button>
+            {family === "reputation" && <button type="button" className={grain === "day" ? "on" : ""} onClick={() => { setGrain("day"); setPeriod(options.periods.day[0]?.key ?? ""); }}>Day on day</button>}
+            <button type="button" className={grain === "week" ? "on" : ""} onClick={() => { setGrain("week"); setPeriod(""); }}>Week on week</button>
+            <button type="button" className={grain === "month" ? "on" : ""} onClick={() => { setGrain("month"); setPeriod(""); }}>Month on month</button>
           </div>
         </div>
         <div className="wf">
@@ -252,12 +256,19 @@ export function DeckForm({ options, initial, prefill }: { options: DeckOptions; 
       <section className="cgrid">
         <label className="wf">
           <span>{edit ? "Make a version for" : "First version"}</span>
+          {grain === "day" ? (
+            // a day by day deck names its day: the newest one may still be filling
+            <select value={period || periods[0]?.key || ""} onChange={(e) => setPeriod(e.target.value)}>
+              {periods.map((p) => <option key={p.key} value={p.key}>{p.label}</option>)}
+            </select>
+          ) : (
           <select value={period} onChange={(e) => setPeriod(e.target.value)}>
             <option value="">Latest {grain} the data covers{periods[0] ? ` (${periods[0].label})` : ""}</option>
             {periods.slice(1).map((p) => <option key={p.key} value={p.key}>{p.label}</option>)}
           </select>
+          )}
         </label>
-        <label className="dcheck wide"><input type="checkbox" checked={recurring} onChange={(e) => setRecurring(e.target.checked)} /> Make the next version every {grain} <small>(when a new {grain} of data lands; data runs to {options.data_through})</small></label>
+        <label className="dcheck wide"><input type="checkbox" checked={recurring} onChange={(e) => setRecurring(e.target.checked)} /> Make the next version every {grain} <small>({grain === "day" ? "each morning at 07:00 WIB, for the day before, once its data has landed" : `when a new ${grain} of data lands`}; data runs to {options.data_through})</small></label>
       </section>
 
       {error && <div className="errbox">{error}</div>}
