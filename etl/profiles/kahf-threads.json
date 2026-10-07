@@ -90,6 +90,13 @@
       "file": "kahf/contents_threads_1007e.csv",
       "naive_tz": "Asia/Jakarta",
       "note": "posts_structured.csv, 7 Oct: 122 posts to 13:27 WIB; Jakarta time (Kahf's apology DeKWiFpE_9K reads 00:45:49, the first file's 17:45:49 UTC). Posts already loaded keep their labels; their likes, replies and reposts update, and columns this file lacks (views, followers) keep what was there"
+    },
+    {
+      "kind": "contents",
+      "platform": "threads",
+      "file": "kahf/contents_threads_1007f.csv",
+      "naive_tz": "Asia/Jakarta",
+      "note": "Kahf New - posts batch3_structured.csv, 7 Oct: 72 posts, 5 Oct 17:51 to 7 Oct 15:47 WIB, none loaded before. Jakarta time, checked against @rul.zmi DeLxwJRCWph (14:02): \"Kahf Indonesia minta maaf ... 13 jam lepas (2am)\" puts the apology (00:45 WIB, 01:45 MYT) 13 hours earlier, i.e. 14:00 WIB. Comments to follow"
     }
   ]
 }
