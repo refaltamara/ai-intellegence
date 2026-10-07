@@ -1,5 +1,5 @@
 /**
- * Vercel Cron, every 10 minutes: label unlabelled comments (sentiment) and
+ * Vercel Cron, every 5 minutes (a run stops itself inside 4, so runs do not overlap): label unlabelled comments (sentiment) and
  * earned posts (stance) in every profile workspace, within a time budget. It
  * does nothing when there is nothing to label. Protected by CRON_SECRET like the
  * other crons. `?workspace=<id>` restricts to one workspace, `?budget=<seconds>`
