@@ -170,12 +170,16 @@ export async function releaseToAll(roleId: RoleId, version: string, who: Who): P
   return { ok: true, version };
 }
 
-/** The next minor version after every version a role has, as a draft copied from its current release. */
+/**
+ * The next minor version after every version a role has, as a draft copied from its newest
+ * release, staged ones included: 1.3 builds on 1.2 even while 1.2 is out to a few teams only.
+ */
 export async function newDraft(roleId: RoleId, who: Who, note?: string): Promise<Result> {
-  const rows = (await sql.query("select version from role_versions where role = $1", [roleId])) as { version: string }[];
+  const rows = (await sql.query("select version, status from role_versions where role = $1", [roleId])) as { version: string; status: string }[];
   const top = rows.map((r) => r.version).sort(compareVersions).at(-1) ?? "1.0";
   const [major, minor] = top.split(".").map(Number);
-  const current = (await fairVersion(roleId)) ?? ROLES[roleId];
+  const newest = rows.filter((r) => r.status === "released").map((r) => r.version).sort(compareVersions).at(-1);
+  const current = (newest ? await fairVersion(roleId, newest) : null) ?? (await fairVersion(roleId)) ?? ROLES[roleId];
   return saveDraft(roleId, `${major}.${minor + 1}`, current, who, note);
 }
 

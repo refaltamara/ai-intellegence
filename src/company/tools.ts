@@ -186,7 +186,7 @@ export function makeTools(role: RoleId, ext: ExtDef[] = [], decks: DeckBrief[] =
     } as Anthropic.Tool,
     ...(role === "pr" ? [{
       name: "change_case_words",
-      description: "When the person asks to add or remove a sister brand (a partner brand named beside the subject) or a boycott word. Counts what the words match in the data and shows a card; a Builder saves it from the card, a Member asks their Builder. Free: words are counted in the database. Fair's own entries stay; only the team's can be removed.",
+      description: "When the person asks to add or remove a sister brand (a partner brand named beside the subject) or a boycott word. Counts what the words match in the data and shows a card; a Builder saves it from the card, a Member sends it to their Builder. Free: words are counted in the database. Fair's own entries stay; only the team's can be removed.",
       input_schema: {
         type: "object",
         properties: {
@@ -265,7 +265,7 @@ export async function executeTeamTool(name: string, input: Record<string, unknow
     const pv = await changeCaseWords(ctx.actor, ctx.ws, { list, action: "preview", name: String(input.name ?? ""), terms: words.length ? words : String(input.name ?? "") });
     if (!pv.ok || !pv.preview) return { content: JSON.stringify({ status: "refused", message: pv.ok ? "Nothing to count." : pv.error }), isError: false, title: "Case words" };
     return {
-      content: JSON.stringify({ status: "proposed", list, action, name: input.name ?? null, terms: pv.preview.terms, matches: { posts: pv.preview.posts, comments: pv.preview.comments }, note: `Shown as a card; not saved yet. ${builder ? "They save it from the card." : "Only a Builder saves it; they ask theirs."} Say in one sentence what it matches, using only these numbers.` }),
+      content: JSON.stringify({ status: "proposed", list, action, name: input.name ?? null, terms: pv.preview.terms, matches: { posts: pv.preview.posts, comments: pv.preview.comments }, note: `Shown as a card; not saved yet. ${builder ? "They save it from the card." : "They send it to their Builder from the card; it counts once a Builder adds it."} Say in one sentence what it matches, using only these numbers.` }),
       isError: false,
       title: list === "partners" ? "Sister brand" : "Boycott words",
       proposal: { type: "case_words", list, action, name: String(input.name ?? "").trim(), terms: pv.preview.terms, posts: pv.preview.posts, comments: pv.preview.comments, builder },

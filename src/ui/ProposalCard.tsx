@@ -177,7 +177,9 @@ function CaseWordsCard({ p, codename }: { p: Extract<Proposal, { type: "case_wor
   const [msg, setMsg] = useState("");
   async function save() {
     setBusy(true); setMsg("");
-    const r = await post("/api/builder/case-words", { list: p.list, action: p.action, name: p.name, terms: p.list === "boycott" ? p.terms : p.terms });
+    // a Member's addition waits for a Builder (Our Chorus → Case words)
+    const action = p.builder ? p.action : "request";
+    const r = await post("/api/builder/case-words", { list: p.list, action, name: p.name, terms: p.terms });
     setBusy(false);
     if (!r.ok) { setMsg(r.error ?? "That did not work."); return; }
     setDone(true);
@@ -185,7 +187,7 @@ function CaseWordsCard({ p, codename }: { p: Extract<Proposal, { type: "case_wor
   const what = p.list === "partners" ? `Sister brand: ${p.name}` : `Boycott word${p.terms.length > 1 ? "s" : ""}: ${p.terms.join(", ")}`;
   return (
     <div className="card proposal">
-      <h4><span><i className="badge client">Case words</i>{p.action === "remove" ? `Remove ${what}` : what}</span><span className={`pstatus ${done ? "approved" : "draft"}`}>{done ? "Saved" : "Not saved yet"}</span></h4>
+      <h4><span><i className="badge client">Case words</i>{p.action === "remove" ? `Remove ${what}` : what}</span><span className={`pstatus ${done ? (p.builder ? "approved" : "waiting") : "draft"}`}>{done ? (p.builder ? "Saved" : "Waiting for your Builder") : "Not saved yet"}</span></h4>
       <div className="body">
         {p.list === "partners" && <p>Words: {p.terms.join(", ")}</p>}
         <p>Matches {n(p.posts)} posts and {n(p.comments)} comments in the data so far. Free: counted in the database.</p>
@@ -193,7 +195,8 @@ function CaseWordsCard({ p, codename }: { p: Extract<Proposal, { type: "case_wor
       <footer>
         {msg && <span className="err">{msg}</span>}
         {!done && p.builder && <button className="btn pri sm" disabled={busy} onClick={save}>{p.action === "remove" ? "Remove" : "Add"}</button>}
-        {!p.builder && <span className="muted">Only a Builder saves case words; ask yours.</span>}
+        {!done && !p.builder && p.action === "add" && <button className="btn pri sm" disabled={busy} onClick={save}>Send to my Builder</button>}
+        {!p.builder && p.action === "remove" && <span className="muted">Only a Builder removes case words; ask yours.</span>}
         <Link className="btn sm ghost" href="/company#case-words">Our {codename ?? "team"}</Link>
       </footer>
     </div>
