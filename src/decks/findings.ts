@@ -25,6 +25,7 @@ const LABELS: Record<string, string> = {
   creator_handle: "Creator", brand_id: "Brand", brand_a: "Brand", brand_b: "With", top_brand: "Top brand", er_pct: "ER", comment_rate_pct: "Comment rate",
   share_of_posts_pct: "Share of posts", share_of_views_pct: "Share of views", brand_share_pct: "Brand share", cart_share_pct: "Cart share", change_posts_pct: "Posts change",
   posted_at: "Posted", last_post: "Last post", last_seen: "Last seen", first_seen: "First seen", url: "Post", content_format: "Format", brand_count: "Brands",
+  count_comments: "Comments", count_posts: "Posts", count_commenters: "Commenters", count_creators: "Creators", negative_pct: "Negative", positive_pct: "Positive", net_sentiment: "Net sentiment", sum_likes: "Likes", sum_views: "Views", sum_engagements: "Engagements", sum_comments: "Comments on them",
 };
 const MAX_COLUMNS = 7;
 const ROWS_KEPT = 10;
@@ -80,7 +81,7 @@ export async function runFindings(specs: FindingSpec[], workspaceId: string, per
   const out: Finding[] = [];
   const brands = new Map((await loadContext(new SkillDb(), workspaceId)).brands.map((b) => [b.id, brandLabel(b.name)]));
   for (const f of specs) {
-    const base = { key: f.key, title: f.title, question: f.question, columns: [] as FindingColumn[], rows: [] as Record<string, unknown>[], rows_total: 0, data_window: { from: period.from, to: period.to } };
+    const base = { key: f.key, title: f.title, question: f.question, columns: [] as FindingColumn[], rows: [] as Record<string, unknown>[], rows_total: 0, data_window: { from: period.from, to: period.to }, ...(f.after ? { after: f.after } : {}), ...(f.by ? { by: f.by } : {}) };
     if (f.skill.startsWith("recipe:")) {
       // one of Fair's recipes or the team's own skills, over the deck's period
       const key = f.skill.slice("recipe:".length);

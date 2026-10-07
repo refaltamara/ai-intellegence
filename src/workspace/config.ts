@@ -48,8 +48,8 @@ export function teamFor(cfg: Pick<WorkspaceConfig, "kind"> & { team_override?: P
 }
 
 /** Partner brands are per subject and never guessed: an owner sets them, and Pulse counts only what is listed. */
-export type Partner = { name: string; terms?: string[] };
-export type CommercialSettings = { partners?: Partner[]; boycott_terms?: string[] };
+export type Partner = { name: string; terms?: string[]; /** a team's own addition (Our Chorus → Case words): who added it */ by?: string };
+export type CommercialSettings = { partners?: Partner[]; boycott_terms?: string[]; /** boycott words a team added, and who added each */ boycott_by?: Record<string, string> };
 export type Commercial = { partners: { name: string; terms: string[] }[]; boycott_terms: string[] };
 
 export type WorkspaceRow = { id: string; name: string; category: string | null; client_brand_id: string | null; tz: string; kind: WorkspaceKind; settings: WorkspaceSettings | null };

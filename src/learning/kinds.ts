@@ -53,6 +53,11 @@ export const SIGNALS = {
   "deck.version_opened": { surface: "decks", family: "use", label: "Deck version opened", payload: { report: "uuid" }, client: true },
   "deck.slide_ask": { surface: "decks", family: "use", label: "Ask AI on a slide", payload: { report: "uuid", n: "int" } },
   "deck.downloaded": { surface: "decks", family: "use", label: "Deck downloaded", payload: { format: ["pptx", "pdf"] } },
+  // teams build their own (DECISIONS, 7 Oct 2026): what changed, from where, never the words
+  "deck.changed": { surface: "decks", family: "shaping", label: "Deck changed", payload: { deck: "uuid", from: ["chat", "comment", "form"], template: "bool", added: "int", removed: "int", grain: "bool" } },
+  "deck.slide_drafted": { surface: "decks", family: "shaping", label: "Own slide drafted", payload: { from: ["form", "chat", "comment"], status: ["ok", "empty", "error"] } },
+  "deck.comment": { surface: "decks", family: "use", label: "Slide comment", payload: { report: "uuid", n: "int", cemo: "bool" } },
+  "casewords.changed": { surface: "company", family: "shaping", label: "Case words changed", payload: { list: ["partners", "boycott"], action: ["add", "remove"] } },
 
   "alert.sent": { surface: "signals", family: "use", label: "Alert sent", payload: { kind: "id" } },
 } as const satisfies Record<string, SignalDef>;

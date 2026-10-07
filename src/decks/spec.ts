@@ -17,7 +17,8 @@ export const DECK_PLATFORMS: Platform[] = ["tiktok", "instagram", "threads", "x"
 
 /** An analysis pinned from Chats: the skill and the settings it ran with; each version runs it again over the deck's period. */
 /** skill: a skill name, or "recipe:<key>" for one of Fair's or the team's recipes (src/recipes/) */
-export type FindingSpec = { key: string; skill: string; params: Record<string, unknown>; question: string; title: string };
+/** after: in a PR or Social deck, the slide it follows (none = at the end); by: who made the analysis, for its slide */
+export type FindingSpec = { key: string; skill: string; params: Record<string, unknown>; question: string; title: string; after?: string; by?: string };
 
 export type DeckSpec = {
   /** the title on the slides ("Monthly Competitor Review") */
@@ -42,6 +43,20 @@ export function brandLabel(name: string): string {
 }
 
 const str = (v: unknown, max: number) => (typeof v === "string" ? v.trim().slice(0, max) : "");
+
+/** Findings as the page sends them: a skill or one of the team's analyses ("recipe:<key>"), six at most, keys unique. */
+export function cleanFindings(input: unknown): FindingSpec[] {
+  const seen = new Set<string>();
+  return (Array.isArray(input) ? input : [])
+    .map((f, i) => {
+      const x = (f && typeof f === "object" ? f : {}) as Record<string, unknown>;
+      const after = str(x.after, 30), by = str(x.by, 80);
+      return { key: str(x.key, 20) || `f${i + 1}`, skill: str(x.skill, 60), params: (x.params && typeof x.params === "object" ? x.params : {}) as Record<string, unknown>, question: str(x.question, 300), title: str(x.title, 80) || "Finding", ...(after ? { after } : {}), ...(by ? { by } : {}) };
+    })
+    // a skill, or one of the team's analyses written as a recipe ("recipe:<key>", src/recipes/)
+    .filter((f) => (/^[a-z][a-z-]*$/.test(f.skill) || /^recipe:[a-z0-9][a-z0-9-]{2,48}$/.test(f.skill)) && !seen.has(f.key) && !!seen.add(f.key))
+    .slice(0, 6);
+}
 const ids = (v: unknown, known: Set<string>) => (Array.isArray(v) ? [...new Set(v.filter((x): x is string => typeof x === "string" && known.has(x)))].slice(0, 12) : []);
 
 /** A spec from what the page sends: known brands only, a watchlist of at least one brand, known slides, the summary first. */
@@ -53,7 +68,8 @@ export function cleanSpec(input: unknown, known: Set<string>): DeckSpec | { erro
     const focus = str(r.focus, 80);
     if (!known.has(focus)) return { error: "pick the brand this deck is about" };
     const platform = typeof r.platform === "string" && /^[a-z]{1,12}$/.test(r.platform) ? r.platform : "all";
-    return { title: str(o.title, 60) || "Content Review", grain, platforms: [], client: null, watchlist: [], slides: ["summary"], social: { focus, platform, slides: cleanSocialSlides(r.slides) } };
+    const findings = cleanFindings(o.findings);
+    return { title: str(o.title, 60) || "Content Review", grain, platforms: [], client: null, watchlist: [], slides: ["summary"], social: { focus, platform, slides: cleanSocialSlides(r.slides) }, ...(findings.length ? { findings } : {}) };
   }
   if (o.rep && typeof o.rep === "object") {
     const r = o.rep as Record<string, unknown>;
@@ -61,7 +77,8 @@ export function cleanSpec(input: unknown, known: Set<string>): DeckSpec | { erro
     if (!known.has(focus)) return { error: "pick the brand this deck is about" };
     const platform = typeof r.platform === "string" && /^[a-z]{1,12}$/.test(r.platform) ? r.platform : "all";
     // a PR deck may go day by day (a case moves by the hour); the others keep weeks and months
-    return { title: str(o.title, 60) || "Reputation Report", grain: o.grain === "day" ? "day" : grain, platforms: [], client: null, watchlist: [], slides: ["summary"], rep: { focus, platform, slides: cleanRepSlides(r.slides) } };
+    const findings = cleanFindings(o.findings);
+    return { title: str(o.title, 60) || "Reputation Report", grain: o.grain === "day" ? "day" : grain, platforms: [], client: null, watchlist: [], slides: ["summary"], rep: { focus, platform, slides: cleanRepSlides(r.slides) }, ...(findings.length ? { findings } : {}) };
   }
   const platforms = Array.isArray(o.platforms) ? DECK_PLATFORMS.filter((p) => (o.platforms as unknown[]).includes(p)) : [];
   const watchlist = (Array.isArray(o.watchlist) ? o.watchlist : [])
@@ -90,14 +107,7 @@ export function cleanSpec(input: unknown, known: Set<string>): DeckSpec | { erro
     const both = clientBrands.flatMap((b) => b.brand_ids).filter((id) => watched.has(id));
     if (both.length) return { error: `${both.join(", ")} cannot be both the client's and a watched brand` };
   }
-  const findings = (Array.isArray(o.findings) ? o.findings : [])
-    .map((f, i) => {
-      const x = (f && typeof f === "object" ? f : {}) as Record<string, unknown>;
-      return { key: str(x.key, 20) || `f${i + 1}`, skill: str(x.skill, 60), params: (x.params && typeof x.params === "object" ? x.params : {}) as Record<string, unknown>, question: str(x.question, 300), title: str(x.title, 80) || "Finding" };
-    })
-    // a skill, or one of the team's analyses written as a recipe ("recipe:<key>", src/recipes/)
-    .filter((f) => /^[a-z][a-z-]*$/.test(f.skill) || /^recipe:[a-z0-9][a-z0-9-]{2,48}$/.test(f.skill))
-    .slice(0, 6);
+  const findings = cleanFindings(o.findings);
   return {
     title: str(o.title, 60) || "Deck",
     grain,

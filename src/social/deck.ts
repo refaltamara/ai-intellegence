@@ -17,6 +17,8 @@ import { deckPeriod, latestComplete, type Grain, type Period } from "../competit
 import { change, compact, dayMonth, int, pct, pts } from "../competitor/view";
 import { shiftPeriod } from "../dashboard/period";
 import { foot, frame, plainText, quoteBox, table } from "../reputation/deck";
+import type { Finding } from "../competitor/types";
+import { teamSheet, teamSlide } from "../decks/teamSlide";
 import { SOCIAL, type RoleModel } from "../roles/model";
 import { SkillDb } from "../skills/db";
 import { BAND_ORDER, socialFacts, type OwnPost, type SocialData } from "./dashboard";
@@ -24,7 +26,7 @@ import type { SocialSlide, SocialSpec } from "./slides";
 
 export { SOCIAL_SLIDES, SOCIAL_SLIDE_KINDS, cleanSocialSlides, type SocialSlide, type SocialSpec } from "./slides";
 
-export type SocialReport = SocialData & { title: string; grain: Grain; period: Period; previous: Period; slides: SocialSlide[] };
+export type SocialReport = SocialData & { title: string; grain: Grain; period: Period; previous: Period; slides: SocialSlide[]; findings?: Finding[] };
 export type SocialNarrative = {
   summary: { headline: string; worked: string; didnt: string; next: string };
   accounts: string;
@@ -38,13 +40,14 @@ const PLATFORM: Record<string, string> = { tiktok: "TikTok", instagram: "Instagr
 const DOW = ["", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const times = (x: number) => (x >= 100 ? `×${int(x)}` : `×${x.toFixed(1)}`);
 
-export async function socialReport(ws: string, o: { title: string; grain: Grain; spec: SocialSpec; period?: string; asOf: string; role?: RoleModel }): Promise<SocialReport> {
+export async function socialReport(ws: string, o: { title: string; grain: Grain; spec: SocialSpec; period?: string; asOf: string; role?: RoleModel; findings?: (p: Period) => Promise<Finding[] | undefined> }): Promise<SocialReport> {
   const period = o.period ? deckPeriod(o.grain, o.period) : latestComplete(o.grain, o.asOf);
   const previous = shiftPeriod(period, -1);
   const d = await socialFacts(ws, { focus: o.spec.focus, from: period.from, to: period.to, platform: o.spec.platform, prev: { from: previous.from, to: previous.to } }, o.role ?? SOCIAL, new SkillDb());
   if (!d) throw new Error("this workspace has no brands to report on");
   if (!d.kpis.posts.now) throw new Error(`no own posts from ${d.focus.name} in ${period.label}`);
-  return { ...d, title: o.title, grain: o.grain, period, previous, slides: o.spec.slides };
+  const findings = o.findings ? await o.findings(period) : undefined;
+  return { ...d, title: o.title, grain: o.grain, period, previous, slides: o.spec.slides, ...(findings?.length ? { findings } : {}) };
 }
 
 // -------------------------------------------------------------- fact sheet
@@ -77,6 +80,7 @@ export function socialSheet(r: SocialReport): string {
   for (const t of r.topics) out.push(`- ${t.topic}: ${int(t.comments)}; ${pct(t.share)}; ${pct(t.neg_pct)}; ${pct(t.intent_pct)}`);
   for (const q of [...r.quotes.positive.slice(0, 2), ...r.quotes.negative.slice(0, 2)]) out.push(`- comment (${q.sentiment}): "${plainText(q.text).slice(0, 200)}"${q.translation ? ` (${q.translation.slice(0, 180)})` : ""}, ${int(q.likes)} likes`);
   if (r.notes.length) out.push(`\n## Caveats\n${r.notes.map((n) => `- ${n}`).join("\n")}`);
+  out.push(...teamSheet(r.findings));
   return out.join("\n");
 }
 
@@ -304,6 +308,13 @@ function communitySlide(pres: PptxGenJS, r: SocialReport, n: SocialNarrative, pa
 
 export function buildSocialDeck(pres: PptxGenJS, r: SocialReport, n: SocialNarrative): void {
   let page = 1;
+  // the team's own slides follow the slide they name; the rest close the deck
+  const team = (after: string | null) => {
+    for (const f of (r.findings ?? []).filter((x) => (after ? x.after === after : !x.after || !r.slides.includes(x.after as SocialSlide)))) {
+      const p = page++;
+      teamSlide(pres, f, { frame: (s) => frame(s, top(r), bottom(r), p), period: r.period.label, foot });
+    }
+  };
   for (const k of r.slides) {
     if (k === "summary") summarySlide(pres, r, n, page++);
     else if (k === "accounts") accountsSlide(pres, r, n, page++);
@@ -311,7 +322,9 @@ export function buildSocialDeck(pres: PptxGenJS, r: SocialReport, n: SocialNarra
     else if (k === "best") bestSlide(pres, r, n, page++);
     else if (k === "competitors") competitorsSlide(pres, r, n, page++);
     else if (k === "community") communitySlide(pres, r, n, page++);
+    team(k);
   }
+  team(null);
 }
 
 export async function socialPptx(r: SocialReport, n: SocialNarrative): Promise<Buffer> {

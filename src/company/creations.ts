@@ -26,6 +26,7 @@ import { GRAINS } from "../competitor/period";
 import { cleanSlides } from "../competitor/slides";
 import { cleanRepSlides } from "../reputation/slides";
 import { cleanSocialSlides } from "../social/slides";
+import { cleanFindings } from "../decks/spec";
 import { refuseTerm, refuseText, type Memory, type Term } from "./rules";
 import { validateExt, type ExtDefInput } from "../extensions/spec";
 import { by, signal } from "../learning/signals";
@@ -74,7 +75,10 @@ export function cleanTemplate(input: Record<string, unknown>, role: RoleId, key:
   const name = String(input.name ?? "").trim().slice(0, 60);
   if (!name) return { error: "Give the template a name." };
   const from = typeof input.from === "string" ? DECK_TEMPLATES.find((t) => t.key === input.from && t.roles.includes(role)) ?? null : null;
-  const grain = GRAINS.includes(input.grain as never) ? (input.grain as DeckTemplate["grain"]) : from?.grain ?? "month";
+  // a PR template may go day by day (a case moves by the hour); the others keep weeks and months
+  const grain = GRAINS.includes(input.grain as never) || (role === "pr" && input.grain === "day") ? (input.grain as DeckTemplate["grain"]) : from?.grain ?? "month";
+  // the team's own analyses ride along as slides (recipes only: a skill pinned from Chats belongs to its deck)
+  const findings = cleanFindings(input.findings).filter((f) => f.skill.startsWith("recipe:"));
   const base: Omit<CompanyTemplate, "slides"> = {
     key,
     name,
@@ -85,6 +89,7 @@ export function cleanTemplate(input: Record<string, unknown>, role: RoleId, key:
     recurring: typeof input.recurring === "boolean" ? input.recurring : from?.recurring ?? true,
     roles: [role],
     from: from?.key ?? null,
+    ...(findings.length ? { findings } : {}),
   };
   if (role === "pr") return { ...base, slides: ["summary"], family: "reputation", rep_slides: cleanRepSlides(input.slides ?? from?.rep_slides) };
   if (role === "social") return { ...base, slides: ["summary"], family: "social", social_slides: cleanSocialSlides(input.slides ?? from?.social_slides) };
@@ -119,9 +124,11 @@ export async function cleanCreation(kind: CreationKind, role: RoleId, input: Rec
     if (fair.has(key) || skillNames().includes(key)) return { error: `"${key}" is already one of Fair's; pick another key.` };
     return { title: spec.title, key, spec: spec as unknown as Record<string, unknown> };
   }
-  const key = `co-${slug(String(input.name ?? "template"))}`;
+  const replaces = typeof input.replaces === "string" && /^[0-9a-f-]{36}$/.test(input.replaces) ? input.replaces : null;
+  const key = typeof input.key === "string" && /^co-[a-z0-9-]{1,40}$/.test(input.key) && replaces ? input.key : `co-${slug(String(input.name ?? "template"))}`;
   const t = cleanTemplate(input, role, key);
-  return "error" in t ? t : { title: t.name, key: t.key, spec: t as unknown as Record<string, unknown> };
+  // a change to a live template, waiting for a Builder: once approved it takes the live one's place
+  return "error" in t ? t : { title: t.name, key: t.key, spec: { ...(t as unknown as Record<string, unknown>), ...(replaces ? { replaces } : {}) } };
 }
 
 // ------------------------------------------------------------------ store
@@ -156,7 +163,8 @@ export async function makeCreation(actor: Actor, o: { ws: string; role: RoleId; 
   const limit = await limitError(o.ws, o.role, o.kind, actor);
   if (limit) return { ok: false, error: limit };
   if (clean.key) {
-    const taken = (await sql.query("select 1 from creations where workspace_id = $1 and role = $2 and key = $3 and status = 'approved'", [o.ws, o.role, clean.key])) as unknown[];
+    const replaces = typeof clean.spec.replaces === "string" ? clean.spec.replaces : "00000000-0000-0000-0000-000000000000";
+    const taken = (await sql.query("select 1 from creations where workspace_id = $1 and role = $2 and key = $3 and status = 'approved' and id <> $4", [o.ws, o.role, clean.key, replaces])) as unknown[];
     if (taken.length) return { ok: false, error: "Your team already has one with that name; pick another." };
   }
   const live = !!o.live && isBuilder(actor, o.ws, o.role);
@@ -170,6 +178,22 @@ export async function makeCreation(actor: Actor, o: { ws: string; role: RoleId; 
   const shape = creationShape(o.kind, clean.spec);
   await signal(by(actor, o.ws, o.role), "creation.made", { kind: o.kind, level, shape });
   if (live) await signal(by(actor, o.ws, o.role), "creation.approved", { kind: o.kind, shape, own: true });
+  return { ok: true, creation: rows[0] };
+}
+
+/**
+ * A Builder changes a live creation in place (a deck template made better from a deck, a comment
+ * or Chats). The old spec stays in the audit log; decks already made from it keep their own slides.
+ */
+export async function reviseCreation(actor: Actor, id: string, ws: string, input: Record<string, unknown>): Promise<Ok<{ creation: Creation }> | Err> {
+  const c = await getCreation(id, ws);
+  if (!c || c.status !== "approved") return { ok: false, error: "No such live creation." };
+  if (!isBuilder(actor, ws, c.role)) return { ok: false, error: "Only a Builder changes a live one; send yours to the Builder instead." };
+  const clean = await cleanCreation(c.kind, c.role, { ...input, key: c.key, replaces: c.id }, ws);
+  if ("error" in clean) return { ok: false, error: clean.error };
+  const { replaces: _r, ...spec } = clean.spec;
+  const rows = (await sql.query("update creations set spec = $2::jsonb, title = $3, updated_at = now() where id = $1 returning *", [c.id, toJson(spec), clean.title])) as Creation[];
+  await audit({ workspace_id: ws, actor: actor.email, area: "creation", action: "revise", path: `${c.role}:${c.kind}:${c.id}`, old: c.spec, new: spec });
   return { ok: true, creation: rows[0] };
 }
 
@@ -190,6 +214,10 @@ export async function actOn(actor: Actor, id: string, ws: string, action: Creati
     if (c.kind === "extension" && status === "approved") {
       const block = await (await import("../extensions/store")).approvalBlock(c.id);
       if (block) return { ok: false as const, error: block };
+    }
+    if (status === "approved" && typeof c.spec.replaces === "string") {
+      // a change to a live template: the one it replaces steps down, this one takes its key
+      await sql.query("update creations set status = 'removed', note = 'replaced by a change', updated_at = now() where id = $1 and workspace_id = $2 and status = 'approved'", [c.spec.replaces, ws]);
     }
     if (c.key && status === "approved") {
       const taken = (await sql.query("select 1 from creations where workspace_id = $1 and role = $2 and key = $3 and status = 'approved' and id <> $4", [ws, c.role, c.key, c.id])) as unknown[];
@@ -300,6 +328,7 @@ export async function waitingFor(actor: Actor, ws: string): Promise<Creation[]> 
 
 /** A live company skill by key, on any team of the workspace (decks run them as findings). */
 export async function companyRecipeByKey(ws: string, key: string): Promise<RecipeSpec | null> {
-  const rows = (await sql.query("select key, spec, role from creations where workspace_id = $1 and kind = 'skill' and status = 'approved' and key = $2 limit 1", [ws, key])) as { key: string; spec: RecipeSpec; role: RoleId }[];
+  // a Member's own slide works on their deck before a Builder approves it (it is theirs until then)
+  const rows = (await sql.query("select key, spec, role from creations where workspace_id = $1 and kind = 'skill' and status in ('approved','draft','waiting','sent_back') and key = $2 order by status = 'approved' desc, updated_at desc limit 1", [ws, key])) as { key: string; spec: RecipeSpec; role: RoleId }[];
   return rows[0] ? { ...rows[0].spec, key: rows[0].key } : null;
 }

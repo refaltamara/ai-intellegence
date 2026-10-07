@@ -50,7 +50,7 @@ export async function POST(req: Request) {
       if (!deck) return no("No such deck.", 404);
       const sp = deck.spec;
       kind = "deck_template";
-      input = { name: input.name ?? `${deck.name} template`, description: input.description ?? `Saved from the deck "${deck.name}".`, from: deck.template, grain: sp.grain, recurring: deck.recurring, slides: sp.rep?.slides ?? sp.social?.slides ?? sp.slides };
+      input = { name: input.name ?? `${deck.name} template`, description: input.description ?? `Saved from the deck "${deck.name}".`, from: deck.template, grain: sp.grain, recurring: deck.recurring, slides: sp.rep?.slides ?? sp.social?.slides ?? sp.slides, findings: (sp.findings ?? []).filter((f) => f.skill.startsWith("recipe:")) };
     }
     if (!isCreationKind(kind)) return no("Unknown kind.");
     const r = await makeCreation(actor, { ws, role: role.id, kind, input, live: !!b.live });

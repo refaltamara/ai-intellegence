@@ -1225,3 +1225,32 @@ export const dataSources = pgTable(
   },
   (t) => [index("data_sources_ws_idx").on(t.workspaceId)],
 );
+
+/**
+ * Comments on a deck's slides (DECISIONS, 7 Oct 2026, "Teams build their own"): the team's notes on
+ * one version's slide, and CeMO's replies when a comment mentions @CeMO, with the change it proposes
+ * (src/decks/comments.ts). A version's comments go with the version.
+ */
+export const slideComments = pgTable(
+  "slide_comments",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workspaceId: text("workspace_id").notNull().references(() => workspaces.id),
+    deckId: uuid("deck_id").notNull().references(() => decks.id, { onDelete: "cascade" }),
+    reportId: uuid("report_id").notNull().references(() => reports.id, { onDelete: "cascade" }),
+    /** the slide's number in that version */
+    slide: integer("slide").notNull(),
+    /** "person" or "cemo" */
+    author: text("author").notNull().default("person"),
+    authorEmail: text("author_email"),
+    authorName: text("author_name"),
+    text: text("text").notNull(),
+    /** CeMO's reply: the deck change it proposes (src/decks/changes.ts), shown as a card */
+    proposal: jsonb("proposal"),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index("slide_comments_report_idx").on(t.reportId, t.slide),
+    check("slide_comments_author_chk", sql`${t.author} in ('person','cemo')`),
+  ],
+);

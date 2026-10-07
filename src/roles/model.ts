@@ -10,6 +10,7 @@
  * changes and the person's own settings, field by field under src/roles/policy.ts.
  * Pure: no data access here, so client components may import it.
  */
+import type { DeckTemplate } from "../decks/templates";
 
 export type RoleId = "pr" | "brand_kol" | "social";
 export type NavKey = "dashboard" | "weekly" | "decks" | "pulse" | "chats" | "reports";
@@ -35,6 +36,8 @@ export type RoleModel = {
   suggested?: string[];
   /** deck templates this team starts from (src/decks/templates.ts ids), in the order shown */
   deck_templates: string[];
+  /** deck templates Fair adopted from a client's (CMS → Client creations → Adopt): data, offered beside the code's */
+  template_defs?: DeckTemplate[];
   /** skill layers shown first in the composer's menu */
   skill_order?: string[];
   /** the alert that moves the status ladder; numbers only, applied in SQL (src/reputation/) */

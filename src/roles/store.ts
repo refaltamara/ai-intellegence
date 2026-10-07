@@ -180,7 +180,7 @@ export async function newDraft(roleId: RoleId, who: Who, note?: string): Promise
 }
 
 /** The fields of Fair's role a draft may change here (identity and nav stay with code changes). */
-export const DRAFT_FIELDS = ["voice", "hero_title", "hero_intro", "suggested", "recipes", "deck_templates", "skill_order", "alert", "watch", "description"] as const;
+export const DRAFT_FIELDS = ["voice", "hero_title", "hero_intro", "suggested", "recipes", "deck_templates", "template_defs", "skill_order", "alert", "watch", "description"] as const;
 export type DraftPatch = Partial<Pick<RoleModel, (typeof DRAFT_FIELDS)[number]>>;
 
 /** Change a draft (or a proposal, which goes back to draft): only the listed fields, by a role owner. */

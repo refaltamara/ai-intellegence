@@ -28,15 +28,22 @@ import { companyState, fairShown, previewChange, type Preview } from "./changes"
 import { charge } from "../credits/ledger";
 import { describeModelError } from "../chat/client";
 import { CREDIT_PRICES } from "../config/credits";
+import { cleanChange, findDeck, previewDeckChange, roleOfSpec, type ChangeLine, type DeckChange } from "../decks/changes";
+import { listDecks } from "../decks/store";
+import { changeCaseWords } from "./caseWords";
+import { fairRecipes } from "../recipes/store";
+import { companyRecipes } from "./creations";
 
-export const MAKE_TOOLS = ["make_skill", "make_deck_template", "remember_for_team", "make_extension"] as const;
+export const MAKE_TOOLS = ["make_skill", "make_deck_template", "remember_for_team", "make_extension", "change_deck", "change_case_words"] as const;
 export const BUILDER_TOOLS = ["change_team"] as const;
 
 /** what the card shows and its buttons act on */
 export type Proposal =
   | { type: "creation"; id: string; kind: CreationKind; title: string; status: Creation["status"]; builder: boolean; detail: string[] }
   | { type: "change"; changes: Record<string, unknown>; preview: Preview; note: string; builder: boolean }
-  | { type: "extension"; id: string; def_id: string; title: string; status: Creation["status"]; builder: boolean; target: string; source: string; values: string[]; estimate: Estimate; stopped?: string };
+  | { type: "extension"; id: string; def_id: string; title: string; status: Creation["status"]; builder: boolean; target: string; source: string; values: string[]; estimate: Estimate; stopped?: string }
+  | { type: "deck_change"; deck_id: string; deck_name: string; change: DeckChange; lines: ChangeLine[]; dropped: string[]; template: boolean; team_template: boolean; builder: boolean }
+  | { type: "case_words"; list: "partners" | "boycott"; action: "add" | "remove"; name: string; terms: string[]; posts: number; comments: number; builder: boolean };
 
 export const ACTIVITY: Record<string, string> = {
   make_skill: "Drafting the analysis and trying it on your data",
@@ -44,13 +51,18 @@ export const ACTIVITY: Record<string, string> = {
   remember_for_team: "Writing it down for the team",
   change_team: "Checking what the change would do",
   make_extension: "Drafting it and trying it on a sample",
+  change_deck: "Checking what the change does to the deck",
+  change_case_words: "Counting what the words match",
 };
+
+/** The team's decks and analyses, as CeMO sees them when asked to change a deck. */
+export type DeckBrief = { id: string; name: string; grain: string; slides: string[]; team_slides: string[]; template: string | null };
 
 function slideKinds(role: RoleId) {
   return role === "pr" ? REP_SLIDES : role === "social" ? SOCIAL_SLIDES : SLIDES;
 }
 
-export function makeTools(role: RoleId, ext: ExtDef[] = []): Anthropic.Tool[] {
+export function makeTools(role: RoleId, ext: ExtDef[] = [], decks: DeckBrief[] = [], analyses: { key: string; title: string }[] = []): Anthropic.Tool[] {
   const slides = slideKinds(role);
   const extDims = ext.map((d) => dimName(d.key));
   return [
@@ -99,8 +111,9 @@ export function makeTools(role: RoleId, ext: ExtDef[] = []): Anthropic.Tool[] {
           description: { type: "string" },
           from: { type: "string", enum: templatesFor(role).map((t) => t.key) },
           slides: { type: "array", items: { type: "string", enum: slides.map((s) => s.kind) } },
-          grain: { type: "string", enum: ["week", "month"] },
+          grain: { type: "string", enum: role === "pr" ? ["day", "week", "month"] : ["week", "month"] },
           recurring: { type: "boolean" },
+          analyses: { type: "array", items: { type: "string" }, description: "the team's analyses (their keys) to carry as slides in every deck made from it" },
         },
         required: ["name", "slides", "grain"],
         additionalProperties: false,
@@ -145,6 +158,48 @@ export function makeTools(role: RoleId, ext: ExtDef[] = []): Anthropic.Tool[] {
       },
       strict: false,
     } as Anthropic.Tool,
+    {
+      name: "change_deck",
+      description:
+        "When the person asks to change one of the team's decks: add or drop slides, put one of the team's analyses on it as a slide, switch day on day (PR decks only), week on week or month on month, rename it, or turn its schedule on or off. Set template when they want the template it came from to change too (\"keep it in the template\"). It is shown as a card with what is added (+), dropped (−) and kept (=); the person applies it with the card's buttons. Never say it is applied. To put a new analysis on a deck, save it with make_skill first, then call this with its key in add_analyses." +
+        (decks.length ? `\nThe team's decks: ${decks.map((d) => `"${d.name}" (id ${d.id}; ${d.grain}; slides: ${d.slides.join(", ")}${d.team_slides.length ? `; team slides: ${d.team_slides.join(", ")}` : ""})`).join("; ")}.` : "\nThe team has no decks yet; say so and offer to start one in Decks.") +
+        `\nSlides this team's decks can carry: ${slides.filter((x) => x.kind !== "findings").map((x) => `${x.kind} (${x.title})`).join(", ")}.` +
+        (analyses.length ? `\nAnalyses that can be a slide (add_analyses recipe): ${analyses.map((a) => `${a.key} (${a.title})`).join(", ")}.` : ""),
+      input_schema: {
+        type: "object",
+        properties: {
+          deck: { type: "string", description: "the deck's id, or its name as the person said it" },
+          add_slides: { type: "array", items: { type: "string", enum: slides.filter((x) => x.kind !== "findings").map((x) => x.kind) } },
+          remove_slides: { type: "array", items: { type: "string" }, description: "slide kinds, or a team slide's analysis key" },
+          add_analyses: { type: "array", items: { type: "object", properties: { recipe: { type: "string" }, after: { type: "string", description: "the slide kind it follows; leave out for the end" } }, required: ["recipe"] } },
+          remove_analyses: { type: "array", items: { type: "string" } },
+          grain: { type: "string", enum: role === "pr" ? ["day", "week", "month"] : ["week", "month"] },
+          name: { type: "string" },
+          recurring: { type: "boolean" },
+          template: { type: "boolean", description: "also change the template the deck came from" },
+          note: { type: "string", description: "one line: why, in their words" },
+        },
+        required: ["deck"],
+        additionalProperties: false,
+      },
+      strict: false,
+    } as Anthropic.Tool,
+    ...(role === "pr" ? [{
+      name: "change_case_words",
+      description: "When the person asks to add or remove a sister brand (a partner brand named beside the subject) or a boycott word. Counts what the words match in the data and shows a card; a Builder saves it from the card, a Member asks their Builder. Free: words are counted in the database. Fair's own entries stay; only the team's can be removed.",
+      input_schema: {
+        type: "object",
+        properties: {
+          list: { type: "string", enum: ["partners", "boycott"] },
+          action: { type: "string", enum: ["add", "remove"] },
+          name: { type: "string", description: "partners: the brand's name" },
+          terms: { type: "array", items: { type: "string" }, description: "the words people write for it (partners), or the boycott words" },
+        },
+        required: ["list", "action"],
+        additionalProperties: false,
+      },
+      strict: false,
+    } as Anthropic.Tool] : []),
   ];
 }
 
@@ -203,8 +258,48 @@ export async function executeTeamTool(name: string, input: Record<string, unknow
       proposal: { type: "change", changes: Object.fromEntries(preview.lines.map((l) => [l.path, changes[l.path]])), preview, note, builder },
     };
   }
+  if (name === "change_case_words") {
+    const list = input.list === "boycott" ? "boycott" : "partners";
+    const action = input.action === "remove" ? "remove" : "add";
+    const words = Array.isArray(input.terms) ? (input.terms as unknown[]).map(String) : [];
+    const pv = await changeCaseWords(ctx.actor, ctx.ws, { list, action: "preview", name: String(input.name ?? ""), terms: words.length ? words : String(input.name ?? "") });
+    if (!pv.ok || !pv.preview) return { content: JSON.stringify({ status: "refused", message: pv.ok ? "Nothing to count." : pv.error }), isError: false, title: "Case words" };
+    return {
+      content: JSON.stringify({ status: "proposed", list, action, name: input.name ?? null, terms: pv.preview.terms, matches: { posts: pv.preview.posts, comments: pv.preview.comments }, note: `Shown as a card; not saved yet. ${builder ? "They save it from the card." : "Only a Builder saves it; they ask theirs."} Say in one sentence what it matches, using only these numbers.` }),
+      isError: false,
+      title: list === "partners" ? "Sister brand" : "Boycott words",
+      proposal: { type: "case_words", list, action, name: String(input.name ?? "").trim(), terms: pv.preview.terms, posts: pv.preview.posts, comments: pv.preview.comments, builder },
+    };
+  }
+  if (name === "change_deck") {
+    const decks = await listDecks(ctx.ws);
+    const mine = decks.filter((d) => roleOfSpec(d.spec) === ctx.role.id);
+    const id = await findDeck(ctx.ws, String(input.deck ?? ""), mine);
+    if (!id) return { content: JSON.stringify({ status: "refused", message: `No deck called "${String(input.deck ?? "")}" on this team.`, decks: mine.map((d) => d.name), note: "Say which decks there are in one sentence." }), isError: false, title: "No such deck" };
+    const deck = mine.find((d) => d.id === id)!;
+    const change = cleanChange(input);
+    const preview = await previewDeckChange(deck, change, ctx.actor.email);
+    const template = input.template === true;
+    if (!preview.changed && !template) return { content: JSON.stringify({ status: "nothing", dropped: preview.dropped, message: "Nothing in it would change the deck; say why in one sentence." }), isError: false, title: "No change" };
+    await charge({ ws: ctx.ws, email: ctx.actor.email, staff: ctx.actor.staff.length > 0, kind: "creation", credits: CREDIT_PRICES.creation, ref: deck.id, note: `Change to ${deck.name}` });
+    return {
+      content: JSON.stringify({ status: "proposed", deck: deck.name, lines: preview.lines.map((l) => `${l.sign} ${l.text}${l.note ? ` (${l.note})` : ""}`), dropped: preview.dropped, template, note: `Shown as a card; not applied yet. ${builder ? "They apply it from the card" : "They apply it to the deck from the card; a template change goes to their Builder"}. Say what changes in one sentence.` }),
+      isError: false,
+      title: `Change to ${deck.name}`,
+      proposal: { type: "deck_change", deck_id: deck.id, deck_name: deck.name, change, lines: preview.lines, dropped: preview.dropped, template, team_template: !!deck.template?.startsWith("co-"), builder },
+    };
+  }
   const kind: CreationKind | null = name === "make_skill" ? "skill" : name === "make_deck_template" ? "deck_template" : name === "make_extension" ? "extension" : name === "remember_for_team" ? (["rule", "fact", "term"].includes(String(input.kind)) ? (input.kind as CreationKind) : null) : null;
   if (!kind) return err("Unknown kind.");
+  if (kind === "deck_template" && Array.isArray(input.analyses) && input.analyses.length) {
+    // the team's analyses ride in the template as slides (recipes: Fair's or the team's own)
+    const fair = await fairRecipes();
+    const own = await companyRecipes(ctx.ws, ctx.role.id, ctx.actor.email);
+    input = { ...input, findings: (input.analyses as unknown[]).map(String).slice(0, 6).flatMap((k, i) => {
+      const r = fair.get(k) ?? own.find((x) => x.key === k);
+      return r ? [{ key: `t${i + 1}`, skill: `recipe:${k}`, params: {}, question: r.description, title: r.title }] : [];
+    }) };
+  }
   const made = await makeCreation(ctx.actor, { ws: ctx.ws, role: ctx.role.id, kind, input });
   if (!made.ok) return { ...err(made.error), content: JSON.stringify({ status: "refused", message: made.error, note: "Say why in one plain sentence and offer a version that would work." }) };
   const c = made.creation;
@@ -248,7 +343,7 @@ export async function executeTeamTool(name: string, input: Record<string, unknow
     };
   }
   const detail = kind === "deck_template"
-    ? [String((c.spec as { description?: string }).description ?? ""), `Slides: ${slideKinds(ctx.role.id).filter((s) => [...((c.spec.rep_slides ?? c.spec.social_slides ?? c.spec.slides) as string[])].includes(s.kind)).map((s) => s.title).join(", ")}`, `${c.spec.grain === "week" ? "Weekly" : "Monthly"}`]
+    ? [String((c.spec as { description?: string }).description ?? ""), `Slides: ${slideKinds(ctx.role.id).filter((s) => [...((c.spec.rep_slides ?? c.spec.social_slides ?? c.spec.slides) as string[])].includes(s.kind)).map((s) => s.title).join(", ")}`, `${c.spec.grain === "day" ? "Daily" : c.spec.grain === "week" ? "Weekly" : "Monthly"}`, ...(Array.isArray(c.spec.findings) && c.spec.findings.length ? [`Your team's slides: ${(c.spec.findings as { title: string }[]).map((f) => f.title).join(", ")}`] : [])]
     : [];
   return {
     content: JSON.stringify({ status: "drafted", title: c.title, note: `Drafted; ${next} Say so in one sentence.` }),

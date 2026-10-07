@@ -54,6 +54,8 @@ export const GROUP_BY = ["brand_id", "platform", "source", "tier", "day", "week"
 const CAPTION_DIMS = new Set(["caption_product", "caption_event", "caption_event_name", "caption_offer", "caption_hook"]);
 const capDim = (col: string, none: string) => `case when p.cap_source = 'model' then coalesce(nullif(${col}, 'none'), '${none}') else 'not read' end`;
 const list = (v: unknown) => (Array.isArray(v) ? v : [v]).map((s) => String(s).toLowerCase());
+/** Words a post or comment must contain (any of them), for an analysis about a name or a word ("halal", "wardah"): up to 12, each 2 to 40 characters, matched anywhere in the text. */
+export const mentionPatterns = (v: unknown) => [...new Set(list(v).map((s) => s.replace(/[%_\\]/g, "").trim()).filter((s) => s.length >= 2 && s.length <= 40))].slice(0, 12).map((s) => `%${s}%`);
 export const METRICS = ["count_posts", "count_creators", "sum_views", "median_views", "avg_views", "sum_engagements", "sum_comments", "er_pct", "comment_rate_pct", "cart_pct", "share_of_voice"] as const;
 
 /** filter name -> SQL fragment builder (over alias p = posts) */
@@ -85,6 +87,7 @@ export const FILTERS: Record<string, (v: unknown, add: (val: unknown) => string,
   topic: (v, add) => `(pt.label ilike any(${add(list(v).map((s) => s.replace(/[%_]/g, "")))}::text[]) or p.topic_id = any(${add(list(v))}::text[]))`,
   stance: (v, add) => `p.stance = any(${add(list(v))}::text[])`,
   voice: (v, add) => `lower(p.voice) = any(${add(list(v))}::text[])`,
+  mentions: (v, add) => { const w = mentionPatterns(v); return w.length ? `p.caption ilike any(${add(w)}::text[])` : null; },
 };
 
 const DIM_SQL: Record<(typeof GROUP_BY)[number], (ctx: Context) => string> = {
@@ -160,6 +163,7 @@ const COMMENT_FILTERS: Record<string, (v: unknown, add: (val: unknown) => string
   purchase_intent: (v) => (v ? "c.purchase_intent" : "c.purchase_intent is not true"),
   voice: (v, add) => `lower(c.voice) = any(${add(list(v))}::text[])`,
   min_likes: (v, add) => `c.likes >= ${add(Number(v))}`,
+  mentions: (v, add) => { const w = mentionPatterns(v); return w.length ? `c.text ilike any(${add(w)}::text[])` : null; },
 };
 const COMMENT_DIM_SQL: Record<(typeof COMMENT_GROUP_BY)[number], (ctx: Context) => string> = {
   brand_id: () => "p.brand_id",

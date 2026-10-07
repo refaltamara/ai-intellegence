@@ -39,7 +39,8 @@ const STARTERS: WeeklyContract[] = [paragon as WeeklyContract];
 
 /** The templates a team starts from: Fair's in the order its role (and company) asks, then the team's own, badged. */
 async function teamTemplates(workspaceId: string, role: RoleModel, email: string | null, client: string | null): Promise<DeckOptions["templates"]> {
-  const fair = templatesFor(role.id);
+  // the code's templates, and those Fair adopted from clients into this role version
+  const fair = [...templatesFor(role.id), ...(role.template_defs ?? []).filter((t) => !templatesFor(role.id).some((c) => c.key === t.key))];
   const order = role.deck_templates?.length ? role.deck_templates : fair.map((t) => t.key);
   const ours = fair.filter((t) => order.includes(t.key)).sort((a, b) => order.indexOf(a.key) - order.indexOf(b.key)).map((t) => ({ ...t, badge: "Fair" }));
   const own = await companyTemplates(workspaceId, role.id, email).catch(() => []);

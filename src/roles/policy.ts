@@ -113,7 +113,7 @@ export function resolve(fair: RoleModel, company?: Overrides | null, member?: Ov
   const dropped: Resolved["dropped"] = [];
   out.nav = out.nav.filter((k): k is NavKey => NAV_KEYS.includes(k));
   out.skill_order = out.skill_order?.filter((l) => (SKILL_LAYERS as readonly string[]).includes(l));
-  out.deck_templates = out.deck_templates.filter((k) => DECK_TEMPLATE_KEYS.includes(k));
+  out.deck_templates = out.deck_templates.filter((k) => DECK_TEMPLATE_KEYS.includes(k) || (out.template_defs ?? []).some((d) => d.key === k));
   for (const [layer, changes] of [["company", company], ["member", member]] as const) {
     for (const [path, value] of Object.entries(changes ?? {})) {
       if (!allowed(path, layer)) {

@@ -42,6 +42,7 @@ export const FILTER_SCHEMA = {
     voice: { type: "array", items: { type: "string" }, description: "the community the author speaks as, e.g. Malaysian, Indonesian, unclear (where the workspace labels it)" },
     purchase_intent: { type: "boolean", description: "comments only: comments that want to buy or sign up" },
     min_likes: { type: "integer", description: "comments only" },
+    mentions: { type: "array", items: { type: "string" }, description: "words the post caption or comment text must contain, any of them (a name, a brand, a word such as halal); up to 12" },
   },
   required: [],
   additionalProperties: false,

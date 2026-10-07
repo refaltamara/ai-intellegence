@@ -58,7 +58,7 @@ export default async function AdminCreations({ searchParams }: { searchParams: P
 
         <h2 className="cmsh">Creations</h2>
         <div className="tablewrap people"><table>
-          <thead><tr><th>Updated</th><th>Client</th><th>Role</th><th>Kind</th><th>Title</th><th>What</th><th>Made by</th><th>Status</th></tr></thead>
+          <thead><tr><th>Updated</th><th>Client</th><th>Role</th><th>Kind</th><th>Title</th><th>What</th><th>Made by</th><th>Status</th><th /></tr></thead>
           <tbody>
             {rows.map((c) => (
               <tr key={c.id}>
@@ -66,9 +66,10 @@ export default async function AdminCreations({ searchParams }: { searchParams: P
                 <td><b>{c.title}</b></td><td className="muted">{what(c.spec, c.kind).slice(0, 140)}</td>
                 <td>{c.maker_name ?? c.maker_email}{c.approver && c.approver !== c.maker_email ? <small className="muted"> · approved by {c.approver}</small> : null}</td>
                 <td>{STATUS[c.status]}</td>
+                <td className="acts">{c.status === "approved" && (c.kind === "skill" || c.kind === "deck_template") && <Act label={`Adopt into ${ROLES[c.role]?.codename ?? "the role"}`} url="/api/admin/creations" body={{ adopt: c.id }} confirm={`Add "${c.title}" to the next draft of Fair's ${ROLES[c.role]?.codename}? Its shape is copied, never the client's data; the draft goes through the role's tests before anyone releases it.`} done="In the draft" />}</td>
               </tr>
             ))}
-            {!rows.length && <tr><td className="muted" colSpan={8}>Nothing here yet.</td></tr>}
+            {!rows.length && <tr><td className="muted" colSpan={9}>Nothing here yet.</td></tr>}
           </tbody>
         </table></div>
       </div>
