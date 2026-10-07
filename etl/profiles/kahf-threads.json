@@ -76,6 +76,13 @@
       "file": "kahf/comments_threads_1007c.csv",
       "naive_tz": "Asia/Jakarta",
       "note": "kahf_comments_structured.xlsx, 7 Oct: comments on Kahf's apology post DeKWiFpE_9K only (scrape incomplete, more to come); Jakarta time: the first row is the post itself at 00:45:50 WIB"
+    },
+    {
+      "kind": "comments",
+      "platform": "threads",
+      "file": "kahf/comments_threads_1007d.csv",
+      "naive_tz": "Asia/Jakarta",
+      "note": "new_post_zrhjkt_structured.xlsx, 7 Oct: comments on @_zrhjkt_ DeKfbrwk9No only; Jakarta time (post 02:03 WIB, first comment 02:23)"
     }
   ]
 }

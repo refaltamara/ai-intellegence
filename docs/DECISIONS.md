@@ -532,3 +532,19 @@ Refal asked for the Chorus (PR) dashboard and PR decks on `kahf-threads`, becaus
 - Picking a day: the list runs newest first, the newest marked "(so far)" while the data may still be filling it.
 - Repeating: a daily deck runs each morning at 07:00 WIB for the day before, once the data has moved past it. A day already made is skipped, so a "(so far)" version is redone by hand ("New version" → the day → replace).
 - A PR template's name follows the comparison ("Daily Reputation Report").
+
+## Crisis slides and the Crisis Report template (Refal, 7 Oct 2026)
+
+Refal's team wanted more reports in a case deck. Six slides join the PR deck library. Each is counted in SQL over the deck's period, in the workspace's time zone (`src/reputation/case.ts`), and drawn in `src/reputation/deck.ts`:
+- **How it spread (chronology):** dated steps. The first post with a stance in the period, the first boycott call, when each partner brand was first named, the subject's own posts, the first hour a side carried more than half of the talk, the busiest hour, and the biggest posts. Eleven fit a slide; the fact sheet keeps up to fourteen.
+- **Posts and comments per hour:** per day when the period runs past three days. Posts split by against and the rest; comments by negative, other and not read yet.
+- **Who is talking, over time:** posts and comments per bin by the labeller's voice, with each side's total, negative share and busiest bin. Dropped where no voice is read.
+- **Sister brands and boycott calls:** the workspace's partner brands (`settings.commercial`) named in posts and comments, their negative share and when each was first named, plus the boycott words with the top posts. Dropped where none are set.
+- **Where the anger is:** comments under the subject's own posts against everywhere else, and each own post's reception.
+- **Most commented posts, still moving:** the eight most commented posts and what they took in the last 24 and 6 hours up to the newest comment.
+
+**Issues building** shows up to four issues (it showed three), so a fourth such as the sister brands is not cut.
+
+**Crisis Report** is a new PR template: day on day, repeating, with summary, chronology, pace, motion, issues, exposure, narratives, anger, moving and voices.
+
+**Chorus 1.2** is 1.1 plus that template on the role's list. Refal asked for the template; it was released staged to `fintech-id` (which already ran 1.1) and `kahf-threads`. The other PR workspaces stay on their version until it goes to everyone.

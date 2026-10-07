@@ -19,6 +19,7 @@ import { drawPdf, recordWith, slideTextsOf, type SlideText } from "../competitor
 import { deckPeriod, isDay, isRange, latestComplete, previousPeriod, type DeckGrain, type Period } from "../competitor/period";
 import { change, compact, dayMonth, int, pct, pts } from "../competitor/view";
 import { getWorkspace } from "../workspace/store";
+import { caseFacts, type CaseFacts } from "./case";
 import { PR, type RoleModel } from "../roles/model";
 import { SkillDb } from "../skills/db";
 import { reputationFacts, type Issue, type Level, type PrDashboardData, type Quote } from "./dashboard";
@@ -34,7 +35,12 @@ export type ReputationReport = PrDashboardData & {
   slides: RepSlide[];
   /** what this workspace leaves out (settings.pr.hide: status, reach, csat, intent) */
   hide: string[];
+  /** the crisis slides' facts (src/reputation/case.ts), when the deck carries any of them */
+  case?: CaseFacts;
 };
+
+/** The crisis slides (Refal, 7 Oct 2026): each reads CaseFacts. */
+const CASE_SLIDES: RepSlide[] = ["chronology", "pace", "motion", "exposure", "anger", "moving"];
 
 export type RepNarrative = {
   summary: { headline: string; happened: string; means: string; next: string };
@@ -87,9 +93,14 @@ export async function reputationReport(ws: string, o: { title: string; grain: De
   if (!d) throw new Error("this workspace has no brands to report on");
   if (!d.kpis.mentions.now && !d.kpis.comments.now) throw new Error(`no posts or comments about ${d.focus.name} in ${period.label}`);
   // a slide with nothing it could measure here stays out: the competitors need a second brand, service needs comment themes
-  const hide = (await getWorkspace(ws))?.pr_hide ?? [];
-  const slides = o.spec.slides.filter((k) => !(k === "competitive" && solo(d)) && !(k === "service" && !d.service.measured) && !(k === "timeline" && hide.includes("status")));
-  return { ...d, title: o.title, grain: o.grain, period, previous, slides, hide };
+  const cfg = await getWorkspace(ws);
+  const hide = cfg?.pr_hide ?? [];
+  const cf = o.spec.slides.some((k) => CASE_SLIDES.includes(k))
+    ? await caseFacts(ws, { from: period.from, to: period.to, focus: d.focus.id, platform: d.filters.platform, tz: d.tz, commercial: cfg?.commercial ?? { partners: [], boycott_terms: [] } })
+    : undefined;
+  const slides = o.spec.slides.filter((k) => !(k === "competitive" && solo(d)) && !(k === "service" && !d.service.measured) && !(k === "timeline" && hide.includes("status"))
+    && !(k === "motion" && !cf?.voices.length) && !(k === "exposure" && !cf?.exposure) && !(k === "pace" && !cf?.pace.length));
+  return { ...d, title: o.title, grain: o.grain, period, previous, slides, hide, case: cf };
 }
 
 // -------------------------------------------------------------- fact sheet
@@ -145,6 +156,40 @@ export function repSheet(r: ReputationReport): string {
   if (r.service.measured) {
     out.push(`\n## For customer service: ${int(r.service.total)} service complaints (payments, refunds, accounts, the app)`);
     for (const q of r.service.quotes.slice(0, 4)) out.push(`- ${quoteLine(q)}`);
+  }
+  const cf = r.case;
+  if (cf) {
+    const W = cf.unit === "hour" ? "hour" : "day";
+    if (r.slides.includes("chronology") && cf.chronology.length) {
+      out.push(`\n## How it spread (WIB)`);
+      for (const e of cf.chronology) out.push(`- ${e.at}: ${e.what}. ${e.detail}`);
+    }
+    if (r.slides.includes("pace") && cf.pace.length) {
+      const peak = cf.pace.reduce((a, b) => (b.posts + b.comments > a.posts + a.comments ? b : a));
+      out.push(`\n## Posts and comments per ${W} (busiest ${W} ${peak.t}: ${int(peak.posts)} posts, ${int(peak.comments)} comments)`);
+      for (const b of cf.pace) out.push(`- ${b.t}: ${int(b.posts)} posts (${int(b.against)} against); ${int(b.comments)} comments (${int(b.negative)} negative of ${int(b.labelled)} read)`);
+    }
+    if (r.slides.includes("motion") && cf.voices.length) {
+      out.push(`\n## Who is talking, per ${W} (posts and comments together; negative share of those read)`);
+      for (const b of cf.motion) out.push(`- ${b.t}: ${cf.voices.map((v) => { const x = b.voices[v]; return `${v === "unclear" ? "not clear" : v} ${int(x?.n ?? 0)}${x?.labelled ? ` (${pct(shareOf(x.negative, x.labelled))} negative)` : ""}`; }).join("; ")}`);
+    }
+    if (r.slides.includes("exposure") && cf.exposure) {
+      out.push(`\n## Sister brands and boycott calls`);
+      for (const p of cf.exposure.partners) out.push(`- ${p.name}: named in ${int(p.posts)} posts and ${int(p.comments)} comments${p.labelled ? ` (${pct(shareOf(p.negative, p.labelled))} of those comments negative)` : ""}${p.first ? `; first ${p.first}` : ""}`);
+      out.push(`- Boycott words: ${int(cf.exposure.boycott.posts)} posts and ${int(cf.exposure.boycott.comments)} comments${cf.exposure.boycott.first ? `; first ${cf.exposure.boycott.first}` : ""}`);
+      for (const q of cf.exposure.boycott.quotes) out.push(`  - "${q.text}" [${int(q.likes)} likes]`);
+    }
+    if (r.slides.includes("anger")) {
+      const a = cf.anger;
+      out.push(`\n## Where the anger is`);
+      out.push(`- Under ${who}'s own posts: ${int(a.own.n)} comments, ${int(a.own.negative)} negative (${pct(shareOf(a.own.negative, a.own.labelled))}), ${int(a.own.positive)} defending`);
+      out.push(`- Everywhere else: ${int(a.others.n)} comments, ${int(a.others.negative)} negative (${pct(shareOf(a.others.negative, a.others.labelled))}), ${int(a.others.positive)} defending`);
+      for (const p of a.own_posts) out.push(`  - own post ${p.posted_at}: ${int(p.comments)} comments, ${int(p.negative)} negative: ${p.caption}`);
+    }
+    if (r.slides.includes("moving") && cf.moving.length) {
+      out.push(`\n## Most commented posts, still moving (comments in the period; in the last 24 and 6 hours up to ${cf.end ?? "the end"})`);
+      for (const m of cf.moving) out.push(`- @${m.handle ?? "unknown"}${m.own ? " (our own post)" : ""}, ${m.posted_at}: ${int(m.comments)} comments, ${int(m.last24)} in the last 24 hours, ${int(m.last6)} in the last 6; ${int(m.negative)} negative of ${int(m.labelled)} read: ${m.caption}`);
+    }
   }
   if (r.notes.length) out.push(`\n## Caveats\n${r.notes.map((n) => `- ${n}`).join("\n")}`);
   return out.join("\n");
@@ -478,7 +523,8 @@ function issueCard(s: Slide, r: ReputationReport, i: Issue, n: RepNarrative["iss
 function issuesSlide(pres: PptxGenJS, r: ReputationReport, n: RepNarrative, page: number) {
   const s = pres.addSlide();
   chrome(s, r, page);
-  const list = r.issues.slice(0, 3);
+  // up to four: the fourth is often the one that matters in a case (the sister brands)
+  const list = r.issues.slice(0, 4);
   title(s, list.length ? "Issues building" : "No issue building", list.length ? `The topics carrying ${r.focus.name}'s negative ${saidOf(r)} in ${r.period.label}${solo(r) ? "" : ", and whether each is ours alone"}` : `No topic carried enough negative ${saidOf(r)} about ${r.focus.name} to call an issue.`);
   const gap = 0.2, w = list.length ? (CW - gap * (list.length - 1)) / list.length : CW;
   list.forEach((i, k) => issueCard(s, r, i, n.issues[k], M + k * (w + gap), 1.7, w, 4.8));
@@ -589,6 +635,132 @@ function serviceSlide(pres: PptxGenJS, r: ReputationReport, n: RepNarrative, pag
   foot(s, "Negative comments whose theme is a payment, a refund, an account, a transfer or the app: service problems to hand over, not reputation stories.");
 }
 
+// ---------------------------------------------------------- crisis slides
+const VOICE_COLOR = ["2563EB", "F59E0B", "10B981", "8B5CF6"];
+const voiceColor = (cf: CaseFacts, v: string) => (v === "unclear" ? "CBD5E1" : VOICE_COLOR[cf.voices.filter((x) => x !== "unclear").indexOf(v) % VOICE_COLOR.length]);
+const binLabel = (cf: CaseFacts, t: string) => (cf.unit === "hour" ? `${dayMonth(t.slice(0, 10))} ${t.slice(11, 13)}h` : dayMonth(t));
+
+/** Stacked bars, one per bin, with the bin's label every few bars. */
+function stacked(s: Slide, labels: string[], stacks: { values: number[]; color: string }[], x: number, y: number, w: number, h: number, caption: string) {
+  const totals = labels.map((_, i) => stacks.reduce((a, st) => a + (st.values[i] ?? 0), 0));
+  const max = Math.max(1, ...totals);
+  const slot = w / Math.max(1, labels.length);
+  add(s, caption, { x, y: y - 0.28, w, h: 0.24, fontSize: 10, bold: true, color: C.ink6 });
+  s.addShape("line", { x, y: y + h, w, h: 0, line: { color: C.line, width: 0.75 } });
+  labels.forEach((l, i) => {
+    let top = y + h;
+    for (const st of stacks) {
+      const v = st.values[i] ?? 0;
+      if (!v) continue;
+      const bh = (v / max) * (h - 0.1);
+      top -= bh;
+      s.addShape("rect", { x: x + i * slot + slot * 0.12, y: top, w: Math.max(0.02, slot * 0.76), h: Math.max(0.01, bh), fill: { color: st.color }, line: { color: "FFFFFF", width: 0 } });
+    }
+    if (i % Math.max(1, Math.ceil(labels.length / 12)) === 0) add(s, l, { x: x + i * slot, y: y + h + 0.04, w: Math.max(0.9, slot * 3), h: 0.2, fontSize: 7.5, color: C.ink4 });
+  });
+  add(s, int(max), { x: x - 0.45, y: y - 0.04, w: 0.4, h: 0.2, fontSize: 7.5, color: C.ink4, align: "right" });
+}
+
+function legend(s: Slide, items: [string, string][], x: number, y: number) {
+  items.forEach(([l, c], i) => {
+    s.addShape("rect", { x: x + i * 2.1, y: y + 0.04, w: 0.2, h: 0.14, fill: { color: c }, line: { color: "FFFFFF", width: 0 } });
+    add(s, l, { x: x + i * 2.1 + 0.26, y, w: 1.8, h: 0.22, fontSize: 9, color: C.ink6 });
+  });
+}
+
+function chronologySlide(pres: PptxGenJS, r: ReputationReport, page: number) {
+  const cf = r.case!;
+  const s = pres.addSlide();
+  chrome(s, r, page);
+  title(s, "How it spread", `The case in dated steps, ${r.period.label} (WIB)`);
+  // eleven steps fit one slide; the fact sheet keeps them all
+  table(s, ["When (WIB)", "What", "Detail"], cf.chronology.slice(0, 11).map((e) => [`${dayMonth(e.at.slice(0, 10))} ${e.at.slice(11, 16)}`, e.url ? [text(plainText(e.what).slice(0, 80), { fontSize: 9, bold: true, color: C.blue5, hyperlink: { url: e.url } })] : plainText(e.what), plainText(e.detail).slice(0, 95)]),
+    { x: M, y: 1.65, w: CW, colW: [1.4, 4.6, 6.333], size: 9, maxH: 4.5 });
+  foot(s, "First post: the earliest post about it with a stance in the period. Boycott and partner brands are matched on the workspace's words. A side takes over in the first hour it carries more than half of the posts and comments.");
+}
+
+function paceSlide(pres: PptxGenJS, r: ReputationReport, page: number) {
+  const cf = r.case!;
+  const s = pres.addSlide();
+  chrome(s, r, page);
+  const unit = cf.unit === "hour" ? "hour" : "day";
+  const peak = cf.pace.reduce((a, b) => (b.posts + b.comments > a.posts + a.comments ? b : a));
+  title(s, `Posts and comments per ${unit}`, `Busiest ${unit}: ${binLabel(cf, peak.t)} WIB, with ${int(peak.posts)} posts and ${int(peak.comments)} comments.`);
+  const labels = cf.pace.map((b) => binLabel(cf, b.t));
+  stacked(s, labels, [{ values: cf.pace.map((b) => b.against), color: "E5484D" }, { values: cf.pace.map((b) => b.posts - b.against), color: "CBD5E1" }], M + 0.4, 2.0, CW - 0.4, 1.7, `Posts per ${unit}`);
+  stacked(s, labels, [{ values: cf.pace.map((b) => b.negative), color: "E5484D" }, { values: cf.pace.map((b) => b.labelled - b.negative), color: "94A3B8" }, { values: cf.pace.map((b) => b.comments - b.labelled), color: C.line }], M + 0.4, 4.35, CW - 0.4, 1.7, `Comments per ${unit}`);
+  legend(s, [["Against / negative", "E5484D"], ["Other posts", "CBD5E1"], ["Other comments", "94A3B8"], ["Not read yet", C.line]], M, 6.35);
+  foot(s, `Times are WIB. Posts by other accounts about ${r.focus.name}; comments under posts about it, off-topic left out.`);
+}
+
+function motionSlide(pres: PptxGenJS, r: ReputationReport, page: number) {
+  const cf = r.case!;
+  const s = pres.addSlide();
+  chrome(s, r, page);
+  const unit = cf.unit === "hour" ? "hour" : "day";
+  const tot = (v: string) => cf.motion.reduce((a, b) => a + (b.voices[v]?.n ?? 0), 0);
+  const lead = cf.voices.filter((v) => v !== "unclear")[0];
+  title(s, "Who is talking, over time", lead ? `${lead} voices carry ${pct(shareOf(tot(lead), cf.voices.reduce((a, v) => a + tot(v), 0)))} of the posts and comments in ${r.period.label}.` : undefined);
+  stacked(s, cf.motion.map((b) => binLabel(cf, b.t)), cf.voices.map((v) => ({ values: cf.motion.map((b) => b.voices[v]?.n ?? 0), color: voiceColor(cf, v) })), M + 0.4, 1.95, CW - 0.4, 2.0, `Posts and comments per ${unit}, by side`);
+  legend(s, cf.voices.map((v) => [v === "unclear" ? "Not clear" : v, voiceColor(cf, v)]), M, 4.3);
+  const rows = cf.voices.map((v) => {
+    const x = cf.motion.reduce((a, b) => ({ n: a.n + (b.voices[v]?.n ?? 0), negative: a.negative + (b.voices[v]?.negative ?? 0), labelled: a.labelled + (b.voices[v]?.labelled ?? 0) }), { n: 0, negative: 0, labelled: 0 });
+    const peak = cf.motion.reduce<{ t: string; n: number } | null>((a, b) => ((b.voices[v]?.n ?? 0) > (a?.n ?? 0) ? { t: b.t, n: b.voices[v]!.n } : a), null);
+    return [v === "unclear" ? "Not clear" : v, int(x.n), pct(shareOf(x.negative, x.labelled)), peak ? `${binLabel(cf, peak.t)} (${int(peak.n)})` : "–"];
+  });
+  table(s, ["Side", "Posts and comments", "Negative", `Busiest ${unit}`], rows, { x: M, y: 4.62, w: 8, colW: [2, 2, 1.5, 2.5], right: [1, 2], bold: [0], size: 9.5, maxH: 1.4 });
+  foot(s, "The side each post or comment is written from, as the labeller reads it (the words people use, flags, how they name themselves). Negative is the share of those read.");
+}
+
+function exposureSlide(pres: PptxGenJS, r: ReputationReport, page: number) {
+  const ex = r.case!.exposure!;
+  const s = pres.addSlide();
+  chrome(s, r, page);
+  const hit = ex.partners.filter((p) => p.posts + p.comments > 0);
+  title(s, "Sister brands and boycott calls", hit.length ? `${hit.map((p) => p.name).join(", ")} ${hit.length === 1 ? "is" : "are"} named beside ${r.focus.name}; ${int(ex.boycott.posts + ex.boycott.comments)} posts and comments use a boycott word.` : `No partner brand is named in ${r.period.label}.`);
+  table(s, ["Brand", "Posts naming it", "Comments naming it", "Negative", "First named (WIB)"],
+    ex.partners.map((p) => [p.name, int(p.posts), int(p.comments), p.labelled ? pct(shareOf(p.negative, p.labelled)) : "–", p.first ? `${dayMonth(p.first.slice(0, 10))} ${p.first.slice(11, 16)}` : "–"]),
+    { x: M, y: 1.75, w: CW, colW: [3.2, 2, 2.2, 1.8, 3.133], right: [1, 2, 3], bold: [0], size: 10, maxH: 2.2 });
+  add(s, [text("Boycott calls: ", { fontSize: 11, bold: true, color: C.ink }), text(`${int(ex.boycott.posts)} posts and ${int(ex.boycott.comments)} comments${ex.boycott.first ? `, the first at ${dayMonth(ex.boycott.first.slice(0, 10))} ${ex.boycott.first.slice(11, 16)} WIB` : ""}.`, { fontSize: 11, color: C.ink6 })], { x: M, y: 4.2, w: CW, h: 0.3 });
+  const w = (CW - 0.3 * 2) / 3;
+  ex.boycott.quotes.slice(0, 3).forEach((q, i) => quoteBox(s, { text: q.text, translation: null, likes: q.likes, platform: "threads", url: q.url }, M + i * (w + 0.3), 4.6, w, 1.8));
+  foot(s, "Named = the brand's words appear in the post or comment; a mention is not always a threat, so read the posts before briefing partners.");
+}
+
+function angerSlide(pres: PptxGenJS, r: ReputationReport, page: number) {
+  const a = r.case!.anger;
+  const s = pres.addSlide();
+  chrome(s, r, page);
+  const ownPct = shareOf(a.own.negative, a.own.labelled), otherPct = shareOf(a.others.negative, a.others.labelled);
+  title(s, "Where the anger is", a.own.n ? `${pct(ownPct)} of the comments under ${r.focus.name}'s own posts are negative, against ${pct(otherPct)} everywhere else.` : `No comments under ${r.focus.name}'s own posts in ${r.period.label}.`);
+  const box = (x: number, label: string, v: { n: number; negative: number; positive: number; labelled: number }) => {
+    s.addShape("roundRect", { x, y: 1.75, w: 5.9, h: 1.5, fill: { color: "FDECEC" }, line: { color: "FDECEC", width: 0 }, rectRadius: 0.1 });
+    add(s, [text(label, { fontSize: 11, bold: true, color: C.ink6, breakLine: true }), text(pct(shareOf(v.negative, v.labelled)), { fontSize: 24, bold: true, color: "E5484D" }), text(` negative`, { fontSize: 11, color: C.ink6, breakLine: true }),
+      text(`${int(v.n)} comments · ${int(v.negative)} negative · ${int(v.positive)} defending`, { fontSize: 10, color: C.ink6 })], { x: x + 0.25, y: 1.85, w: 5.4, h: 1.3 });
+  };
+  box(M, `Under ${r.focus.name}'s own posts`, a.own);
+  box(M + 6.43, "Under everyone else's posts", a.others);
+  if (a.own_posts.length) {
+    add(s, `${r.focus.name}'s own posts`, { x: M, y: 3.5, w: 6, h: 0.26, fontSize: 11, bold: true, color: C.ink6 });
+    table(s, ["Posted (WIB)", "Post", "Comments", "Negative"], a.own_posts.map((p) => [`${dayMonth(p.posted_at.slice(0, 10))} ${p.posted_at.slice(11, 16)}`, plainText(p.caption), int(p.comments), pct(shareOf(p.negative, p.labelled))]),
+      { x: M, y: 3.8, w: CW, colW: [1.5, 7.833, 1.5, 1.5], right: [2, 3], size: 9.5, maxH: 2.4 });
+  }
+  foot(s, "A comment under our own post is written to us; elsewhere it is written about us. Off-topic comments left out.");
+}
+
+function movingSlide(pres: PptxGenJS, r: ReputationReport, page: number) {
+  const cf = r.case!;
+  const s = pres.addSlide();
+  chrome(s, r, page);
+  const still = cf.moving.filter((m) => m.last6 > 0);
+  title(s, "Most commented posts, still moving", `${still.length} of the ${cf.moving.length} most commented posts still took comments in the last 6 hours up to ${cf.end ? `${dayMonth(cf.end.slice(0, 10))} ${cf.end.slice(11, 16)} WIB` : "the end"}.`);
+  const st = (m: (typeof cf.moving)[number]) => (m.own ? "our post" : m.stance === "negative" ? "against" : m.stance === "positive" ? "defending" : m.stance === "neutral" ? "neutral" : "–");
+  table(s, ["Post", "Posted (WIB)", "Stance", "Comments", "Last 24h", "Last 6h", "Negative"],
+    cf.moving.map((m) => [[text(`@${m.handle ?? "unknown"} `, { fontSize: 9.5, bold: true, color: C.blue5, hyperlink: { url: m.url } }), text(plainText(m.caption).slice(0, 110), { fontSize: 9, color: C.ink6 })], `${dayMonth(m.posted_at.slice(0, 10))} ${m.posted_at.slice(11, 16)}`, st(m), int(m.comments), int(m.last24), int(m.last6), pct(shareOf(m.negative, m.labelled))]),
+    { x: M, y: 1.7, w: CW, colW: [5.6, 1.4, 1.1, 1.05, 1.0, 0.95, 1.233], right: [3, 4, 5, 6], size: 9.5, maxH: 4.7 });
+  foot(s, "Comments loaded for the period; the last 24 and 6 hours run up to the newest comment in it. A post still taking comments is the one to answer or watch.");
+}
+
 export function buildRepDeck(pres: PptxGenJS, r: ReputationReport, n: RepNarrative): void {
   let page = 1;
   for (const k of r.slides) {
@@ -600,6 +772,12 @@ export function buildRepDeck(pres: PptxGenJS, r: ReputationReport, n: RepNarrati
     else if (k === "competitive") competitiveSlide(pres, r, n, page++);
     else if (k === "voices") voicesSlide(pres, r, n, page++);
     else if (k === "service") serviceSlide(pres, r, n, page++);
+    else if (r.case && k === "chronology" && r.case.chronology.length) chronologySlide(pres, r, page++);
+    else if (r.case && k === "pace") paceSlide(pres, r, page++);
+    else if (r.case && k === "motion") motionSlide(pres, r, page++);
+    else if (r.case?.exposure && k === "exposure") exposureSlide(pres, r, page++);
+    else if (r.case && k === "anger") angerSlide(pres, r, page++);
+    else if (r.case && k === "moving" && r.case.moving.length) movingSlide(pres, r, page++);
   }
 }
 

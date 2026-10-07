@@ -172,5 +172,8 @@ One contents file, `data/raw/kahf/contents_threads.csv` (posts only; comments to
   - 654 in → 604 loaded, all under `@kahfeveryday/post/DeKWiFpE_9K`. Refal says the scrape is incomplete; more is coming.
   - Jakarta time: the first row is at 00:45:50 WIB, the minute the post went up.
   - One row is Kahf's own (not labelled). Dropped: 41 empty, 9 emoji only.
+- **Comments on @_zrhjkt_'s post** (`new_post_zrhjkt_structured.xlsx`, 7 Oct; `kahf/comments_threads_1007d.csv`):
+  - 975 in → 921 loaded, all under `@_zrhjkt_/post/DeKfbrwk9No` ("Jangan main dengan boikot orang Malaysia", 2,837 replies). Dropped: 44 empty, the rest emoji only.
+  - Jakarta time: the post went up at 02:03 WIB and the first comment came at 02:23.
 - **All comments labelled by 12:30 WIB on 7 Oct**: 8,965 on posts about the case (off-topic left out). Labelling moved to every 5 minutes the same day.
 

@@ -76,7 +76,7 @@ export const PR: RoleModel = {
     "Which complaints are about {{client}} only, and which hit every brand?",
     "Draft a holding statement on the biggest negative issue this week",
   ],
-  deck_templates: ["reputation-weekly", "reputation-monthly", "issue-postmortem"],
+  deck_templates: ["reputation-weekly", "reputation-monthly", "issue-postmortem", "crisis-report"],
   skill_order: ["comments", "conversation", "posts"],
   alert: { negative_multiple: 2, min_comments: 50, baseline_days: 28 },
 };
