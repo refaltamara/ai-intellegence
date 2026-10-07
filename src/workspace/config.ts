@@ -29,6 +29,8 @@ export type WorkspaceSettings = {
   team?: Partial<Team>;
   /** the roles this dataset is open to (src/roles/model.ts); default one by kind */
   roles?: RoleId[];
+  /** a profile that has moved onto the reputation dashboard ("reputation"); its crisis view moves to Pulse */
+  dashboard?: "reputation" | "crisis";
 };
 
 /** Who a workspace is for: people choose a team when they sign in, and the team decides the data and the first screen. */
@@ -71,6 +73,8 @@ export type WorkspaceConfig = {
   /** the client brand's (or subject's) name, when one is set */
   client_name: string | null;
   team_override?: Partial<Team>;
+  /** the Dashboard is the reputation dashboard (every panel; a profile once settings.dashboard says so) */
+  reputation: boolean;
 };
 
 /** One platform name everywhere; CeMO is the assistant you talk to in Chats, on every team. */
@@ -136,6 +140,7 @@ export function workspaceConfig(row: WorkspaceRow, clientName: string | null = n
     roles: workspaceRoles(kind, s.roles),
     client_name: clientName,
     team_override: s.team,
+    reputation: kind !== "profile" || s.dashboard === "reputation",
     commercial: {
       // A partner with no terms of its own is matched on its name, which is what an
       // owner typing "Oatside" into the Data page expects.

@@ -14,6 +14,8 @@ describe("role models", () => {
   });
   it("a one-person profile keeps its crisis view and boards", () => {
     expect(roleNav(PR, "profile")).toEqual(["dashboard", "pulse", "chats", "reports"]);
+    // a profile on the reputation dashboard keeps its crisis view as Pulse, beside the decks
+    expect(roleNav(PR, "profile", true)).toEqual(["dashboard", "pulse", "decks", "chats"]);
     expect(roleNav(PR, "category")).toEqual(PR.nav);
     expect(roleNav(BRAND_KOL, "category")).toContain("weekly");
   });

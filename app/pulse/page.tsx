@@ -1,6 +1,9 @@
 /** Pulses (DECISIONS, 30 Sep 2026): the boards a team builds for the situation in front of it. */
 import { redirect } from "next/navigation";
 import { currentWorkspaceId } from "@/auth/current";
+import { pulsePage } from "@/pulse/page";
+import { PulsePage } from "@/ui/PulsePage";
+import { getWorkspace } from "@/workspace/store";
 import { panelWorkspace } from "@/pulses/api";
 import { editorOptions } from "@/pulses/page";
 import { listPulses } from "@/pulses/store";
@@ -10,9 +13,17 @@ import { NewPulse } from "@/ui/pulse/NewPulse";
 import { PulseList } from "@/ui/pulse/PulseList";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 export default async function PulsesPage() {
   const ws = await currentWorkspaceId();
+  // a profile on the reputation dashboard keeps its crisis view here, hour by hour
+  const cfg = await getWorkspace(ws);
+  if (cfg?.kind === "profile" && cfg.reputation) {
+    const d = await pulsePage(ws);
+    if (!d) redirect("/data");
+    return <PulsePage d={d} title="Pulse" />;
+  }
   // a team with a brand panel builds decks now (DECISIONS, 2 Oct 2026); its old boards are listed there
   if (await panelWorkspace(ws)) redirect("/decks");
   const [pulses, panel, options] = await Promise.all([listPulses(ws), panelWorkspace(ws), editorOptions(ws)]);

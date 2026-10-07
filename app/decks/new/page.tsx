@@ -2,14 +2,14 @@
 import { redirect } from "next/navigation";
 import { currentActor, currentRole, currentWorkspaceId } from "@/auth/current";
 import { deckOptions } from "@/decks/page";
-import { panelWorkspace } from "@/pulses/api";
+import { deckWorkspace } from "@/pulses/api";
 import { DeckForm } from "@/ui/decks/DeckForm";
 
 export const dynamic = "force-dynamic";
 
 export default async function NewDeckPage({ searchParams }: { searchParams: Promise<{ slide?: string; brands?: string; grain?: string }> }) {
   const ws = await currentWorkspaceId();
-  if (!(await panelWorkspace(ws))) redirect("/pulse");
+  if (!(await deckWorkspace(ws))) redirect("/pulse");
   const [options, sp] = await Promise.all([deckOptions(ws, await currentRole(ws), (await currentActor())?.email ?? null), searchParams]);
   // from "Add to a deck → New deck" on the Dashboard: that section's slide, brands and grain
   const prefill = sp.slide && options.slides.some((s) => s.kind === sp.slide)

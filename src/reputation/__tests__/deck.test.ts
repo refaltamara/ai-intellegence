@@ -8,9 +8,9 @@ const q = (text: string) => ({ text, translation: null, likes: 12, platform: "th
 const post = { url: "https://www.threads.com/@a/post/x", platform: "threads", handle: "a", source: "earned", caption: "promo gopay 😭 gak masuk", posted_at: "2026-09-15", views: 58000, comments: 39, negative: 17 };
 
 function report(): ReputationReport {
-  const days = Array.from({ length: 30 }, (_, i) => ({ d: `2026-08-${String(22 + i).padStart(2, "0")}`.replace(/-08-(3[2-9]|[4-9]\d)/, (_, x) => `-09-${String(Number(x) - 31).padStart(2, "0")}`), comments: 500, negative: 40, neg_pct: 8, level: "calm" as const }));
+  const days = Array.from({ length: 30 }, (_, i) => ({ d: `2026-08-${String(22 + i).padStart(2, "0")}`.replace(/-08-(3[2-9]|[4-9]\d)/, (_, x) => `-09-${String(Number(x) - 31).padStart(2, "0")}`), comments: 500, negative: 40, neg_pct: 8, level: "calm" as const, norm: true }));
   return {
-    as_of: "2026-09-25", settled: "2026-09-22", tz: "Asia/Jakarta",
+    as_of: "2026-09-25", settled: "2026-09-22", tz: "Asia/Jakarta", voice_posts: 0,
     focus: { id: "gopay", name: "GoPay", is_client: true },
     brands: [{ id: "gopay", name: "GoPay" }, { id: "dana", name: "DANA" }],
     platforms: ["instagram", "threads"],
@@ -22,10 +22,10 @@ function report(): ReputationReport {
       daily: [{ d: "2026-09-14", negative: 5 }, { d: "2026-09-15", negative: 30 }], platforms: [{ platform: "threads", negative: 70 }], themes: [{ theme: "voucher issue", n: 16 }],
       posts: [post], quotes: [q("kok aku gak dapet voucher nya 😭")], industry: { negative: 37, negative_prev: 62, neg_pct: 4.6, brands_up: [] }, scope: "only_us",
     }],
-    rising: [], amplifiers: [{ handle: "writtenbyfeb", platform: "threads", tier: "nano", followers: 3613, posts: 1, views: 694000, comments: 94, neg_pct: 36.2, top_url: post.url }],
+    rising: [], amplifiers: [{ handle: "writtenbyfeb", platform: "threads", tier: "nano", followers: 3613, posts: 1, views: 694000, comments: 94, neg_pct: 36.2, top_url: post.url, likes: 0, stanced: 0, against: 0 }],
     narratives: [{ topic_id: "fintech-id:promo-cashback", topic: "Promo & Cashback", catch_all: false, comments: 620, comments_prev: 248, share: 12.9, neg_pct: 14.2, neg_pct_prev: 3.6, csat: 3.37, quote: q("Klik banner mulai dr 5000 lalu pilih aja") }],
     own: [{ platform: "instagram", posts: 4, views: 1_300_000, comments: 17, neg_pct: 29.4, replies: 0, others_neg_pct: 12.5 }], own_worst: [post],
-    service: { total: 84, quotes: [q("saldo gopay saya hilang 600rb")] },
+    service: { measured: true, total: 84, quotes: [q("saldo gopay saya hilang 600rb")] },
     competitive: [{ id: "gopay", name: "GoPay", is_focus: true, is_client: true, posts: 853, posts_prev: 618, sov: 31.1, views: 7_200_000, comments: 5723, neg_pct: 7.9, neg_pct_prev: 9.3, csat: 3.49, intent_pct: 7.5, top_issue: null }],
     coverage: [], off_topic_posts: 0, notes: [],
     title: "Weekly Reputation Report", grain: "week",

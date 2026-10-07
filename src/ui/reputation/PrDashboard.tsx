@@ -52,14 +52,19 @@ function QuoteLine({ q }: { q: Quote }) {
   );
 }
 
+const STANCE: Record<string, { label: string; tone: string }> = { negative: { label: "against", tone: "down" }, positive: { label: "defending", tone: "up" }, neutral: { label: "neutral", tone: "" } };
+
 function PostLine({ p, extra }: { p: PostRef; extra?: string }) {
+  // Threads reports no views: likes stand in, and a post that is a voice itself shows its own stance
+  const reach = p.views != null ? `${compact(p.views)} views` : p.likes != null ? `${int(p.likes)} likes` : "– views";
+  const st = p.stance ? STANCE[p.stance] : null;
   return (
     <li className="prpost">
       {pf(p.platform)}
       <div>
-        <a href={p.url} target="_blank" rel="noreferrer"><b>{p.handle ? `@${p.handle}` : "Unknown account"}</b>{p.source === "owned" ? <span className="tag me">own post</span> : null}</a>
+        <a href={p.url} target="_blank" rel="noreferrer"><b>{p.handle ? `@${p.handle}` : "Unknown account"}</b>{p.source === "owned" ? <span className="tag me">own post</span> : null}{st ? <span className={`tag ${st.tone}`}>{st.label}</span> : null}</a>
         <p>{p.caption || <i className="muted">No caption</i>}</p>
-        <small>{dayMonth(p.posted_at)} · {compact(p.views)} views · {int(p.comments)} comments{p.negative ? `, ${int(p.negative)} negative` : ""}{extra ? ` · ${extra}` : ""}</small>
+        <small>{dayMonth(p.posted_at)} · {reach}{p.comments || !st ? ` · ${int(p.comments)} comments${p.negative ? `, ${int(p.negative)} negative` : ""}` : ""}{extra ? ` · ${extra}` : ""}</small>
       </div>
     </li>
   );
@@ -84,20 +89,27 @@ export function PrDashboard({ d, client, view }: { d: PrDashboardData; client: s
   const L = LEVEL[st.level];
   const k = d.kpis;
   const scopeWord = f.platform === "all" ? "" : ` on ${PLATFORM[f.platform] ?? f.platform}`;
+  // around one subject the labelled posts are counted with the comments (src/reputation/dashboard.ts, VOICES)
+  const withPosts = d.voice_posts > 0;
+  const said = withPosts ? "posts and comments" : "comments";
+  const noNorm = st.baseline.neg_pct == null && !!st.day && st.level === "calm";
   const tiles: { key: string; label: string; value: string; delta: React.ReactNode; sub: string; tone: string }[] = [
     { key: "mentions", label: "Mentions", value: int(k.mentions.now ?? 0), delta: <Delta k={k.mentions} kind="count" />, sub: `Posts about ${who}`, tone: "blue" },
-    { key: "reach", label: "Reach", value: compact(k.reach.now), delta: <Delta k={k.reach} kind="count" />, sub: "Views of those posts", tone: "violet" },
-    { key: "comments", label: "Comments", value: int(k.comments.now ?? 0), delta: <Delta k={k.comments} kind="count" />, sub: "Under those posts; brand replies left out", tone: "mint" },
-    { key: "neg", label: "Negative", value: pct(k.neg_pct.now), delta: <Delta k={k.neg_pct} kind="pct" good="down" />, sub: "Share of labelled comments", tone: "coral" },
+    { key: "reach", label: "Reach", value: k.reach.now == null ? "–" : compact(k.reach.now), delta: k.reach.now == null ? <span className="delta flat">Not reported</span> : <Delta k={k.reach} kind="count" />, sub: k.reach.now == null ? "These platforms report no views" : "Views of those posts", tone: "violet" },
+    { key: "comments", label: withPosts ? "Posts and comments" : "Comments", value: int(k.comments.now ?? 0), delta: <Delta k={k.comments} kind="count" />, sub: withPosts ? `${int(d.voice_posts)} posts with a stance, and the comments under them; ${who}'s own replies left out` : "Under those posts; brand replies left out", tone: "mint" },
+    { key: "neg", label: "Negative", value: pct(k.neg_pct.now), delta: <Delta k={k.neg_pct} kind="pct" good="down" />, sub: `Share of labelled ${said}`, tone: "coral" },
     { key: "csat", label: "CSAT", value: k.csat.now == null ? "–" : k.csat.now.toFixed(2), delta: <Delta k={k.csat} kind="score" />, sub: "Average of 1 to 5, per comment", tone: "blue" },
     { key: "intent", label: "Purchase intent", value: pct(k.intent_pct.now), delta: <Delta k={k.intent_pct} kind="pct" />, sub: "Comments that want to buy or sign up", tone: "mint" },
   ];
+  const ampViews = d.amplifiers.some((a) => a.views > 0);
+  // a section with nothing it could measure here stays out: service needs comment themes, the competitive view a second brand
+  const unmeasured = new Set([...(d.service.measured ? [] : ["service"]), ...(d.brands.length > 1 ? [] : ["competitive"])]);
   const maxIssue = Math.max(1, ...d.issues.flatMap((i) => i.daily.map((x) => x.negative)));
   const render: Record<string, (t: string) => React.ReactNode> = {
     issues: (t) => (
       <div className="dsection">
-        <header><h2>{t}</h2><span>The topics carrying {who}&apos;s negative comments in {range}, and whether the same complaint hits the other brands.</span></header>
-        {d.issues.length === 0 ? <div className="dcard empty">No topic carries enough negative comments about {who} in these days to call an issue.</div> : (
+        <header><h2>{t}</h2><span>The topics carrying {who}&apos;s negative {said} in {range}{d.brands.length > 1 ? ", and whether the same complaint hits the other brands" : ""}.</span></header>
+        {d.issues.length === 0 ? <div className="dcard empty">No topic carries enough negative {said} about {who} in these days to call an issue.</div> : (
           <div className="prissues">
             {d.issues.map((i) => {
               const sc = SCOPE[i.scope];
@@ -105,17 +117,17 @@ export function PrDashboard({ d, client, view }: { d: PrDashboardData; client: s
                 <article className="dcard prissue" key={i.topic_id ?? i.topic}>
                   <header>
                     <h3>{i.topic}</h3>
-                    <span className={`chip ${sc.tone}`}>{sc.label}</span>
+                    {d.brands.length > 1 && <span className={`chip ${sc.tone}`}>{sc.label}</span>}
                     <span className="chip">{STAGE[i.stage]}</span>
                   </header>
                   <div className="nums">
-                    <div><b>{int(i.negative)}</b><small>negative comments<br />{i.negative_prev ? `${change(i.negative, i.negative_prev)} vs previous` : "none before"}</small></div>
-                    <div><b>{pct(i.neg_pct)}</b><small>of {int(i.comments)} comments on it<br />others: {pct(i.industry.neg_pct)}</small></div>
+                    <div><b>{int(i.negative)}</b><small>negative {said}<br />{i.negative_prev ? `${change(i.negative, i.negative_prev)} vs previous` : "none before"}</small></div>
+                    <div><b>{pct(i.neg_pct)}</b><small>of {int(i.comments)} {said} on it{d.brands.length > 1 && <><br />others: {pct(i.industry.neg_pct)}</>}</small></div>
                     <Bars data={i.daily} max={maxIssue} />
                   </div>
                   <p className="scope">
-                    {i.scope === "only_us" ? `${who}'s negative share on this topic is well above the other brands' (${pct(i.neg_pct)} against ${pct(i.industry.neg_pct)}). It is about us.` : i.scope === "category" ? `The other brands see the same or worse${i.industry.brands_up.length ? ` (${i.industry.brands_up.join(", ")})` : ""}: a category complaint, not ours alone.` : `Some other brands see it too${i.industry.brands_up.length ? ` (${i.industry.brands_up.join(", ")})` : ""}, but not the whole category.`}
-                    {" "}Mostly on {i.platforms.slice(0, 2).map((p) => PLATFORM[p.platform] ?? p.platform).join(" and ")}{i.peak_day ? `; peak ${dayMonth(i.peak_day)}` : ""}.
+                    {d.brands.length < 2 ? "" : i.scope === "only_us" ? `${who}'s negative share on this topic is well above the other brands' (${pct(i.neg_pct)} against ${pct(i.industry.neg_pct)}). It is about us.` : i.scope === "category" ? `The other brands see the same or worse${i.industry.brands_up.length ? ` (${i.industry.brands_up.join(", ")})` : ""}: a category complaint, not ours alone.` : `Some other brands see it too${i.industry.brands_up.length ? ` (${i.industry.brands_up.join(", ")})` : ""}, but not the whole category.`}
+                    {d.brands.length < 2 ? "" : " "}Mostly on {i.platforms.slice(0, 2).map((p) => PLATFORM[p.platform] ?? p.platform).join(" and ")}{i.peak_day ? `; peak ${dayMonth(i.peak_day)}` : ""}.
                   </p>
                   {i.themes.length > 0 && <div className="prthemes">{i.themes.map((t) => <span className="tag" key={t.theme}>{t.theme} · {int(t.n)}</span>)}</div>}
                   {i.quotes.slice(0, 2).map((q, n) => <QuoteLine key={n} q={q} />)}
@@ -133,7 +145,7 @@ export function PrDashboard({ d, client, view }: { d: PrDashboardData; client: s
     ),
     rising: (t) => (
       <div className="dsection">
-        <header><h2>{t}</h2><span>{who}&apos;s posts from the last three days by views, with where they are likely to end up from how posts here usually grow.</span></header>
+        <header><h2>{t}</h2><span>Posts about {who} from the last three days by views (likes where views are not reported), with where they are likely to end up from how posts here usually grow.</span></header>
         <div className="dcard">
           {d.rising.length === 0 ? <div className="empty">No new posts about {who} in the last three days.</div> : (
             <ul className="prposts">{d.rising.map((r) => <PostLine key={r.url} p={r} extra={r.projected && r.views != null && r.projected > r.views * 1.05 ? `likely about ${compact(r.projected)} views` : r.neg_pct != null ? `${pct(r.neg_pct)} of comments negative` : undefined} />)}</ul>
@@ -143,15 +155,15 @@ export function PrDashboard({ d, client, view }: { d: PrDashboardData; client: s
     ),
     amplifiers: (t) => (
       <div className="dsection">
-        <header><h2>{t}</h2><span>The accounts whose posts about {who} reached most people in {range}, and how the comments under them leaned.</span></header>
+        <header><h2>{t}</h2><span>The accounts whose posts about {who} reached most people in {range}, and how {ampViews ? "the comments under them" : "their posts"} leaned.</span></header>
         <div className="dcard tablewrap still">
           {d.amplifiers.length === 0 ? <div className="empty">No creator posts about {who} in these days.</div> : (
-            <table><thead><tr><th>Account</th><th className="num">Reach</th><th className="num">Comments</th><th className="num">Negative</th></tr></thead>
+            <table><thead><tr><th>Account</th><th className="num">{ampViews ? "Reach" : "Likes"}</th><th className="num">Comments</th><th className="num">{ampViews ? "Negative" : "Stance"}</th></tr></thead>
               <tbody>{d.amplifiers.map((a) => (
                 <tr key={a.platform + a.handle}>
                   <td>{pf(a.platform)}<a href={a.top_url} target="_blank" rel="noreferrer">@{a.handle}</a><small className="muted"> {a.tier ? a.tier : ""}{a.followers ? ` · ${compact(a.followers)} followers` : ""}{a.posts > 1 ? ` · ${a.posts} posts` : ""}</small></td>
-                  <td className="num">{compact(a.views)}</td><td className="num">{int(a.comments)}</td>
-                  <td className={`num ${a.neg_pct != null && a.neg_pct >= 25 ? "down" : ""}`}>{a.neg_pct == null ? "–" : pct(a.neg_pct)}</td>
+                  <td className="num">{ampViews ? compact(a.views) : int(a.likes)}</td><td className="num">{int(a.comments)}</td>
+                  <td className={`num ${(a.neg_pct != null && a.neg_pct >= 25) || (a.neg_pct == null && a.stanced > 0 && a.against * 2 > a.stanced) ? "down" : ""}`}>{a.neg_pct != null ? pct(a.neg_pct) : a.stanced === 1 ? (a.against ? "against" : "not against") : a.stanced > 1 ? `${int(a.against)} of ${int(a.stanced)} against` : "–"}</td>
                 </tr>))}
               </tbody>
             </table>
@@ -163,7 +175,7 @@ export function PrDashboard({ d, client, view }: { d: PrDashboardData; client: s
       <div className="dsection">
         <header><h2>{t}</h2><span>What people say about {who}, by topic: how much of the conversation each holds, and how it leans.</span></header>
         <div className="dcard tablewrap still">
-          <table className="prnarr"><thead><tr><th>Topic</th><th className="num">Comments</th><th className="num">Share</th><th className="num">Change</th><th className="num">Negative</th><th className="num">CSAT</th><th>In their words</th></tr></thead>
+          <table className="prnarr"><thead><tr><th>Topic</th><th className="num">{withPosts ? "Posts and comments" : "Comments"}</th><th className="num">Share</th><th className="num">Change</th><th className="num">Negative</th><th className="num">CSAT</th><th>In their words</th></tr></thead>
             <tbody>{d.narratives.filter((x) => x.comments > 0).map((x) => (
               <tr key={x.topic_id}>
                 <td><b>{x.catch_all ? `${x.topic} (no topic fits)` : x.topic}</b></td>
@@ -247,19 +259,19 @@ export function PrDashboard({ d, client, view }: { d: PrDashboardData; client: s
       <div className="wrap wide">
         {d.notes.length > 0 && <div className="dcaveats">{d.notes.map((c) => <p key={c}>{c}</p>)}</div>}
 
-        <div className={`prstatus ${L.tone}`}>
+        <div className={`prstatus ${noNorm ? "nonorm" : L.tone}`}>
           <div className="lv">
             <span className="dot" />
-            <div><small>Reputation status · {st.day ? dayMonth(st.day.d) : "–"}</small><b>{L.label}</b></div>
+            <div><small>Reputation status · {st.day ? dayMonth(st.day.d) : "–"}</small><b>{noNorm ? "No norm yet" : L.label}</b></div>
           </div>
           <div className="prwhy">
-            <p><b>{L.line}</b> {st.reason}</p>
+            <p>{noNorm ? null : <b>{L.line}</b>} {st.reason}</p>
             <div className="prladder" aria-label="Status over the last 30 days">
-              {st.history.map((h) => <i key={h.d} className={h.level} title={`${dayMonth(h.d)}: ${LEVEL[h.level].label}${h.neg_pct != null ? `, ${h.neg_pct}% negative of ${int(h.comments)}` : ""}`} />)}
+              {st.history.map((h) => <i key={h.d} className={h.norm ? h.level : "none"} title={`${dayMonth(h.d)}: ${h.norm ? LEVEL[h.level].label : "no norm yet"}${h.neg_pct != null ? `, ${h.neg_pct}% negative of ${int(h.comments)}` : ""}`} />)}
             </div>
             <small className="rule">{st.rule} {view.alert && <LadderDrawer brand={f.brand} alert={view.alert} builder={view.builder} />}</small>
           </div>
-          {st.level !== "calm" && <Link className="btn sm" href={ask(`What is driving the negative talk about ${who} around ${st.day ? dayMonth(st.day.d) : "the latest day"}, and should we respond?`)}>Ask CeMO</Link>}
+          {(st.level !== "calm" || noNorm) && <Link className="btn sm" href={ask(`What is driving the negative talk about ${who} around ${st.day ? dayMonth(st.day.d) : "the latest day"}, and should we respond?`)}>Ask CeMO</Link>}
         </div>
 
         <div className="kpis six">
@@ -273,7 +285,7 @@ export function PrDashboard({ d, client, view }: { d: PrDashboardData; client: s
           ))}
         </div>
 
-        <Sections arranged={layout} render={render} who={hiddenFor} showHref={showHref} />
+        <Sections arranged={{ ...layout, shown: layout.shown.filter((x) => !unmeasured.has(x.key)) }} render={render} who={hiddenFor} showHref={showHref} />
       </div>
     </section>
   );

@@ -53,6 +53,9 @@ export type Commenters = {
 };
 export type ReplyEffect = { at: string; before: { comments: number; labelled: number; negative: number }; after: { comments: number; labelled: number; negative: number }; same_platform: { platform: string; before: { comments: number; labelled: number; negative: number }; after: { comments: number; labelled: number; negative: number } } } | null;
 
+/** One side of the conversation (a voice, or a topic): posts by stance, and the comments with their sentiment. */
+export type SideRow = { key: string; label: string; posts: number; against: number; neutral: number; for_: number; stanced: number; comments: number; c_negative: number; c_positive: number; c_labelled: number };
+
 export type PulseData = {
   subject: string;
   productName: string;
@@ -74,6 +77,8 @@ export type PulseData = {
   posts_hourly: { x: string[]; series: { name: string; data: number[]; stack?: string }[] };
   posts_hourly_stance: { x: string[]; series: { name: string; data: number[]; stack?: string }[] };
   posts_daily: { x: string[]; series: { name: string; data: number[]; stack?: string }[] };
+  /** who is talking (the labeller's voices) and about what (the workspace's topics); empty until labelled */
+  sides: { voices: SideRow[]; topics: SideRow[] };
   stance: StanceRow[];
   commenters: Commenters;
   reply_effect: ReplyEffect;
@@ -362,7 +367,7 @@ async function build(ws: string): Promise<PulseData | null> {
   // flat line that squashes the days that matter.
   const sinceIso = firstH ? firstH.slice(0, 10) : root ? root.posted_at.slice(0, 10) : null;
   const days = await db.q<Row>(
-    `with bounds as (select coalesce($3::date, (max(posted_at) - interval '30 days')::date) as first, greatest(max(posted_at), (select max(posted_at) from posts where workspace_id = $1 and source = 'earned'))::date as last from comments where workspace_id = $1),
+    `with bounds as (select coalesce($3::date, ((max(posted_at) at time zone $2) - interval '30 days')::date) as first, (greatest(max(posted_at), (select max(posted_at) from posts where workspace_id = $1 and source = 'earned')) at time zone $2)::date as last from comments where workspace_id = $1),
      ds as (select generate_series((select first from bounds), (select last from bounds), interval '1 day')::date as d)
      select to_char(ds.d, 'YYYY-MM-DD') as h, c.platform, count(c.id)::int as n
      from ds left join comments c on c.workspace_id = $1 and c.sentiment_source is distinct from 'subject' and (c.posted_at at time zone $2)::date = ds.d
@@ -371,7 +376,7 @@ async function build(ws: string): Promise<PulseData | null> {
   );
   const daily = pivot(days, "h");
   const postDays = await db.q<Row>(
-    `with bounds as (select coalesce($3::date, (max(posted_at) - interval '30 days')::date) as first, greatest(max(posted_at), (select max(posted_at) from posts where workspace_id = $1 and source = 'earned'))::date as last from comments where workspace_id = $1),
+    `with bounds as (select coalesce($3::date, ((max(posted_at) at time zone $2) - interval '30 days')::date) as first, (greatest(max(posted_at), (select max(posted_at) from posts where workspace_id = $1 and source = 'earned')) at time zone $2)::date as last from comments where workspace_id = $1),
      ds as (select generate_series((select first from bounds), (select last from bounds), interval '1 day')::date as d)
      select to_char(ds.d, 'YYYY-MM-DD') as h, p.platform, count(p.id)::int as n
      from ds left join posts p on p.workspace_id = $1 and p.source = 'earned' and p.content_type is distinct from 'stub' and p.relevant is not false and (p.posted_at at time zone $2)::date = ds.d
@@ -410,6 +415,40 @@ async function build(ws: string): Promise<PulseData | null> {
   // about is not silently matched, and a term list that is empty means the card
   // says so rather than showing a confident zero.
   const commercial = await commercialExposure(db, ws, tz, cfg.commercial, sinceIso);
+
+  // Who is talking and about what: the labeller's voice and topic on earned posts and on comments.
+  const sideRows = async (col: "voice" | "topic_id") => {
+    const rows = await db.q<Row>(
+      `with pp as (
+         select coalesce(${col}, '') as k, count(*)::int as posts, count(*) filter (where stance = 'negative')::int as against, count(*) filter (where stance = 'neutral')::int as neutral,
+                count(*) filter (where stance = 'positive')::int as for_, count(stance)::int as stanced
+         from posts where workspace_id = $1 and source = 'earned' and content_type is distinct from 'stub' and relevant is not false and stance_source = 'model' group by 1),
+       cc as (
+         select coalesce(${col}, '') as k, count(*)::int as comments, count(*) filter (where sentiment = 'negative')::int as c_negative, count(*) filter (where sentiment = 'positive')::int as c_positive, count(sentiment)::int as c_labelled
+         from comments where workspace_id = $1 and sentiment_source is distinct from 'subject' and not coalesce(off_topic, false) and sentiment is not null group by 1)
+       select nullif(coalesce(pp.k, cc.k), '') as k, ${col === "topic_id" ? "t.label, t.is_catch_all, t.sort_order" : "null as label, false as is_catch_all, 0 as sort_order"},
+              coalesce(pp.posts, 0) as posts, coalesce(pp.against, 0) as against, coalesce(pp.neutral, 0) as neutral, coalesce(pp.for_, 0) as for_, coalesce(pp.stanced, 0) as stanced,
+              coalesce(cc.comments, 0) as comments, coalesce(cc.c_negative, 0) as c_negative, coalesce(cc.c_positive, 0) as c_positive, coalesce(cc.c_labelled, 0) as c_labelled
+       from pp full join cc on cc.k = pp.k ${col === "topic_id" ? "left join topics t on t.id = coalesce(pp.k, cc.k)" : ""}
+       order by ${col === "topic_id" ? "coalesce(t.is_catch_all, true), " : ""}coalesce(pp.posts, 0) + coalesce(cc.comments, 0) desc`,
+      [ws],
+    );
+    return rows.filter((r) => r.k != null || col === "voice").map((r): SideRow => ({
+      key: String(r.k ?? "unclear"), label: col === "voice" ? (r.k == null || r.k === "unclear" ? "Not clear" : String(r.k)) : String(r.label ?? r.k),
+      posts: Number(r.posts), against: Number(r.against), neutral: Number(r.neutral), for_: Number(r.for_), stanced: Number(r.stanced),
+      comments: Number(r.comments), c_negative: Number(r.c_negative), c_positive: Number(r.c_positive), c_labelled: Number(r.c_labelled),
+    }));
+  };
+  const [voiceRows, topicRows] = await Promise.all([sideRows("voice"), sideRows("topic_id")]);
+  // "Not clear" and a voice the labeller never used are folded together; a workspace with no voices labelled shows none
+  const voicesFolded = voiceRows.reduce<SideRow[]>((a, r) => {
+    const k = r.label === "Not clear" ? "unclear" : r.key;
+    const hit = a.find((x) => x.key === k);
+    if (!hit) a.push({ ...r, key: k });
+    else for (const f of ["posts", "against", "neutral", "for_", "stanced", "comments", "c_negative", "c_positive", "c_labelled"] as const) hit[f] += r[f];
+    return a;
+  }, []).sort((a, b) => Number(a.key === "unclear") - Number(b.key === "unclear") || b.posts + b.comments - (a.posts + a.comments));
+  const sides = { voices: voicesFolded.some((r) => r.key !== "unclear") ? voicesFolded : [], topics: topicRows };
 
   // the skills, unpersisted
   const actor = { user_id: "pulse", via: "api" as const };
@@ -466,7 +505,7 @@ async function build(ws: string): Promise<PulseData | null> {
     totals: totals!, root: root ? { url: root.url, posted_at: root.posted_at, caption: root.caption, views: root.views, likes: root.likes, comments: root.comments, early_comments: root.early_comments } : null,
     reply: reply ? { at: reply.at, likes: reply.likes, text: reply.text } : null,
     trend, status, watch, commercial,
-    hourly, posts_hourly, posts_hourly_stance, posts_daily, negative_trend: trimLead(negative_trend), stance, commenters: { ...commenters, first_time: trimLead(commenters.first_time) }, reply_effect, daily, events, spread: spread.map(({ first_post_url: _u, ...s }) => s), sentiment, drivers, themes, seeding,
+    hourly, posts_hourly, posts_hourly_stance, posts_daily, sides, negative_trend: trimLead(negative_trend), stance, commenters: { ...commenters, first_time: trimLead(commenters.first_time) }, reply_effect, daily, events, spread: spread.map(({ first_post_url: _u, ...s }) => s), sentiment, drivers, themes, seeding,
   };
 }
 

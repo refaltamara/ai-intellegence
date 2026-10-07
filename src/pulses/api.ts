@@ -14,6 +14,11 @@ export async function panelWorkspace(workspaceId: string): Promise<boolean> {
   return (await getWorkspace(workspaceId).catch(() => null))?.kind !== "profile";
 }
 
+/** Decks need the reputation facts: every panel, and a profile once it has moved onto the reputation dashboard. */
+export async function deckWorkspace(workspaceId: string): Promise<boolean> {
+  return (await getWorkspace(workspaceId).catch(() => null))?.reputation ?? false;
+}
+
 export const SIZES: CardSize[] = ["s", "m", "l"];
 
 /** Add a card from a request body: { kind, config, size?, title? } or { kind: "skill", skill_run_id }. */

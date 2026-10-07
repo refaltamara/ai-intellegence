@@ -27,8 +27,8 @@ export const maxDuration = 60;
 export default async function DashboardPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const ws = await currentWorkspaceId();
   const [cfg, role] = await Promise.all([getWorkspace(ws), currentRole(ws)]);
-  // a one-person profile keeps its crisis view; a PR team on a brand panel gets the reputation dashboard
-  if (cfg?.kind === "profile") {
+  // a one-person profile keeps its crisis view until it moves onto the reputation dashboard (then the crisis view is Pulse)
+  if (cfg?.kind === "profile" && !cfg.reputation) {
     const d = await pulsePage(ws);
     if (!d) redirect("/data");
     return <PulsePage d={d} />;
