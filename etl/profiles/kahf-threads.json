@@ -83,6 +83,13 @@
       "file": "kahf/comments_threads_1007d.csv",
       "naive_tz": "Asia/Jakarta",
       "note": "new_post_zrhjkt_structured.xlsx, 7 Oct: comments on @_zrhjkt_ DeKfbrwk9No only; Jakarta time (post 02:03 WIB, first comment 02:23)"
+    },
+    {
+      "kind": "contents",
+      "platform": "threads",
+      "file": "kahf/contents_threads_1007e.csv",
+      "naive_tz": "Asia/Jakarta",
+      "note": "posts_structured.csv, 7 Oct: 122 posts to 13:27 WIB; Jakarta time (Kahf's apology DeKWiFpE_9K reads 00:45:49, the first file's 17:45:49 UTC). Posts already loaded keep their labels; their likes, replies and reposts update, and columns this file lacks (views, followers) keep what was there"
     }
   ]
 }
