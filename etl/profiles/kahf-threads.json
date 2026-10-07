@@ -49,6 +49,10 @@
     {
       "url": "https://www.threads.com/@aimannahmaddd/post/DPKsYDQEp60",
       "reason": "September 2025, before the case"
+    },
+    {
+      "url": "https://threads.com/@watsonsmy/post/DbXfRdViVxb",
+      "reason": "July 2026, Watsons Malaysia on fraudulent emails: before the case"
     }
   ],
   "files": [
@@ -104,6 +108,12 @@
       "file": "kahf/comments_threads_1007g.csv",
       "naive_tz": "Asia/Jakarta",
       "note": "comments_batch3_structured.xlsx (comments sheet), 7 Oct: 6,296 comments on 54 posts already loaded (batch 3 and earlier), 4 Oct 19:50 to 7 Oct 16:22. Jakarta time: read so, no post's first comment comes before it and the median first comment lands 8 minutes after"
+    },
+    {
+      "kind": "contents",
+      "platform": "threads",
+      "file": "kahf/contents_threads_1007h.csv",
+      "note": "Kahf_717_contnt_7_oct_21_38 - kahf_threads_recent.csv (a different export: epoch timestamps, so no zone to guess), 7 Oct 21:38: 717 posts; the 35 already loaded were left out of this file as asked (their numbers stay as loaded), 682 written here in the usual columns (quote_count as reshare, repost_count as repost). One July post (Watsons, fraud warning) is in drop_urls"
     }
   ]
 }
