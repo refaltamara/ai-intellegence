@@ -15,6 +15,7 @@ export const SECTIONS: Record<RoleId, SectionDef[]> = {
     { key: "rising", label: "Rising now", width: "half" },
     { key: "amplifiers", label: "Amplifiers", width: "half" },
     { key: "narratives", label: "Narratives", width: "full" },
+    { key: "voices", label: "Who is talking", width: "full" },
     { key: "own", label: "Own channels", width: "half" },
     { key: "service", label: "For customer service", width: "half" },
     { key: "competitive", label: "Competitive reputation", width: "full" },

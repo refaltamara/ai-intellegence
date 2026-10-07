@@ -1390,6 +1390,23 @@ th{background:linear-gradient(180deg,#F8FAFE,#F4F7FC)}
 .prladder i{flex:1;height:14px;border-radius:3px;background:var(--green);opacity:.75;max-width:22px}
 .prladder i.none{background:var(--line);opacity:1}.prladder i.watch{background:var(--sun)}.prladder i.issue{background:var(--coral)}.prladder i.crisis{background:var(--red)}.prladder i.recovering{background:var(--blue);opacity:.45}
 .kpis.six{grid-template-columns:repeat(6,minmax(0,1fr))}
+.kpis.five{grid-template-columns:repeat(5,minmax(0,1fr))}
+.prissue .nums:has(.prsplit){grid-template-columns:1fr 120px;align-items:center}
+.prsplit{width:100%;border-collapse:collapse;font-size:12.5px}
+.prsplit th{font-size:10.5px;font-weight:700;color:var(--text-3);text-align:left;padding:2px 6px 4px 0}
+.prsplit th.num,.prsplit td.num{text-align:right}
+.prsplit td{padding:4px 6px 4px 0;border-top:1px solid var(--line)}
+.prsplit td:first-child{font-weight:700;color:var(--text)}
+.prsplit td.num{font-weight:700;font-variant-numeric:tabular-nums}
+.prsplit td small{font-weight:500;color:var(--text-3);font-size:10.5px}
+.prsplit td.down,.prnarr td.down,.dcard td.down{color:var(--red)}.prsplit td.up,.dcard td.up{color:var(--green)}
+.prconv{display:flex;flex-direction:column;gap:12px;padding:16px 20px;margin-bottom:18px}
+.prlean{display:grid;grid-template-columns:220px 1fr 300px;gap:14px;align-items:center;font-size:13px}
+.prlean .lbl{color:var(--text-2)}.prlean .lbl b{font-size:18px;color:var(--text);margin-right:4px}
+.prlean .bar{display:flex;height:14px;border-radius:7px;overflow:hidden;background:var(--line)}
+.prlean .bar i{display:block;height:100%}
+.prlean .nums{font-size:12px;color:var(--text-3)}.prlean .nums b.down{color:var(--red)}.prlean .nums b.up{color:var(--green)}
+@media (max-width:900px){.prlean{grid-template-columns:1fr}}
 .prissues{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
 .prissue{display:flex;flex-direction:column;gap:10px}
 .prissue>header{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
@@ -1425,8 +1442,8 @@ th{background:linear-gradient(180deg,#F8FAFE,#F4F7FC)}
 .prbig b{font-size:24px;font-weight:800;color:var(--text);margin-right:4px}
 .pr .dcard.tablewrap{padding:0;overflow:auto}
 .pr .dcard .tablewrap{border:0}
-@media (max-width:1200px){.kpis.six{grid-template-columns:repeat(3,minmax(0,1fr))}.prissues{grid-template-columns:1fr}}
-@media (max-width:720px){.kpis.six{grid-template-columns:repeat(2,minmax(0,1fr))}.prstatus{flex-direction:column;align-items:stretch}}
+@media (max-width:1200px){.kpis.six,.kpis.five{grid-template-columns:repeat(3,minmax(0,1fr))}.prissues{grid-template-columns:1fr}}
+@media (max-width:720px){.kpis.six,.kpis.five{grid-template-columns:repeat(2,minmax(0,1fr))}.prstatus{flex-direction:column;align-items:stretch}}
 
 /* ---------------------------------------------------------- Social Media dashboard (DECISIONS 3 Oct 2026) */
 .fmtbars{display:flex;flex-direction:column;gap:12px}
@@ -1708,3 +1725,6 @@ tr.warnrow td{background:#FFFBF0}
 .origins .chk{display:flex;gap:8px;align-items:flex-start;font-size:13px;padding:3px 0;line-height:1.4}
 .origins .chk input{margin-top:3px;flex:none}
 .cmsblock header .btn{margin-left:auto}
+.periodpick{display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap}
+.periodpick .dates{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--text-3)}
+.periodpick input[type=date]{font:inherit;font-size:12px;padding:4px 6px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--text)}

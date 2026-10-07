@@ -501,3 +501,28 @@ Refal asked for the Chorus (PR) dashboard and PR decks on `kahf-threads`, becaus
 - Daily charts cut days in the workspace's time zone, not UTC.
 - Copy left over from the Maudy case is now generic (the YouTube caveat only where there is YouTube).
 - The busiest-hour line only appears when comments exist.
+
+## Kahf dashboard and decks for the case (Refal, 7 Oct 2026)
+
+**What a workspace can leave out.** `settings.pr.hide` lists what the PR dashboard and its decks leave out for one workspace: `status` (the norm and the ladder), `reach`, `csat`, `intent`. Fair sets it per workspace. Kahf hides all four:
+- The norm needs weeks of ordinary days before a story, which a case capture never has.
+- Threads gives no views.
+- CSAT and purchase intent do not apply to a boycott.
+
+**Posts and comments apart.** Where posts carry a stance (`voice_posts > 0`), the dashboard and its decks never merge posts and comments into one number:
+- **Tiles:** Posts about the subject, Posts against, Comments, Comments negative.
+- **Conversation bar:** in place of the status card when status is hidden, two stacked bars, posts by stance and comments by sentiment, with what is still unread.
+- **Issues:** each one shows a small table, posts and comments, each with its total, negative and positive (`Issue.split`).
+- **Narratives:** posts, against, comments, negative per topic.
+- Panels have no stanced posts and read as before; Fintech's deck fact sheet is unchanged word for word.
+
+**Who is talking.** A new PR dashboard section (`voices`): voice by stance and sentiment, posts and comments apart. It shows only where the labeller reads a voice. In decks it sits under the narratives.
+
+**Off-topic comments** are left out of the reputation facts (`not c.off_topic`), as Pulse already did. Listening comments carry no such flag.
+
+**Decks on chosen dates.** PR decks can be made for days picked by hand (`YYYY-MM-DD..YYYY-MM-DD`, at most 92 days, `rangePeriod` in `src/competitor/period.ts`):
+- The comparison is the same number of days right before (`previousPeriod`).
+- "Choose dates…" sits in the period picker of a PR deck (`PeriodPick`).
+- A range never moves a recurring deck's schedule.
+- Brand & KOL and Social decks keep weeks and months.
+- With no status, the summary slide shows how posts and comments lean instead, and the status slide is dropped.

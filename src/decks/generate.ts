@@ -10,7 +10,7 @@
 import { signal } from "../learning/signals";
 import { getRole } from "../roles/store";
 import { weeklyReport } from "../competitor/facts";
-import { deckPeriod, latestComplete, type Grain } from "../competitor/period";
+import { RANGE_RE, deckPeriod, isRange, latestComplete, type Grain } from "../competitor/period";
 import { shiftPeriod } from "../dashboard/period";
 import { FORMATS, storeWeekly } from "../competitor/scheduled";
 import { writeNarrative } from "../competitor/write";
@@ -42,6 +42,11 @@ export function nextRun(grain: Grain, now = new Date()): string {
 /** A day later, at 07:00 WIB: when the period's data has not landed yet, or a run failed. */
 export function retryRun(now = new Date()): string {
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()) + DAY).toISOString();
+}
+
+/** The last day the workspace's data reaches (the latest a chosen range may end). */
+export async function dataAsOf(workspaceId: string): Promise<string> {
+  return (await loadContext(new SkillDb(), workspaceId)).asOf.slice(0, 10);
 }
 
 /** The periods a version can be made for: those the data fully covers, newest first. */
@@ -85,8 +90,10 @@ async function makeVersion(deck: DeckRow, opts: { period?: string; reason: "crea
     const ctx = await loadContext(new SkillDb(), deck.workspace_id);
     const period = opts.period ? deckPeriod(grain, opts.period) : latestComplete(grain, ctx.asOf);
     key = period.key;
+    // chosen days are for PR decks (a case moves faster than a week); the other decks keep their weeks and months
+    if (isRange(period) && !spec.rep) throw new Error("chosen dates work for PR decks; pick a week or a month for this deck");
     if (period.from > ctx.asOf) throw new Error(`the data runs to ${ctx.asOf}; ${period.label} has not started in it yet`);
-    if (opts.reason === "schedule" && deck.last_period && period.key <= deck.last_period) {
+    if (opts.reason === "schedule" && deck.last_period && !RANGE_RE.test(deck.last_period) && period.key <= deck.last_period) {
       await markDeckRun(deck.id, { next_run_at: retryRun(), error: null });
       return { status: "skipped", message: `no new ${grain} of data: ${period.label} is already in the deck (data through ${ctx.asOf})`, report_id: null, period: period.key };
     }
@@ -110,7 +117,8 @@ async function makeVersion(deck: DeckRow, opts: { period?: string; reason: "crea
       const written = await writeRep(r, { role, workspace: deck.workspace_id });
       const stored = await storeReputation({ workspaceId: deck.workspace_id, report: r, narrative: written.narrative, by: written.by, problems: written.problems, deck: { id: deck.id, name: deck.name } });
       await pruneVersions(deck.id, deck.workspace_id, r.period.key, stored.reportId);
-      const last = deck.last_period && deck.last_period > period.key ? deck.last_period : period.key;
+      // chosen days never move the schedule: it keeps counting weeks or months
+      const last = isRange(period) ? deck.last_period : deck.last_period && deck.last_period > period.key ? deck.last_period : period.key;
       await markDeckRun(deck.id, { last_period: last, next_run_at: deck.recurring ? nextRun(grain) : null, error: null });
       return { status: "ok", message: `${period.label}: ${r.status.level}, ${r.issues.length} issue${r.issues.length === 1 ? "" : "s"}, words by ${written.by === "model" ? "CeMO" : "the plain template"}`, report_id: stored.reportId, period: period.key, narrative_by: written.by };
     }

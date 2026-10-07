@@ -168,4 +168,9 @@ One contents file, `data/raw/kahf/contents_threads.csv` (posts only; comments to
   - **Times are Jakarta time**, without a zone, unlike the posts file (UTC) and the first comments file (Z). Read that way, each post's first comment lands 0 to 9 minutes after it. As UTC every post would wait 7 hours for its first comment, and as Malaysian time 35 of 40 posts would get comments before they went up. The contract now takes a zone per file (`naive_tz`).
   - **Copy-paste accounts:** 22 accounts posted the same text under three posts or more. The most active is one account pasting "Korang support brand badlab ni…" under 15 posts. Pulse's coordinated-pattern card reads these.
   - The posts sheet carries views, likes, comments and shares for these 40 posts (Threads views are not in the posts export). These are not loaded yet: views on 40 of 577 posts would make reach look complete when it is not.
+- **Comments on Kahf's apology post** (`kahf_comments_structured.xlsx`, 7 Oct; `kahf/comments_threads_1007c.csv`):
+  - 654 in → 604 loaded, all under `@kahfeveryday/post/DeKWiFpE_9K`. Refal says the scrape is incomplete; more is coming.
+  - Jakarta time: the first row is at 00:45:50 WIB, the minute the post went up.
+  - One row is Kahf's own (not labelled). Dropped: 41 empty, 9 emoji only.
+- **All comments labelled by 12:30 WIB on 7 Oct**: 8,965 on posts about the case (off-topic left out). Labelling moved to every 5 minutes the same day.
 

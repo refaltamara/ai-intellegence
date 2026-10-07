@@ -69,6 +69,13 @@
       "file": "kahf/comments_threads_1007b.csv",
       "naive_tz": "Asia/Jakarta",
       "note": "comments_structured.xlsx (comments sheet), 7 Oct; times without zone are Jakarta time: read so, each post's first comment lands 0 to 9 minutes after it"
+    },
+    {
+      "kind": "comments",
+      "platform": "threads",
+      "file": "kahf/comments_threads_1007c.csv",
+      "naive_tz": "Asia/Jakarta",
+      "note": "kahf_comments_structured.xlsx, 7 Oct: comments on Kahf's apology post DeKWiFpE_9K only (scrape incomplete, more to come); Jakarta time: the first row is the post itself at 00:45:50 WIB"
     }
   ]
 }

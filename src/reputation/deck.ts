@@ -16,9 +16,9 @@ import { hasModelCredentials, modelId } from "../chat/loop";
 import { numbersIn } from "../competitor/narrative";
 import { C, CW, FONT, M, W, add, chip, text, title, type Slide } from "../competitor/draw";
 import { drawPdf, recordWith, slideTextsOf, type SlideText } from "../competitor/pdfdeck";
-import { deckPeriod, latestComplete, type Grain, type Period } from "../competitor/period";
+import { deckPeriod, isRange, latestComplete, previousPeriod, type Grain, type Period } from "../competitor/period";
 import { change, compact, dayMonth, int, pct, pts } from "../competitor/view";
-import { shiftPeriod } from "../dashboard/period";
+import { getWorkspace } from "../workspace/store";
 import { PR, type RoleModel } from "../roles/model";
 import { SkillDb } from "../skills/db";
 import { reputationFacts, type Issue, type Level, type PrDashboardData, type Quote } from "./dashboard";
@@ -32,6 +32,8 @@ export type ReputationReport = PrDashboardData & {
   period: Period;
   previous: Period;
   slides: RepSlide[];
+  /** what this workspace leaves out (settings.pr.hide: status, reach, csat, intent) */
+  hide: string[];
 };
 
 export type RepNarrative = {
@@ -68,18 +70,26 @@ const levelName = (r: PrDashboardData) => (noNorm(r) ? "No norm yet" : LEVEL_NAM
 const saidOf = (r: PrDashboardData) => (r.voice_posts > 0 ? "posts and comments" : "comments");
 const reachOf = (v: number | null) => (v == null ? "not reported" : compact(v));
 const NO_NORM_COLOR = "94A3B8", NO_NORM_BG = "F1F5F9";
+const shown = (r: { hide?: string[] }, k: string) => !(r.hide ?? []).includes(k);
+const shareOf = (a: number, b: number) => (b > 0 ? Math.round((a / b) * 1000) / 10 : null);
+/** "this week", "this month", or the days picked */
+const periodWord = (r: { grain: Grain; period: Period }) => (isRange(r.period) ? r.period.label : r.grain === "month" ? "this month" : "this week");
+/** posts and comments apart, as the deck prints them */
+const splitLine = (x: { n: number; negative: number; positive: number; labelled: number }, unit: string, neg: string, pos: string) =>
+  `${int(x.n)} ${unit}${x.labelled < x.n ? ` (${int(x.labelled)} read)` : ""}: ${int(x.negative)} ${neg} (${pct(shareOf(x.negative, x.labelled))}), ${int(x.positive)} ${pos} (${pct(shareOf(x.positive, x.labelled))})`;
 
 // ------------------------------------------------------------------- facts
 /** The report for one period (the latest the data fully covers by default) and the period before it. */
 export async function reputationReport(ws: string, o: { title: string; grain: Grain; spec: RepSpec; period?: string; asOf: string; role?: RoleModel }): Promise<ReputationReport> {
   const period = o.period ? deckPeriod(o.grain, o.period) : latestComplete(o.grain, o.asOf);
-  const previous = shiftPeriod(period, -1);
+  const previous = previousPeriod(period);
   const d = await reputationFacts(ws, { focus: o.spec.focus, from: period.from, to: period.to, platform: o.spec.platform, prev: { from: previous.from, to: previous.to } }, o.role ?? PR, new SkillDb());
   if (!d) throw new Error("this workspace has no brands to report on");
   if (!d.kpis.mentions.now && !d.kpis.comments.now) throw new Error(`no posts or comments about ${d.focus.name} in ${period.label}`);
   // a slide with nothing it could measure here stays out: the competitors need a second brand, service needs comment themes
-  const slides = o.spec.slides.filter((k) => !(k === "competitive" && solo(d)) && !(k === "service" && !d.service.measured));
-  return { ...d, title: o.title, grain: o.grain, period, previous, slides };
+  const hide = (await getWorkspace(ws))?.pr_hide ?? [];
+  const slides = o.spec.slides.filter((k) => !(k === "competitive" && solo(d)) && !(k === "service" && !d.service.measured) && !(k === "timeline" && hide.includes("status")));
+  return { ...d, title: o.title, grain: o.grain, period, previous, slides, hide };
 }
 
 // -------------------------------------------------------------- fact sheet
@@ -92,20 +102,33 @@ export function repSheet(r: ReputationReport): string {
   const who = r.focus.name;
   out.push(`Reputation report for ${who}${r.focus.is_client ? " (our brand)" : ""}: ${r.period.label}, against ${r.previous.label}. Platforms: ${r.filters.platform === "all" ? r.platforms.map((p) => PLATFORM[p] ?? p).join(", ") : PLATFORM[r.filters.platform] ?? r.filters.platform}.`);
   const said = saidOf(r);
+  if (shown(r, "status")) {
   out.push(`\n## Status on ${r.status.day ? dayMonth(r.status.day.d) : "–"}: ${levelName(r)}`);
   out.push(r.status.reason);
   out.push(`Days in the period by status: ${Object.entries(r.status.history.filter((h) => h.d >= r.period.from && h.d <= r.period.to).reduce<Record<string, number>>((a, h) => ({ ...a, [LEVEL_NAME[h.level]]: (a[LEVEL_NAME[h.level]] ?? 0) + 1 }), {})).map(([l, n]) => `${l} ${n}`).join(", ")}.`);
+  }
+  if (r.voice_posts > 0) {
+    const cv = r.conversation;
+    out.push(`\n## The conversation in ${r.period.label} (posts by other accounts with a stance, and the comments under posts; off-topic left out)`);
+    out.push(`- Posts: ${splitLine(cv.now.posts, "posts", "against", `defending ${who}`)}; ${int(cv.now.posts.neutral)} neutral. Before (${r.previous.label}): ${int(cv.prev.posts.n)} posts.`);
+    out.push(`- Comments: ${splitLine(cv.now.comments, "comments", "negative", `defending ${who}`)}; ${int(cv.now.comments.neutral)} neutral${cv.now.comments.n > cv.now.comments.labelled ? `; ${int(cv.now.comments.n - cv.now.comments.labelled)} not read yet` : ""}. Before: ${int(cv.prev.comments.n)} comments.`);
+    if (cv.by_voice.length) {
+      out.push(`\n## Who is talking (the side each post and comment is written from)`);
+      for (const v of cv.by_voice) out.push(`- ${v.voice === "unclear" ? "Not clear" : v.voice}: ${splitLine(v.posts, "posts", "against", "defending")}; ${splitLine(v.comments, "comments", "negative", "defending")}`);
+    }
+  }
   out.push(`\n## Headline numbers (this period; previous; change)`);
   out.push(`- Mentions (posts about ${who}): ${int(k.mentions.now ?? 0)}; ${int(k.mentions.prev ?? 0)}; ${change(k.mentions.now ?? 0, k.mentions.prev ?? 0)}`);
-  out.push(k.reach.now == null ? `- Reach: not reported (these platforms report no views)` : `- Reach (views of those posts): ${compact(k.reach.now)}; ${compact(k.reach.prev)}; ${change(k.reach.now ?? 0, k.reach.prev ?? 0)}`);
+  if (shown(r, "reach")) out.push(k.reach.now == null ? `- Reach: not reported (these platforms report no views)` : `- Reach (views of those posts): ${compact(k.reach.now)}; ${compact(k.reach.prev)}; ${change(k.reach.now ?? 0, k.reach.prev ?? 0)}`);
   out.push(`- ${r.voice_posts > 0 ? `Posts and comments (${int(r.voice_posts)} posts with a stance, and the comments under posts)` : "Comments"}: ${int(k.comments.now ?? 0)}; ${int(k.comments.prev ?? 0)}; ${change(k.comments.now ?? 0, k.comments.prev ?? 0)}`);
   out.push(`- Negative share of ${said}: ${pct(k.neg_pct.now)}; ${pct(k.neg_pct.prev)}; ${pts(k.neg_pct.now, k.neg_pct.prev)}`);
-  out.push(`- CSAT (1 to 5): ${k.csat.now?.toFixed(2) ?? "–"}; ${k.csat.prev?.toFixed(2) ?? "–"}`);
-  out.push(`- Purchase intent share of comments: ${pct(k.intent_pct.now)}; ${pct(k.intent_pct.prev)}; ${pts(k.intent_pct.now, k.intent_pct.prev)}`);
+  if (shown(r, "csat")) out.push(`- CSAT (1 to 5): ${k.csat.now?.toFixed(2) ?? "–"}; ${k.csat.prev?.toFixed(2) ?? "–"}`);
+  if (shown(r, "intent")) out.push(`- Purchase intent share of comments: ${pct(k.intent_pct.now)}; ${pct(k.intent_pct.prev)}; ${pts(k.intent_pct.now, k.intent_pct.prev)}`);
   out.push(`\n## Issues (topics carrying ${who}'s negative ${said})`);
   if (!r.issues.length) out.push(`None: no topic carried enough negative ${said} to call an issue.`);
   for (const i of r.issues) {
     out.push(`- ${i.topic}: ${int(i.negative)} negative ${said} (${int(i.negative_prev)} before, ${change(i.negative, i.negative_prev)}), ${pct(i.neg_pct)} of ${int(i.comments)} ${said} on it${solo(r) ? "" : `; other brands ${pct(i.industry.neg_pct)}. Scope: ${SCOPE[i.scope]}${i.industry.brands_up.length ? ` (also hit: ${i.industry.brands_up.join(", ")})` : ""}`}. Stage: ${i.stage}. Peak ${i.peak_day ? dayMonth(i.peak_day) : "–"}. Platforms: ${i.platforms.map((p) => `${PLATFORM[p.platform] ?? p.platform} ${int(p.negative)}`).join(", ")}. Themes: ${i.themes.map((t) => `${t.theme} ${int(t.n)}`).join(", ") || "–"}.`);
+    if (r.voice_posts > 0) out.push(`  - apart: ${splitLine(i.split.posts, "posts", "against", "defending")}; ${splitLine(i.split.comments, "comments", "negative", "defending")}`);
     for (const q of i.quotes.slice(0, 2)) out.push(`  - quote: ${quoteLine(q)}`);
     for (const p of i.posts.slice(0, 2)) out.push(`  - post: @${p.handle ?? "unknown"} on ${PLATFORM[p.platform] ?? p.platform}${p.source === "owned" ? " (our own post)" : ""}, ${p.views != null ? `${compact(p.views)} views` : `${int(p.likes ?? 0)} likes`}${p.stance ? `, ${p.stance === "negative" ? "against" : p.stance === "positive" ? "defending" : "neutral"}` : ""}, ${int(p.negative)} negative of ${int(p.comments)} comments under it: ${p.caption.slice(0, 160)}`);
   }
@@ -193,14 +216,19 @@ export function plainRep(r: ReputationReport): RepNarrative {
     summary: {
       headline: (noNorm(r)
         ? `${who}: ${top ? `${top.topic === "Not in a topic" ? "complaints outside our topics" : top.topic} leads the negative talk` : "no normal level yet to judge against"}`
+        : !shown(r, "status") || isRange(r.period) ? `${who}: ${top ? `${top.topic === "Not in a topic" ? "complaints outside our topics" : top.topic} leads the negative talk` : `the talk in ${r.period.label}`}`
         : `${who}: ${LEVEL_NAME[lv].toLowerCase()} ${r.grain === "month" ? "month" : "week"}${only ? `, but ${only.topic} complaints are ours alone` : top ? `, ${top.topic === "Not in a topic" ? "complaints outside our topics" : top.topic} leads the negative talk` : ""}`).slice(0, 120),
-      happened: `${int(k.mentions.now ?? 0)} posts about ${who}${k.reach.now != null ? ` reached ${compact(k.reach.now)} views and` : ""} drew ${int(k.comments.now ?? 0)} ${said}; ${pct(k.neg_pct.now)} were negative${k.neg_pct.prev != null ? ` (${pts(k.neg_pct.now, k.neg_pct.prev)} on ${r.previous.label})` : ""}.`,
+      happened: r.voice_posts > 0
+        ? `${pct(shareOf(r.conversation.now.posts.negative, r.conversation.now.posts.labelled))} of ${int(r.conversation.now.posts.labelled)} posts about ${who} were against it, and ${pct(shareOf(r.conversation.now.comments.negative, r.conversation.now.comments.labelled))} of ${int(r.conversation.now.comments.labelled)} comments read were negative.`
+        : `${int(k.mentions.now ?? 0)} posts about ${who}${k.reach.now != null && shown(r, "reach") ? ` reached ${compact(k.reach.now)} views and` : ""} drew ${int(k.comments.now ?? 0)} ${said}; ${pct(k.neg_pct.now)} were negative${k.neg_pct.prev != null ? ` (${pts(k.neg_pct.now, k.neg_pct.prev)} on ${r.previous.label})` : ""}.`,
       means: only ? `${only.topic} is a complaint about ${who} alone: ${pct(only.neg_pct)} negative against ${pct(only.industry.neg_pct)} for the other brands.` : top ? `${top.topic} carries most of the negative talk${solo(r) ? "" : ", and the other brands see it too"}.` : "Nothing points to a reputation problem this period.",
-      next: lv === "issue" || lv === "crisis" ? `Decide on a response to ${top?.topic ?? "the negative talk"} today and brief spokespeople.` : noNorm(r) && top ? `Decide on a response to ${top.topic}; there is no normal level yet to say how unusual this is, so read the issues on the next slides.` : only ? `Look into ${only.topic} with the team that owns it before it grows.` : "No response needed; keep watching the issues on the next slides.",
+      next: !shown(r, "status") && top ? `Decide on a response to ${top.topic === "Not in a topic" ? "the negative talk" : top.topic} and brief spokespeople; the issues on the next slides show where it is.` : lv === "issue" || lv === "crisis" ? `Decide on a response to ${top?.topic ?? "the negative talk"} today and brief spokespeople.` : noNorm(r) && top ? `Decide on a response to ${top.topic}; there is no normal level yet to say how unusual this is, so read the issues on the next slides.` : only ? `Look into ${only.topic} with the team that owns it before it grows.` : "No response needed; keep watching the issues on the next slides.",
     },
     issues: r.issues.map((i) => ({
       topic: i.topic,
-      read: `${int(i.negative)} negative ${said} (${change(i.negative, i.negative_prev)}), ${pct(i.neg_pct)} of ${said} on it${solo(r) ? "" : ` against ${pct(i.industry.neg_pct)} for the other brands`}; mostly on ${i.platforms.slice(0, 2).map((p) => PLATFORM[p.platform] ?? p.platform).join(" and ")}.`,
+      read: r.voice_posts > 0
+        ? `${int(i.split.posts.negative)} of ${int(i.split.posts.n)} posts against ${who} (${pct(shareOf(i.split.posts.negative, i.split.posts.labelled))}); ${int(i.split.comments.negative)} of ${int(i.split.comments.n)} comments negative (${pct(shareOf(i.split.comments.negative, i.split.comments.labelled))}); mostly on ${i.platforms.slice(0, 2).map((p) => PLATFORM[p.platform] ?? p.platform).join(" and ")}.`
+        : `${int(i.negative)} negative ${said} (${change(i.negative, i.negative_prev)}), ${pct(i.neg_pct)} of ${said} on it${solo(r) ? "" : ` against ${pct(i.industry.neg_pct)} for the other brands`}; mostly on ${i.platforms.slice(0, 2).map((p) => PLATFORM[p.platform] ?? p.platform).join(" and ")}.`,
       response: respond(i),
     })),
     narratives: narr ? `${narr.topic} is the largest named topic at ${pct(narr.share)} of the conversation, ${pct(narr.neg_pct)} negative.` : "No topic stands out this period.",
@@ -243,13 +271,14 @@ function repTool(r: ReputationReport): Anthropic.Tool {
 
 function repSystem(r: ReputationReport, role: RoleModel): string {
   return [
-    `You write the words of a ${r.grain === "month" ? "monthly" : "weekly"} reputation deck for ${r.focus.name}'s PR team, for them to send to management. ${role.voice.replace(/\{\{client\}\}/g, r.focus.name)}`,
+    `You write the words of a ${isRange(r.period) ? `reputation deck covering ${r.period.label}` : `${r.grain === "month" ? "monthly" : "weekly"} reputation deck`} for ${r.focus.name}'s PR team, for them to send to management. ${role.voice.replace(/\{\{client\}\}/g, r.focus.name)}`,
     "The numbers are already on the slides. Use only numbers from the fact sheet, written exactly as it prints them (1.2M, 16.1%, +2.7 pt); never compute a new one, never round differently. Quote comments only from the fact sheet.",
     "Write in plain English, short sentences, no jargon, no hype. Name the platform when it matters. Say clearly whether an issue is about us alone or the whole category, and when no response is the right call.",
     "Never mention tools, analyses, skills or how the data was made.",
     ...(solo(r) ? [`${r.focus.name} is the only brand watched here: never compare with other brands or the category, and leave the competitive and service lines short.`] : []),
-    ...(noNorm(r) ? ["There is no normal level to compare with yet (the capture starts with this story): never call the period calm; say how much of the talk is negative and what it is about."] : []),
-    ...(r.voice_posts > 0 ? ["Posts by other accounts carry a stance and are counted with the comments: call them posts and comments, not comments."] : []),
+    ...(!shown(r, "status") ? ["The deck carries no status level: never call the period calm, an issue or a crisis by a rule; say what the posts and comments show."] : []),
+    ...(noNorm(r) && shown(r, "status") ? ["There is no normal level to compare with yet (the capture starts with this story): never call the period calm; say how much of the talk is negative and what it is about."] : []),
+    ...(r.voice_posts > 0 ? ["Posts by other accounts carry a stance and are counted with the comments: keep posts and comments apart when you give numbers, as the fact sheet does."] : []),
   ].join("\n\n");
 }
 
@@ -335,10 +364,21 @@ function summarySlide(pres: PptxGenJS, r: ReputationReport, n: RepNarrative, pag
   const lv = r.status.level;
   const nn = noNorm(r);
   const said = saidOf(r);
+  if (!shown(r, "status") && r.voice_posts > 0) {
+    // no status rule here: the box says how the posts and the comments lean instead
+    const cv = r.conversation.now;
+    s.addShape("roundRect", { x: M, y: 1.7, w: 3.1, h: 1.5, fill: { color: "FDECEC" }, line: { color: "FDECEC", width: 0 }, rectRadius: 0.1 });
+    add(s, [
+      text(`${pct(shareOf(cv.posts.negative, cv.posts.labelled))}`, { fontSize: 24, bold: true, color: "E5484D" }), text(` of posts against`, { fontSize: 10.5, color: C.ink6, breakLine: true }),
+      text(`${pct(shareOf(cv.comments.negative, cv.comments.labelled))}`, { fontSize: 24, bold: true, color: "E5484D" }), text(` of comments negative`, { fontSize: 10.5, color: C.ink6, breakLine: true }),
+      text(`${int(cv.posts.labelled)} posts, ${int(cv.comments.labelled)} comments read`, { fontSize: 9, color: C.ink6 }),
+    ], { x: M + 0.2, y: 1.78, w: 2.8, h: 1.35, valign: "top" });
+  } else {
   s.addShape("roundRect", { x: M, y: 1.7, w: 3.1, h: 1.5, fill: { color: nn ? NO_NORM_BG : LEVEL_BG[lv] }, line: { color: nn ? NO_NORM_BG : LEVEL_BG[lv], width: 0 }, rectRadius: 0.1 });
   add(s, `Status on ${r.status.day ? dayMonth(r.status.day.d) : "–"}`, { x: M + 0.2, y: 1.82, w: 2.8, h: 0.25, fontSize: 10, bold: true, color: C.ink6 });
   add(s, levelName(r), { x: M + 0.2, y: 2.08, w: 2.8, h: 0.5, fontSize: nn ? 24 : 28, bold: true, color: nn ? NO_NORM_COLOR : LEVEL_COLOR[lv] });
   add(s, r.status.baseline.neg_pct != null && r.status.day?.neg_pct != null ? `${pct(r.status.day.neg_pct)} negative that day, norm ${pct(r.status.baseline.neg_pct)}` : nn && r.status.day?.neg_pct != null ? `${pct(r.status.day.neg_pct)} negative that day; no normal level to compare with yet` : `Not enough ${said} that day to judge`, { x: M + 0.2, y: 2.65, w: 2.8, h: 0.45, fontSize: 9.5, color: C.ink6 });
+  }
   const blocks: [string, string][] = [["What happened", n.summary.happened], ["What it means", n.summary.means], ["What to do next", n.summary.next]];
   blocks.forEach(([h, t], i) => {
     const x = M + 3.35 + i * 3.0;
@@ -346,7 +386,14 @@ function summarySlide(pres: PptxGenJS, r: ReputationReport, n: RepNarrative, pag
     add(s, t, { x, y: 2.02, w: 2.85, h: 1.3, fontSize: 11, color: C.ink, fit: "shrink" });
   });
   const k = r.kpis;
-  const tiles: [string, string, string][] = [
+  const cvn = r.conversation.now, cvp = r.conversation.prev;
+  const caseTiles: [string, string, string][] = [
+    ["Posts about " + r.focus.name, int(k.mentions.now ?? 0), change(k.mentions.now ?? 0, k.mentions.prev ?? 0)],
+    ["Posts against", pct(shareOf(cvn.posts.negative, cvn.posts.labelled)), pts(shareOf(cvn.posts.negative, cvn.posts.labelled), shareOf(cvp.posts.negative, cvp.posts.labelled))],
+    ["Comments", int(cvn.comments.n), change(cvn.comments.n, cvp.comments.n)],
+    ["Comments negative", pct(shareOf(cvn.comments.negative, cvn.comments.labelled)), pts(shareOf(cvn.comments.negative, cvn.comments.labelled), shareOf(cvp.comments.negative, cvp.comments.labelled))],
+  ];
+  const allTiles: [string, string, string][] = [
     ["Mentions", int(k.mentions.now ?? 0), change(k.mentions.now ?? 0, k.mentions.prev ?? 0)],
     ["Reach", k.reach.now == null ? "–" : compact(k.reach.now), k.reach.now == null ? "not reported;" : change(k.reach.now ?? 0, k.reach.prev ?? 0)],
     [r.voice_posts > 0 ? "Posts and comments" : "Comments", int(k.comments.now ?? 0), change(k.comments.now ?? 0, k.comments.prev ?? 0)],
@@ -354,7 +401,10 @@ function summarySlide(pres: PptxGenJS, r: ReputationReport, n: RepNarrative, pag
     ["CSAT", k.csat.now?.toFixed(2) ?? "–", k.csat.now != null && k.csat.prev != null ? `${k.csat.now - k.csat.prev >= 0 ? "+" : "−"}${Math.abs(k.csat.now - k.csat.prev).toFixed(2)}` : "–"],
     ["Purchase intent", pct(k.intent_pct.now), pts(k.intent_pct.now, k.intent_pct.prev)],
   ];
-  const tw = (CW - 0.15 * 5) / 6;
+  const KEY: Record<string, string> = { Reach: "reach", CSAT: "csat", "Purchase intent": "intent" };
+  const extraTiles = allTiles.filter(([l]) => KEY[l]);
+  const tiles = (r.voice_posts > 0 ? [...caseTiles, ...extraTiles] : allTiles).filter(([l]) => !KEY[l] || shown(r, KEY[l]));
+  const tw = (CW - 0.15 * (tiles.length - 1)) / tiles.length;
   tiles.forEach(([l, v, d], i) => {
     const x = M + i * (tw + 0.15);
     s.addShape("roundRect", { x, y: 3.6, w: tw, h: 1.35, fill: { color: C.white }, line: { color: C.line, width: 0.75 }, rectRadius: 0.08 });
@@ -368,10 +418,10 @@ function summarySlide(pres: PptxGenJS, r: ReputationReport, n: RepNarrative, pag
     issues.forEach((i, j) => {
       const x = M + j * (CW / issues.length);
       if (!solo(r)) chip(s, SCOPE[i.scope], x, 5.55, { fill: i.scope === "only_us" ? "FFEEE8" : C.blue05, color: i.scope === "only_us" ? "C2410C" : C.blue });
-      add(s, [text(i.topic, { fontSize: 12, bold: true, color: C.ink, breakLine: true }), text(`${int(i.negative)} negative · ${pct(i.neg_pct)} of ${said}`, { fontSize: 10, color: C.ink6 })], { x, y: 5.9, w: CW / issues.length - 0.2, h: 0.6 });
+      add(s, [text(i.topic, { fontSize: 12, bold: true, color: C.ink, breakLine: true }), text(r.voice_posts > 0 ? `${int(i.split.posts.negative)} posts against · ${int(i.split.comments.negative)} comments negative` : `${int(i.negative)} negative · ${pct(i.neg_pct)} of ${said}`, { fontSize: 10, color: C.ink6 })], { x, y: 5.9, w: CW / issues.length - 0.2, h: 0.6 });
     });
   }
-  foot(s, `${r.voice_posts > 0 ? `Posts about ${r.focus.name} that carry a stance, and the comments under posts` : `Comments about ${r.focus.name} under posts that name the brand or are its own`}; the brand's own replies are left out. Negative = share of labelled ${said}. Status: ${r.status.rule}`);
+  foot(s, `${r.voice_posts > 0 ? `Posts about ${r.focus.name} that carry a stance, and the comments under posts` : `Comments about ${r.focus.name} under posts that name the brand or are its own`}; the brand's own replies are left out. Negative = share of labelled ${said}.${shown(r, "status") ? ` Status: ${r.status.rule}` : ""}`);
   s.addNotes(`${n.summary.headline}\n${n.summary.happened}\n${n.summary.means}\n${n.summary.next}`);
 }
 
@@ -409,8 +459,17 @@ function issueCard(s: Slide, r: ReputationReport, i: Issue, n: RepNarrative["iss
   let cx = x + 0.18;
   if (!solo(r)) cx += chip(s, SCOPE[i.scope], cx, y + 0.52, { fill: i.scope === "only_us" ? "FFEEE8" : C.blue05, color: i.scope === "only_us" ? "C2410C" : C.blue }) + 0.08;
   chip(s, i.stage.charAt(0).toUpperCase() + i.stage.slice(1), cx, y + 0.52, { fill: "F1F5F9", color: C.ink6 });
+  if (r.voice_posts > 0) {
+    // posts and comments apart: how many, how many against, how many defending
+    const part = (label: string, xs: { n: number; negative: number; positive: number; labelled: number }, neg: string) => [
+      text(`${label} `, { fontSize: 10, bold: true, color: C.ink6 }), text(int(xs.n), { fontSize: 15, bold: true, color: C.ink }),
+      text(`  ${int(xs.negative)} ${neg} (${pct(shareOf(xs.negative, xs.labelled))}) · ${int(xs.positive)} defending`, { fontSize: 9.5, color: C.ink6, breakLine: true }),
+    ];
+    add(s, [...part("Posts", i.split.posts, "against"), ...part("Comments", i.split.comments, "negative")], { x: x + 0.18, y: y + 0.88, w: w - 0.36, h: 0.78, fit: "shrink" });
+  } else {
   add(s, [text(int(i.negative), { fontSize: 22, bold: true, color: C.ink, breakLine: true }), text(`negative, ${change(i.negative, i.negative_prev)}`, { fontSize: 9, color: C.ink6 })], { x: x + 0.18, y: y + 0.92, w: w / 2 - 0.2, h: 0.7 });
   add(s, [text(pct(i.neg_pct), { fontSize: 22, bold: true, color: C.ink, breakLine: true }), text(solo(r) ? `of ${int(i.comments)} ${saidOf(r)}` : `others ${pct(i.industry.neg_pct)}`, { fontSize: 9, color: C.ink6 })], { x: x + w / 2, y: y + 0.92, w: w / 2 - 0.2, h: 0.7 });
+  }
   add(s, n?.read ?? "", { x: x + 0.18, y: y + 1.72, w: w - 0.36, h: 1.05, fontSize: 10.5, color: C.ink, fit: "shrink" });
   if (i.quotes[0]) quoteBox(s, i.quotes[0], x + 0.18, y + 2.85, w - 0.36, 1.05);
   add(s, [text("Response: ", { fontSize: 10, bold: true, color: C.blue }), text(n?.response ?? "", { fontSize: 10, color: C.ink })], { x: x + 0.18, y: y + h - 0.85, w: w - 0.36, h: 0.72, fit: "shrink" });
@@ -462,6 +521,21 @@ function narrativesSlide(pres: PptxGenJS, r: ReputationReport, n: RepNarrative, 
   chrome(s, r, page);
   title(s, `What people say about ${r.focus.name}`, n.narratives);
   const rows = r.narratives.filter((x) => x.comments > 0).slice(0, 9);
+  if (r.voice_posts > 0) {
+    const sp = (a: number, b: number) => pct(shareOf(a, b));
+    table(s, ["Topic", "Posts", "Against", "Comments", "Negative", "Share", "In their words"],
+      rows.map((x) => [x.catch_all ? `${x.topic} (no topic fits)` : x.topic, int(x.split.posts.n), sp(x.split.posts.negative, x.split.posts.labelled), int(x.split.comments.n), sp(x.split.comments.negative, x.split.comments.labelled), pct(x.share), x.quote ? `“${plainText(x.quote.text).slice(0, 80)}${plainText(x.quote.text).length > 80 ? "…" : ""}”` : "–"]),
+      { x: M, y: 1.7, w: CW, colW: [2.3, 0.8, 0.9, 1.0, 0.95, 0.8, 5.583], right: [1, 2, 3, 4, 5], bold: [0], size: 9.5, maxH: r.conversation.by_voice.length ? 2.4 : 4.6 });
+    const bv = r.conversation.by_voice;
+    if (bv.length) {
+      add(s, "Who is talking", { x: M, y: 4.55, w: 4, h: 0.26, fontSize: 11, bold: true, color: C.ink6 });
+      table(s, ["Voice", "Posts", "Against", "Defending", "Comments", "Negative", "Defending"],
+        bv.map((v) => [v.voice === "unclear" ? "Not clear" : v.voice, int(v.posts.n), sp(v.posts.negative, v.posts.labelled), sp(v.posts.positive, v.posts.labelled), int(v.comments.n), sp(v.comments.negative, v.comments.labelled), sp(v.comments.positive, v.comments.labelled)]),
+        { x: M, y: 4.85, w: 8.2, colW: [1.6, 1.0, 1.1, 1.1, 1.1, 1.1, 1.2], right: [1, 2, 3, 4, 5, 6], bold: [0], size: 9.5, maxH: 1.5 });
+    }
+    foot(s, `Posts by other accounts with a stance, and the comments under posts, about ${r.focus.name} in ${r.period.label}, by topic; off-topic left out. Voice is the side a post or comment is written from.`);
+    return;
+  }
   table(s, ["Topic", r.voice_posts > 0 ? "Posts + comments" : "Comments", "Share", "Change", "Negative", "vs before", "CSAT", "In their words"],
     rows.map((x) => [x.catch_all ? `${x.topic} (no topic fits)` : x.topic, int(x.comments), pct(x.share), change(x.comments, x.comments_prev), pct(x.neg_pct), pts(x.neg_pct, x.neg_pct_prev), x.csat?.toFixed(2) ?? "–", x.quote ? `“${plainText(x.quote.text).slice(0, 90)}${plainText(x.quote.text).length > 90 ? "…" : ""}”` : "–"]),
     { x: M, y: 1.7, w: CW, colW: [2.1, 0.95, 0.8, 0.85, 0.95, 0.9, 0.7, 5.083], right: [1, 2, 3, 4, 5, 6], bold: [0], size: 9.5 });
@@ -486,7 +560,8 @@ function voicesSlide(pres: PptxGenJS, r: ReputationReport, n: RepNarrative, page
   const half = (CW - 0.3) / 2;
   add(s, "Amplifiers", { x: M, y: 1.65, w: half, h: 0.26, fontSize: 11, bold: true, color: C.ink6 });
   const ampViews = r.amplifiers.some((a) => a.views > 0);
-  table(s, ["Account", "Platform", ampViews ? "Reach" : "Likes", "Comments", ampViews ? "Negative" : "Stance"],
+  const ampNeg = ampViews || r.amplifiers.some((a) => a.neg_pct != null);
+  table(s, ["Account", "Platform", ampViews ? "Reach" : "Likes", "Comments", ampNeg ? "Negative" : "Stance"],
     r.amplifiers.slice(0, 8).map((a) => [[text(`@${a.handle}`, { fontSize: 10, bold: true, color: C.blue5, hyperlink: { url: a.top_url } })], PLATFORM[a.platform] ?? a.platform, ampViews ? compact(a.views) : int(a.likes), int(a.comments), a.neg_pct != null ? pct(a.neg_pct) : a.stanced === 1 ? (a.against ? "against" : "not against") : a.stanced > 1 ? `${int(a.against)} of ${int(a.stanced)} against` : "–"]),
     { x: M, y: 1.95, w: half, colW: [2.2, 1.05, 0.85, 0.9, 0.916], right: [2, 3, 4], maxH: 4.3 });
   add(s, "Own channels", { x: M + half + 0.3, y: 1.65, w: half, h: 0.26, fontSize: 11, bold: true, color: C.ink6 });

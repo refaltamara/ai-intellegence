@@ -31,6 +31,8 @@ export type WorkspaceSettings = {
   roles?: RoleId[];
   /** a profile that has moved onto the reputation dashboard ("reputation"); its crisis view moves to Pulse */
   dashboard?: "reputation" | "crisis";
+  /** what the PR dashboard and decks leave out for this case (Fair sets it): "status" (the norm and ladder), "reach", "csat", "intent" */
+  pr?: { hide?: string[] };
 };
 
 /** Who a workspace is for: people choose a team when they sign in, and the team decides the data and the first screen. */
@@ -75,6 +77,8 @@ export type WorkspaceConfig = {
   team_override?: Partial<Team>;
   /** the Dashboard is the reputation dashboard (every panel; a profile once settings.dashboard says so) */
   reputation: boolean;
+  /** PR dashboard parts this workspace leaves out (settings.pr.hide) */
+  pr_hide: string[];
 };
 
 /** One platform name everywhere; CeMO is the assistant you talk to in Chats, on every team. */
@@ -141,6 +145,7 @@ export function workspaceConfig(row: WorkspaceRow, clientName: string | null = n
     client_name: clientName,
     team_override: s.team,
     reputation: kind !== "profile" || s.dashboard === "reputation",
+    pr_hide: (s.pr?.hide ?? []).filter((x): x is string => typeof x === "string"),
     commercial: {
       // A partner with no terms of its own is matched on its name, which is what an
       // owner typing "Oatside" into the Data page expects.

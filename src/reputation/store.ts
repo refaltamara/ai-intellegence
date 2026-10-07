@@ -44,7 +44,7 @@ export async function storeReputation(o: { workspaceId: string; report: Reputati
     [o.workspaceId, `${o.deck.name} · ${r.period.label}`, o.deck.id, body, toJson(blocks)],
   )) as { id: string }[];
   const reportId = rows[0].id;
-  const base = `${slug(o.deck.name) || "Deck"}_${r.period.key}`;
+  const base = `${slug(o.deck.name) || "Deck"}_${r.period.key.replace("..", "_to_")}`;
   await saveReportFile({ workspaceId: o.workspaceId, reportId, format: "pptx", filename: `${base}.pptx`, data: await repPptx(r, n) });
   await saveReportFile({ workspaceId: o.workspaceId, reportId, format: "pdf", filename: `${base}.pdf`, data: await repPdf(r, n) });
   return { reportId };
