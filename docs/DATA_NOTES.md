@@ -136,15 +136,14 @@ Templates for the dump: `Indonesian_Beauty_Q3_2026_{TikTok,Instagram}_template.x
 One contents file, `data/raw/kahf/contents_threads.csv` (posts only; comments to follow). Contract: `etl/profiles/kahf-threads.json`; loader: `etl/load_profile.py`.
 
 - **In → loaded:** 584 → 582 posts, from 525 accounts.
-  - 5 are Kahf's own: the two apology posts on @kahfeveryday at 17:45 WIB on 6 Oct, and three September posts on @kahfeveryday.my.
+  - 5 are Kahf's own: the two apology posts on @kahfeveryday at 00:45 WIB on 7 Oct, and three September posts on @kahfeveryday.my.
   - 577 are earned.
   - Two were dropped as captured by mistake: a June cake festival and a September 2025 post.
 - **Not in the data:** the original post (the AFF meme). It was deleted; Refal sent a screenshot. Its content is in `settings.label.context`.
-- **Times:** 12-hour, no zone, and Jakarta time (Refal, 7 Oct; Maudy's Threads export was UTC, so check the zone per export). Read that way:
-  - first boycott reply 08:02 WIB on 6 Oct;
-  - "Kenapa delete @kahfeveryday" 14:16 WIB;
-  - apology 17:45 WIB;
-  - the surge is 7 Oct 00:00 to 01:59 WIB (497 posts, 01:00 to 03:00 in Malaysia), the last hours of the export.
+- **Times:** 12-hour, no zone, and **UTC**. Refal first said Jakarta time (7 Oct, posts reloaded that way), but the comments settled it the same day:
+  - the 96 posts that the scraper also listed as their own first reply sit exactly 7.00 hours apart from them when the posts are read as Jakarta time, and line up to the second as UTC;
+  - read as Jakarta time, no comment would arrive within 7 hours of its post, and the first boycott reply would come before the deleted post went up.
+  - Read as UTC: first boycott reply 08:02 UTC (15:02 WIB) on 6 Oct; "Kenapa delete @kahfeveryday" 14:16 UTC (21:16 WIB); the apology 17:45 UTC (00:45 WIB on 7 Oct); the surge 00:00 to 01:59 UTC on 7 Oct (497 posts; 07:00 to 09:00 WIB, 08:00 to 10:00 in Malaysia).
 - **Threads gives no views.** Reach is likes; `comments` is the reply count on each post.
 - **What the posts are about (by eye, before labelling):**
   - Mostly Malaysians calling to boycott Kahf, and sometimes every Indonesian brand.
@@ -154,10 +153,19 @@ One contents file, `data/raw/kahf/contents_threads.csv` (posts only; comments to
   - A few early posts in the file are not about the case (a fun run, Watsons, Cosmoderm). The labeller sets these aside as `relevant = false`.
 - **Labelling:** sentiment, stance, topic and voice come from `/api/cron/label` once deployed. Until then the 577 earned posts carry `stance_source = 'awaiting_context'`.
 - **Comments, first batch** (`kahf/comments_threads_1007a.csv`, 7 Oct):
-  - 1,079 in → 992 loaded, on 86 of the posts. Every comment's post is already loaded; none needed a stub.
-  - Dropped: 72 with no text (stickers and images), 15 emoji only.
-  - One is Kahf's own reply.
+  - **Replaced.** Refal's first file had its text column out of line: 787 of 1,079 comments carried another row's text, and 10 sat under the wrong post. Those rows were deleted before labelling and the corrected file loaded in their place.
+  - The corrected file's text column had no header; the stored copy names it `comment_text`.
+  - 1,079 in → 927 loaded, on 91 posts. Every comment's post is already loaded; none needed a stub.
+  - Dropped: 96 that are the post itself (Threads scrapers list a post as its own first reply; the loader now drops a comment by the post's author that repeats its caption), 39 with no text (stickers and images), the rest emoji only.
+  - Kahf has no replies of its own in this batch (the one first counted was its apology post repeated).
   - Times carry a `Z` and are read as UTC, unlike the posts file.
   - The column is `source_post_url` (the loader now accepts it). There are no comment ids, so ids are hashed. 33 rows have a blank platform; the contract says Threads.
   - More batches to come; loading again upserts.
+- **Comments, big batch** (`comments_structured.xlsx`, 7 Oct; the comments sheet is `kahf/comments_threads_1007b.csv`, the posts sheet `kahf/post_stats_1007b.csv`):
+  - 10,509 in → 9,408 loaded, on 40 posts, none of them in the first batch. Real Threads comment ids.
+  - Dropped: 749 under the two posts the contract drops (the June cake festival, the 2025 "which Kahf scent" post). Both have been pulled into the case, but only one comment on each is from the case; the rest predate it. Also dropped: 269 with no text, 83 emoji only.
+  - One is Kahf's own reply.
+  - **Times are Jakarta time**, without a zone, unlike the posts file (UTC) and the first comments file (Z). Read that way, each post's first comment lands 0 to 9 minutes after it. As UTC every post would wait 7 hours for its first comment, and as Malaysian time 35 of 40 posts would get comments before they went up. The contract now takes a zone per file (`naive_tz`).
+  - **Copy-paste accounts:** 22 accounts posted the same text under three posts or more. The most active is one account pasting "Korang support brand badlab ni…" under 15 posts. Pulse's coordinated-pattern card reads these.
+  - The posts sheet carries views, likes, comments and shares for these 40 posts (Threads views are not in the posts export). These are not loaded yet: views on 40 of 577 posts would make reach look complete when it is not.
 

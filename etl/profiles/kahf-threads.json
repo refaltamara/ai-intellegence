@@ -23,9 +23,9 @@
   },
   "export_time": "2026-10-07T03:00:00Z",
   "naive_dates_tz": {
-    "threads": "Asia/Jakarta"
+    "threads": "UTC"
   },
-  "naive_dates_note": "The Threads export carries 12-hour times with no zone. They are Jakarta time (Refal, 7 Oct), unlike Maudy's Threads export, which was UTC. Read that way: the first boycott reply in the data is 08:02 WIB on 6 Oct, \"Kenapa delete @kahfeveryday\" is 14:16 WIB, the two apology posts are 17:45 WIB, and the surge is 00:00 to 02:00 WIB on 7 Oct (01:00 to 03:00 in Malaysia). The deleted post is not in the export.",
+  "naive_dates_note": "The Threads posts export carries 12-hour times with no zone; they are UTC. Refal first said Jakarta time (7 Oct), but the comments (ISO times with Z) settle it: the 96 posts the scraper also listed as their own first reply sit exactly 7.00 hours apart from them when the posts are read as Jakarta time and line up to the second as UTC, no comment would arrive within 7 hours of its post, and the first boycott reply (08:02) would come before the deleted post went up. Read as UTC: first boycott reply 08:02 UTC (15:02 WIB) on 6 Oct, \"Kenapa delete @kahfeveryday\" 14:16 UTC (21:16 WIB), the apology 17:45 UTC (00:45 WIB on 7 Oct), the surge 00:00 to 02:00 UTC on 7 Oct (07:00 to 09:00 WIB, 08:00 to 10:00 in Malaysia). The deleted post is not in the export.",
   "root_url": "https://www.threads.com/@kahfeveryday/post/DeKWiFpE_9K",
   "keywords": [
     "kahf",
@@ -62,6 +62,13 @@
       "platform": "threads",
       "file": "kahf/comments_threads_1007a.csv",
       "note": "first comments batch, 7 Oct (times carry Z: UTC)"
+    },
+    {
+      "kind": "comments",
+      "platform": "threads",
+      "file": "kahf/comments_threads_1007b.csv",
+      "naive_tz": "Asia/Jakarta",
+      "note": "comments_structured.xlsx (comments sheet), 7 Oct; times without zone are Jakarta time: read so, each post's first comment lands 0 to 9 minutes after it"
     }
   ]
 }
