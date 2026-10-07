@@ -425,3 +425,45 @@ Market check, 6 Oct 2026, at Rp 17,900 per USD:
 - **Brandwatch, Meltwater, Sprinklr:** Rp 170M to 900M a year and up.
 
 Claude's recommendation was Rp 42M for Growth. Rp 21M is kept as early-access pricing and revisited before the product goes public.
+
+## Kahf on Threads: case context, topics, voice and restricted workspaces (Refal, 7 Oct 2026)
+
+A crisis workspace for one case: `kahf-threads` (profile, PR role, Threads only), set up while the case was live.
+
+**Who sees it.** Only Refal and Raissa (Refal's call).
+- `settings.restricted_to` lists the emails allowed in. A workspace with that list is hidden from every other account, Fair staff included. It is left out of their teams, the workspace switcher and the CMS lists, and `can()` refuses it.
+- `loadActor` builds the list of hidden workspaces once per request (`actor.hidden`).
+- No list (or an empty one) means the usual rules apply.
+
+**What the labeller is told** (`settings.label`, read by `labelContext` in `src/label/run.ts`):
+- `subject`, `about`, `context`: the case in plain words. Here that is the AFF meme, its deletion and the apology about eight hours later, as Refal described them from a screenshot.
+- `languages`.
+- Without `about`, the prompts are the same as before, so Maudy's labels do not move.
+
+**Topics.** These are the workspace's `topics` rows, labelled per post and per comment (`topic_id`, `topic_confidence`):
+- Boycott calls
+- The original post
+- The apology
+- ParagonCorp and sister brands
+- Others (the catch-all)
+
+They come from reading the 582 posts. Refal agreed to four topics plus Others.
+
+**Voice.** `settings.label.voices` (Malaysian, Indonesian; the model may also answer "unclear") goes into `posts.voice` and `comments.voice`.
+- In this case, which side someone writes from matters as much as how they feel.
+- The hint is the everyday words that differ between Malay and Indonesian.
+- Query it with the `voice` dimension and filter (posts and comments).
+
+**Off-topic posts.** With `post_off_topic`, the labeller may set a post aside as not about the subject or the case (`relevant = false`), as listening workspaces do at load.
+- Threads replies rarely repeat the brand's name, so nothing is dropped by keyword at load.
+- Pulse now keeps `relevant is not false` on every earned-post query.
+
+**Sentiment** stays three classes (negative, neutral, positive) on comments and stance on earned posts. Kahf's own posts are never labelled.
+
+**Holding posts until deploy.** Posts loaded before this labeller was deployed carry `stance_source = 'awaiting_context'`, so the old labeller leaves them alone and the new one picks them up.
+
+**Pulse with posts only.** The dashboard now works before comments arrive:
+- The headline follows posts.
+- No root is claimed without comments.
+- Kahf's own posts during the wave (the apology) are on the timeline.
+- The copy names the subject instead of "her".

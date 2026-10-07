@@ -37,7 +37,9 @@ export const FILTER_SCHEMA = {
     captions_read: { type: "boolean", description: "only posts whose caption was read" },
     // comments entity only
     sentiment: { type: "array", items: { type: "string", enum: ["positive", "neutral", "negative"] }, description: "comments only" },
-    topic: { type: "array", items: { type: "string" }, description: "comments only: topic labels, matched loosely" },
+    topic: { type: "array", items: { type: "string" }, description: "topic labels, matched loosely (comments; posts too where the workspace labels them)" },
+    stance: { type: "array", items: { type: "string", enum: ["positive", "neutral", "negative"] }, description: "posts only: what an earned post says about the subject (profile workspaces)" },
+    voice: { type: "array", items: { type: "string" }, description: "the community the author speaks as, e.g. Malaysian, Indonesian, unclear (where the workspace labels it)" },
     purchase_intent: { type: "boolean", description: "comments only: comments that want to buy or sign up" },
     min_likes: { type: "integer", description: "comments only" },
   },
@@ -151,7 +153,7 @@ export function buildTools(recipes: RecipeSpec[] = [], ext: ExtDim[] = []): Anth
   const queryMetrics: Anthropic.Tool = {
     name: "query_metrics",
     description:
-      `Query aggregated metrics from the social listening database when no skill fits. Choose an entity, filters, group_by dimensions, and metrics; the server builds and runs safe SQL and returns up to 200 rows with evidence refs. Use run_skill first when a skill exists. Entities: ${ENTITIES.join(", ")}. Filters: ${Object.keys(FILTERS).join(", ")} (dates as ISO YYYY-MM-DD; brand_id accepts a slug or a list). Metrics: ${METRICS.join(", ")}. Group_by: ${GROUP_BY.join(", ")}. The comments entity counts what people say under the posts (without the brands' own replies): filters brand_id, platform, source, date_from, date_to, sentiment, topic, purchase_intent, min_likes; metrics ${COMMENT_METRICS.join(", ")}; group_by ${COMMENT_GROUP_BY.join(", ")}; defaults to the last 30 days.${ext.length ? ` The team's own data, as group_by and filters on either entity: ${ext.map((e) => `ext_${e.key} (${e.name} on ${e.target}s: ${e.values.join(", ")}; "none" when read and nothing fits, "not tagged" when not read yet)`).join("; ")}.` : ""}`,
+      `Query aggregated metrics from the social listening database when no skill fits. Choose an entity, filters, group_by dimensions, and metrics; the server builds and runs safe SQL and returns up to 200 rows with evidence refs. Use run_skill first when a skill exists. Entities: ${ENTITIES.join(", ")}. Filters: ${Object.keys(FILTERS).join(", ")} (dates as ISO YYYY-MM-DD; brand_id accepts a slug or a list). Metrics: ${METRICS.join(", ")}. Group_by: ${GROUP_BY.join(", ")}. The comments entity counts what people say under the posts (without the brands' own replies): filters brand_id, platform, source, date_from, date_to, sentiment, topic, voice, purchase_intent, min_likes; metrics ${COMMENT_METRICS.join(", ")}; group_by ${COMMENT_GROUP_BY.join(", ")}; defaults to the last 30 days.${ext.length ? ` The team's own data, as group_by and filters on either entity: ${ext.map((e) => `ext_${e.key} (${e.name} on ${e.target}s: ${e.values.join(", ")}; "none" when read and nothing fits, "not tagged" when not read yet)`).join("; ")}.` : ""}`,
     input_schema: {
       type: "object",
       properties: {

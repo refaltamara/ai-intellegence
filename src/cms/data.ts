@@ -38,8 +38,9 @@ export type WorkspaceState = {
   status: string; health: string | null;
 };
 
-export async function workspaceStates(): Promise<WorkspaceState[]> {
-  const ws = await listWorkspaces();
+/** Every workspace's state for the CMS; `hidden` (the person's closed workspaces, src/auth/can.ts) are left out. */
+export async function workspaceStates(hidden: string[] = []): Promise<WorkspaceState[]> {
+  const ws = (await listWorkspaces()).filter((w) => !hidden.includes(w.id));
   const [posts, comments, loads, people, invites] = await Promise.all([
     sql.query("select workspace_id, count(*)::int as n, count(*) filter (where relevant = false)::int as off, to_char(max(posted_at), 'YYYY-MM-DD') as through from posts group by 1") as unknown as Promise<{ workspace_id: string; n: number; off: number; through: string | null }[]>,
     sql.query("select workspace_id, count(*)::int as n from comments group by 1") as unknown as Promise<{ workspace_id: string; n: number }[]>,

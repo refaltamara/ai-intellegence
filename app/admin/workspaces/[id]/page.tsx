@@ -34,8 +34,8 @@ const list = (o: unknown) => Object.entries((o ?? {}) as Record<string, unknown>
 
 export default async function WorkspaceData({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ tab?: string }> }) {
   const actor = await currentActor();
-  if (!actor || !can(actor, "workspace.data")) notFound();
   const [{ id }, sp] = await Promise.all([params, searchParams]);
+  if (!actor || !can(actor, "workspace.data", { workspace: id })) notFound();
   const d = await workspacePage(id);
   if (!d) notFound();
   const tab = TABS.some(([k]) => k === sp.tab) ? sp.tab! : "overview";

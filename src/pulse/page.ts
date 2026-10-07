@@ -107,15 +107,15 @@ async function build(ws: string): Promise<PulseData | null> {
   const subject = (await db.one<{ name: string }>("select b.name from workspaces w join brands b on b.id = w.client_brand_id where w.id = $1", [ws]))?.name ?? cfg.name;
 
   const totals = await db.one<PulseData["totals"]>(
-    `select (select count(*) from posts where workspace_id = $1 and content_type is distinct from 'stub')::int as posts,
-            (select count(*) from posts where workspace_id = $1 and source = 'earned' and content_type is distinct from 'stub')::int as earned_posts,
+    `select (select count(*) from posts where workspace_id = $1 and content_type is distinct from 'stub' and relevant is not false)::int as posts,
+            (select count(*) from posts where workspace_id = $1 and source = 'earned' and content_type is distinct from 'stub' and relevant is not false)::int as earned_posts,
             (select count(*) from comments where workspace_id = $1 and sentiment_source is distinct from 'subject')::int as comments,
             (select count(*) from comments where workspace_id = $1 and sentiment is not null)::int as labelled,
             (select count(*) from comments where workspace_id = $1 and sentiment = 'negative')::int as negative,
             (select count(*) from comments where workspace_id = $1 and sentiment = 'neutral')::int as neutral,
             (select count(*) from comments where workspace_id = $1 and sentiment = 'positive')::int as positive,
             (select count(distinct (platform, author_handle)) from comments where workspace_id = $1 and sentiment_source is distinct from 'subject')::int as accounts,
-            (select count(distinct platform) from comments where workspace_id = $1)::int as platforms,
+            (select count(distinct platform) from (select platform from comments where workspace_id = $1 union select platform from posts where workspace_id = $1 and relevant is not false) x)::int as platforms,
             (select count(distinct post_id) from comments where workspace_id = $1)::int as posts_with_comments,
             (select count(*) from comments where workspace_id = $1 and off_topic)::int as off_topic,
             (select count(*) from comments where workspace_id = $1 and sentiment_source is distinct from 'subject' and not coalesce(off_topic, false))::int as on_topic,
@@ -126,11 +126,11 @@ async function build(ws: string): Promise<PulseData | null> {
             (select count(*) from comments c join posts p on p.id = c.post_id where c.workspace_id = $1 and not coalesce(c.off_topic, false) and c.sentiment = 'negative' and p.source = 'owned')::int as owned_negative,
             (select count(*) from comments c join posts p on p.id = c.post_id where c.workspace_id = $1 and c.sentiment_source is distinct from 'subject' and not coalesce(c.off_topic, false) and p.source = 'earned')::int as earned_comments,
             (select count(*) from comments c join posts p on p.id = c.post_id where c.workspace_id = $1 and not coalesce(c.off_topic, false) and c.sentiment = 'negative' and p.source = 'earned')::int as earned_negative,
-            (select count(*) from posts where workspace_id = $1 and source = 'earned' and content_type is distinct from 'stub' and stance is not null)::int as posts_stance_labelled,
-            (select count(*) from posts where workspace_id = $1 and source = 'earned' and content_type is distinct from 'stub' and stance = 'negative')::int as posts_against,
-            (select count(*) from posts where workspace_id = $1 and source = 'earned' and content_type is distinct from 'stub' and stance = 'neutral')::int as posts_neutral,
-            (select count(*) from posts where workspace_id = $1 and source = 'earned' and content_type is distinct from 'stub' and stance = 'positive')::int as posts_for,
-            (select count(*) from posts where workspace_id = $1 and source = 'earned' and content_type is distinct from 'stub' and caption is null)::int as posts_no_caption`,
+            (select count(*) from posts where workspace_id = $1 and source = 'earned' and content_type is distinct from 'stub' and relevant is not false and stance is not null)::int as posts_stance_labelled,
+            (select count(*) from posts where workspace_id = $1 and source = 'earned' and content_type is distinct from 'stub' and relevant is not false and stance = 'negative')::int as posts_against,
+            (select count(*) from posts where workspace_id = $1 and source = 'earned' and content_type is distinct from 'stub' and relevant is not false and stance = 'neutral')::int as posts_neutral,
+            (select count(*) from posts where workspace_id = $1 and source = 'earned' and content_type is distinct from 'stub' and relevant is not false and stance = 'positive')::int as posts_for,
+            (select count(*) from posts where workspace_id = $1 and source = 'earned' and content_type is distinct from 'stub' and relevant is not false and caption is null)::int as posts_no_caption`,
     [ws],
   );
   const asOfRow = await db.one<{ c: string; p: string }>(`select to_char((select max(posted_at) from comments where workspace_id = $1) at time zone $2, 'YYYY-MM-DD HH24:MI') as c, to_char((select max(posted_at) from posts where workspace_id = $1 and source = 'earned') at time zone $2, 'YYYY-MM-DD HH24:MI') as p`, [ws, tz]);
@@ -147,7 +147,7 @@ async function build(ws: string): Promise<PulseData | null> {
      hrs as (select generate_series((select h from last) - interval '13 days', (select h from last), interval '1 hour') as h)
      select to_char(hrs.h, 'YYYY-MM-DD HH24:00:00') as h,
             (select count(*) from comments c where c.workspace_id = $1 and c.sentiment_source is distinct from 'subject' and date_trunc('hour', c.posted_at at time zone $2) = hrs.h)::int
-            + 5 * (select count(*) from posts p where p.workspace_id = $1 and p.source = 'earned' and p.content_type is distinct from 'stub' and date_trunc('hour', p.posted_at at time zone $2) = hrs.h)::int as n
+            + 5 * (select count(*) from posts p where p.workspace_id = $1 and p.source = 'earned' and p.content_type is distinct from 'stub' and p.relevant is not false and date_trunc('hour', p.posted_at at time zone $2) = hrs.h)::int as n
      from hrs order by 1`,
     [ws, tz],
   );
@@ -166,7 +166,9 @@ async function build(ws: string): Promise<PulseData | null> {
      from posts p where p.workspace_id = $1 and p.source = 'owned' order by first_day desc, comments desc limit 1`,
     [ws, tz, firstH],
   );
-  const root = rootRow ? { url: rootRow.url as string, posted_at: rootRow.posted_at as string, caption: String(rootRow.caption ?? "").replace(/\s+/g, " ").slice(0, 220), views: rootRow.views as number | null, likes: rootRow.likes as number | null, comments: rootRow.comments as number, early_comments: rootRow.early_comments as number, platform: rootRow.platform as string } : null;
+  // A root needs comments to be one: with none loaded (or a deleted original that never
+  // reached the export) any owned post would win the ranking, so there is no root.
+  const root = rootRow && (rootRow.comments as number) > 0 ? { url: rootRow.url as string, posted_at: rootRow.posted_at as string, caption: String(rootRow.caption ?? "").replace(/\s+/g, " ").slice(0, 220), views: rootRow.views as number | null, likes: rootRow.likes as number | null, comments: rootRow.comments as number, early_comments: rootRow.early_comments as number, platform: rootRow.platform as string } : null;
   const replyRow = await db.one<Row>(`select to_char(posted_at at time zone $2, 'YYYY-MM-DD HH24:MI') as at, coalesce(likes, 0)::int as likes, text, platform from comments where workspace_id = $1 and sentiment_source = 'subject' order by likes desc nulls last limit 1`, [ws, tz]);
   const reply = replyRow && (replyRow.likes as number) > 0 ? { at: replyRow.at as string, likes: replyRow.likes as number, text: String(replyRow.text).replace(/\s+/g, " ").slice(0, 240), platform: replyRow.platform as string } : null;
 
@@ -211,7 +213,7 @@ async function build(ws: string): Promise<PulseData | null> {
               count(p.id) filter (where p.stance = 'negative')::int as against,
               count(p.id) filter (where p.stance = 'positive')::int as for_,
               count(p.id) filter (where p.stance = 'neutral')::int as neutral_posts
-       from hrs left join posts p on p.workspace_id = $1 and p.source = 'earned' and p.content_type is distinct from 'stub'
+       from hrs left join posts p on p.workspace_id = $1 and p.source = 'earned' and p.content_type is distinct from 'stub' and p.relevant is not false
             and date_trunc('hour', p.posted_at at time zone $2) = hrs.h
        group by 1 order by 1`,
       [ws, tz, firstH, lastH],
@@ -249,7 +251,7 @@ async function build(ws: string): Promise<PulseData | null> {
               count(c.id) filter (where c.sentiment_source is distinct from 'subject' and c.posted_at > (select max(posted_at) from comments where workspace_id = $1) - interval '24 hours')::int as last24h,
               to_char(max(c.posted_at) at time zone $2, 'YYYY-MM-DD HH24:MI') as latest
        from posts p join comments c on c.post_id = p.id
-       where p.workspace_id = $1 and p.content_type is distinct from 'stub'
+       where p.workspace_id = $1 and p.content_type is distinct from 'stub' and p.relevant is not false
        group by p.id, p.url, p.platform, p.source, p.creator_handle, p.caption, p.stance, p.views, p.likes, p.posted_at),
      ranked as (select *, row_number() over (partition by platform order by on_topic desc, comments desc) as rn from per_post)
      select * from ranked where rn <= 3 order by on_topic desc, comments desc`,
@@ -279,7 +281,7 @@ async function build(ws: string): Promise<PulseData | null> {
     `with bounds as (select date_trunc('hour', greatest((select max(posted_at) from comments where workspace_id = $1), (select max(posted_at) from posts where workspace_id = $1 and source = 'earned')) at time zone $2) as last),
      hrs as (select generate_series((select last from bounds) - interval '71 hours', (select last from bounds), interval '1 hour') as h)
      select to_char(hrs.h, 'YYYY-MM-DD HH24:00') as h, p.platform, coalesce(p.stance, 'unlabelled') as stance, count(p.id)::int as n
-     from hrs left join posts p on p.workspace_id = $1 and p.source = 'earned' and p.content_type is distinct from 'stub' and date_trunc('hour', p.posted_at at time zone $2) = hrs.h
+     from hrs left join posts p on p.workspace_id = $1 and p.source = 'earned' and p.content_type is distinct from 'stub' and p.relevant is not false and date_trunc('hour', p.posted_at at time zone $2) = hrs.h
      group by 1, 2, 3 order by 1`,
     [ws, tz],
   );
@@ -311,7 +313,7 @@ async function build(ws: string): Promise<PulseData | null> {
             coalesce(sum(views) filter (where stance = 'positive'), 0)::float8 as views_for, coalesce(sum(views) filter (where stance = 'neutral'), 0)::float8 as views_neutral,
             coalesce(sum(likes), 0)::int as likes_total, coalesce(sum(likes) filter (where stance = 'negative'), 0)::int as likes_against,
             coalesce(sum(likes) filter (where stance = 'positive'), 0)::int as likes_for, coalesce(sum(likes) filter (where stance = 'neutral'), 0)::int as likes_neutral
-     from posts where workspace_id = $1 and source = 'earned' and content_type is distinct from 'stub'
+     from posts where workspace_id = $1 and source = 'earned' and content_type is distinct from 'stub' and relevant is not false
      group by 1 order by posts desc`,
     [ws],
   )) as unknown as StanceRow[];
@@ -372,7 +374,7 @@ async function build(ws: string): Promise<PulseData | null> {
     `with bounds as (select coalesce($3::date, (max(posted_at) - interval '30 days')::date) as first, greatest(max(posted_at), (select max(posted_at) from posts where workspace_id = $1 and source = 'earned'))::date as last from comments where workspace_id = $1),
      ds as (select generate_series((select first from bounds), (select last from bounds), interval '1 day')::date as d)
      select to_char(ds.d, 'YYYY-MM-DD') as h, p.platform, count(p.id)::int as n
-     from ds left join posts p on p.workspace_id = $1 and p.source = 'earned' and p.content_type is distinct from 'stub' and (p.posted_at at time zone $2)::date = ds.d
+     from ds left join posts p on p.workspace_id = $1 and p.source = 'earned' and p.content_type is distinct from 'stub' and p.relevant is not false and (p.posted_at at time zone $2)::date = ds.d
      group by 1, 2 order by 1`,
     [ws, tz, sinceIso],
   );
@@ -386,7 +388,7 @@ async function build(ws: string): Promise<PulseData | null> {
      peak as (select distinct on (platform) platform, to_char(h, 'YYYY-MM-DD HH24:00') as peak_hour, n as peak_comments from per_hour order by platform, n desc, h),
      takeoff as (select platform, to_char(min(h), 'YYYY-MM-DD HH24:00') as takeoff from per_hour where n >= 20 group by 1),
      firstpost as (select distinct on (platform) platform, to_char(posted_at at time zone $2, 'YYYY-MM-DD HH24:MI') as first_post, creator_handle as first_post_handle, url as first_post_url
-                   from posts where workspace_id = $1 and source = 'earned' and content_type is distinct from 'stub' and posted_at >= now() - interval '60 days' order by platform, posted_at),
+                   from posts where workspace_id = $1 and source = 'earned' and content_type is distinct from 'stub' and relevant is not false and posted_at >= now() - interval '60 days' order by platform, posted_at),
      agg as (select c.platform, count(*)::int as comments,
                     count(*) filter (where not coalesce(c.off_topic, false))::int as on_topic,
                     count(*) filter (where not coalesce(c.off_topic, false) and c.sentiment = 'negative')::int as negative,
@@ -394,7 +396,7 @@ async function build(ws: string): Promise<PulseData | null> {
                     count(*) filter (where not coalesce(c.off_topic, false) and c.sentiment is not null)::int as labelled,
                     to_char(min(c.posted_at) filter (where c.posted_at >= coalesce($3::date, (now() - interval '60 days')::date)) at time zone $2, 'YYYY-MM-DD HH24:MI') as first_comment
              from comments c where c.workspace_id = $1 and c.sentiment_source is distinct from 'subject' group by 1),
-     np as (select platform, count(*)::int as posts from posts where workspace_id = $1 and content_type is distinct from 'stub' group by 1)
+     np as (select platform, count(*)::int as posts from posts where workspace_id = $1 and content_type is distinct from 'stub' and relevant is not false group by 1)
      select a.platform, f.first_post, f.first_post_handle, f.first_post_url, a.first_comment, t.takeoff, pk.peak_hour, coalesce(pk.peak_comments, 0) as peak_comments,
             coalesce(np.posts, 0) as posts, a.comments, a.on_topic, a.negative, a.positive, a.labelled
      from agg a left join firstpost f using (platform) left join takeoff t using (platform) left join peak pk using (platform) left join np using (platform)
@@ -429,10 +431,30 @@ async function build(ws: string): Promise<PulseData | null> {
     if (s.takeoff) events.push({ at: s.takeoff, platform: s.platform, what: `${label(s.platform)} comments take off`, detail: `first hour with 20 or more comments`, kind: "takeoff" });
     if (s.peak_hour) events.push({ at: s.peak_hour, platform: s.platform, what: `${label(s.platform)} peak`, detail: `${fmt(s.peak_comments)} comments in one hour`, kind: "peak" });
   }
+  // The subject's own posts once the wave is under way (a statement, an apology).
+  const firsts = await db.q<Row>(
+    `select distinct on (p.platform) p.platform, to_char(p.posted_at at time zone $2, 'YYYY-MM-DD HH24:MI') as at, p.creator_handle, p.url
+     from posts p where p.workspace_id = $1 and p.source = 'earned' and p.content_type is distinct from 'stub' and p.relevant is not false
+     order by p.platform, p.posted_at`,
+    [ws, tz],
+  );
+  // a platform with posts but no comments yet still gets its first post on the timeline
+  for (const f of firsts) if (!spread.some((x) => x.platform === f.platform && x.first_post)) events.push({ at: f.at as string, platform: f.platform as string, what: `First ${label(f.platform as string)} post about ${subject}`, detail: `@${f.creator_handle}`, url: f.url as string, kind: "first" });
+  const firstEarned = firsts.map((x) => x.at as string).sort()[0];
+  if (firstEarned) {
+    const own = await db.q<Row>(
+      `select to_char(p.posted_at at time zone $2, 'YYYY-MM-DD HH24:MI') as at, p.platform, p.creator_handle, p.url, p.likes, p.comments_count, p.caption
+       from posts p where p.workspace_id = $1 and p.source = 'owned' and p.content_type is distinct from 'stub'
+         and p.posted_at at time zone $2 >= $3::timestamp and p.url is distinct from $4
+       order by p.posted_at limit 5`,
+      [ws, tz, firstEarned, root?.url ?? null],
+    );
+    for (const o of own) events.push({ at: o.at as string, platform: o.platform as string, what: `${subject} posts on @${o.creator_handle}: “${String(o.caption ?? "").replace(/\s+/g, " ").slice(0, 70)}”`, detail: `${fmt(o.likes)} likes · ${fmt(o.comments_count)} comments`, url: o.url as string, kind: "reply" });
+  }
   if (reply) events.push({ at: reply.at, platform: reply.platform, what: `${subject} replies`, detail: `${fmt(reply.likes)} likes · “${reply.text.slice(0, 90)}…”`, kind: "reply" });
   const tops = await db.q<Row>(
     `select to_char(p.posted_at at time zone $2, 'YYYY-MM-DD HH24:MI') as at, p.platform, p.creator_handle, p.url, p.views::float8 as views, p.likes, p.comments_count, p.caption
-     from posts p where p.workspace_id = $1 and p.source = 'earned' and p.content_type is distinct from 'stub'
+     from posts p where p.workspace_id = $1 and p.source = 'earned' and p.content_type is distinct from 'stub' and p.relevant is not false
      order by coalesce(p.views, 0) + coalesce(p.likes, 0) * 20 desc limit 6`,
     [ws, tz],
   );
@@ -459,10 +481,10 @@ async function commercialExposure(db: SkillDb, ws: string, tz: string, cfg: { pa
   const configured = cfg.partners.length > 0;
   const totals = await db.one<Row>(
     `with last as (select greatest((select max(posted_at) from comments where workspace_id = $1), (select max(posted_at) from posts where workspace_id = $1)) as at)
-     select (select count(*) from posts where workspace_id = $1 and source = 'earned' and content_type is distinct from 'stub' and caption ilike any($2::text[]))::int as posts,
+     select (select count(*) from posts where workspace_id = $1 and source = 'earned' and content_type is distinct from 'stub' and relevant is not false and caption ilike any($2::text[]))::int as posts,
             (select count(*) from comments where workspace_id = $1 and text ilike any($2::text[]))::int as comments,
-            (select count(*) from posts where workspace_id = $1 and source = 'earned' and content_type is distinct from 'stub' and caption ilike any($2::text[]) and posted_at > (select at from last) - interval '24 hours')::int as posts_24h,
-            (select count(*) from posts where workspace_id = $1 and source = 'earned' and content_type is distinct from 'stub' and caption ilike any($2::text[]) and posted_at between (select at from last) - interval '48 hours' and (select at from last) - interval '24 hours')::int as posts_prev_24h,
+            (select count(*) from posts where workspace_id = $1 and source = 'earned' and content_type is distinct from 'stub' and relevant is not false and caption ilike any($2::text[]) and posted_at > (select at from last) - interval '24 hours')::int as posts_24h,
+            (select count(*) from posts where workspace_id = $1 and source = 'earned' and content_type is distinct from 'stub' and relevant is not false and caption ilike any($2::text[]) and posted_at between (select at from last) - interval '48 hours' and (select at from last) - interval '24 hours')::int as posts_prev_24h,
             (select count(*) from comments where workspace_id = $1 and text ilike any($2::text[]) and posted_at > (select at from last) - interval '24 hours')::int as comments_24h,
             (select count(*) from comments where workspace_id = $1 and text ilike any($2::text[]) and posted_at between (select at from last) - interval '48 hours' and (select at from last) - interval '24 hours')::int as comments_prev_24h`,
     [ws, boycott],
@@ -470,7 +492,7 @@ async function commercialExposure(db: SkillDb, ws: string, tz: string, cfg: { pa
   const daily = await db.q<Row>(
     `with ds as (select generate_series(coalesce($3::date, (now() - interval '6 days')::date), (select max(posted_at at time zone $2)::date from comments where workspace_id = $1), interval '1 day')::date as d)
      select to_char(ds.d, 'YYYY-MM-DD') as d,
-            (select count(*) from posts p where p.workspace_id = $1 and p.source = 'earned' and p.content_type is distinct from 'stub' and p.caption ilike any($4::text[]) and (p.posted_at at time zone $2)::date = ds.d)::int as posts,
+            (select count(*) from posts p where p.workspace_id = $1 and p.source = 'earned' and p.content_type is distinct from 'stub' and p.relevant is not false and p.caption ilike any($4::text[]) and (p.posted_at at time zone $2)::date = ds.d)::int as posts,
             (select count(*) from comments c where c.workspace_id = $1 and c.text ilike any($4::text[]) and (c.posted_at at time zone $2)::date = ds.d)::int as comments,
             (select max(p.views) from posts p where p.workspace_id = $1 and p.source = 'earned' and p.caption ilike any($4::text[]) and (p.posted_at at time zone $2)::date = ds.d)::float8 as reach
      from ds order by 1`,
@@ -479,7 +501,7 @@ async function commercialExposure(db: SkillDb, ws: string, tz: string, cfg: { pa
   const top = await db.q<Row>(
     `select url, platform, creator_handle as handle, caption, to_char(posted_at at time zone $2, 'YYYY-MM-DD HH24:MI') as posted_at,
             views::float8 as views, likes, stance
-     from posts where workspace_id = $1 and source = 'earned' and content_type is distinct from 'stub' and caption ilike any($3::text[])
+     from posts where workspace_id = $1 and source = 'earned' and content_type is distinct from 'stub' and relevant is not false and caption ilike any($3::text[])
      order by coalesce(views, 0) + coalesce(likes, 0) * 20 desc limit 5`,
     [ws, tz, boycott],
   );
@@ -489,9 +511,9 @@ async function commercialExposure(db: SkillDb, ws: string, tz: string, cfg: { pa
          pat as (select name, terms from jsonb_to_recordset($2::jsonb) as p(name text, terms text[])),
          per_partner as (
          select pat.name,
-                (select count(*) from posts p where p.workspace_id = $1 and p.source = 'earned' and p.content_type is distinct from 'stub' and p.caption ilike any(pat.terms))::int as posts,
+                (select count(*) from posts p where p.workspace_id = $1 and p.source = 'earned' and p.content_type is distinct from 'stub' and p.relevant is not false and p.caption ilike any(pat.terms))::int as posts,
                 (select count(*) from comments c where c.workspace_id = $1 and c.text ilike any(pat.terms))::int as comments,
-                (select count(*) from posts p where p.workspace_id = $1 and p.source = 'earned' and p.content_type is distinct from 'stub' and p.caption ilike any(pat.terms) and p.posted_at > (select at from last) - interval '24 hours')::int as posts_24h,
+                (select count(*) from posts p where p.workspace_id = $1 and p.source = 'earned' and p.content_type is distinct from 'stub' and p.relevant is not false and p.caption ilike any(pat.terms) and p.posted_at > (select at from last) - interval '24 hours')::int as posts_24h,
                 (select count(*) from comments c where c.workspace_id = $1 and c.text ilike any(pat.terms) and c.posted_at > (select at from last) - interval '24 hours')::int as comments_24h,
                 (select max(p.views) from posts p where p.workspace_id = $1 and p.source = 'earned' and p.caption ilike any(pat.terms))::float8 as top_views,
                 to_char((select min(t) from (select min(p.posted_at) t from posts p where p.workspace_id = $1 and p.source = 'earned' and p.caption ilike any(pat.terms)

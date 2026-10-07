@@ -130,3 +130,27 @@ Templates for the dump: `Indonesian_Beauty_Q3_2026_{TikTok,Instagram}_template.x
 - Caveats:
   - Dates have no time of day (daily and monthly views are fine).
   - Q3 has far fewer zero-like posts than Q2 (4% against 34%; median likes 25 against 5). That points to a change in collection, so Q2 against Q3 comparisons on likes need that said.
+
+## Kahf on Threads (profile workspace `kahf-threads`, Fair's scraper, 7 Oct 2026 ~10:00 WIB)
+
+One contents file, `data/raw/kahf/contents_threads.csv` (posts only; comments to follow). Contract: `etl/profiles/kahf-threads.json`; loader: `etl/load_profile.py`.
+
+- **In → loaded:** 584 → 582 posts, from 525 accounts.
+  - 5 are Kahf's own: the two apology posts on @kahfeveryday at 17:45 UTC on 6 Oct, and three September posts on @kahfeveryday.my.
+  - 577 are earned.
+  - Two were dropped as captured by mistake: a June cake festival and a September 2025 post.
+- **Not in the data:** the original post (the AFF meme). It was deleted; Refal sent a screenshot. Its content is in `settings.label.context`.
+- **Times:** 12-hour, no zone, read as UTC (to confirm with Refal). Read that way:
+  - first boycott reply 08:02 UTC on 6 Oct;
+  - "Kenapa delete @kahfeveryday" 14:16 UTC;
+  - apology 17:45 UTC (00:45 WIB, 7 Oct);
+  - the surge is 7 Oct 00:00 to 01:59 UTC (497 posts, 08:00 to 10:00 in Malaysia).
+- **Threads gives no views.** Reach is likes; `comments` is the reply count on each post.
+- **What the posts are about (by eye, before labelling):**
+  - Mostly Malaysians calling to boycott Kahf, and sometimes every Indonesian brand.
+  - "Support local", with Bad Lab named as the Malaysian alternative.
+  - Spill-over to ParagonCorp's other brands, matched on text in Pulse: Wardah 22 posts, ParagonCorp 12, Emina 8, Make Over 5.
+  - Some Indonesians answer back.
+  - A few early posts in the file are not about the case (a fun run, Watsons, Cosmoderm). The labeller sets these aside as `relevant = false`.
+- **Labelling:** sentiment, stance, topic and voice come from `/api/cron/label` once deployed. Until then the 577 earned posts carry `stance_source = 'awaiting_context'`.
+

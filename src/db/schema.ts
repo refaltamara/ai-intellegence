@@ -235,6 +235,11 @@ export const posts = pgTable(
     /** profile workspaces only: what an earned post says about the subject ('positive' | 'neutral' | 'negative'); owned posts and category workspaces stay null */
     stance: text("stance"),
     stanceSource: text("stance_source"),
+    /** profile workspaces with topics (settings.label; src/label/): the topic the labeller put the post under */
+    topicId: text("topic_id").references((): AnyPgColumn => topics.id),
+    topicConfidence: numeric("topic_confidence"),
+    /** which community the author speaks as, when the workspace names voices (settings.label.voices), e.g. Malaysian | Indonesian | unclear */
+    voice: text("voice"),
     /**
      * Caption reading (DECISIONS, 2 Oct 2026; src/captions/): what the post is about, read by the model
      * from the caption, the same on every brand row of one url. Category workspaces, posts that matter
@@ -371,6 +376,8 @@ export const comments = pgTable(
     translation: text("translation"),
     topicId: text("topic_id").references(() => topics.id),
     topicConfidence: numeric("topic_confidence"),
+    /** as posts.voice: the community the commenter speaks as, when the workspace names voices */
+    voice: text("voice"),
     classifiedAt: ts("classified_at"),
   },
   (t) => [
