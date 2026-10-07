@@ -186,6 +186,9 @@ One contents file, `data/raw/kahf/contents_threads.csv` (posts only; comments to
 - **Comments batch 3** (`comments_batch3_structured.xlsx`, comments sheet, 7 Oct; `kahf/comments_threads_1007g.csv`):
   - 6,296 in → 5,998 loaded, on 54 posts already loaded (Kahf's Malay apology DeLYd4ZCb0u 906, @dirvandha 795, @farahanani33 314, @hafezmy 293), 4 Oct 19:50 to 7 Oct 16:22 WIB. None loaded before. Dropped: 226 empty, 72 emoji or symbols only. 17,858 comments in all.
   - Jakarta time: read so, no post's first comment comes before it, and the median first comment lands 8 minutes after the post.
+- **Recent posts at 21:38** (`Kahf_717_contnt_7_oct_21_38 - kahf_threads_recent.csv`, 7 Oct; `kahf/contents_threads_1007h.csv`):
+  - A different export: Threads' own columns (code, username, followers, verified, epoch `timestamp`, like/reply/repost/quote counts). Epoch times need no zone; the 35 posts already loaded carry exactly the times we had read as Jakarta time (716 of 716 agree to the second).
+  - 717 posts: the 35 already loaded were left out of the file, as Refal asked, and keep their numbers; 682 written in the usual columns (quote_count as reshare, repost_count as repost); one July Watsons post (fraud warning) dropped as before the case. 681 loaded, 1,440 posts in all, nearly all on 7 Oct.
   - Jakarta time: the post went up at 02:03 WIB and the first comment came at 02:23.
 - **All comments labelled by 12:30 WIB on 7 Oct**: 8,965 on posts about the case (off-topic left out). Labelling moved to every 5 minutes the same day.
 
