@@ -136,15 +136,14 @@ Templates for the dump: `Indonesian_Beauty_Q3_2026_{TikTok,Instagram}_template.x
 One contents file, `data/raw/kahf/contents_threads.csv` (posts only; comments to follow). Contract: `etl/profiles/kahf-threads.json`; loader: `etl/load_profile.py`.
 
 - **In → loaded:** 584 → 582 posts, from 525 accounts.
-  - 5 are Kahf's own: the two apology posts on @kahfeveryday at 17:45 WIB on 6 Oct, and three September posts on @kahfeveryday.my.
+  - 5 are Kahf's own: the two apology posts on @kahfeveryday at 00:45 WIB on 7 Oct, and three September posts on @kahfeveryday.my.
   - 577 are earned.
   - Two were dropped as captured by mistake: a June cake festival and a September 2025 post.
 - **Not in the data:** the original post (the AFF meme). It was deleted; Refal sent a screenshot. Its content is in `settings.label.context`.
-- **Times:** 12-hour, no zone, and Jakarta time (Refal, 7 Oct; Maudy's Threads export was UTC, so check the zone per export). Read that way:
-  - first boycott reply 08:02 WIB on 6 Oct;
-  - "Kenapa delete @kahfeveryday" 14:16 WIB;
-  - apology 17:45 WIB;
-  - the surge is 7 Oct 00:00 to 01:59 WIB (497 posts, 01:00 to 03:00 in Malaysia), the last hours of the export.
+- **Times:** 12-hour, no zone, and **UTC**. Refal first said Jakarta time (7 Oct, posts reloaded that way), but the comments settled it the same day:
+  - the 96 posts that the scraper also listed as their own first reply sit exactly 7.00 hours apart from them when the posts are read as Jakarta time, and line up to the second as UTC;
+  - read as Jakarta time, no comment would arrive within 7 hours of its post, and the first boycott reply would come before the deleted post went up.
+  - Read as UTC: first boycott reply 08:02 UTC (15:02 WIB) on 6 Oct; "Kenapa delete @kahfeveryday" 14:16 UTC (21:16 WIB); the apology 17:45 UTC (00:45 WIB on 7 Oct); the surge 00:00 to 01:59 UTC on 7 Oct (497 posts; 07:00 to 09:00 WIB, 08:00 to 10:00 in Malaysia).
 - **Threads gives no views.** Reach is likes; `comments` is the reply count on each post.
 - **What the posts are about (by eye, before labelling):**
   - Mostly Malaysians calling to boycott Kahf, and sometimes every Indonesian brand.
@@ -156,9 +155,9 @@ One contents file, `data/raw/kahf/contents_threads.csv` (posts only; comments to
 - **Comments, first batch** (`kahf/comments_threads_1007a.csv`, 7 Oct):
   - **Replaced.** Refal's first file had its text column out of line: 787 of 1,079 comments carried another row's text, and 10 sat under the wrong post. Those rows were deleted before labelling and the corrected file loaded in their place.
   - The corrected file's text column had no header; the stored copy names it `comment_text`.
-  - 1,079 in → 1,023 loaded, on all 97 posts it names. Every comment's post is already loaded; none needed a stub.
-  - Dropped: 39 with no text (stickers and images), the rest emoji only.
-  - One is Kahf's own reply.
+  - 1,079 in → 927 loaded, on 91 posts. Every comment's post is already loaded; none needed a stub.
+  - Dropped: 96 that are the post itself (Threads scrapers list a post as its own first reply; the loader now drops a comment by the post's author that repeats its caption), 39 with no text (stickers and images), the rest emoji only.
+  - Kahf has no replies of its own in this batch (the one first counted was its apology post repeated).
   - Times carry a `Z` and are read as UTC, unlike the posts file.
   - The column is `source_post_url` (the loader now accepts it). There are no comment ids, so ids are hashed. 33 rows have a blank platform; the contract says Threads.
   - More batches to come; loading again upserts.

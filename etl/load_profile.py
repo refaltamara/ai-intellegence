@@ -426,8 +426,12 @@ def load_contents(db, ws, prof, platform, path, dry, anchor=None):
     return report, {r["url"] for r in rows}, dropped
 
 # ---------------------------------------------------------------- comments
-def normalise_comments(df, platform, prof, known_urls, dropped_urls, source_file, anchor=None):
-    """-> rows (comment dicts), drops (Tally), stubs (url -> stub post dict)."""
+def normalise_comments(df, platform, prof, known_urls, dropped_urls, source_file, anchor=None, own_text=None):
+    """-> rows (comment dicts), drops (Tally), stubs (url -> stub post dict).
+    own_text: url -> (author handle, caption) of the posts already loaded; a comment by the post's
+    author that repeats its caption is the post itself (Threads scrapers list it as the first reply)."""
+    own_text = own_text or {}
+    squash = lambda t: re.sub(r"\s+", " ", t or "").strip()
     drops, rows, stubs, seen_ids = Tally(), [], {}, set()
     # exports differ in their column names; accept every shape Fair Listening has sent
     urls = col(df, "post_url", "source_post_url", "source_url", "url"); ids = col(df, "comment_id", "id")
@@ -446,6 +450,8 @@ def normalise_comments(df, platform, prof, known_urls, dropped_urls, source_file
         if url in dropped_urls:
             drops.add("comment on a dropped post", f"{url} {text[:50]!r}"); continue
         handle = norm_handle(authors.iloc[i])
+        if url in own_text and own_text[url][0] == handle and squash(own_text[url][1]) == squash(text):
+            drops.add("the post itself, captured as its first comment", url); continue
         when, how = parse_when(dates.iloc[i], anchor or prof.anchor, prof.naive_tz.get(platform))
         if when is None and to_str(dates.iloc[i]):
             drops.add(f"unparseable date ({how})", f"{url} {dates.iloc[i]!r}"); continue
@@ -506,7 +512,9 @@ def load_comments(db, ws, prof, platform, path, known_urls, dropped_urls, dry, a
     t0 = time.time()
     log(f"\n== {path.name} ({platform} comments)")
     df = read_csv(path)
-    rows, drops, stubs = normalise_comments(df, platform, prof, known_urls, dropped_urls, path.name, anchor)
+    own_text = {} if dry else {r["url"]: (norm_handle(r["creator_handle"]), r["caption"]) for r in db.rows(
+        "select url, creator_handle, caption from posts where workspace_id = $1 and platform = $2 and caption is not null", [ws, platform])}
+    rows, drops, stubs = normalise_comments(df, platform, prof, known_urls, dropped_urls, path.name, anchor, own_text)
     load_id = None
     if not dry:
         load_id = db.scalar("""insert into data_loads (workspace_id, file, platform, kind, rows_in)
