@@ -7,6 +7,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { PeriodPick } from "./PeriodPick";
 import type { WeeklyItem } from "@/reports/weekly";
 import { WeeklyViewer } from "../weekly/WeeklyViewer";
 
@@ -16,9 +17,11 @@ type Props = {
   initialId: string;
   initialSlide: number;
   periods: { key: string; label: string }[];
+  /** chosen days (PR decks): the last day the data reaches */
+  range?: { asOf: string } | null;
 };
 
-export function DeckViewer({ deck, items, initialId, initialSlide, periods }: Props) {
+export function DeckViewer({ deck, items, initialId, initialSlide, periods, range }: Props) {
   const router = useRouter();
   const [recurring, setRecurring] = useState(deck.recurring);
   const [menu, setMenu] = useState(false);
@@ -44,7 +47,7 @@ export function DeckViewer({ deck, items, initialId, initialSlide, periods }: Pr
   }
 
   async function makeVersion() {
-    const label = periods.find((p) => p.key === period)?.label ?? period;
+    const label = periods.find((p) => p.key === period)?.label ?? period.replace("..", " to ");
     setMenu(false);
     setBusy(`Making the ${label} version: the numbers, the words, the slides… (about a minute)`);
     setError("");
@@ -93,8 +96,8 @@ export function DeckViewer({ deck, items, initialId, initialSlide, periods }: Pr
         <button className="btn sm" onClick={() => setMenu((m) => !m)} disabled={!!busy}>New version ▾</button>
         {menu && (
           <div className="dmenu-pop">
-            <label>For<select value={period} onChange={(e) => setPeriod(e.target.value)}>{periods.map((p) => <option key={p.key} value={p.key}>{p.label}{items.some((i) => i.iso === p.key) ? " (replace)" : ""}</option>)}</select></label>
-            <button className="btn pri sm" onClick={makeVersion}>Make it</button>
+            <label>For<PeriodPick periods={periods} value={period} onChange={setPeriod} range={range} replaced={(k) => items.some((i) => i.iso === k)} /></label>
+            <button className="btn pri sm" onClick={makeVersion} disabled={!period}>Make it</button>
           </div>
         )}
       </div>

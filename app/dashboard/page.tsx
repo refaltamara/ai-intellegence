@@ -53,7 +53,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   if (role.id === "pr") {
     const d = await prDashboard(ws, sp, role);
     if (!d) redirect("/data");
-    return <PrDashboard d={d} client={cfg?.client_brand_id ?? null} view={view} />;
+    return <PrDashboard d={d} client={cfg?.client_brand_id ?? null} view={view} hide={cfg?.pr_hide ?? []} />;
   }
   const ctx = await loadContext(new SkillDb(), ws);
   const cq = readContentQuery(sp);

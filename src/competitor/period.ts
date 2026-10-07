@@ -11,8 +11,34 @@ import { addDays, isoWeek, weekStart } from "./weeks";
 export type { Grain, Period };
 export const GRAINS: Grain[] = ["week", "month"];
 
-/** "2026-W26" or any day in it for a week; "2026-06" or any day in it for a month. */
+const SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const dm = (d: string) => `${Number(d.slice(8, 10))} ${SHORT[Number(d.slice(5, 7)) - 1]}`;
+
+/** A range of days a person picked ("2026-10-06..2026-10-07"): for a deck about a case, not a calendar period. */
+export const RANGE_RE = /^(\d{4}-\d{2}-\d{2})\.\.(\d{4}-\d{2}-\d{2})$/;
+export const MAX_RANGE_DAYS = 92;
+export const isRange = (p: Pick<Period, "key">) => RANGE_RE.test(p.key);
+
+export function rangePeriod(from: string, to: string): Period {
+  if (to < from) [from, to] = [to, from];
+  const days = Math.round((Date.parse(to) - Date.parse(from)) / 86_400_000) + 1;
+  if (days > MAX_RANGE_DAYS) throw new Error(`pick at most ${MAX_RANGE_DAYS} days`);
+  const label = from === to ? `${dm(from)} ${from.slice(0, 4)}` : from.slice(0, 7) === to.slice(0, 7) ? `${Number(from.slice(8, 10))}–${dm(to)} ${to.slice(0, 4)}` : `${dm(from)} – ${dm(to)} ${to.slice(0, 4)}`;
+  // grain is only nominal here: a range never steps by weeks or months (previousPeriod does the arithmetic)
+  return { key: `${from}..${to}`, grain: "week", from, to, label, short: from === to ? dm(from) : `${dm(from)}–${dm(to)}` };
+}
+
+/** The period just before: the week or month before, or as many days right before a range. */
+export function previousPeriod(p: Period): Period {
+  if (!isRange(p)) return shiftPeriod(p, -1);
+  const days = Math.round((Date.parse(p.to) - Date.parse(p.from)) / 86_400_000) + 1;
+  return rangePeriod(addDays(p.from, -days), addDays(p.from, -1));
+}
+
+/** "2026-W26" or any day in it for a week; "2026-06" or any day in it for a month; "YYYY-MM-DD..YYYY-MM-DD" for chosen days. */
 export function deckPeriod(grain: Grain, raw: string): Period {
+  const r = RANGE_RE.exec(raw);
+  if (r) return rangePeriod(r[1], r[2]);
   if (grain === "week") return /^\d{4}-\d{2}-\d{2}$/.test(raw) ? weekOf(raw) : parsePeriod(isoWeek(weekStart(raw)))!;
   const m = /^(\d{4})-(\d{2})(-\d{2})?$/.exec(raw);
   const p = m ? parsePeriod(`${m[1]}-${m[2]}`) : null;

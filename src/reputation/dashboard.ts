@@ -32,7 +32,13 @@ export type Status = {
 export type Kpi = { now: number | null; prev: number | null };
 export type PostRef = { url: string; platform: string; handle: string | null; source: string; caption: string; posted_at: string; views: number | null; comments: number; negative: number; likes?: number | null; /** the post's own stance, where it is a voice itself */ stance?: string | null };
 export type Quote = { text: string; translation: string | null; likes: number; platform: string; url: string; sentiment: string | null; theme: string | null };
+/** Posts and comments kept apart: how many, and how many lean each way (a post's stance, a comment's sentiment). */
+export type Split = { n: number; negative: number; neutral: number; positive: number; labelled: number };
+export type PostsComments = { posts: Split; comments: Split };
+
 export type Issue = {
+  /** the same numbers, posts and comments apart (both are voices where posts carry a stance) */
+  split: PostsComments;
   topic_id: string | null;
   topic: string;
   catch_all: boolean;
@@ -53,7 +59,7 @@ export type Issue = {
   scope: "only_us" | "category" | "mixed";
 };
 export type Rising = PostRef & { day: number; projected: number | null; neg_pct: number | null };
-export type Narrative = { topic_id: string; topic: string; catch_all: boolean; comments: number; comments_prev: number; share: number | null; neg_pct: number | null; neg_pct_prev: number | null; csat: number | null; quote: Quote | null };
+export type Narrative = { split: PostsComments; topic_id: string; topic: string; catch_all: boolean; comments: number; comments_prev: number; share: number | null; neg_pct: number | null; neg_pct_prev: number | null; csat: number | null; quote: Quote | null };
 export type Amplifier = { handle: string; platform: string; tier: string | null; followers: number | null; posts: number; views: number; likes: number; comments: number; neg_pct: number | null; top_url: string; /** their posts that carry a stance, and how many are against */ stanced: number; against: number };
 export type OwnRow = { platform: string; posts: number; views: number; comments: number; neg_pct: number | null; replies: number; others_neg_pct: number | null };
 export type BrandRow = { id: string; name: string; is_focus: boolean; is_client: boolean; posts: number; posts_prev: number; sov: number | null; views: number; comments: number; neg_pct: number | null; neg_pct_prev: number | null; csat: number | null; intent_pct: number | null; top_issue: { topic: string; negative: number; negative_prev: number } | null };
@@ -70,6 +76,8 @@ export type PrDashboardData = {
   filters: PrFilters & { from: string; to: string; prev_from: string; prev_to: string };
   /** of the comments counted, how many are earned posts standing in as voices (a profile's posts carry a stance) */
   voice_posts: number;
+  /** the window's posts with a stance and its comments, apart; and by voice where the labeller gives one */
+  conversation: { now: PostsComments; prev: PostsComments; by_voice: ({ voice: string } & PostsComments)[] };
   status: Status;
   kpis: { mentions: Kpi; reach: Kpi; comments: Kpi; neg_pct: Kpi; csat: Kpi; intent_pct: Kpi };
   issues: Issue[];
@@ -106,10 +114,10 @@ const NOT_SERVICE = /promo|voucher|discount|cashback|coin|banner|giveaway/i;
  * is the sentiment, its caption the text. Panels carry no stance on posts, so for them this is
  * their comments alone.
  */
-export const VOICES = `(select c.id, c.post_id, c.workspace_id, c.platform, c.posted_at, c.sentiment, c.sentiment_source, c.topic_id, c.likes, c.text, c.translation, c.theme, c.csat, c.purchase_intent, false as is_post
+export const VOICES = `(select c.id, c.post_id, c.workspace_id, c.platform, c.posted_at, c.sentiment, c.sentiment_source, c.topic_id, c.likes, c.text, c.translation, c.theme, c.csat, c.purchase_intent, false as is_post, c.voice, coalesce(c.off_topic, false) as off_topic
      from comments c
    union all
-   select p.id, p.id, p.workspace_id, p.platform, p.posted_at, p.stance, 'post', p.topic_id, p.likes, p.caption, null::text, null::text, null::smallint, null::boolean, true
+   select p.id, p.id, p.workspace_id, p.platform, p.posted_at, p.stance, 'post', p.topic_id, p.likes, p.caption, null::text, null::text, null::smallint, null::boolean, true, p.voice, false
      from posts p where p.source = 'earned' and p.stance_source = 'model' and p.relevant is not false)`;
 
 export function crisisOf(alert: NonNullable<RoleModel["alert"]>): { multiple: number; min_negative: number } {
@@ -231,7 +239,7 @@ export async function reputationFacts(ws: string, win: { focus: string; from: st
   const platC = plat ? "and c.platform = $3" : "and $3::text is null";
   const platP = plat ? "and p.platform = $3" : "and $3::text is null";
   const onBrandComments = `${VOICES} c join posts p on p.id = c.post_id
-     where c.workspace_id = $1 and p.relevant is not false and c.sentiment_source is distinct from 'subject' and c.posted_at is not null ${platC}`;
+     where c.workspace_id = $1 and p.relevant is not false and c.sentiment_source is distinct from 'subject' and not c.off_topic and c.posted_at is not null ${platC}`;
   const base = [ws, tz, plat];
 
   // ---- status ladder: the focus brand's daily negative share against the 28 days before each day (all platforms)
@@ -278,6 +286,29 @@ export async function reputationFacts(ws: string, win: { focus: string; from: st
       [...base, focus.id, a, b],
     );
   const [kn, kp] = await Promise.all([kpiRow(from, to), kpiRow(prevFrom, prevTo)]);
+  // the conversation, posts and comments apart, now and before, and by the labeller's voice
+  const convRows = await db.q<{ win: string; is_post: boolean; voice: string | null; n: number; negative: number; neutral: number; positive: number; labelled: number }>(
+    `select case when ${inDays("c.posted_at", "$5", "$6")} then 'now' else 'prev' end as win, c.is_post, c.voice,
+            count(*)::int as n, count(*) filter (where c.sentiment = 'negative')::int as negative, count(*) filter (where c.sentiment = 'neutral')::int as neutral,
+            count(*) filter (where c.sentiment = 'positive')::int as positive, count(c.sentiment)::int as labelled
+     from ${onBrandComments} and p.brand_id = $4 and ${inDays("c.posted_at", "$7", "$6")}
+     group by 1, 2, 3`,
+    [...base, focus.id, from, to, prevFrom],
+  );
+  const convOf = (rows: typeof convRows): PostsComments => {
+    const one = (post: boolean): Split => rows.filter((r) => !!r.is_post === post).reduce((a, r) => ({ n: a.n + n(r.n), negative: a.negative + n(r.negative), neutral: a.neutral + n(r.neutral), positive: a.positive + n(r.positive), labelled: a.labelled + n(r.labelled) }), { n: 0, negative: 0, neutral: 0, positive: 0, labelled: 0 });
+    return { posts: one(true), comments: one(false) };
+  };
+  const nowConv = convRows.filter((r) => r.win === "now");
+  const voices = [...new Set(nowConv.map((r) => r.voice ?? "unclear"))];
+  const conversation = {
+    now: convOf(nowConv), prev: convOf(convRows.filter((r) => r.win === "prev")),
+    // only where the labeller reads a voice (a case workspace); "unclear" last
+    by_voice: nowConv.some((r) => r.voice != null && r.voice !== "unclear")
+      ? voices.map((v) => ({ voice: v, ...convOf(nowConv.filter((r) => (r.voice ?? "unclear") === v)) }))
+        .sort((a, b) => Number(a.voice === "unclear") - Number(b.voice === "unclear") || b.posts.n + b.comments.n - (a.posts.n + a.comments.n))
+      : [],
+  };
   const kpis = {
     mentions: { now: n(kn?.mentions), prev: n(kp?.mentions) },
     // Threads and some exports report no views: reach is unknown there, not zero
@@ -289,17 +320,22 @@ export async function reputationFacts(ws: string, win: { focus: string; from: st
   };
 
   // ---- topics for everyone in both windows (narratives, issues, the industry check)
-  const topicRows = await db.q<{ topic_id: string | null; label: string | null; catch_all: boolean | null; brand_id: string; win: string; comments: number; negative: number; labelled: number; csat: number | null; scored: number }>(
+  const topicRows = await db.q<{ topic_id: string | null; label: string | null; catch_all: boolean | null; brand_id: string; win: string; is_post: boolean; comments: number; negative: number; neutral: number; positive: number; labelled: number; csat: number | null; scored: number }>(
     `select c.topic_id, t.label, t.is_catch_all as catch_all, p.brand_id,
-            case when ${inDays("c.posted_at", "$4", "$5")} then 'now' else 'prev' end as win,
-            count(*)::int as comments, count(*) filter (where c.sentiment = 'negative')::int as negative, count(c.sentiment)::int as labelled, avg(c.csat)::float8 as csat, count(c.csat)::int as scored
+            case when ${inDays("c.posted_at", "$4", "$5")} then 'now' else 'prev' end as win, c.is_post,
+            count(*)::int as comments, count(*) filter (where c.sentiment = 'negative')::int as negative, count(*) filter (where c.sentiment = 'neutral')::int as neutral,
+            count(*) filter (where c.sentiment = 'positive')::int as positive, count(c.sentiment)::int as labelled, avg(c.csat)::float8 as csat, count(c.csat)::int as scored
      from ${VOICES} c join posts p on p.id = c.post_id left join topics t on t.id = c.topic_id
-     where c.workspace_id = $1 and p.relevant is not false and c.sentiment_source is distinct from 'subject' and c.posted_at is not null ${platC}
+     where c.workspace_id = $1 and p.relevant is not false and c.sentiment_source is distinct from 'subject' and not c.off_topic and c.posted_at is not null ${platC}
        and ${inDays("c.posted_at", "$6", "$5")}
-     group by 1, 2, 3, 4, 5`,
+     group by 1, 2, 3, 4, 5, 6`,
     [...base, from, to, prevFrom],
   );
   const tKey = (r: { topic_id: string | null }) => r.topic_id ?? "";
+  const splitOf = (rows: typeof topicRows): PostsComments => {
+    const one = (post: boolean): Split => rows.filter((r) => !!r.is_post === post).reduce((a, r) => ({ n: a.n + n(r.comments), negative: a.negative + n(r.negative), neutral: a.neutral + n(r.neutral), positive: a.positive + n(r.positive), labelled: a.labelled + n(r.labelled) }), { n: 0, negative: 0, neutral: 0, positive: 0, labelled: 0 });
+    return { posts: one(true), comments: one(false) };
+  };
   const topics = new Map<string, { label: string; catch_all: boolean }>();
   for (const r of topicRows) if (r.topic_id) topics.set(r.topic_id, { label: r.label ?? r.topic_id, catch_all: !!r.catch_all });
   const sum = (pred: (r: (typeof topicRows)[number]) => boolean, k: "comments" | "negative" | "labelled") => topicRows.filter(pred).reduce((a, r) => a + n(r[k]), 0);
@@ -321,6 +357,7 @@ export async function reputationFacts(ws: string, win: { focus: string; from: st
     const csatW = now.reduce((a, r) => a + (r.csat == null ? 0 : Number(r.csat) * n(r.scored)), 0);
     const scored = now.reduce((a, r) => a + n(r.scored), 0);
     narratives.push({
+      split: splitOf(now),
       topic_id: id, topic: t.label, catch_all: t.catch_all, comments: c, comments_prev: prev.reduce((a, r) => a + n(r.comments), 0), share: share(c, focusNowTotal),
       neg_pct: share(now.reduce((a, r) => a + n(r.negative), 0), lab), neg_pct_prev: share(prev.reduce((a, r) => a + n(r.negative), 0), prev.reduce((a, r) => a + n(r.labelled), 0)),
       csat: scored ? Math.round((csatW / scored) * 100) / 100 : null, quote: null,
@@ -383,6 +420,7 @@ export async function reputationFacts(ws: string, win: { focus: string; from: st
       : theirPct != null && ourPct != null && (theirPct >= ourPct || (theirPrevPct != null && theirPct >= theirPrevPct * 1.25)) ? "category"
       : "mixed";
     return {
+      split: splitOf(topicRows.filter((r) => r.brand_id === focus.id && r.win === "now" && tKey(r) === id)),
       topic_id: id, topic: t.catch_all ? "Not in a topic" : t.label, catch_all: t.catch_all, negative: mineNow, negative_prev: minePrev, comments: mine("now", "comments"), neg_pct: share(mineNow, mine("now", "labelled")),
       stage, first_day: firstDay, peak_day: peak?.negative ? peak.d : null, daily: series,
       platforms: platRows.map((r) => ({ platform: r.platform, negative: n(r.negative) })),
@@ -457,13 +495,13 @@ export async function reputationFacts(ws: string, win: { focus: string; from: st
     };
   }).filter((r) => r.posts > 0).sort((a, b) => b.comments - a.comments);
   const ownWorst = (await db.q(
-    `select p.url, p.platform, p.creator_handle as handle, p.source, left(regexp_replace(coalesce(p.caption, ''), '\\s+', ' ', 'g'), 200) as caption, to_char(p.posted_at at time zone $2, 'YYYY-MM-DD') as posted_at, p.views::float8 as views,
+    `select p.url, p.platform, p.creator_handle as handle, p.source, left(regexp_replace(coalesce(p.caption, ''), '\\s+', ' ', 'g'), 200) as caption, to_char(p.posted_at at time zone $2, 'YYYY-MM-DD') as posted_at, p.views::float8 as views, p.likes,
             count(c.id)::int as comments, count(c.id) filter (where c.sentiment = 'negative')::int as negative
-     from posts p join comments c on c.post_id = p.id and c.sentiment_source is distinct from 'subject'
+     from posts p join comments c on c.post_id = p.id and c.sentiment_source is distinct from 'subject' and not coalesce(c.off_topic, false)
      where p.workspace_id = $1 and p.brand_id = $4 and p.source = 'owned' ${platP} and ${inDays("c.posted_at", "$5", "$6")}
      group by p.id having count(c.id) filter (where c.sentiment = 'negative') > 0 order by negative desc limit 3`,
     [...base, focus.id, from, to],
-  )).map((r) => ({ url: String(r.url), platform: String(r.platform), handle: (r.handle as string) ?? null, source: String(r.source), caption: String(r.caption ?? ""), posted_at: String(r.posted_at), views: nn(r.views), comments: n(r.comments), negative: n(r.negative) }));
+  )).map((r) => ({ url: String(r.url), platform: String(r.platform), handle: (r.handle as string) ?? null, source: String(r.source), caption: String(r.caption ?? ""), posted_at: String(r.posted_at), views: nn(r.views), comments: n(r.comments), negative: n(r.negative), likes: nn(r.likes) }));
 
   // ---- for customer service: negative comments that are service problems, not reputation stories
   const serviceWhere = (a: string, b: string) => `and c.sentiment = 'negative' and c.theme ~* ${a} and c.theme !~* ${b}`;
@@ -548,7 +586,7 @@ export async function reputationFacts(ws: string, win: { focus: string; from: st
   return {
     as_of: asOf, settled, tz, focus: { id: focus.id, name: focus.name, is_client: focus.id === client }, brands: brands.map((b) => ({ id: b.id, name: b.name })), platforms,
     filters: { ...f, from, to, prev_from: prevFrom, prev_to: prevTo },
-    voice_posts: n(kn?.post_voices), status, kpis, issues, rising, narratives, amplifiers, own, own_worst: ownWorst,
+    voice_posts: n(kn?.post_voices), conversation, status, kpis, issues, rising, narratives, amplifiers, own, own_worst: ownWorst,
     service: { measured: !!themed?.any, total: n(serviceCount?.n), quotes: serviceQuotes.map(toQuote) },
     competitive, coverage, off_topic_posts: coverage.reduce((a, c) => a + c.off_topic, 0), notes,
   };

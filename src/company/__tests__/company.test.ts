@@ -10,7 +10,7 @@ describe("dashboard sections", () => {
   it("keep the default order and pair half-width sections", () => {
     const a = arrange("pr", undefined);
     expect(a.shown.map((s) => s.key)).toEqual(sectionKeys("pr"));
-    expect(rows(a.shown).map((r) => r.map((s) => s.key))).toEqual([["issues"], ["rising", "amplifiers"], ["narratives"], ["own", "service"], ["competitive"], ["health"]]);
+    expect(rows(a.shown).map((r) => r.map((s) => s.key))).toEqual([["issues"], ["rising", "amplifiers"], ["narratives"], ["voices"], ["own", "service"], ["competitive"], ["health"]]);
   });
   it("follow the GoPay example: Amplifiers hidden, service complaints first, renamed", () => {
     const a = arrange("pr", { hidden: ["amplifiers"], order: ["service", ...sectionKeys("pr").filter((k) => k !== "service")], names: { service: "Customer care" } });
