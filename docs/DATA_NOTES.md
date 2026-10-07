@@ -179,6 +179,10 @@ One contents file, `data/raw/kahf/contents_threads.csv` (posts only; comments to
   - 105 are new (687 posts in all). The 17 already loaded keep their stance and relevance and take the newer likes, replies and reposts (the apology: 2,297 → 4,524 likes, 10,349 → 16,480 replies).
   - The file has no views or followers: the loader now keeps what a post already has when a later export lacks a column (`coalesce` on update), and reads `reshare`/`repost` (the first posts file's reposts were not read; they are now).
   - Some are off the case (Watsons on dry skin, forest fires, a Quran question): the labeller sets them aside (`relevant = false`).
+- **Posts batch 3** (`Kahf New - posts batch3_structured.csv`, 7 Oct; `kahf/contents_threads_1007f.csv`):
+  - 72 posts, 5 Oct 17:51 to 7 Oct 15:47 WIB, none loaded before (759 posts in all). Comments on them are still being scraped.
+  - Jakarta time. No overlap to line up, so checked from the text: @rul.zmi (14:02) writes that Kahf Indonesia apologised "13 jam lepas (2am)"; the apology is 00:45 WIB (01:45 in Malaysia), 13 hours before 14:00 WIB.
+  - Hours without a leading zero ("5:25:01") read as 05:25.
   - Jakarta time: the post went up at 02:03 WIB and the first comment came at 02:23.
 - **All comments labelled by 12:30 WIB on 7 Oct**: 8,965 on posts about the case (off-topic left out). Labelling moved to every 5 minutes the same day.
 
