@@ -174,6 +174,11 @@ One contents file, `data/raw/kahf/contents_threads.csv` (posts only; comments to
   - One row is Kahf's own (not labelled). Dropped: 41 empty, 9 emoji only.
 - **Comments on @_zrhjkt_'s post** (`new_post_zrhjkt_structured.xlsx`, 7 Oct; `kahf/comments_threads_1007d.csv`):
   - 975 in → 921 loaded, all under `@_zrhjkt_/post/DeKfbrwk9No` ("Jangan main dengan boikot orang Malaysia", 2,837 replies). Dropped: 44 empty, the rest emoji only.
+- **More posts** (`posts_structured.csv`, 7 Oct; `kahf/contents_threads_1007e.csv`):
+  - 122 posts, 2 Oct to 7 Oct 13:27 WIB. Times are Jakarta time: the 17 posts already loaded match to the second when read so (the apology DeKWiFpE_9K at 00:45:49 WIB).
+  - 105 are new (687 posts in all). The 17 already loaded keep their stance and relevance and take the newer likes, replies and reposts (the apology: 2,297 → 4,524 likes, 10,349 → 16,480 replies).
+  - The file has no views or followers: the loader now keeps what a post already has when a later export lacks a column (`coalesce` on update), and reads `reshare`/`repost` (the first posts file's reposts were not read; they are now).
+  - Some are off the case (Watsons on dry skin, forest fires, a Quran question): the labeller sets them aside (`relevant = false`).
   - Jakarta time: the post went up at 02:03 WIB and the first comment came at 02:23.
 - **All comments labelled by 12:30 WIB on 7 Oct**: 8,965 on posts about the case (off-topic left out). Labelling moved to every 5 minutes the same day.
 

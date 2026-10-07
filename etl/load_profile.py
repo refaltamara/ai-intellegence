@@ -286,14 +286,14 @@ def col(df, *names):
     return pd.Series([""] * len(df), index=df.index, dtype=str)
 
 # ---------------------------------------------------------------- contents
-def normalise_contents(df, platform, prof, source_file, anchor=None):
+def normalise_contents(df, platform, prof, source_file, anchor=None, naive_tz=None):
     """-> rows (post dicts), drops (Tally), dropped_urls (set)."""
     drops, rows, dropped = Tally(), [], set()
     urls = col(df, "url"); accounts = col(df, "account_name", "account", "author")
     dates = col(df, "date_posted", "date"); descs = col(df, "description", "caption", "text")
     ctypes = col(df, "content_type"); views = col(df, "views"); likes = col(df, "likes", "like")
-    replies = col(df, "replies/comments", "replies", "comments", "reply"); reposts = col(df, "retweet/repost", "reposts")
-    shares = col(df, "share", "shares"); followers = col(df, "followers")
+    replies = col(df, "replies/comments", "replies", "comments", "reply"); reposts = col(df, "retweet/repost", "reposts", "repost")
+    shares = col(df, "share", "shares", "reshare"); followers = col(df, "followers")
     canon = [canon_url(u, platform) for u in urls]
     last_index = {}
     for i, u in enumerate(canon):
@@ -307,7 +307,7 @@ def normalise_contents(df, platform, prof, source_file, anchor=None):
             drops.add("same url repeated in the file (kept the last row)", url); continue
         handle = norm_handle(accounts.iloc[i]) or handle_from_url(url)
         caption = to_str(descs.iloc[i])
-        when, how = parse_when(dates.iloc[i], anchor or prof.anchor, prof.naive_tz.get(platform))
+        when, how = parse_when(dates.iloc[i], anchor or prof.anchor, naive_tz or prof.naive_tz.get(platform))
         if platform == "x" and (when is None or how in ("epoch_s",) or (how == "naive_local" and not re.search(r"[A-Za-z:]", str(dates.iloc[i])))):
             # an export with a broken date column (a bare number) still carries the time inside the status id
             sf = snowflake_time(url)
@@ -355,7 +355,8 @@ UPDATE_COLS = [c for c in POST_COLS if c != "creator_key"]
 def upsert_sql(stub):
     on_conflict = ("do nothing" if stub else
                    "do update set load_id = excluded.load_id, creator_id = excluded.creator_id, " +
-                   ", ".join(f"{c} = excluded.{c}" for c in UPDATE_COLS if c not in ("url", "brand_id")))
+                   # a later export may lack a column (Kahf's 7 Oct posts file has no views or followers): keep what is there
+                   ", ".join(f"{c} = coalesce(excluded.{c}, posts.{c})" for c in UPDATE_COLS if c not in ("url", "brand_id")))
     return f"""
       insert into posts (workspace_id, platform, load_id, creator_id, {", ".join(UPDATE_COLS)})
       select $2, r.platform, $3::uuid, c.id, {", ".join("r." + c for c in UPDATE_COLS)}
@@ -405,11 +406,11 @@ def upsert_posts(db, ws, load_id, rows, dry, stub=False):
         n += res.get("rowCount") or 0
     return n
 
-def load_contents(db, ws, prof, platform, path, dry, anchor=None):
+def load_contents(db, ws, prof, platform, path, dry, anchor=None, naive_tz=None):
     t0 = time.time()
     log(f"\n== {path.name} ({platform} contents)")
     df = read_csv(path)
-    rows, drops, dropped = normalise_contents(df, platform, prof, path.name, anchor)
+    rows, drops, dropped = normalise_contents(df, platform, prof, path.name, anchor, naive_tz)
     load_id = None
     if not dry:
         load_id = db.scalar("""insert into data_loads (workspace_id, file, platform, kind, rows_in)
@@ -677,7 +678,7 @@ def main():
             reports.append(rep)
             continue
         if f["kind"] == "contents":
-            rep, urls, drop = load_contents(db, ws, prof, p, path, a.dry_run, prof.anchor_for(f))
+            rep, urls, drop = load_contents(db, ws, prof, p, path, a.dry_run, prof.anchor_for(f), prof.naive_tz_for(f, p))
             known.setdefault(p, set()).update(urls); dropped.setdefault(p, set()).update(drop)
         else:
             if p not in known and not a.dry_run:
