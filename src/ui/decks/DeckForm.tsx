@@ -55,6 +55,7 @@ export function DeckForm({ options, initial, prefill }: { options: DeckOptions; 
     const x = options.templates.find((y) => y.key === key)!;
     setTemplate(key);
     setGrain(x.grain);
+    setPeriod(x.grain === "day" ? options.periods.day[0]?.key ?? "" : "");
     setSlides(x.slides);
     setRecurring(x.recurring);
     if (x.rep_slides ?? x.social_slides) setRepSlides((x.rep_slides ?? x.social_slides)!);
@@ -129,7 +130,7 @@ export function DeckForm({ options, initial, prefill }: { options: DeckOptions; 
             {options.templates.map((x) => (
               <button key={x.key} type="button" className={template === x.key ? "on" : ""} onClick={() => pickTemplate(x.key)}>
                 <b>{x.name}{x.badge && <i className={`badge ${x.badge === "Fair" ? "fair" : "client"}`} title={x.by ? `Made by ${x.by}` : undefined}>{x.badge}</i>}</b><span>{x.description}</span>
-                <small>{x.grain === "month" ? "Month on month" : "Week on week"} · {(x.rep_slides ?? x.social_slides ?? x.slides).length} slide types</small>
+                <small>{x.grain === "month" ? "Month on month" : x.grain === "day" ? "Day on day" : "Week on week"} · {(x.rep_slides ?? x.social_slides ?? x.slides).length} slide types</small>
               </button>
             ))}
           </div>

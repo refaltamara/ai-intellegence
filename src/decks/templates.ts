@@ -4,7 +4,7 @@
  * team picks the brands, the client (optional) and the period. Every slide can
  * be added or removed afterwards.
  */
-import type { Grain } from "../competitor/period";
+import type { DeckGrain } from "../competitor/period";
 import type { SlideKind } from "../competitor/slides";
 import type { RoleId } from "../roles/model";
 import type { RepSlide } from "../reputation/slides";
@@ -16,7 +16,7 @@ export type DeckTemplate = {
   /** the title printed on the slides */
   title: string;
   description: string;
-  grain: Grain;
+  grain: DeckGrain;
   slides: SlideKind[];
   /** what the brand picker asks for */
   brands: "watchlist" | "focus";
@@ -135,6 +135,19 @@ export const DECK_TEMPLATES: DeckTemplate[] = [
     roles: ["pr"],
     family: "reputation",
     rep_slides: ["summary", "timeline", "issue_detail", "competitive", "service"],
+  },
+  {
+    key: "crisis-report",
+    name: "Crisis Report",
+    title: "Crisis Report",
+    description: "For a case on the move, day by day: how it spread, the pace per hour, who is talking, the issues, the sister brands and boycott calls, where the anger is, and the posts still taking comments.",
+    grain: "day",
+    slides: ["summary"],
+    brands: "focus",
+    recurring: true,
+    roles: ["pr"],
+    family: "reputation",
+    rep_slides: ["summary", "chronology", "pace", "motion", "issues", "exposure", "narratives", "anger", "moving", "voices"],
   },
   // ---- Social Media (DECISIONS, 3 Oct 2026): the brand's own accounts
   {
