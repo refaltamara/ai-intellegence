@@ -11,12 +11,14 @@ import { sql } from "../db/client";
 import { toJson } from "../db/json";
 import { audit } from "../roles/store";
 import { by, signal } from "../learning/signals";
-import type { CommercialSettings, Partner } from "../workspace/config";
+import type { CaseWordRequest, CommercialSettings, Partner } from "../workspace/config";
 import { isBuilder } from "./creations";
 
 export type CaseWords = {
   partners: { name: string; terms: string[]; by: string | null; posts: number; comments: number }[];
   boycott: { term: string; by: string | null; posts: number; comments: number }[];
+  /** what Members asked to add, with what it would match */
+  pending: (CaseWordRequest & { posts: number; comments: number })[];
 };
 
 const clean = (t: unknown) => String(t ?? "").replace(/[%_\\]/g, "").replace(/\s+/g, " ").trim().toLowerCase().slice(0, 40);
@@ -46,12 +48,49 @@ export async function caseWords(ws: string): Promise<CaseWords> {
     return { name: p.name, terms: t, by: p.by ?? null, ...(await matches(ws, t)) };
   }));
   const boycott = await Promise.all((c.boycott_terms ?? []).map(async (t) => ({ term: t, by: c.boycott_by?.[t] ?? null, ...(await matches(ws, [t])) })));
-  return { partners, boycott };
+  const pending = await Promise.all((c.pending ?? []).map(async (r) => ({ ...r, ...(await matches(ws, r.terms)) })));
+  return { partners, boycott, pending };
 }
 
-export type CaseWordsOp = { list: "partners" | "boycott"; action: "add" | "remove" | "preview"; name?: string; terms?: string[] | string };
+export type CaseWordsOp = { list: "partners" | "boycott"; action: "add" | "remove" | "preview" | "request" | "approve" | "decline"; name?: string; terms?: string[] | string; id?: string };
 
-/** Add or remove a team's case word. A Builder's change is saved at once; preview only counts. */
+type Lists = { partners: Partner[]; boycott: string[]; boycottBy: Record<string, string> };
+
+/** One add or remove on the lists; the error is a sentence for the person. */
+function applyOp(l: Lists, list: "partners" | "boycott", action: "add" | "remove", name: string, words: string[], who: string): string | null {
+  if (list === "partners") {
+    if (action === "add") {
+      if (!name) return "Name the brand.";
+      if (l.partners.some((p) => p.name.toLowerCase() === name.toLowerCase())) return `${name} is already on the list.`;
+      if (l.partners.length >= 20) return "The list holds 20 brands at most.";
+      l.partners.push({ name, terms: words.length ? words : [clean(name)], by: who });
+      return null;
+    }
+    const i = l.partners.findIndex((p) => p.name.toLowerCase() === name.toLowerCase());
+    if (i < 0) return `${name} is not on the list.`;
+    if (!l.partners[i].by) return `${l.partners[i].name} was set by Fair; ask Fair to take it off.`;
+    l.partners.splice(i, 1);
+    return null;
+  }
+  if (action === "add") {
+    const fresh = words.filter((w) => !l.boycott.includes(w));
+    if (!fresh.length) return "Those words are already on the list.";
+    if (l.boycott.length + fresh.length > 30) return "The list holds 30 words at most.";
+    for (const w of fresh) { l.boycott.push(w); l.boycottBy[w] = who; }
+    return null;
+  }
+  const w = words[0];
+  if (!w || !l.boycott.includes(w)) return "That word is not on the list.";
+  if (!l.boycottBy[w]) return `"${w}" was set by Fair; ask Fair to take it off.`;
+  l.boycott.splice(l.boycott.indexOf(w), 1);
+  delete l.boycottBy[w];
+  return null;
+}
+
+/**
+ * Add or remove a team's case word. A Builder's change is saved at once; a Member asks (request)
+ * and it waits under Case words until a Builder approves or declines it; preview only counts.
+ */
 export async function changeCaseWords(actor: Actor, ws: string, op: CaseWordsOp): Promise<{ ok: true; words?: CaseWords; preview?: { posts: number; comments: number; terms: string[] } } | { ok: false; error: string }> {
   const list = op.list === "boycott" ? "boycott" : "partners";
   const name = String(op.name ?? "").replace(/\s+/g, " ").trim().slice(0, 40);
@@ -60,41 +99,37 @@ export async function changeCaseWords(actor: Actor, ws: string, op: CaseWordsOp)
     if (!words.length) return { ok: false, error: "Give at least one word of two letters or more." };
     return { ok: true, preview: { ...(await matches(ws, words)), terms: words } };
   }
-  if (!isBuilder(actor, ws, "pr")) return { ok: false, error: "Only a Builder changes the team's case words; ask yours to add it." };
+  const builder = isBuilder(actor, ws, "pr");
   const c = await raw(ws);
-  const partners: Partner[] = [...(c.partners ?? [])];
-  const boycott = [...(c.boycott_terms ?? [])];
-  const boycottBy = { ...(c.boycott_by ?? {}) };
+  const l: Lists = { partners: [...(c.partners ?? [])], boycott: [...(c.boycott_terms ?? [])], boycottBy: { ...(c.boycott_by ?? {}) } };
+  let pending = [...(c.pending ?? [])];
   const who = actor.name ?? actor.email;
-  if (list === "partners") {
-    if (op.action === "add") {
-      if (!name) return { ok: false, error: "Name the brand." };
-      if (partners.some((p) => p.name.toLowerCase() === name.toLowerCase())) return { ok: false, error: `${name} is already on the list.` };
-      if (partners.length >= 20) return { ok: false, error: "The list holds 20 brands at most." };
-      partners.push({ name, terms: words.length ? words : [clean(name)], by: who });
-    } else {
-      const i = partners.findIndex((p) => p.name.toLowerCase() === name.toLowerCase());
-      if (i < 0) return { ok: false, error: `${name} is not on the list.` };
-      if (!partners[i].by) return { ok: false, error: `${partners[i].name} was set by Fair; ask Fair to take it off.` };
-      partners.splice(i, 1);
-    }
+  let path = `${list}:${list === "partners" ? name : words.join(",")}`;
+  if (op.action === "add" || op.action === "remove") {
+    if (!builder) return { ok: false, error: "Only a Builder changes the team's case words; send it to yours to add." };
+    const err = applyOp(l, list, op.action, name, words, who);
+    if (err) return { ok: false, error: err };
+  } else if (op.action === "request") {
+    // checked against the lists as they are, so a Builder never gets a request that cannot apply
+    const err = applyOp({ partners: [...l.partners], boycott: [...l.boycott], boycottBy: { ...l.boycottBy } }, list, "add", name, words, who);
+    if (err) return { ok: false, error: err };
+    if (pending.length >= 20) return { ok: false, error: "Twenty requests already wait for a Builder." };
+    pending.push({ id: crypto.randomUUID(), list, name: list === "partners" ? name : words.join(", "), terms: words.length ? words : [clean(name)], by: who, by_email: actor.email, at: new Date().toISOString() });
   } else {
-    if (op.action === "add") {
-      const fresh = words.filter((w) => !boycott.includes(w));
-      if (!fresh.length) return { ok: false, error: "Those words are already on the list." };
-      if (boycott.length + fresh.length > 30) return { ok: false, error: "The list holds 30 words at most." };
-      for (const w of fresh) { boycott.push(w); boycottBy[w] = who; }
-    } else {
-      const w = words[0];
-      if (!w || !boycott.includes(w)) return { ok: false, error: "That word is not on the list." };
-      if (!boycottBy[w]) return { ok: false, error: `"${w}" was set by Fair; ask Fair to take it off.` };
-      boycott.splice(boycott.indexOf(w), 1);
-      delete boycottBy[w];
+    if (!builder) return { ok: false, error: "Only a Builder answers a request." };
+    const r = pending.find((x) => x.id === op.id);
+    if (!r) return { ok: false, error: "That request is no longer waiting." };
+    pending = pending.filter((x) => x.id !== r.id);
+    path = `${r.list}:${r.name}`;
+    if (op.action === "approve") {
+      // the word is the Member's: it carries their name
+      const err = applyOp(l, r.list, "add", r.list === "partners" ? r.name : "", r.terms, r.by);
+      if (err) return { ok: false, error: err };
     }
   }
-  const next: CommercialSettings = { ...c, partners, boycott_terms: boycott, boycott_by: boycottBy };
+  const next: CommercialSettings = { ...c, partners: l.partners, boycott_terms: l.boycott, boycott_by: l.boycottBy, pending };
   await sql.query("update workspaces set settings = jsonb_set(coalesce(settings, '{}'::jsonb), '{commercial}', $2::jsonb) where id = $1", [ws, toJson(next)]);
-  await audit({ workspace_id: ws, actor: actor.email, area: "case_words", action: op.action, path: `${list}:${list === "partners" ? name : words.join(",")}`, old: c as Record<string, unknown>, new: next as Record<string, unknown> });
+  await audit({ workspace_id: ws, actor: actor.email, area: "case_words", action: op.action, path, old: c as Record<string, unknown>, new: next as Record<string, unknown> });
   await signal(by(actor, ws, "pr"), "casewords.changed", { list, action: op.action });
   return { ok: true, words: await caseWords(ws) };
 }

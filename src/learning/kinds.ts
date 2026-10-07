@@ -57,7 +57,7 @@ export const SIGNALS = {
   "deck.changed": { surface: "decks", family: "shaping", label: "Deck changed", payload: { deck: "uuid", from: ["chat", "comment", "form"], template: "bool", added: "int", removed: "int", grain: "bool" } },
   "deck.slide_drafted": { surface: "decks", family: "shaping", label: "Own slide drafted", payload: { from: ["form", "chat", "comment"], status: ["ok", "empty", "error"] } },
   "deck.comment": { surface: "decks", family: "use", label: "Slide comment", payload: { report: "uuid", n: "int", cemo: "bool" } },
-  "casewords.changed": { surface: "company", family: "shaping", label: "Case words changed", payload: { list: ["partners", "boycott"], action: ["add", "remove"] } },
+  "casewords.changed": { surface: "company", family: "shaping", label: "Case words changed", payload: { list: ["partners", "boycott"], action: ["add", "remove", "request", "approve", "decline"] } },
 
   "alert.sent": { surface: "signals", family: "use", label: "Alert sent", payload: { kind: "id" } },
 } as const satisfies Record<string, SignalDef>;
