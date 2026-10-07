@@ -16,7 +16,7 @@ import { hasModelCredentials, modelId } from "../chat/loop";
 import { numbersIn } from "../competitor/narrative";
 import { C, CW, FONT, M, W, add, chip, text, title, type Slide } from "../competitor/draw";
 import { drawPdf, recordWith, slideTextsOf, type SlideText } from "../competitor/pdfdeck";
-import { deckPeriod, isRange, latestComplete, previousPeriod, type Grain, type Period } from "../competitor/period";
+import { deckPeriod, isDay, isRange, latestComplete, previousPeriod, type DeckGrain, type Period } from "../competitor/period";
 import { change, compact, dayMonth, int, pct, pts } from "../competitor/view";
 import { getWorkspace } from "../workspace/store";
 import { PR, type RoleModel } from "../roles/model";
@@ -28,7 +28,7 @@ import type { RepSlide, RepSpec } from "./slides";
 
 export type ReputationReport = PrDashboardData & {
   title: string;
-  grain: Grain;
+  grain: DeckGrain;
   period: Period;
   previous: Period;
   slides: RepSlide[];
@@ -73,14 +73,14 @@ const NO_NORM_COLOR = "94A3B8", NO_NORM_BG = "F1F5F9";
 const shown = (r: { hide?: string[] }, k: string) => !(r.hide ?? []).includes(k);
 const shareOf = (a: number, b: number) => (b > 0 ? Math.round((a / b) * 1000) / 10 : null);
 /** "this week", "this month", or the days picked */
-const periodWord = (r: { grain: Grain; period: Period }) => (isRange(r.period) ? r.period.label : r.grain === "month" ? "this month" : "this week");
+const periodWord = (r: { grain: DeckGrain; period: Period }) => (isRange(r.period) || isDay(r.period) ? r.period.label : r.grain === "month" ? "this month" : "this week");
 /** posts and comments apart, as the deck prints them */
 const splitLine = (x: { n: number; negative: number; positive: number; labelled: number }, unit: string, neg: string, pos: string) =>
   `${int(x.n)} ${unit}${x.labelled < x.n ? ` (${int(x.labelled)} read)` : ""}: ${int(x.negative)} ${neg} (${pct(shareOf(x.negative, x.labelled))}), ${int(x.positive)} ${pos} (${pct(shareOf(x.positive, x.labelled))})`;
 
 // ------------------------------------------------------------------- facts
 /** The report for one period (the latest the data fully covers by default) and the period before it. */
-export async function reputationReport(ws: string, o: { title: string; grain: Grain; spec: RepSpec; period?: string; asOf: string; role?: RoleModel }): Promise<ReputationReport> {
+export async function reputationReport(ws: string, o: { title: string; grain: DeckGrain; spec: RepSpec; period?: string; asOf: string; role?: RoleModel }): Promise<ReputationReport> {
   const period = o.period ? deckPeriod(o.grain, o.period) : latestComplete(o.grain, o.asOf);
   const previous = previousPeriod(period);
   const d = await reputationFacts(ws, { focus: o.spec.focus, from: period.from, to: period.to, platform: o.spec.platform, prev: { from: previous.from, to: previous.to } }, o.role ?? PR, new SkillDb());
@@ -216,7 +216,7 @@ export function plainRep(r: ReputationReport): RepNarrative {
     summary: {
       headline: (noNorm(r)
         ? `${who}: ${top ? `${top.topic === "Not in a topic" ? "complaints outside our topics" : top.topic} leads the negative talk` : "no normal level yet to judge against"}`
-        : !shown(r, "status") || isRange(r.period) ? `${who}: ${top ? `${top.topic === "Not in a topic" ? "complaints outside our topics" : top.topic} leads the negative talk` : `the talk in ${r.period.label}`}`
+        : !shown(r, "status") || isRange(r.period) || isDay(r.period) ? `${who}: ${top ? `${top.topic === "Not in a topic" ? "complaints outside our topics" : top.topic} leads the negative talk` : `the talk in ${r.period.label}`}`
         : `${who}: ${LEVEL_NAME[lv].toLowerCase()} ${r.grain === "month" ? "month" : "week"}${only ? `, but ${only.topic} complaints are ours alone` : top ? `, ${top.topic === "Not in a topic" ? "complaints outside our topics" : top.topic} leads the negative talk` : ""}`).slice(0, 120),
       happened: r.voice_posts > 0
         ? `${pct(shareOf(r.conversation.now.posts.negative, r.conversation.now.posts.labelled))} of ${int(r.conversation.now.posts.labelled)} posts about ${who} were against it, and ${pct(shareOf(r.conversation.now.comments.negative, r.conversation.now.comments.labelled))} of ${int(r.conversation.now.comments.labelled)} comments read were negative.`
@@ -271,7 +271,7 @@ function repTool(r: ReputationReport): Anthropic.Tool {
 
 function repSystem(r: ReputationReport, role: RoleModel): string {
   return [
-    `You write the words of a ${isRange(r.period) ? `reputation deck covering ${r.period.label}` : `${r.grain === "month" ? "monthly" : "weekly"} reputation deck`} for ${r.focus.name}'s PR team, for them to send to management. ${role.voice.replace(/\{\{client\}\}/g, r.focus.name)}`,
+    `You write the words of a ${isDay(r.period) ? `daily reputation deck for ${r.period.label}, against the day before` : isRange(r.period) ? `reputation deck covering ${r.period.label}` : `${r.grain === "month" ? "monthly" : "weekly"} reputation deck`} for ${r.focus.name}'s PR team, for them to send to management. ${role.voice.replace(/\{\{client\}\}/g, r.focus.name)}`,
     "The numbers are already on the slides. Use only numbers from the fact sheet, written exactly as it prints them (1.2M, 16.1%, +2.7 pt); never compute a new one, never round differently. Quote comments only from the fact sheet.",
     "Write in plain English, short sentences, no jargon, no hype. Name the platform when it matters. Say clearly whether an issue is about us alone or the whole category, and when no response is the right call.",
     "Never mention tools, analyses, skills or how the data was made.",

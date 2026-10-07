@@ -18,7 +18,7 @@ export type DeckOptions = {
   /** Fair's (badge "Fair") and the team's own (badge: the client's name; by: who made it) */
   templates: (DeckTemplate & { badge?: string; by?: string })[];
   slides: { kind: string; title: string; description: string; pages: string; required?: boolean; needs?: string }[];
-  periods: { week: { key: string; label: string }[]; month: { key: string; label: string }[] };
+  periods: { day: { key: string; label: string }[]; week: { key: string; label: string }[]; month: { key: string; label: string }[] };
   /** the workspace's client brand, offered (not set) as the client */
   client: { name: string; brand_ids: string[] } | null;
   /** the Weekly Competitor Pulse's watchlist and client, when this team has one */
@@ -46,7 +46,7 @@ async function teamTemplates(workspaceId: string, role: RoleModel, email: string
 
 export async function deckOptions(workspaceId: string, role: RoleModel = BRAND_KOL, email: string | null = null): Promise<DeckOptions> {
   const ctx = await loadContext(new SkillDb(), workspaceId);
-  const [week, month] = await Promise.all([deckPeriods(workspaceId, "week", 12), deckPeriods(workspaceId, "month", 6)]);
+  const [day, week, month] = await Promise.all([deckPeriods(workspaceId, "day", 14), deckPeriods(workspaceId, "week", 12), deckPeriods(workspaceId, "month", 6)]);
   const brands = ctx.brands.map((b) => ({ id: b.id, name: brandLabel(b.name) })).sort((a, b) => a.name.localeCompare(b.name));
   const own = ctx.clientBrandId ? brands.find((b) => b.id === ctx.clientBrandId) : null;
   const c = STARTERS.find((t) => t.workspace === workspaceId);
@@ -55,7 +55,7 @@ export async function deckOptions(workspaceId: string, role: RoleModel = BRAND_K
     brands,
     templates: await teamTemplates(workspaceId, role, email, own?.name ?? null),
     slides: SLIDES.map((s) => ({ kind: s.kind, title: s.title, description: s.description, pages: s.pages, ...(s.required ? { required: true } : {}), ...(s.needs ? { needs: s.needs } : {}) })),
-    periods: { week: week.map((p) => ({ key: p.key, label: p.label })), month: month.map((p) => ({ key: p.key, label: p.label })) },
+    periods: { day: day.map((p) => ({ key: p.key, label: p.label })), week: week.map((p) => ({ key: p.key, label: p.label })), month: month.map((p) => ({ key: p.key, label: p.label })) },
     client: own ? { name: own.name, brand_ids: [own.id] } : null,
     starter: c
       ? {

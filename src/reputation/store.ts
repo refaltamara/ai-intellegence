@@ -12,7 +12,7 @@ export type RepBlocks = {
   kind: "deck";
   family: "reputation";
   deck_id: string;
-  grain: "week" | "month";
+  grain: "day" | "week" | "month";
   title: string;
   client: string;
   week: { iso: string; label: string; from: string; to: string };

@@ -12,7 +12,7 @@ import type { WeeklyItem } from "@/reports/weekly";
 import { WeeklyViewer } from "../weekly/WeeklyViewer";
 
 type Props = {
-  deck: { id: string; name: string; grain: "week" | "month"; recurring: boolean; last_error: string | null; source: string; next_run_at: string | null };
+  deck: { id: string; name: string; grain: "day" | "week" | "month"; recurring: boolean; last_error: string | null; source: string; next_run_at: string | null };
   items: WeeklyItem[];
   initialId: string;
   initialSlide: number;
@@ -122,7 +122,7 @@ export function DeckViewer({ deck, items, initialId, initialSlide, periods, rang
         initialId={initialId}
         initialSlide={initialSlide}
         title={deck.name}
-        subtitle={`${unit === "month" ? "Month on month" : "Week on week"} · ${items.length} version${items.length === 1 ? "" : "s"}${recurring ? ` · a new one every ${unit}` : ""} · Ask AI on every slide`}
+        subtitle={`${unit === "month" ? "Month on month" : unit === "day" ? "Day on day" : "Week on week"} · ${items.length} version${items.length === 1 ? "" : "s"}${recurring ? ` · a new one every ${unit}` : ""} · Ask AI on every slide`}
         path={`/decks/${deck.id}`}
         param="v"
         actions={actions}

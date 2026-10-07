@@ -14,7 +14,7 @@ export default async function DeckPage({ params, searchParams }: { params: Promi
   const [{ id }, sp] = await Promise.all([params, searchParams]);
   const deck = await getDeck(id, ws);
   if (!deck) notFound();
-  const [versions, periods] = await Promise.all([deckVersions(deck.id, ws), deckPeriods(ws, deck.spec.grain, deck.spec.grain === "month" ? 6 : 12)]);
+  const [versions, periods] = await Promise.all([deckVersions(deck.id, ws), deckPeriods(ws, deck.spec.grain, deck.spec.grain === "month" ? 6 : deck.spec.grain === "day" ? 14 : 12)]);
   // PR decks may cover days picked by hand (a case moves faster than a week)
   const range = deck.spec.rep ? { asOf: await dataAsOf(ws) } : null;
   if (!versions.length) {

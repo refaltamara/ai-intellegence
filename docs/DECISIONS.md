@@ -526,3 +526,9 @@ Refal asked for the Chorus (PR) dashboard and PR decks on `kahf-threads`, becaus
 - A range never moves a recurring deck's schedule.
 - Brand & KOL and Social decks keep weeks and months.
 - With no status, the summary slide shows how posts and comments lean instead, and the status slide is dropped.
+
+**Daily PR decks (Refal, 7 Oct 2026).**
+- "Day on day" is a third comparison for PR decks: one day against the day before (`DeckGrain = Grain | "day"`, `dayPeriod`, key `YYYY-MM-DD`). Brand & KOL and Social decks keep weeks and months; the dashboard's periods are untouched.
+- Picking a day: the list runs newest first, the newest marked "(so far)" while the data may still be filling it.
+- Repeating: a daily deck runs each morning at 07:00 WIB for the day before, once the data has moved past it. A day already made is skipped, so a "(so far)" version is redone by hand ("New version" → the day → replace).
+- A PR template's name follows the comparison ("Daily Reputation Report").

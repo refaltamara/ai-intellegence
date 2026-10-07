@@ -6,7 +6,7 @@
  * same facts. Pure: checked against the workspace's brands by the caller.
  */
 import type { WeeklyContract } from "../competitor/contract";
-import { GRAINS, type Grain } from "../competitor/period";
+import { GRAINS, type DeckGrain, type Grain } from "../competitor/period";
 import { cleanSlides, type SlideKind } from "../competitor/slides";
 import type { Platform } from "../competitor/types";
 import { cleanRepSlides, type RepSpec } from "../reputation/slides";
@@ -22,7 +22,8 @@ export type FindingSpec = { key: string; skill: string; params: Record<string, u
 export type DeckSpec = {
   /** the title on the slides ("Monthly Competitor Review") */
   title: string;
-  grain: Grain;
+  /** week or month; a PR deck may also go day by day */
+  grain: DeckGrain;
   platforms: Platform[];
   client: { name: string; brands: { name: string; brand_ids: string[] }[] } | null;
   watchlist: { name: string; short?: string; group: "core" | "when_relevant"; brand_ids: string[] }[];
@@ -59,7 +60,8 @@ export function cleanSpec(input: unknown, known: Set<string>): DeckSpec | { erro
     const focus = str(r.focus, 80);
     if (!known.has(focus)) return { error: "pick the brand this deck is about" };
     const platform = typeof r.platform === "string" && /^[a-z]{1,12}$/.test(r.platform) ? r.platform : "all";
-    return { title: str(o.title, 60) || "Reputation Report", grain, platforms: [], client: null, watchlist: [], slides: ["summary"], rep: { focus, platform, slides: cleanRepSlides(r.slides) } };
+    // a PR deck may go day by day (a case moves by the hour); the others keep weeks and months
+    return { title: str(o.title, 60) || "Reputation Report", grain: o.grain === "day" ? "day" : grain, platforms: [], client: null, watchlist: [], slides: ["summary"], rep: { focus, platform, slides: cleanRepSlides(r.slides) } };
   }
   const platforms = Array.isArray(o.platforms) ? DECK_PLATFORMS.filter((p) => (o.platforms as unknown[]).includes(p)) : [];
   const watchlist = (Array.isArray(o.watchlist) ? o.watchlist : [])
@@ -116,7 +118,7 @@ export function specContract(spec: DeckSpec, workspaceId: string): WeeklyContrac
     client: spec.client,
     watchlist: spec.watchlist,
     platforms: spec.platforms,
-    grain: spec.grain,
+    grain: spec.grain === "day" ? "week" : spec.grain,
     slides: spec.slides,
   };
 }
