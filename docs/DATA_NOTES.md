@@ -183,6 +183,9 @@ One contents file, `data/raw/kahf/contents_threads.csv` (posts only; comments to
   - 72 posts, 5 Oct 17:51 to 7 Oct 15:47 WIB, none loaded before (759 posts in all). Comments on them are still being scraped.
   - Jakarta time. No overlap to line up, so checked from the text: @rul.zmi (14:02) writes that Kahf Indonesia apologised "13 jam lepas (2am)"; the apology is 00:45 WIB (01:45 in Malaysia), 13 hours before 14:00 WIB.
   - Hours without a leading zero ("5:25:01") read as 05:25.
+- **Comments batch 3** (`comments_batch3_structured.xlsx`, comments sheet, 7 Oct; `kahf/comments_threads_1007g.csv`):
+  - 6,296 in → 5,998 loaded, on 54 posts already loaded (Kahf's Malay apology DeLYd4ZCb0u 906, @dirvandha 795, @farahanani33 314, @hafezmy 293), 4 Oct 19:50 to 7 Oct 16:22 WIB. None loaded before. Dropped: 226 empty, 72 emoji or symbols only. 17,858 comments in all.
+  - Jakarta time: read so, no post's first comment comes before it, and the median first comment lands 8 minutes after the post.
   - Jakarta time: the post went up at 02:03 WIB and the first comment came at 02:23.
 - **All comments labelled by 12:30 WIB on 7 Oct**: 8,965 on posts about the case (off-topic left out). Labelling moved to every 5 minutes the same day.
 

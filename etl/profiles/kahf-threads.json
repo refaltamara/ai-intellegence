@@ -97,6 +97,13 @@
       "file": "kahf/contents_threads_1007f.csv",
       "naive_tz": "Asia/Jakarta",
       "note": "Kahf New - posts batch3_structured.csv, 7 Oct: 72 posts, 5 Oct 17:51 to 7 Oct 15:47 WIB, none loaded before. Jakarta time, checked against @rul.zmi DeLxwJRCWph (14:02): \"Kahf Indonesia minta maaf ... 13 jam lepas (2am)\" puts the apology (00:45 WIB, 01:45 MYT) 13 hours earlier, i.e. 14:00 WIB. Comments to follow"
+    },
+    {
+      "kind": "comments",
+      "platform": "threads",
+      "file": "kahf/comments_threads_1007g.csv",
+      "naive_tz": "Asia/Jakarta",
+      "note": "comments_batch3_structured.xlsx (comments sheet), 7 Oct: 6,296 comments on 54 posts already loaded (batch 3 and earlier), 4 Oct 19:50 to 7 Oct 16:22. Jakarta time: read so, no post's first comment comes before it and the median first comment lands 8 minutes after"
     }
   ]
 }
