@@ -9,6 +9,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { DeckOptions } from "@/decks/page";
 import type { DeckSpec } from "@/decks/spec";
 import { MultiSelect } from "../MultiSelect";
+import { PeriodPick } from "./PeriodPick";
 
 type Group = DeckSpec["watchlist"][number];
 type Initial = { id: string; name: string; spec: DeckSpec; recurring: boolean; template: string | null };
@@ -258,10 +259,8 @@ export function DeckForm({ options, initial, prefill }: { options: DeckOptions; 
         <label className="wf">
           <span>{edit ? "Make a version for" : "First version"}</span>
           {grain === "day" ? (
-            // a day by day deck names its day: the newest one may still be filling
-            <select value={period || periods[0]?.key || ""} onChange={(e) => setPeriod(e.target.value)}>
-              {periods.map((p) => <option key={p.key} value={p.key}>{p.label}</option>)}
-            </select>
+            // a day by day deck names its day: one of the last days (the newest may still be filling), any day from a calendar, or a run of days
+            <PeriodPick periods={periods} value={period || periods[0]?.key || ""} onChange={setPeriod} range={{ asOf: options.data_through.slice(0, 10), first: options.data_from }} day />
           ) : (
           <select value={period} onChange={(e) => setPeriod(e.target.value)}>
             <option value="">Latest {grain} the data covers{periods[0] ? ` (${periods[0].label})` : ""}</option>

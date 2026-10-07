@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { PeriodPick } from "./PeriodPick";
 
-export function DeckFirst({ deckId, error, periods, range }: { deckId: string; error: string | null; periods: { key: string; label: string }[]; range?: { asOf: string } | null }) {
+export function DeckFirst({ deckId, error, periods, range, day }: { deckId: string; error: string | null; periods: { key: string; label: string }[]; range?: { asOf: string; first?: string } | null; day?: boolean }) {
   const router = useRouter();
   const [period, setPeriod] = useState(periods[0]?.key ?? "");
   const [busy, setBusy] = useState(false);
@@ -24,7 +24,7 @@ export function DeckFirst({ deckId, error, periods, range }: { deckId: string; e
       <h3>Make the first version</h3>
       {err && <div className="errbox">Last run: {err}</div>}
       <div className="wactions" style={{ justifyContent: "flex-start" }}>
-        <PeriodPick periods={periods} value={period} onChange={setPeriod} range={range} />
+        <PeriodPick periods={periods} value={period} onChange={setPeriod} range={range} day={day} />
         <button className="btn pri sm" disabled={busy || !period} onClick={make}>{busy ? "Making it… (about a minute)" : "Make it"}</button>
         <a className="btn sm ghost" href={`/decks/${deckId}/edit`}>Edit the deck</a>
       </div>
