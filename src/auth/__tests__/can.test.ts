@@ -57,3 +57,13 @@ describe("can", () => {
     expect(levelOf(builder, "fintech-id", "brand_kol")).toBeNull();
   });
 });
+
+describe("a workspace restricted to named people", () => {
+  it("is closed to everyone it does not name, Fair staff included", () => {
+    const rafli = { uid: "u", account_id: "a", email: "rafli@fair-indonesia.com", name: null, staff: ["owner"], home: "beauty-id", memberships: [], hidden: ["kahf-threads"] } as never;
+    expect(can(rafli, "workspace.reach", { workspace: "kahf-threads" })).toBe(false);
+    expect(can(rafli, "workspace.data", { workspace: "kahf-threads" })).toBe(false);
+    expect(can(rafli, "workspace.reach", { workspace: "beauty-id" })).toBe(true);
+    expect(can(rafli, "role.release")).toBe(true);
+  });
+});

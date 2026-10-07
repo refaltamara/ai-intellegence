@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { workspaceStates } from "@/cms/data";
+import { currentActor } from "@/auth/current";
 import { ROLES } from "@/roles/model";
 import { fmtNum } from "@/ui/format";
 
@@ -9,7 +10,7 @@ const day = (d: string | null) => (d ? new Date(d).toLocaleDateString("en-GB", {
 
 /** Workspaces: every client workspace, its status, data and people; a new one starts the onboarding wizard. */
 export default async function AdminWorkspaces() {
-  const rows = await workspaceStates();
+  const rows = await workspaceStates((await currentActor())?.hidden);
   return (
     <section className="screen">
       <div className="topbar"><div><h1>Workspaces</h1><span className="meta">{rows.length} workspaces</span></div><Link className="btn pri sm" href="/admin/workspaces/new">New workspace</Link></div>

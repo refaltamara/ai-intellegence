@@ -49,7 +49,7 @@ function refOf(def: ExtDef, entity: "posts" | "comments"): string | null {
 }
 
 export const ENTITIES = ["posts", "creators", "brand_weeks", "creator_brand_months", "comments"] as const;
-export const GROUP_BY = ["brand_id", "platform", "source", "tier", "week", "month", "creator_id", "content_format", "product_category", "universe", "caption_product", "caption_event", "caption_event_name", "caption_offer", "caption_hook"] as const;
+export const GROUP_BY = ["brand_id", "platform", "source", "tier", "day", "week", "month", "creator_id", "content_format", "product_category", "universe", "caption_product", "caption_event", "caption_event_name", "caption_offer", "caption_hook", "topic", "stance", "voice"] as const;
 /** Read from captions by the model (src/captions/): posts not read yet group as "not read". */
 const CAPTION_DIMS = new Set(["caption_product", "caption_event", "caption_event_name", "caption_offer", "caption_hook"]);
 const capDim = (col: string, none: string) => `case when p.cap_source = 'model' then coalesce(nullif(${col}, 'none'), '${none}') else 'not read' end`;
@@ -81,6 +81,10 @@ export const FILTERS: Record<string, (v: unknown, add: (val: unknown) => string,
   caption_hook: (v, add) => `p.cap_hook = any(${add(list(v))}::text[])`,
   caption_product: (v, add) => `lower(p.cap_product) like any(${add(list(v).map((s) => `%${s.replace(/[%_]/g, "")}%`))}::text[])`,
   captions_read: (v) => (v ? "p.cap_source = 'model'" : null),
+  // profile workspaces with labelling context (src/label/): the post's topic, its stance toward the subject, its author's voice
+  topic: (v, add) => `(pt.label ilike any(${add(list(v).map((s) => s.replace(/[%_]/g, "")))}::text[]) or p.topic_id = any(${add(list(v))}::text[]))`,
+  stance: (v, add) => `p.stance = any(${add(list(v))}::text[])`,
+  voice: (v, add) => `lower(p.voice) = any(${add(list(v))}::text[])`,
 };
 
 const DIM_SQL: Record<(typeof GROUP_BY)[number], (ctx: Context) => string> = {
@@ -99,6 +103,10 @@ const DIM_SQL: Record<(typeof GROUP_BY)[number], (ctx: Context) => string> = {
   caption_event_name: () => capDim("p.cap_event_name", "none"),
   caption_offer: () => capDim("p.cap_offer", "none"),
   caption_hook: () => capDim("p.cap_hook", "other"),
+  day: (ctx) => `to_char((p.posted_at at time zone '${ctx.tz}')::date, 'YYYY-MM-DD')`,
+  topic: () => "coalesce(pt.label, 'no topic')",
+  stance: () => "coalesce(p.stance, 'unlabelled')",
+  voice: () => "coalesce(p.voice, 'unknown')",
 };
 
 const METRIC_SQL: Record<(typeof METRICS)[number], string> = {
@@ -139,7 +147,7 @@ export type QueryMetricsResult = {
  * under a post that does not name its brand (DECISIONS 3 Oct 2026). Shares are over
  * labelled comments; unlabelled ones are not neutral.
  */
-export const COMMENT_GROUP_BY = ["brand_id", "platform", "source", "topic", "sentiment", "day", "week", "month"] as const;
+export const COMMENT_GROUP_BY = ["brand_id", "platform", "source", "topic", "sentiment", "voice", "day", "week", "month"] as const;
 export const COMMENT_METRICS = ["count_comments", "count_commenters", "count_posts", "negative_pct", "positive_pct", "net_sentiment", "purchase_intent_pct", "sum_likes"] as const;
 const COMMENT_FILTERS: Record<string, (v: unknown, add: (val: unknown) => string, ctx: Context) => string | null> = {
   brand_id: FILTERS.brand_id,
@@ -150,6 +158,7 @@ const COMMENT_FILTERS: Record<string, (v: unknown, add: (val: unknown) => string
   sentiment: (v, add) => `c.sentiment = any(${add(list(v))}::text[])`,
   topic: (v, add) => `(t.label ilike any(${add(list(v).map((s) => s.replace(/[%_]/g, "")))}::text[]) or c.topic_id = any(${add(list(v))}::text[]))`,
   purchase_intent: (v) => (v ? "c.purchase_intent" : "c.purchase_intent is not true"),
+  voice: (v, add) => `lower(c.voice) = any(${add(list(v))}::text[])`,
   min_likes: (v, add) => `c.likes >= ${add(Number(v))}`,
 };
 const COMMENT_DIM_SQL: Record<(typeof COMMENT_GROUP_BY)[number], (ctx: Context) => string> = {
@@ -158,6 +167,7 @@ const COMMENT_DIM_SQL: Record<(typeof COMMENT_GROUP_BY)[number], (ctx: Context) 
   source: () => "p.source",
   topic: () => "coalesce(t.label, 'no topic')",
   sentiment: () => "coalesce(c.sentiment, 'unlabelled')",
+  voice: () => "coalesce(c.voice, 'unknown')",
   day: (ctx) => `to_char((c.posted_at at time zone '${ctx.tz}')::date, 'YYYY-MM-DD')`,
   week: (ctx) => `to_char((date_trunc('week', c.posted_at at time zone '${ctx.tz}'))::date, 'YYYY-MM-DD')`,
   month: (ctx) => `to_char((c.posted_at at time zone '${ctx.tz}'), 'YYYY-MM')`,
@@ -291,7 +301,7 @@ export async function queryMetrics(input: QueryMetricsInput, workspaceId: string
     const dir = (orderDir ?? "desc").toLowerCase() === "asc" ? "asc" : "desc";
     const limit = Math.max(1, Math.min(200, Number(input.limit ?? 50) || 50));
     const sql = `select ${[...dims, ...mets].join(", ")}, count(*) over() as matched
-      from posts p ${ext.joins.join(" ")} where ${where.join(" and ")}
+      from posts p left join topics pt on pt.id = p.topic_id ${ext.joins.join(" ")} where ${where.join(" and ")}
       ${groupBy.length ? `group by ${groupBy.map((_, i) => i + 1).join(", ")}` : ""}
       order by ${orderCol} ${dir} nulls last limit ${add(limit)}`;
     const rows = await db.q<Row>(sql, params);

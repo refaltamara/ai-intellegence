@@ -89,7 +89,7 @@ async function tool(name: string, input: Record<string, unknown>, role: RoleId, 
       const all = [...(await fairRecipes()).values()];
       return JSON.stringify({
         recipes: all.map((r) => ({ key: r.key, title: r.title, description: r.description, roles: r.roles, params: r.params, query: r.query })),
-        builder: { entities: ENTITIES, posts: { group_by: GROUP_BY, metrics: METRICS, filters: Object.keys(FILTERS) }, comments: { group_by: COMMENT_GROUP_BY, metrics: COMMENT_METRICS, filters: ["brand_id", "platform", "source", "sentiment", "topic", "purchase_intent", "min_likes"] }, params: RECIPE_PARAMS },
+        builder: { entities: ENTITIES, posts: { group_by: GROUP_BY, metrics: METRICS, filters: Object.keys(FILTERS) }, comments: { group_by: COMMENT_GROUP_BY, metrics: COMMENT_METRICS, filters: ["brand_id", "platform", "source", "sentiment", "topic", "voice", "purchase_intent", "min_likes"] }, params: RECIPE_PARAMS },
       });
     }
     case "edit_draft": {

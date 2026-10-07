@@ -33,14 +33,18 @@ export async function loadActor(uid: string): Promise<Actor | null> {
     `select u.id as uid, u.workspace_id as home, a.id as account_id, a.email, a.name, a.staff,
             (select coalesce(json_agg(json_build_object('user_id', m.id, 'workspace_id', m.workspace_id, 'levels', m.levels) order by m.created_at), '[]') from users m join workspaces w on w.id = m.workspace_id
                -- a client reaches only live workspaces (CMS plan, Workspace lifecycle); Fair staff reach every one
-               where m.account_id = a.id and (w.status = 'live' or cardinality(a.staff) > 0)) as memberships
+               where m.account_id = a.id and (w.status = 'live' or cardinality(a.staff) > 0)
+                 and not (jsonb_typeof(w.settings->'restricted_to') = 'array' and jsonb_array_length(w.settings->'restricted_to') > 0 and not (w.settings->'restricted_to' ? a.email))) as memberships,
+            -- a workspace restricted to named people is closed to everyone else, Fair staff included
+            (select coalesce(array_agg(w.id order by w.id), '{}') from workspaces w
+               where jsonb_typeof(w.settings->'restricted_to') = 'array' and jsonb_array_length(w.settings->'restricted_to') > 0 and not (w.settings->'restricted_to' ? a.email)) as hidden
        from users u join accounts a on a.id = u.account_id
       where u.id = $1 and a.password_hash is not null`,
     [uid],
-  )) as { uid: string; home: string; account_id: string; email: string; name: string | null; staff: string[]; memberships: Membership[] }[];
+  )) as { uid: string; home: string; account_id: string; email: string; name: string | null; staff: string[]; memberships: Membership[]; hidden: string[] }[];
   const r = rows[0];
   const actor: Actor | null = r
-    ? { uid: r.uid, home: r.home, account_id: r.account_id, email: r.email, name: r.name, staff: (r.staff ?? []).filter(isDuty), memberships: r.memberships.map((m) => ({ ...m, levels: cleanLevels(m.levels) })) }
+    ? { uid: r.uid, home: r.home, account_id: r.account_id, email: r.email, name: r.name, staff: (r.staff ?? []).filter(isDuty), memberships: r.memberships.map((m) => ({ ...m, levels: cleanLevels(m.levels) })), hidden: r.hidden ?? [] }
     : null;
   actorCache.set(uid, { at: Date.now(), actor });
   return actor;

@@ -40,7 +40,7 @@ export function PulsePage({ d }: { d: PulseData }) {
       <div className="wrap wide">
         <div className="stats">
           <div className="stat"><b>{fmtNum(t.on_topic)}</b><span>comments about {d.subject}, from {fmtNum(t.accounts)} accounts on {fmtNum(t.posts_with_comments)} posts{t.off_topic ? ` · ${fmtNum(t.off_topic)} more in these threads are about something else` : ""}</span></div>
-          <div className="stat"><b style={{ color: negPct != null && negPct >= 50 ? "var(--red)" : undefined }}>{negPct != null ? `${negPct}%` : "–"}</b><span>{t.on_topic_labelled ? `negative, of the ${fmtNum(t.on_topic_labelled)} read so far${t.on_topic_labelled < t.on_topic ? ` · ${fmtNum(t.on_topic - t.on_topic_labelled)} still unlabelled` : ""} · ${pct(t.on_topic_positive, t.on_topic_labelled) ?? 0}% defend her` : "negative · labelling has not started"}</span></div>
+          <div className="stat"><b style={{ color: negPct != null && negPct >= 50 ? "var(--red)" : undefined }}>{negPct != null ? `${negPct}%` : "–"}</b><span>{t.on_topic_labelled ? `negative, of the ${fmtNum(t.on_topic_labelled)} read so far${t.on_topic_labelled < t.on_topic ? ` · ${fmtNum(t.on_topic - t.on_topic_labelled)} still unlabelled` : ""} · ${pct(t.on_topic_positive, t.on_topic_labelled) ?? 0}% defend ${d.subject}` : "negative · labelling has not started"}</span></div>
           <div className="stat"><b style={{ color: againstPct != null && againstPct >= 50 ? "var(--red, #c0392b)" : undefined }}>{againstPct != null ? `${againstPct}%` : "–"}</b><span>{t.posts_stance_labelled ? `of posts are against ${d.subject}, of ${fmtNum(t.posts_stance_labelled)} with a stance${t.earned_posts > t.posts_stance_labelled ? ` · ${fmtNum(t.earned_posts - t.posts_stance_labelled - t.posts_no_caption)} waiting, ${fmtNum(t.posts_no_caption)} have no text in the export` : ""}` : `posts by other accounts · ${fmtNum(t.earned_posts)} waiting for a stance`}</span></div>
           <div className="stat"><b>{fmtNum(t.earned_posts)}</b><span>posts by other accounts about {d.subject}{sum.spike_started ? ` · comments spiked ${when(sum.spike_started, sum.bucket === "day")}` : ""}</span></div>
         </div>
@@ -66,7 +66,7 @@ export function PulsePage({ d }: { d: PulseData }) {
               peakNote={d.trend.peak ? `${fmtNum(d.trend.peak.comments)} in one hour` : undefined}
             />
           </div>
-          <div className="caveats">The three lines are shares of the same blue bar and add up to 100%: every comment about {d.subject} is negative, neutral or defending her. Neutral means it is about her or the controversy but takes no side — anger at the government or the news, unless it blames her. Pale blue is comments the labeller has not reached yet, which is why an hour can be tall and its lines short. Lines are blank under ten comments read, where a percentage would be noise, and the last hour is still filling.</div>
+          <div className="caveats">The three lines are shares of the same blue bar and add up to 100%: every comment about {d.subject} is negative, neutral or defending {d.subject}. Neutral means it is about {d.subject} or the controversy but takes no side — anger at the government or the news, unless it blames {d.subject}. Pale blue is comments the labeller has not reached yet, which is why an hour can be tall and its lines short. Lines are blank under ten comments read, where a percentage would be noise, and the last hour is still filling.</div>
         </div>
 
         <div className="card" style={{ marginBottom: 12 }}>
@@ -75,12 +75,12 @@ export function PulsePage({ d }: { d: PulseData }) {
             <TrendChart
               x={d.trend.points.map((p) => p.h)}
               bars={[
-                { name: "Against her", data: d.trend.points.map((p) => p.against), color: "var(--red)" },
+                { name: `Against ${d.subject}`, data: d.trend.points.map((p) => p.against), color: "var(--red)" },
                 { name: "Neutral", data: d.trend.points.map((p) => p.neutral_posts), color: "#8593A8" },
-                { name: "Defending her", data: d.trend.points.map((p) => p.for_), color: "var(--green)" },
+                { name: `Defending ${d.subject}`, data: d.trend.points.map((p) => p.for_), color: "var(--green)" },
                 { name: "No stance yet", data: d.trend.points.map((p) => Math.max(0, p.posts - p.against - p.neutral_posts - p.for_)), color: "#E6EBF2" },
               ]}
-              lines={[{ name: "Share against her", data: d.trend.points.map((p) => share(p.against, p.posts)), color: "var(--red)" }]}
+              lines={[{ name: `Share against ${d.subject}`, data: d.trend.points.map((p) => share(p.against, p.posts)), color: "var(--red)" }]}
               barLabel="Posts" lineLabel="share of posts that hour" height={260}
               peakNote={d.trend.peak_posts ? `${fmtNum(d.trend.peak_posts.posts)} posts in one hour` : undefined}
             />
@@ -112,11 +112,11 @@ export function PulsePage({ d }: { d: PulseData }) {
             <h4>Where the anger is <span>the same comments, split by whose post they sit under</span></h4>
             <div className="body">
               <div className="split">
-                <SourceBar label={`Under ${d.subject}'s own posts`} comments={t.owned_comments} negative={t.owned_negative} total={t.on_topic} />
-                <SourceBar label="Under everyone else's posts" comments={t.earned_comments} negative={t.earned_negative} total={t.on_topic} />
+                <SourceBar subject={d.subject} label={`Under ${d.subject}'s own posts`} comments={t.owned_comments} negative={t.owned_negative} total={t.on_topic} />
+                <SourceBar subject={d.subject} label="Under everyone else's posts" comments={t.earned_comments} negative={t.earned_negative} total={t.on_topic} />
               </div>
               <p className="quiet" style={{ marginTop: 10 }}>
-                Away from her own accounts this is an argument with two sides; on her own feed it is a pile-on written to her, and it is the part she cannot leave. {pct(t.owned_comments, t.on_topic) ?? 0}% of everything said about {d.subject} is now written under her own posts.
+                Away from {d.subject}'s own accounts this is an argument with two sides; on its own feed it is a pile-on written to {d.subject}, and it is the part that cannot be left. {pct(t.owned_comments, t.on_topic) ?? 0}% of everything said about {d.subject} is now written under {d.subject}'s own posts.
               </p>
             </div>
             {t.labelled < t.comments && <div className="caveats">Labelling is still running and works post by post, so some posts are labelled unevenly until it finishes.</div>}
@@ -151,9 +151,9 @@ export function PulsePage({ d }: { d: PulseData }) {
             </table>
           </div>
         </div>
-        <div className="pulse-grid">
-          <div>
-            {d.root && (
+        {(d.root || d.spread.length > 0) && <div className="pulse-grid" style={d.root && d.spread.length ? undefined : { gridTemplateColumns: "1fr" }}>
+          {d.root && <div>
+            {(
               <div className="card">
                 <h4>The root <span>{when(d.root.posted_at, true)}</span></h4>
                 <div className="body">
@@ -163,16 +163,16 @@ export function PulsePage({ d }: { d: PulseData }) {
                 </div>
               </div>
             )}
-          </div>
-          <div className="card">
-            <h4>Per platform <span>negative share of the comments about her</span></h4>
+          </div>}
+          {d.spread.length > 0 && <div className="card">
+            <h4>Per platform <span>negative share of the comments about {d.subject}</span></h4>
             <div className="tablewrap still" style={{ border: 0 }}>
               <table>
-                <thead><tr><th>Platform</th><th className="num">Posts</th><th className="num">About her</th><th className="num">Negative</th><th>First post</th><th>Peak hour</th></tr></thead>
+                <thead><tr><th>Platform</th><th className="num">Posts</th><th className="num">About {d.subject}</th><th className="num">Negative</th><th>First post</th><th>Peak hour</th></tr></thead>
                 <tbody>{d.spread.map((s) => (
                   <tr key={s.platform}>
                     <td>{label(s.platform)}</td><td className="num">{fmtNum(s.posts)}</td>
-                    <td className="num">{fmtNum(s.on_topic)}{s.on_topic < s.comments ? <small style={{ display: "block", color: "var(--text-3)" }}>{fmtNum(s.comments - s.on_topic)} not about her</small> : null}</td>
+                    <td className="num">{fmtNum(s.on_topic)}{s.on_topic < s.comments ? <small style={{ display: "block", color: "var(--text-3)" }}>{fmtNum(s.comments - s.on_topic)} not about {d.subject}</small> : null}</td>
                     <td className="num" style={{ color: s.on_topic && (s.negative / s.on_topic) >= 0.5 ? "var(--red)" : undefined, fontWeight: 600 }}>{s.on_topic ? `${pct(s.negative, s.on_topic)}%` : "–"}{s.positive ? <small style={{ display: "block", color: "var(--text-3)", fontWeight: 400 }}>{pct(s.positive, s.on_topic)}% defending</small> : null}</td>
                     <td>{s.first_post ? `${when(s.first_post)} @${s.first_post_handle}` : "own posts only"}</td>
                     <td>{s.peak_hour ? `${when(s.peak_hour)} · ${fmtNum(s.peak_comments)}` : "–"}</td>
@@ -180,8 +180,8 @@ export function PulsePage({ d }: { d: PulseData }) {
                 ))}</tbody>
               </table>
             </div>
-          </div>
-        </div>
+          </div>}
+        </div>}
 
         <div className="pulse-grid">
           <div className="card">
@@ -272,9 +272,11 @@ function Now({ d }: { d: PulseData }) {
   const s = d.status;
   const move = (now: number, prev: number, band = 0.15) => (prev <= 0 ? (now > 0 ? 1 : 0) : (now - prev) / prev > band ? 1 : (now - prev) / prev < -band ? -1 : 0);
   const tone = (now: number | null, prev: number | null) => (now == null || prev == null ? 0 : now - prev > 3 ? 1 : now - prev < -3 ? -1 : 0);
-  const vol = move(s.now6.comments, s.prev6.comments);
+  // Posts only (no comments loaded yet): volume follows posts and the tone is not claimed.
+  const postsOnly = s.now6.comments + s.prev6.comments + s.prev_day.comments === 0;
+  const vol = postsOnly ? move(s.now6.posts, s.prev6.posts) : move(s.now6.comments, s.prev6.comments);
   const ton = tone(s.now6.negative_pct, s.prev6.negative_pct);
-  const headline = `${vol > 0 ? "Getting louder" : vol < 0 ? "Quieting down" : "Holding steady"}, ${ton > 0 ? "and angrier" : ton < 0 ? "and less angry" : "and the tone has not moved"}.`;
+  const headline = `${vol > 0 ? "Getting louder" : vol < 0 ? "Quieting down" : "Holding steady"}, ${postsOnly ? "in posts; no comments are loaded yet" : ton > 0 ? "and angrier" : ton < 0 ? "and less angry" : "and the tone has not moved"}.`;
   const per = (n: number, hours: number) => Math.round(n / hours);
   const delta = (now: number, prev: number) => (prev <= 0 ? null : Math.round(((now - prev) / prev) * 100));
   const cStep = delta(s.now6.comments, s.prev6.comments);
@@ -288,7 +290,7 @@ function Now({ d }: { d: PulseData }) {
         <p className="now-head">{headline}</p>
         <p className="quiet" style={{ marginTop: 2 }}>
           {fmtNum(s.now6.comments)} comments and {fmtNum(s.now6.posts)} posts in the last six hours — {fmtNum(per(s.now6.comments, 6))} comments an hour, against {fmtNum(per(s.prev6.comments, 6))} in the six before and {fmtNum(per(s.prev_day.comments, 24))} across the day before that.
-          {s.now6.negative_pct != null && ` Of the comments about ${d.subject} in those hours, ${s.now6.negative_pct}% were negative and ${s.now6.positive_pct ?? 0}% defended her.`}
+          {s.now6.negative_pct != null && ` Of the comments about ${d.subject} in those hours, ${s.now6.negative_pct}% were negative and ${s.now6.positive_pct ?? 0}% defended ${d.subject}.`}
           {d.trend.peak && s.hours_since_peak != null && ` The busiest hour of the whole crisis was ${when(d.trend.peak.h)} WIB with ${fmtNum(d.trend.peak.comments)} comments, ${s.hours_since_peak} hours ago.`}
         </p>
         <div className="steps">
@@ -337,7 +339,7 @@ function Watchlist({ d }: { d: PulseData }) {
           </tbody>
         </table>
       </div>
-      <div className="caveats">This is where a reply lands or a fire keeps burning: a post that is still taking comments hours after it went up is the one to answer. Her own posts are marked, because a comment there is written to her, not about her.</div>
+      <div className="caveats">This is where a reply lands or a fire keeps burning: a post that is still taking comments hours after it went up is the one to answer. {d.subject}'s own posts are marked, because a comment there is written to {d.subject}, not about it.</div>
     </div>
   );
 }
@@ -351,11 +353,11 @@ function WatchRow({ w, subject }: { w: WatchPost; subject: string }) {
           {w.last6h > 0 && <i className="dot" title="took comments in the last six hours" />}
           {w.source === "owned" ? <b>{subject}&apos;s own post</b> : <b>@{w.handle}</b>}
           <span className="quiet"> · {when(w.posted_at)}</span>
-          {w.stance && w.source !== "owned" && <span className={`tag ${w.stance}`}>{w.stance === "negative" ? "against her" : w.stance === "positive" ? "defending her" : "neutral"}</span>}
+          {w.stance && w.source !== "owned" && <span className={`tag ${w.stance}`}>{w.stance === "negative" ? `against ${subject}` : w.stance === "positive" ? `defending ${subject}` : "neutral"}</span>}
         </span>
         <a href={w.url} target="_blank" rel="noreferrer" className="cap">“{w.caption || "no text in the export"}”</a>
       </td>
-      <td className="num">{fmtNum(w.comments)}{noise > 0 && <small style={{ display: "block", color: "var(--text-3)" }}>{fmtNum(noise)} not about her</small>}</td>
+      <td className="num">{fmtNum(w.comments)}{noise > 0 && <small style={{ display: "block", color: "var(--text-3)" }}>{fmtNum(noise)} not about {subject}</small>}</td>
       <td className="num">{fmtNum(w.last24h)}</td>
       <td className="num" style={{ fontWeight: w.last6h > 0 ? 700 : 400 }}>{fmtNum(w.last6h)}</td>
       <td className="num" style={{ color: w.negative_pct != null && w.negative_pct >= 50 ? "var(--red)" : undefined, fontWeight: 600 }}>
@@ -454,11 +456,11 @@ function Exposure({ d }: { d: PulseData }) {
 }
 
 /** Owned against earned: the bar is the negative share, the width underneath is how much of the conversation sits there. */
-function SourceBar({ label: l, comments, negative, total }: { label: string; comments: number; negative: number; total: number }) {
+function SourceBar({ label: l, comments, negative, total, subject }: { label: string; comments: number; negative: number; total: number; subject: string }) {
   const neg = pct(negative, comments);
   return (
     <div className="srow">
-      <span className="lbl">{l}<small>{fmtNum(comments)} comments · {pct(comments, total) ?? 0}% of everything said about her</small></span>
+      <span className="lbl">{l}<small>{fmtNum(comments)} comments · {pct(comments, total) ?? 0}% of everything said about {subject}</small></span>
       <span className="bar"><i style={{ width: `${neg ?? 0}%`, background: "var(--red)" }} /></span>
       <b style={{ color: neg != null && neg >= 50 ? "var(--red)" : undefined }}>{neg == null ? "–" : `${neg}%`}<small>negative</small></b>
     </div>

@@ -43,6 +43,7 @@ export async function POST(req: Request) {
   if (!actor || !can(actor, "workspace.data")) return no("Only Fair's data ops and owners onboard workspaces.", 403);
   const b = (await req.json().catch(() => ({}))) as Record<string, unknown>;
   const ws = String(b.workspace_id ?? "");
+  if (ws && !can(actor, "workspace.data", { workspace: ws })) return no("Unknown workspace.", 404);
   const by = actor.email;
 
   if (b.action === "create") {

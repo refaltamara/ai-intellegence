@@ -14,7 +14,7 @@ export type TeamChoice = Team & { key: string; role: RoleId; nav: NavKey[]; work
 
 export async function teamsFor(actor: Actor | null): Promise<TeamChoice[]> {
   if (!actor) return [];
-  const ids = isStaff(actor) ? (await listWorkspaces()).map((w) => w.id) : actor.memberships.map((m) => m.workspace_id);
+  const ids = (isStaff(actor) ? (await listWorkspaces()).map((w) => w.id) : actor.memberships.map((m) => m.workspace_id)).filter((id) => !actor.hidden?.includes(id));
   const cfgs = (await Promise.all(ids.map((id) => getWorkspace(id)))).filter((c): c is NonNullable<typeof c> => c != null);
   // PR teams first, then the others; within a role, workspaces in their own order
   const pairs = cfgs.flatMap((c) => rolesFor(actor, c.id, c.roles).map((r) => ({ c, r }))).sort((a, b) => (a.r === b.r ? 0 : a.r === "pr" ? -1 : b.r === "pr" ? 1 : 0));

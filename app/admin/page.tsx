@@ -13,7 +13,8 @@ const daysAgo = (d: string | null) => (d ? Math.round((Date.now() - Date.parse(d
 
 /** CMS Home: the roles as they stand, and what needs someone today. */
 export default async function AdminHome() {
-  const [actor, versions, workspaces, invites, staff, recent] = await Promise.all([currentActor(), roleVersions(), workspaceStates(), listInvites(), listStaff(), auditRows({ limit: 8 })]);
+  const actor = await currentActor();
+  const [versions, workspaces, invites, staff, recent] = await Promise.all([roleVersions(), workspaceStates(actor?.hidden), listInvites(), listStaff(), auditRows({ limit: 8 })]);
   const builders = workspaces.reduce((a, w) => a + w.builders, 0);
   const waiting = versions.filter((v) => v.status === "proposed");
   const staged = versions.filter((v) => v.status === "released" && v.stage_workspaces?.length);

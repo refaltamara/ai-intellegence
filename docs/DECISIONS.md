@@ -388,3 +388,82 @@ Followers 0 or null → tier null, excluded from per-1k metrics. Discovery keeps
     - The outcome insight read "…Started from creations in three fintech workspaces."
     - The browser endpoint dropped a copied answer's text, a kind the browser may not send and an extra field, and refused calls without a session.
     - Dashboards record each section seen, with their layout unchanged.
+
+## Early-access listening pricing (Refal, 6 Oct 2026; to revisit)
+Offered only to selected early clients, not yet a public product. Licences are yearly; prices in rupiah, PPN included.
+
+| | Growth | Premium |
+|---|---|---|
+| Brands | 3 | 10 |
+| Price per year | Rp 21M (Rp 7M a brand) | Rp 56M (10 × Rp 7M, less 20%) |
+| Extra brand | Rp 6M a year | Rp 5M a year |
+
+Both packages carry the same benefits:
+- **Platforms:** Instagram, TikTok, Threads and X.
+- **Own accounts:** each brand's own accounts on all four platforms.
+- **Keywords:** Instagram all tagged posts, plus 3 keywords or hashtags per platform on TikTok, Threads and X.
+- **Tracking:** content fetched daily and each post tracked for 7 days.
+- **Comments and sentiment:** all comments, with sentiment on each.
+- **Topics:** set up by Fair's team.
+- **Brand swaps:** one per brand per quarter, as written.
+- **Roles:** PR, Social Media, and Brand & KOL.
+- **Users:** no seat limit.
+- **CeMO credits:** included, with no number stated.
+- **Connector:** the Claude/ChatGPT MCP connector, free.
+
+Internal only, not in the offer:
+- A volume cap on comments exists for later; early clients are not capped.
+- Swaps are written as one per quarter but not enforced for early clients.
+- How CeMO credits are sold is still open (the credit system supports pools and caps per workspace; nothing is enforced until `settings.credits.enforce`).
+- Fair's cost per brand is not measured yet; read it in CMS → Credits once a month of model calls is recorded.
+
+Market check, 6 Oct 2026, at Rp 17,900 per USD:
+- **Local:** Netray Rp 24M a year for all channels with 4 keywords each.
+- **Brand24:** from about Rp 43M a year.
+- **YouScan:** about Rp 107M a year for 3 topics.
+- **Talkwalker:** Rp 161M a year and up.
+- **Brandwatch, Meltwater, Sprinklr:** Rp 170M to 900M a year and up.
+
+Claude's recommendation was Rp 42M for Growth. Rp 21M is kept as early-access pricing and revisited before the product goes public.
+
+## Kahf on Threads: case context, topics, voice and restricted workspaces (Refal, 7 Oct 2026)
+
+A crisis workspace for one case: `kahf-threads` (profile, PR role, Threads only), set up while the case was live.
+
+**Who sees it.** Only Refal and Raissa (Refal's call).
+- `settings.restricted_to` lists the emails allowed in. A workspace with that list is hidden from every other account, Fair staff included. It is left out of their teams, the workspace switcher and the CMS lists, and `can()` refuses it.
+- `loadActor` builds the list of hidden workspaces once per request (`actor.hidden`).
+- No list (or an empty one) means the usual rules apply.
+
+**What the labeller is told** (`settings.label`, read by `labelContext` in `src/label/run.ts`):
+- `subject`, `about`, `context`: the case in plain words. Here that is the AFF meme, its deletion and the apology about eight hours later, as Refal described them from a screenshot.
+- `languages`.
+- Without `about`, the prompts are the same as before, so Maudy's labels do not move.
+
+**Topics.** These are the workspace's `topics` rows, labelled per post and per comment (`topic_id`, `topic_confidence`):
+- Boycott calls
+- The original post
+- The apology
+- ParagonCorp and sister brands
+- Others (the catch-all)
+
+They come from reading the 582 posts. Refal agreed to four topics plus Others.
+
+**Voice.** `settings.label.voices` (Malaysian, Indonesian; the model may also answer "unclear") goes into `posts.voice` and `comments.voice`.
+- In this case, which side someone writes from matters as much as how they feel.
+- The hint is the everyday words that differ between Malay and Indonesian.
+- Query it with the `voice` dimension and filter (posts and comments).
+
+**Off-topic posts.** With `post_off_topic`, the labeller may set a post aside as not about the subject or the case (`relevant = false`), as listening workspaces do at load.
+- Threads replies rarely repeat the brand's name, so nothing is dropped by keyword at load.
+- Pulse now keeps `relevant is not false` on every earned-post query.
+
+**Sentiment** stays three classes (negative, neutral, positive) on comments and stance on earned posts. Kahf's own posts are never labelled.
+
+**Holding posts until deploy.** Posts loaded before this labeller was deployed carry `stance_source = 'awaiting_context'`, so the old labeller leaves them alone and the new one picks them up.
+
+**Pulse with posts only.** The dashboard now works before comments arrive:
+- The headline follows posts.
+- No root is claimed without comments.
+- Kahf's own posts during the wave (the apology) are on the timeline.
+- The copy names the subject instead of "her".

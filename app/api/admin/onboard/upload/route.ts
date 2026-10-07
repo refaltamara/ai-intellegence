@@ -19,6 +19,7 @@ export async function POST(req: Request) {
   if (blobOn()) return Response.json({ error: "Uploads go to Vercel Blob here." }, { status: 400 });
   const form = await req.formData();
   const ws = String(form.get("workspace_id") ?? "");
+  if (!can(actor, "workspace.data", { workspace: ws })) return Response.json({ error: "forbidden" }, { status: 403 });
   if (!((await sql.query("select 1 from workspaces where id = $1", [ws])) as unknown[]).length) return Response.json({ error: "Unknown workspace." }, { status: 404 });
   const files: Record<string, StoredFile> = { ...((await sourceOf(ws)).config.files ?? {}) };
   const saved: string[] = [], skipped: string[] = [];

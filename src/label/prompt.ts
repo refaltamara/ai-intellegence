@@ -28,7 +28,67 @@ export type CommentForLabel = {
 
 export type PostForLabel = { id: string; platform: string; handle: string | null; caption: string; url: string };
 
-export type Label = { id: string; sentiment: CommentClass; confidence: number };
+export type Label = { id: string; sentiment: CommentClass; confidence: number; topic?: string; voice?: string };
+
+/** A topic the labeller may put a row under (the workspace's `topics` rows); the catch-all takes what fits nowhere else. */
+export type LabelTopic = { id: string; label: string; definition: string | null; catch_all: boolean };
+
+/**
+ * What the labeller knows about a workspace (settings.label; DECISIONS 7 Oct 2026). Without it the
+ * prompts are the original ones: an Indonesian public figure, Indonesian and English, sentiment only.
+ */
+export type LabelContext = {
+  subject: string;
+  /** one line on who or what the subject is ("Kahf, an Indonesian men's grooming brand ...") */
+  about?: string;
+  /** what happened, so the model reads replies in context; facts only, written by Fair */
+  context?: string;
+  /** the languages the posts and comments are in */
+  languages?: string;
+  topics?: LabelTopic[];
+  /** the communities an author may speak as ("Malaysian", "Indonesian"); "unclear" is always allowed */
+  voices?: string[];
+  /** how to tell the voices apart (everyday words, flags), written by Fair for the case */
+  voice_hint?: string;
+  /** posts that are not about the subject or the case are set aside (relevant = false) rather than called neutral */
+  post_off_topic?: boolean;
+};
+
+const ctxOf = (c: LabelContext | string): LabelContext => (typeof c === "string" ? { subject: c } : c);
+const POST_CLASSES = [...SENTIMENTS, "off_topic"] as const;
+
+/** The label tool for comments or posts, with topic and voice fields when the workspace has them. */
+export function labelTool(kind: "comments" | "posts", c: LabelContext | string): Anthropic.Tool {
+  const ctx = ctxOf(c);
+  const base = kind === "comments" ? LABEL_COMMENTS_TOOL : LABEL_POSTS_TOOL;
+  if (!ctx.topics?.length && !ctx.voices?.length && !(kind === "posts" && ctx.post_off_topic)) return base;
+  const props: Record<string, unknown> = {
+    id: { type: "string" },
+    sentiment: { type: "string", enum: kind === "comments" ? [...COMMENT_CLASSES] : ctx.post_off_topic ? [...POST_CLASSES] : [...SENTIMENTS] },
+    confidence: { type: "number", description: "0 to 1" },
+  };
+  const required = ["id", "sentiment"];
+  if (ctx.topics?.length) { props.topic = { type: "string", enum: ctx.topics.map((t) => t.id) }; required.push("topic"); }
+  if (ctx.voices?.length) { props.voice = { type: "string", enum: [...ctx.voices, "unclear"] }; required.push("voice"); }
+  return { ...base, input_schema: { type: "object", properties: { labels: { type: "array", items: { type: "object", properties: props, required } } }, required: ["labels"] } };
+}
+
+/** The lines every system prompt gains from the workspace: what happened, the topics, the voices. */
+function contextLines(ctx: LabelContext, what: "comment" | "post"): string[] {
+  const out: string[] = [];
+  if (ctx.context) out.push("", "What happened:", ctx.context);
+  if (ctx.topics?.length) {
+    out.push("", `Also put each ${what} under exactly one topic (use the topic id):`);
+    for (const t of ctx.topics) out.push(`- ${t.id}: ${t.label}${t.definition ? `: ${t.definition}` : ""}${t.catch_all ? " (anything that fits no other topic, including off-topic)" : ""}`);
+  }
+  if (ctx.voices?.length) {
+    out.push("", `Also say which community the author speaks as: ${ctx.voices.join(", ")}, or unclear. ${ctx.voice_hint ?? "Judge from the language, the flag or country they name, and how they refer to the countries involved."} Use unclear when you cannot tell; never guess from a name alone.`);
+  }
+  return out;
+}
+
+const who = (ctx: LabelContext) => ctx.about ?? `${ctx.subject}, an Indonesian public figure,`;
+const langs = (ctx: LabelContext) => ctx.languages ?? "Indonesian, English, slang, and sarcasm";
 
 const CAPTION_MAX = 700;
 const TEXT_MAX = 600;
@@ -75,9 +135,11 @@ export const LABEL_POSTS_TOOL: Anthropic.Tool = {
   },
 };
 
-export function commentSystem(subject: string): string {
+export function commentSystem(c: LabelContext | string): string {
+  const ctx = ctxOf(c);
+  const subject = ctx.subject;
   return [
-    `You label social media comments about ${subject}, an Indonesian public figure, for ${subject}'s own team. Comments mix Indonesian, English, slang, and sarcasm.`,
+    ctx.about ? `You label social media comments about ${who(ctx)}, for ${subject}'s own team. Comments mix ${langs(ctx)}.` : `You label social media comments about ${subject}, an Indonesian public figure, for ${subject}'s own team. Comments mix Indonesian, English, slang, and sarcasm.`,
     "",
     "Label what each comment says about the subject, not the commenter's mood:",
     `- positive: supports, defends, praises, thanks, or expresses warmth toward ${subject}; pushes back on people attacking them.`,
@@ -86,6 +148,8 @@ export function commentSystem(subject: string): string {
     `- off_topic: the comment is not about ${subject} or the controversy at all. A viral post collects unrelated replies: advertising and selling, links to someone's own content, greetings, chatter between two other people, comments about a different subject entirely. These are set aside and counted separately, so use this class rather than forcing a sentiment.`,
     "",
     `Under posts by other accounts about ${subject}, judge the comment by its view of ${subject}, not of the post's author.`,
+    ...contextLines(ctx, "comment"),
+    "",
     "Label every comment listed; use the exact ids given. Confidence is 0 to 1 for how sure you are.",
   ].join("\n");
 }
@@ -119,14 +183,19 @@ export function commentBatchPrompt(subject: string, comments: CommentForLabel[])
   return parts.join("\n");
 }
 
-export function stanceSystem(subject: string): string {
+export function stanceSystem(c: LabelContext | string): string {
+  const ctx = ctxOf(c);
+  const subject = ctx.subject;
   return [
-    `You label social media posts by other accounts that mention ${subject}, an Indonesian public figure, for ${subject}'s own team. Posts mix Indonesian, English, slang and sarcasm.`,
+    ctx.about ? `You label social media posts by other accounts about ${who(ctx)}, for ${subject}'s own team. Posts mix ${langs(ctx)}.` : `You label social media posts by other accounts that mention ${subject}, an Indonesian public figure, for ${subject}'s own team. Posts mix Indonesian, English, slang and sarcasm.`,
     "",
     `Label the post's stance toward ${subject}:`,
     `- positive: supports, defends, praises, or sympathises with ${subject}.`,
     `- negative: criticises, mocks, attacks, or calls for consequences against ${subject}; sarcasm aimed at them.`,
-    "- neutral: reports news or quotes without taking a side, asks a question, or is about something else.",
+    ctx.post_off_topic
+      ? `- neutral: about ${subject} or the controversy but takes no side: reports news, quotes, asks a question.\n- off_topic: not about ${subject} or the controversy at all (another brand's promotion, an event, an unrelated personal post). These are set aside, so use this rather than neutral.`
+      : "- neutral: reports news or quotes without taking a side, asks a question, or is about something else.",
+    ...contextLines(ctx, "post"),
     "",
     "Label every post listed; use the exact ids given. Confidence is 0 to 1 for how sure you are.",
   ].join("\n");
@@ -138,19 +207,23 @@ export function stanceBatchPrompt(posts: PostForLabel[]): string {
 }
 
 /** Keep only well-formed labels for ids we asked about; one per id. */
-export function parseLabels(input: unknown, wanted: Iterable<string>, allow: readonly string[] = COMMENT_CLASSES): { labels: Label[]; missing: string[] } {
+export function parseLabels(input: unknown, wanted: Iterable<string>, allow: readonly string[] = COMMENT_CLASSES, extra: { topics?: string[]; voices?: string[] } = {}): { labels: Label[]; missing: string[] } {
   const ids = new Set(wanted);
   const out = new Map<string, Label>();
   const raw = (input as { labels?: unknown })?.labels;
   if (Array.isArray(raw)) {
     for (const item of raw) {
       if (!item || typeof item !== "object") continue;
-      const { id, sentiment, confidence } = item as { id?: unknown; sentiment?: unknown; confidence?: unknown };
+      const { id, sentiment, confidence, topic, voice } = item as { id?: unknown; sentiment?: unknown; confidence?: unknown; topic?: unknown; voice?: unknown };
       const sid = String(id ?? "");
       const s = String(sentiment ?? "").toLowerCase().replace(/[\s-]/g, "_") as Sentiment;
       if (!ids.has(sid) || !allow.includes(s) || out.has(sid)) continue;
       const c = typeof confidence === "number" && Number.isFinite(confidence) ? Math.min(1, Math.max(0, confidence)) : 0.5;
-      out.set(sid, { id: sid, sentiment: s, confidence: Math.round(c * 100) / 100 });
+      const label: Label = { id: sid, sentiment: s, confidence: Math.round(c * 100) / 100 };
+      // a topic or voice outside the workspace's list is dropped, not the label: sentiment still counts
+      if (extra.topics?.includes(String(topic))) label.topic = String(topic);
+      if (extra.voices && [...extra.voices, "unclear"].includes(String(voice))) label.voice = String(voice);
+      out.set(sid, label);
     }
   }
   const missing = [...ids].filter((i) => !out.has(i));

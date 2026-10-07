@@ -24,6 +24,8 @@ export type Actor = {
   /** the workspace of that membership */
   home: string;
   memberships: Membership[];
+  /** workspaces closed to this person: a workspace whose settings.restricted_to names others only (staff included) */
+  hidden?: string[];
 };
 
 export type Action =
@@ -59,6 +61,8 @@ export const isStaff = (a: Pick<Actor, "staff">) => a.staff.length > 0;
 const member = (a: Actor, ws?: string) => (ws ? a.memberships.find((m) => m.workspace_id === ws) : undefined);
 
 export function can(a: Actor, action: Action, ctx: Ctx = {}): boolean {
+  // a restricted workspace is closed to everyone it does not name, Fair staff included
+  if (ctx.workspace && a.hidden?.includes(ctx.workspace)) return false;
   const m = member(a, ctx.workspace);
   const builderAnywhere = !!m && Object.values(m.levels).includes("builder");
   switch (action) {

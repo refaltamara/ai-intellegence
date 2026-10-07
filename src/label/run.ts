@@ -15,7 +15,7 @@ import { anthropicClient, toolAnswer } from "../chat/client";
 import { modelId } from "../chat/loop";
 import { sql } from "../db/client";
 import { getWorkspace } from "../workspace/store";
-import { LABEL_COMMENTS_TOOL, LABEL_POSTS_TOOL, SENTIMENTS, commentBatchPrompt, commentSystem, parseLabels, stanceBatchPrompt, stanceSystem, type CommentForLabel, type PostForLabel } from "./prompt";
+import { COMMENT_CLASSES, SENTIMENTS, commentBatchPrompt, commentSystem, labelTool, parseLabels, stanceBatchPrompt, stanceSystem, type CommentForLabel, type LabelContext, type LabelTopic, type PostForLabel } from "./prompt";
 import { toJson } from "../db/json";
 
 export type LabelOutcome = {
@@ -85,7 +85,8 @@ async function nextPosts(workspaceId: string, limit: number): Promise<{ rows: Po
      where workspace_id = $1 and source = 'earned' and stance is null and caption is not null and content_type is distinct from 'stub' and ${where}
      order by views desc nulls last, posted_at
      limit $2`;
-  const fresh = (await sql.query(pick("stance_source is null"), [workspaceId, limit])) as PostForLabel[];
+  // 'awaiting_context': loaded before this labeller (with workspace context and topics) was deployed, held back from the old one
+  const fresh = (await sql.query(pick("(stance_source is null or stance_source = 'awaiting_context')"), [workspaceId, limit])) as PostForLabel[];
   if (fresh.length) return { rows: fresh, retry: false };
   return { rows: (await sql.query(pick("stance_source = 'model_failed'"), [workspaceId, limit])) as PostForLabel[], retry: true };
 }
@@ -106,6 +107,10 @@ export async function labelWorkspace(workspaceId: string, opts: LabelOptions = {
   if (!cfg || cfg.kind !== "profile") return { ...out, duration_ms: Date.now() - started };
   const subject = (await clientName(workspaceId)) ?? cfg.name;
   out.subject = subject;
+  const ctx = await labelContext(workspaceId, subject);
+  const extra = { topics: ctx.topics?.map((t) => t.id), voices: ctx.voices };
+  const commentTool = labelTool("comments", ctx);
+  const postTool = labelTool("posts", ctx);
   const client = opts.client ?? anthropicClient({ workspace: workspaceId, purpose: "comment_labels" });
   const inBudget = () => Date.now() - started < budget;
 
@@ -123,11 +128,11 @@ export async function labelWorkspace(workspaceId: string, opts: LabelOptions = {
             model: modelId(),
             max_tokens: 8000,
             output_config: { effort: "low" },
-            system: [{ type: "text", text: commentSystem(subject), cache_control: { type: "ephemeral" } }],
-            tools: [LABEL_COMMENTS_TOOL],
+            system: [{ type: "text", text: commentSystem(ctx), cache_control: { type: "ephemeral" } }],
+            tools: [commentTool],
             messages: [{ role: "user", content: commentBatchPrompt(subject, b) }],
-          }, LABEL_COMMENTS_TOOL.name);
-          return parseLabels(use?.input, b.map((r) => r.id));
+          }, commentTool.name);
+          return parseLabels(use?.input, b.map((r) => r.id), COMMENT_CLASSES, extra);
         } catch (e) {
           out.calls_failed += 1;
           out.last_error = (e as Error).message?.slice(0, 300);
@@ -143,8 +148,10 @@ export async function labelWorkspace(workspaceId: string, opts: LabelOptions = {
         await sql.query(
           `update comments c set sentiment = case when l.sentiment = 'off_topic' then 'neutral' else l.sentiment end,
                   off_topic = (l.sentiment = 'off_topic'),
-                  sentiment_confidence = l.confidence, sentiment_source = 'model', classified_at = now()
-           from jsonb_to_recordset($1::jsonb) as l(id uuid, sentiment text, confidence numeric) where c.id = l.id and c.workspace_id = $2`,
+                  sentiment_confidence = l.confidence, sentiment_source = 'model', classified_at = now(),
+                  topic_id = coalesce(l.topic, c.topic_id), topic_confidence = case when l.topic is not null then l.confidence else c.topic_confidence end,
+                  voice = coalesce(l.voice, c.voice)
+           from jsonb_to_recordset($1::jsonb) as l(id uuid, sentiment text, confidence numeric, topic text, voice text) where c.id = l.id and c.workspace_id = $2`,
           [toJson(labels), workspaceId],
         );
         out.comments_labelled += labels.length;
@@ -166,11 +173,11 @@ export async function labelWorkspace(workspaceId: string, opts: LabelOptions = {
             model: modelId(),
             max_tokens: 8000,
             output_config: { effort: "low" },
-            system: [{ type: "text", text: stanceSystem(subject), cache_control: { type: "ephemeral" } }],
-            tools: [LABEL_POSTS_TOOL],
+            system: [{ type: "text", text: stanceSystem(ctx), cache_control: { type: "ephemeral" } }],
+            tools: [postTool],
             messages: [{ role: "user", content: stanceBatchPrompt(b) }],
-          }, LABEL_POSTS_TOOL.name);
-          return parseLabels(use?.input, b.map((r) => r.id), SENTIMENTS);
+          }, postTool.name);
+          return parseLabels(use?.input, b.map((r) => r.id), ctx.post_off_topic ? [...SENTIMENTS, "off_topic"] : SENTIMENTS, extra);
         } catch (e) {
           out.calls_failed += 1;
           out.last_error = (e as Error).message?.slice(0, 300);
@@ -183,7 +190,12 @@ export async function labelWorkspace(workspaceId: string, opts: LabelOptions = {
       const missing = results.flatMap((r) => r.missing);
       if (labels.length) {
         await sql.query(
-          `update posts p set stance = l.sentiment, stance_source = 'model' from jsonb_to_recordset($1::jsonb) as l(id uuid, sentiment text) where p.id = l.id and p.workspace_id = $2`,
+          // a post that is not about the subject or the case is set aside (relevant = false), as listening workspaces do
+          `update posts p set stance = case when l.sentiment = 'off_topic' then null else l.sentiment end, stance_source = 'model',
+                  relevant = case when l.sentiment = 'off_topic' then false else p.relevant end,
+                  topic_id = coalesce(l.topic, p.topic_id), topic_confidence = case when l.topic is not null then l.confidence else p.topic_confidence end,
+                  voice = coalesce(l.voice, p.voice)
+           from jsonb_to_recordset($1::jsonb) as l(id uuid, sentiment text, confidence numeric, topic text, voice text) where p.id = l.id and p.workspace_id = $2`,
           [toJson(labels), workspaceId],
         );
         out.posts_labelled += labels.length;
@@ -200,7 +212,7 @@ export async function labelWorkspace(workspaceId: string, opts: LabelOptions = {
   }
   const rem = (await sql.query(
     `select (select count(*) from comments where workspace_id = $1 and sentiment is null and coalesce(sentiment_source, '') in ('', 'model_failed') and text is not null)::int as c,
-            (select count(*) from posts where workspace_id = $1 and source = 'earned' and stance is null and coalesce(stance_source, '') in ('', 'model_failed') and caption is not null and content_type is distinct from 'stub')::int as p`,
+            (select count(*) from posts where workspace_id = $1 and source = 'earned' and stance is null and coalesce(stance_source, '') in ('', 'model_failed', 'awaiting_context') and caption is not null and content_type is distinct from 'stub')::int as p`,
     [workspaceId],
   )) as { c: number; p: number }[];
   out.comments_remaining = rem[0]?.c ?? 0;
@@ -216,6 +228,32 @@ export async function labelWorkspace(workspaceId: string, opts: LabelOptions = {
     ).catch(() => undefined);
   }
   return out;
+}
+
+/**
+ * The workspace's labelling context: settings.label (about, context, languages, voices, post_off_topic)
+ * and its topics, the catch-all last. A workspace without settings.label keeps the original prompts.
+ */
+export async function labelContext(workspaceId: string, subject: string): Promise<LabelContext> {
+  const rows = (await sql.query("select settings->'label' as label from workspaces where id = $1", [workspaceId])) as { label: Record<string, unknown> | null }[];
+  const l = rows[0]?.label;
+  if (!l || typeof l !== "object") return { subject };
+  const str = (k: string) => (typeof l[k] === "string" && (l[k] as string).trim() ? (l[k] as string).trim() : undefined);
+  const topics = l.topics === false ? [] : ((await sql.query(
+    "select id, label, definition, is_catch_all as catch_all from topics where workspace_id = $1 order by is_catch_all, sort_order, label",
+    [workspaceId],
+  )) as LabelTopic[]);
+  const voices = Array.isArray(l.voices) ? (l.voices as unknown[]).filter((v): v is string => typeof v === "string" && /^[\w' -]{2,30}$/.test(v)) : [];
+  return {
+    subject: str("subject") ?? subject,
+    about: str("about"),
+    context: str("context"),
+    languages: str("languages"),
+    topics: topics.length ? topics : undefined,
+    voices: voices.length ? voices : undefined,
+    voice_hint: str("voice_hint"),
+    post_off_topic: l.post_off_topic === true,
+  };
 }
 
 async function clientName(workspaceId: string): Promise<string | null> {

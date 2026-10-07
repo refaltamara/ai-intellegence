@@ -1,0 +1,61 @@
+{
+  "workspace": "kahf-threads",
+  "subject": {
+    "brand_id": "kahf",
+    "name": "Kahf",
+    "owned_handles": {
+      "threads": [
+        "kahfeveryday",
+        "kahfeveryday.my"
+      ],
+      "instagram": [
+        "kahfeveryday",
+        "kahfeveryday.my"
+      ],
+      "tiktok": [
+        "kahfeveryday",
+        "kahfeveryday.my"
+      ],
+      "x": [
+        "kahfeveryday"
+      ]
+    }
+  },
+  "export_time": "2026-10-07T03:00:00Z",
+  "naive_dates_tz": {
+    "threads": "Asia/Jakarta"
+  },
+  "naive_dates_note": "The Threads export carries 12-hour times with no zone. They are Jakarta time (Refal, 7 Oct), unlike Maudy's Threads export, which was UTC. Read that way: the first boycott reply in the data is 08:02 WIB on 6 Oct, \"Kenapa delete @kahfeveryday\" is 14:16 WIB, the two apology posts are 17:45 WIB, and the surge is 00:00 to 02:00 WIB on 7 Oct (01:00 to 03:00 in Malaysia). The deleted post is not in the export.",
+  "root_url": "https://www.threads.com/@kahfeveryday/post/DeKWiFpE_9K",
+  "keywords": [
+    "kahf",
+    "k\\*\\*f",
+    "paragon",
+    "wardah",
+    "emina",
+    "make ?over",
+    "badlab",
+    "bad lab",
+    "boikot",
+    "boycott"
+  ],
+  "keyword_platforms": [],
+  "keyword_platforms_note": "Threads replies and quote posts rarely repeat the brand's name (\"Rasa menyesal pernah pakai brand ni\"), so nothing is dropped by keyword: the labeller sets aside posts that are not about Kahf or the case (relevant = false).",
+  "drop_urls": [
+    {
+      "url": "https://www.threads.com/@vier4x4/post/DZ4AitBE--d",
+      "reason": "June 2026, a cake festival; captured by mistake"
+    },
+    {
+      "url": "https://www.threads.com/@aimannahmaddd/post/DPKsYDQEp60",
+      "reason": "September 2025, before the case"
+    }
+  ],
+  "files": [
+    {
+      "kind": "contents",
+      "platform": "threads",
+      "file": "kahf/contents_threads.csv"
+    }
+  ]
+}
