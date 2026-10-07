@@ -136,15 +136,15 @@ Templates for the dump: `Indonesian_Beauty_Q3_2026_{TikTok,Instagram}_template.x
 One contents file, `data/raw/kahf/contents_threads.csv` (posts only; comments to follow). Contract: `etl/profiles/kahf-threads.json`; loader: `etl/load_profile.py`.
 
 - **In → loaded:** 584 → 582 posts, from 525 accounts.
-  - 5 are Kahf's own: the two apology posts on @kahfeveryday at 17:45 UTC on 6 Oct, and three September posts on @kahfeveryday.my.
+  - 5 are Kahf's own: the two apology posts on @kahfeveryday at 17:45 WIB on 6 Oct, and three September posts on @kahfeveryday.my.
   - 577 are earned.
   - Two were dropped as captured by mistake: a June cake festival and a September 2025 post.
 - **Not in the data:** the original post (the AFF meme). It was deleted; Refal sent a screenshot. Its content is in `settings.label.context`.
-- **Times:** 12-hour, no zone, read as UTC (to confirm with Refal). Read that way:
-  - first boycott reply 08:02 UTC on 6 Oct;
-  - "Kenapa delete @kahfeveryday" 14:16 UTC;
-  - apology 17:45 UTC (00:45 WIB, 7 Oct);
-  - the surge is 7 Oct 00:00 to 01:59 UTC (497 posts, 08:00 to 10:00 in Malaysia).
+- **Times:** 12-hour, no zone, and Jakarta time (Refal, 7 Oct; Maudy's Threads export was UTC, so check the zone per export). Read that way:
+  - first boycott reply 08:02 WIB on 6 Oct;
+  - "Kenapa delete @kahfeveryday" 14:16 WIB;
+  - apology 17:45 WIB;
+  - the surge is 7 Oct 00:00 to 01:59 WIB (497 posts, 01:00 to 03:00 in Malaysia), the last hours of the export.
 - **Threads gives no views.** Reach is likes; `comments` is the reply count on each post.
 - **What the posts are about (by eye, before labelling):**
   - Mostly Malaysians calling to boycott Kahf, and sometimes every Indonesian brand.
