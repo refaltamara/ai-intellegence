@@ -1567,6 +1567,11 @@ table.heat td small{font-weight:500;color:var(--text-3)}
 .card.proposal>h4 .badge{margin-left:0}
 .card.proposal .body p{font-size:13px;color:var(--text-2);margin-bottom:6px}
 .card.proposal .body .muted{color:var(--text-3);font-size:12px}
+.dchanges{list-style:none;margin:0 0 6px;padding:0;display:flex;flex-direction:column;gap:4px;font-size:13px}
+.dchanges li{display:flex;gap:8px;align-items:baseline}
+.dchanges li b{width:12px;flex:none;font-weight:800}
+.dchanges li.add b{color:var(--green)}.dchanges li.drop b{color:var(--red)}.dchanges li.keep b,.dchanges li.keep{color:var(--text-3)}.dchanges li.set b{color:var(--blue)}
+.dchanges small{color:var(--text-3)}
 .card.proposal footer{display:flex;gap:8px;align-items:center;justify-content:flex-end;padding:10px 16px;border-top:1px solid var(--line)}
 .card.proposal footer .err{color:var(--red);font-size:12px;margin-right:auto}
 .card.proposal footer .muted{color:var(--text-3);font-size:12px;margin-right:auto}
@@ -1728,3 +1733,39 @@ tr.warnrow td{background:#FFFBF0}
 .periodpick{display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap}
 .periodpick .dates{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--text-3)}
 .periodpick input[type=date]{font:inherit;font-size:12px;padding:4px 6px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--text)}
+
+/* describe your own slide (src/ui/decks/SlideDescriber.tsx) */
+.sdopen{margin-top:8px;padding:9px 12px;border:1px dashed var(--blue-20);border-radius:10px;color:var(--blue);font-weight:600;font-size:13px;width:100%;text-align:left;background:var(--blue-10)}
+.sdbox{margin-top:10px;padding:12px;border:1px solid var(--blue-20);border-radius:12px;background:#fff;display:flex;flex-direction:column;gap:10px}
+.sdbox textarea{font:inherit;font-size:13px;padding:8px 10px;border:1px solid var(--line-2);border-radius:9px;resize:vertical}
+.sdpreview{display:flex;flex-direction:column;gap:6px;padding:10px;border-radius:10px;background:var(--surface)}
+.sdbars{display:flex;align-items:flex-end;gap:4px;height:120px;padding-top:6px}
+.sdbars span{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;gap:2px;min-width:0}
+.sdbars i{display:block;width:100%;background:var(--blue);border-radius:3px 3px 0 0}
+.sdbars small{font-size:9px;color:var(--text-3);white-space:nowrap}
+
+/* deck slide comments (src/ui/decks/SlideComments.tsx) */
+.wk-side{display:flex;flex-direction:column;gap:8px;min-height:0}
+.wk-side .wk-ask{max-height:calc(100vh - 196px)}
+.wk-tabs{display:flex;gap:4px;padding:3px;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+.wk-tabs button{flex:1;padding:6px 10px;border-radius:8px;font-size:12px;font-weight:600;color:var(--text-2)}
+.wk-tabs button.on{background:#fff;color:var(--blue);box-shadow:var(--shadow-xs)}
+.wk-thumb{position:relative}
+.wk-pin{position:absolute;top:4px;right:4px;min-width:16px;height:16px;padding:0 4px;border-radius:8px;background:var(--violet);color:#fff;font-size:10px;font-style:normal;font-weight:700;display:grid;place-items:center}
+.sc-panel{display:flex;flex-direction:column;gap:10px;padding:12px 14px;min-height:0;height:100%}
+.sc-list{flex:1;overflow:auto;display:flex;flex-direction:column;gap:8px;min-height:60px}
+.sc-item{padding:8px 10px;border-radius:10px;background:var(--surface);font-size:13px;display:flex;flex-direction:column;gap:4px}
+.sc-item.cemo{background:var(--blue-10)}
+.sc-item b{font-size:12px}
+.sc-item b span{font-weight:500;color:var(--text-3);margin-left:4px}
+.sc-item p{margin:0;white-space:pre-wrap}
+.sc-item .card.proposal{margin:4px 0 0;background:#fff}
+.sc-compose textarea{width:100%;font:inherit;font-size:13px;padding:8px 10px;border:1px solid var(--line-2);border-radius:9px;resize:vertical}
+
+/* case words (src/ui/company/CaseWords.tsx) */
+.casewords{display:flex;flex-direction:column;gap:10px}
+.casewords h3{font-size:14px;margin-top:6px}
+.casewords h3 small{font-weight:500;color:var(--text-3);margin-left:6px}
+.cwadd{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.cwadd input{font:inherit;font-size:13px;padding:7px 10px;border:1px solid var(--line-2);border-radius:9px;min-width:180px;flex:1}
+.cwcheck{display:inline-flex;gap:6px;align-items:center;font-size:13px;color:var(--text-2);flex-wrap:wrap}

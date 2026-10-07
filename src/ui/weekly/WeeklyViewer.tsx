@@ -7,6 +7,8 @@
  */
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import type { WeeklyItem } from "@/reports/weekly";
+import type { SlideComment } from "@/decks/comments";
+import { SlideComments } from "../decks/SlideComments";
 import { SlideAsk } from "./SlideAsk";
 import { sendSignal } from "../signal";
 
@@ -48,7 +50,7 @@ async function draw(doc: PdfDoc, n: number, canvas: HTMLCanvasElement, cssWidth:
   return task;
 }
 
-function Thumb({ doc, n, on, title, onClick }: { doc: PdfDoc | null; n: number; on: boolean; title: string; onClick: () => void }) {
+function Thumb({ doc, n, on, title, onClick, pins = 0 }: { doc: PdfDoc | null; n: number; on: boolean; title: string; onClick: () => void; pins?: number }) {
   const ref = useRef<HTMLCanvasElement>(null);
   const btn = useRef<HTMLButtonElement>(null);
   useEffect(() => {
@@ -61,6 +63,7 @@ function Thumb({ doc, n, on, title, onClick }: { doc: PdfDoc | null; n: number; 
     <button ref={btn} className={`wk-thumb ${on ? "on" : ""}`} onClick={onClick} title={`${n}. ${title}`} aria-label={`Slide ${n}: ${title}`}>
       <canvas ref={ref} />
       <span>{n}</span>
+      {pins > 0 && <i className="wk-pin" title={`${pins} comment${pins === 1 ? "" : "s"}`}>{pins}</i>}
     </button>
   );
 }
@@ -79,9 +82,11 @@ type ViewerProps = {
   actions?: ReactNode;
   /** told which version is on screen */
   onPick?: (id: string) => void;
+  /** a deck's versions take comments on each slide (src/decks/comments.ts) */
+  comments?: { deckId: string };
 };
 
-export function WeeklyViewer({ items, initialId, initialSlide, title = "Weekly Reports", subtitle, path = "/weekly", param = "r", actions, onPick }: ViewerProps) {
+export function WeeklyViewer({ items, initialId, initialSlide, title = "Weekly Reports", subtitle, path = "/weekly", param = "r", actions, onPick, comments }: ViewerProps) {
   const [id, setId] = useState(initialId);
   const [n, setN] = useState(initialSlide);
   useEffect(() => { sendSignal("deck.version_opened", { report: id }); }, [id]);
@@ -89,7 +94,17 @@ export function WeeklyViewer({ items, initialId, initialSlide, title = "Weekly R
   const [error, setError] = useState("");
   const [presenting, setPresenting] = useState(false);
   const [askOpen, setAskOpen] = useState(true);
+  const [tab, setTab] = useState<"ask" | "comments">("ask");
+  const [notes, setNotes] = useState<SlideComment[]>([]);
   const item = items.find((i) => i.id === id) ?? items[items.length - 1];
+  const commentDeck = comments?.deckId;
+  useEffect(() => {
+    if (!commentDeck) return;
+    let live = true;
+    setNotes([]);
+    void fetch(`/api/decks/${commentDeck}/comments?report=${item.id}`).then((r) => (r.ok ? r.json() : null)).then((j) => { if (live && j?.comments) setNotes(j.comments); });
+    return () => { live = false; };
+  }, [commentDeck, item.id]);
   // a document belongs to one file: while the next week's PDF opens, nothing draws from the last one
   const doc = loaded && loaded.file === item.pdf ? loaded.doc : null;
   const total = item.slides.length || doc?.numPages || 1;
@@ -199,12 +214,23 @@ export function WeeklyViewer({ items, initialId, initialSlide, title = "Weekly R
           {!presenting && (
             <div className="wk-thumbs">
               {Array.from({ length: total }, (_, i) => i + 1).map((k) => (
-                <Thumb key={`${item.id}-${k}`} doc={doc} n={k} on={k === n} title={item.slides.find((s) => s.n === k)?.title ?? ""} onClick={() => go(k)} />
+                <Thumb key={`${item.id}-${k}`} doc={doc} n={k} on={k === n} title={item.slides.find((s) => s.n === k)?.title ?? ""} onClick={() => go(k)} pins={notes.filter((c) => c.slide === k && c.author === "person").length} />
               ))}
             </div>
           )}
         </div>
-        {askOpen && <SlideAsk key={item.id} reportId={item.id} n={n} slideTitle={slideTitle} week={item.label} onClose={() => setAskOpen(false)} />}
+        {askOpen && !comments && <SlideAsk key={item.id} reportId={item.id} n={n} slideTitle={slideTitle} week={item.label} onClose={() => setAskOpen(false)} />}
+        {askOpen && comments && (
+          <div className="wk-side">
+            <div className="wk-tabs" role="tablist">
+              <button role="tab" aria-selected={tab === "ask"} className={tab === "ask" ? "on" : ""} onClick={() => setTab("ask")}>Ask AI</button>
+              <button role="tab" aria-selected={tab === "comments"} className={tab === "comments" ? "on" : ""} onClick={() => setTab("comments")}>Comments{notes.filter((c) => c.slide === n).length ? ` · ${notes.filter((c) => c.slide === n).length}` : ""}</button>
+            </div>
+            {tab === "ask" ? <SlideAsk key={item.id} reportId={item.id} n={n} slideTitle={slideTitle} week={item.label} onClose={() => setAskOpen(false)} /> : (
+              <aside className="wk-ask"><SlideComments deckId={comments.deckId} reportId={item.id} n={n} slideTitle={slideTitle} comments={notes} onPosted={(c) => setNotes((x) => [...x, ...c])} /></aside>
+            )}
+          </div>
+        )}
       </div>
     </section>
   );

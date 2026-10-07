@@ -23,6 +23,8 @@ import { caseFacts, type CaseFacts } from "./case";
 import { PR, type RoleModel } from "../roles/model";
 import { SkillDb } from "../skills/db";
 import { reputationFacts, type Issue, type Level, type PrDashboardData, type Quote } from "./dashboard";
+import type { Finding } from "../competitor/types";
+import { teamSheet, teamSlide } from "../decks/teamSlide";
 
 export { REP_SLIDES, REP_SLIDE_KINDS, cleanRepSlides, type RepSlide, type RepSpec } from "./slides";
 import type { RepSlide, RepSpec } from "./slides";
@@ -37,6 +39,8 @@ export type ReputationReport = PrDashboardData & {
   hide: string[];
   /** the crisis slides' facts (src/reputation/case.ts), when the deck carries any of them */
   case?: CaseFacts;
+  /** the team's own slides (src/decks/teamSlide.ts), each after the slide it names */
+  findings?: Finding[];
 };
 
 /** The crisis slides (Refal, 7 Oct 2026): each reads CaseFacts. */
@@ -86,7 +90,7 @@ const splitLine = (x: { n: number; negative: number; positive: number; labelled:
 
 // ------------------------------------------------------------------- facts
 /** The report for one period (the latest the data fully covers by default) and the period before it. */
-export async function reputationReport(ws: string, o: { title: string; grain: DeckGrain; spec: RepSpec; period?: string; asOf: string; role?: RoleModel }): Promise<ReputationReport> {
+export async function reputationReport(ws: string, o: { title: string; grain: DeckGrain; spec: RepSpec; period?: string; asOf: string; role?: RoleModel; findings?: (p: Period) => Promise<Finding[] | undefined> }): Promise<ReputationReport> {
   const period = o.period ? deckPeriod(o.grain, o.period) : latestComplete(o.grain, o.asOf);
   const previous = previousPeriod(period);
   const d = await reputationFacts(ws, { focus: o.spec.focus, from: period.from, to: period.to, platform: o.spec.platform, prev: { from: previous.from, to: previous.to } }, o.role ?? PR, new SkillDb());
@@ -100,7 +104,8 @@ export async function reputationReport(ws: string, o: { title: string; grain: De
     : undefined;
   const slides = o.spec.slides.filter((k) => !(k === "competitive" && solo(d)) && !(k === "service" && !d.service.measured) && !(k === "timeline" && hide.includes("status"))
     && !(k === "motion" && !cf?.voices.length) && !(k === "exposure" && !cf?.exposure) && !(k === "pace" && !cf?.pace.length));
-  return { ...d, title: o.title, grain: o.grain, period, previous, slides, hide, case: cf };
+  const findings = o.findings ? await o.findings(period) : undefined;
+  return { ...d, title: o.title, grain: o.grain, period, previous, slides, hide, case: cf, ...(findings?.length ? { findings } : {}) };
 }
 
 // -------------------------------------------------------------- fact sheet
@@ -192,6 +197,7 @@ export function repSheet(r: ReputationReport): string {
     }
   }
   if (r.notes.length) out.push(`\n## Caveats\n${r.notes.map((n) => `- ${n}`).join("\n")}`);
+  out.push(...teamSheet(r.findings));
   return out.join("\n");
 }
 
@@ -763,6 +769,13 @@ function movingSlide(pres: PptxGenJS, r: ReputationReport, page: number) {
 
 export function buildRepDeck(pres: PptxGenJS, r: ReputationReport, n: RepNarrative): void {
   let page = 1;
+  // the team's own slides follow the slide they name; the rest close the deck
+  const team = (after: string | null) => {
+    for (const f of (r.findings ?? []).filter((x) => (after ? x.after === after : !x.after || !r.slides.includes(x.after as RepSlide)))) {
+      const p = page++;
+      teamSlide(pres, f, { frame: (s) => chrome(s, r, p), period: r.period.label, foot });
+    }
+  };
   for (const k of r.slides) {
     if (k === "summary") summarySlide(pres, r, n, page++);
     else if (k === "timeline") timelineSlide(pres, r, n, page++);
@@ -778,7 +791,9 @@ export function buildRepDeck(pres: PptxGenJS, r: ReputationReport, n: RepNarrati
     else if (r.case?.exposure && k === "exposure") exposureSlide(pres, r, page++);
     else if (r.case && k === "anger") angerSlide(pres, r, page++);
     else if (r.case && k === "moving" && r.case.moving.length) movingSlide(pres, r, page++);
+    team(k);
   }
+  team(null);
 }
 
 export async function repPptx(r: ReputationReport, n: RepNarrative): Promise<Buffer> {

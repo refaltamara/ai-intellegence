@@ -43,7 +43,9 @@ import { canSpend, charge } from "../credits/ledger";
 import { liveDefs } from "../extensions/store";
 import { workspaceNotes } from "../onboard/health";
 import { CREDIT_PRICES } from "../config/credits";
-import { ACTIVITY as TEAM_ACTIVITY, BUILDER_TOOLS, MAKE_TOOLS, builderPrompt, builderTools, executeTeamTool, makeTools } from "../company/tools";
+import { ACTIVITY as TEAM_ACTIVITY, BUILDER_TOOLS, MAKE_TOOLS, builderPrompt, builderTools, executeTeamTool, makeTools, type DeckBrief } from "../company/tools";
+import { listDecks } from "../decks/store";
+import { roleOfSpec } from "../decks/changes";
 import { signal, type SignalCtx } from "../learning/signals";
 import { queryIntent, skillIntent } from "../learning/vocab";
 
@@ -343,7 +345,9 @@ async function runTurnBody(conversation: { id: string; workspace_id: string; dec
   // the workspace's own extensions, as dimensions CeMO may group and filter by (src/extensions/)
   const ext = roleSpec ? [] : await liveDefs(workspaceId).catch(() => []);
   const extDims = ext.map((d) => ({ key: d.key, name: d.name, target: d.target, values: d.values.map((v) => v.name) }));
-  const tools = [...buildTools(recipes, extDims), ...(onTeam ? makeTools(roleModel.id, ext) : []), ...(builderMode ? builderTools(roleModel.id) : [])];
+  // the team's decks, so CeMO can change one when asked (src/decks/changes.ts)
+  const decks: DeckBrief[] = onTeam ? (await listDecks(workspaceId).catch(() => [])).filter((d) => roleOfSpec(d.spec) === roleModel.id).slice(0, 20).map((d) => ({ id: d.id, name: d.name, grain: d.spec.grain, slides: (d.spec.rep?.slides ?? d.spec.social?.slides ?? d.spec.slides) as string[], team_slides: (d.spec.findings ?? []).map((f) => f.title), template: d.template })) : [];
+  const tools = [...buildTools(recipes, extDims), ...(onTeam ? makeTools(roleModel.id, ext, decks, recipes.map((r) => ({ key: r.key, title: r.title }))) : []), ...(builderMode ? builderTools(roleModel.id) : [])];
   const timings: Timings = { total_ms: 0, model_ms: 0, model_calls: 0, tools_ms: 0, tool_calls: 0, setup_ms: Date.now() - turnStart, effort: chatEffort() };
 
   const replay = historyTurns(history.slice(-MAX_HISTORY_MESSAGES) as Parameters<typeof historyTurns>[0]);

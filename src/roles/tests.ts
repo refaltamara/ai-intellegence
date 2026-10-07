@@ -122,7 +122,8 @@ async function guard(check: GuardCheck, spec: RoleModel): Promise<{ status: Test
       return problems.length ? { status: "fail", detail: { problems } } : { status: "pass", detail: { recipes: spec.recipes?.length ?? 0 } };
     }
     case "templates": {
-      const unknown = spec.deck_templates.filter((t) => !DECK_TEMPLATE_KEYS.includes(t));
+      // a template Fair adopted from a client lives in the version itself (template_defs)
+      const unknown = spec.deck_templates.filter((t) => !DECK_TEMPLATE_KEYS.includes(t) && !(spec.template_defs ?? []).some((d) => d.key === t));
       return unknown.length ? { status: "fail", detail: { problems: unknown.map((t) => `deck template ${t} does not exist`) } } : { status: "pass", detail: {} };
     }
     case "thresholds": {

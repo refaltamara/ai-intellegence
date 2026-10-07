@@ -4,6 +4,7 @@
  * team picks the brands, the client (optional) and the period. Every slide can
  * be added or removed afterwards.
  */
+import type { FindingSpec } from "./spec";
 import type { DeckGrain } from "../competitor/period";
 import type { SlideKind } from "../competitor/slides";
 import type { RoleId } from "../roles/model";
@@ -27,6 +28,8 @@ export type DeckTemplate = {
   family?: "reputation" | "social";
   rep_slides?: RepSlide[];
   social_slides?: SocialSlide[];
+  /** a team template's own slides: the team's analyses ("recipe:<key>"), carried into every deck made from it */
+  findings?: FindingSpec[];
 };
 
 export const DECK_TEMPLATES: DeckTemplate[] = [

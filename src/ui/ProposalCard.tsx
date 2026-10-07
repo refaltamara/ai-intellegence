@@ -10,6 +10,7 @@ import { useEffect, useState } from "react";
 import type { ToolCallRecord } from "@/chat/persist";
 import type { Proposal } from "@/company/tools";
 import { cellOf, columnsOf } from "./table";
+import { DeckChangeCard } from "./decks/DeckChangeCard";
 
 const KIND: Record<string, string> = { skill: "Skill", deck_template: "Deck template", rule: "House rule", fact: "Memory", term: "Vocabulary", extension: "Data extension" };
 const n = (x: number) => Math.round(x).toLocaleString("en-US");
@@ -33,6 +34,8 @@ export function ProposalCard({ tool, codename }: { tool: ToolCallRecord; codenam
   const p = tool.proposal as Proposal;
   if (p.type === "change") return <ChangeCard p={p} codename={codename} />;
   if (p.type === "extension") return <ExtensionCard p={p} codename={codename} />;
+  if (p.type === "deck_change") return <DeckChangeCard p={p} />;
+  if (p.type === "case_words") return <CaseWordsCard p={p} codename={codename} />;
   return <CreationCard p={p} tool={tool} codename={codename} />;
 }
 
@@ -162,6 +165,36 @@ function ExtensionCard({ p, codename }: { p: Extract<Proposal, { type: "extensio
         {open && !p.builder && <button className="btn pri sm" disabled={busy} onClick={() => act("submit")}>Send to your Builder</button>}
         {open && <button className="btn sm ghost" disabled={busy} onClick={() => act("discard")}>Discard</button>}
         {status !== "draft" && <Link className="btn sm ghost" href="/company#extensions">Our {codename ?? "team"}</Link>}
+      </footer>
+    </div>
+  );
+}
+
+/** A sister brand or boycott word, with what it matches; a Builder saves it (free: counted in the database). */
+function CaseWordsCard({ p, codename }: { p: Extract<Proposal, { type: "case_words" }>; codename?: string }) {
+  const [done, setDone] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState("");
+  async function save() {
+    setBusy(true); setMsg("");
+    const r = await post("/api/builder/case-words", { list: p.list, action: p.action, name: p.name, terms: p.list === "boycott" ? p.terms : p.terms });
+    setBusy(false);
+    if (!r.ok) { setMsg(r.error ?? "That did not work."); return; }
+    setDone(true);
+  }
+  const what = p.list === "partners" ? `Sister brand: ${p.name}` : `Boycott word${p.terms.length > 1 ? "s" : ""}: ${p.terms.join(", ")}`;
+  return (
+    <div className="card proposal">
+      <h4><span><i className="badge client">Case words</i>{p.action === "remove" ? `Remove ${what}` : what}</span><span className={`pstatus ${done ? "approved" : "draft"}`}>{done ? "Saved" : "Not saved yet"}</span></h4>
+      <div className="body">
+        {p.list === "partners" && <p>Words: {p.terms.join(", ")}</p>}
+        <p>Matches {n(p.posts)} posts and {n(p.comments)} comments in the data so far. Free: counted in the database.</p>
+      </div>
+      <footer>
+        {msg && <span className="err">{msg}</span>}
+        {!done && p.builder && <button className="btn pri sm" disabled={busy} onClick={save}>{p.action === "remove" ? "Remove" : "Add"}</button>}
+        {!p.builder && <span className="muted">Only a Builder saves case words; ask yours.</span>}
+        <Link className="btn sm ghost" href="/company#case-words">Our {codename ?? "team"}</Link>
       </footer>
     </div>
   );

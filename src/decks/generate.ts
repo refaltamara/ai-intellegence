@@ -20,7 +20,7 @@ import { runFindings } from "./findings";
 import { canSpend, charge } from "../credits/ledger";
 import { CREDIT_PRICES } from "../config/credits";
 import { sql } from "../db/client";
-import { specContract } from "./spec";
+import { specContract, type DeckSpec } from "./spec";
 import { markDeckRun, pruneVersions, type DeckRow } from "./store";
 import { reputationReport, writeRep } from "../reputation/deck";
 import { storeReputation } from "../reputation/store";
@@ -97,6 +97,9 @@ export async function generateDeckVersion(deck: DeckRow, opts: { period?: string
   return out;
 }
 
+/** A PR or Social deck's own slides (the team's analyses), run over the version's period. */
+const teamFindings = (spec: DeckSpec, ws: string) => (p: { from: string; to: string }) => (spec.findings?.length ? runFindings(spec.findings, ws, { from: p.from, to: p.to }) : Promise.resolve(undefined));
+
 async function makeVersion(deck: DeckRow, opts: { period?: string; reason: "create" | "manual" | "schedule" }): Promise<DeckOutcome> {
   const spec = deck.spec;
   const grain = spec.grain;
@@ -117,7 +120,7 @@ async function makeVersion(deck: DeckRow, opts: { period?: string; reason: "crea
       // a Social Media deck: one brand's own accounts over the period (src/social/)
       // the company's version of Spark: its thresholds and its voice (src/roles/store.ts)
       const role = await getRole(deck.workspace_id, "social");
-      const r = await socialReport(deck.workspace_id, { title: spec.title, grain: weekly(grain), spec: spec.social, period: period.key, asOf: ctx.asOf, role });
+      const r = await socialReport(deck.workspace_id, { title: spec.title, grain: weekly(grain), spec: spec.social, period: period.key, asOf: ctx.asOf, role, findings: teamFindings(spec, deck.workspace_id) });
       const written = await writeSocial(r, { role, workspace: deck.workspace_id });
       const stored = await storeSocial({ workspaceId: deck.workspace_id, report: r, narrative: written.narrative, by: written.by, problems: written.problems, deck: { id: deck.id, name: deck.name } });
       await pruneVersions(deck.id, deck.workspace_id, r.period.key, stored.reportId);
@@ -129,7 +132,7 @@ async function makeVersion(deck: DeckRow, opts: { period?: string; reason: "crea
       // a PR deck: one brand's reputation over the period (src/reputation/)
       // the company's version of Chorus: its alert rule and its voice
       const role = await getRole(deck.workspace_id, "pr");
-      const r = await reputationReport(deck.workspace_id, { title: spec.title, grain, spec: spec.rep, period: period.key, asOf: ctx.asOf, role });
+      const r = await reputationReport(deck.workspace_id, { title: spec.title, grain, spec: spec.rep, period: period.key, asOf: ctx.asOf, role, findings: teamFindings(spec, deck.workspace_id) });
       const written = await writeRep(r, { role, workspace: deck.workspace_id });
       const stored = await storeReputation({ workspaceId: deck.workspace_id, report: r, narrative: written.narrative, by: written.by, problems: written.problems, deck: { id: deck.id, name: deck.name } });
       await pruneVersions(deck.id, deck.workspace_id, r.period.key, stored.reportId);

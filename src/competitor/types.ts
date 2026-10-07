@@ -160,6 +160,9 @@ export type Finding = {
   rows: Record<string, unknown>[];
   rows_total: number;
   data_window: { from: string; to: string } | null;
+  /** a team slide: the slide it follows in a PR or Social deck (none = at the end), and who made it */
+  after?: string;
+  by?: string;
 };
 
 export type WeeklyReport = {

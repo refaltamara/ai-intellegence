@@ -15,6 +15,7 @@ import { POLICY_HELP } from "@/roles/policy";
 import { Act } from "@/ui/company/Act";
 import { MemoryForm } from "@/ui/company/MemoryForm";
 import { UploadValues } from "@/ui/company/UploadValues";
+import { CaseWords } from "@/ui/company/CaseWords";
 import { cellOf, columnsOf } from "@/ui/table";
 
 export const dynamic = "force-dynamic";
@@ -29,7 +30,7 @@ const day = (iso: string) => new Date(iso).toLocaleDateString("en-GB", { day: "n
 function what(c: Creation): string {
   const s = c.spec as Record<string, unknown>;
   if (c.kind === "skill") return String(s.description ?? "");
-  if (c.kind === "deck_template") return `${s.grain === "week" ? "Weekly" : "Monthly"} · ${((s.rep_slides ?? s.social_slides ?? s.slides) as string[]).length} slides${s.description ? ` · ${s.description}` : ""}`;
+  if (c.kind === "deck_template") return `${s.grain === "day" ? "Daily" : s.grain === "week" ? "Weekly" : "Monthly"} · ${((s.rep_slides ?? s.social_slides ?? s.slides) as string[]).length} slides${Array.isArray(s.findings) && s.findings.length ? ` + ${s.findings.length} of your team's` : ""}${s.description ? ` · ${s.description}` : ""}`;
   if (c.kind === "term") return c.title;
   if (c.kind === "extension") {
     const est = (c as Creation & { estimate?: { credits_now: number } }).estimate;
@@ -47,6 +48,7 @@ export default async function CompanyPage() {
     sql.query("select b.name from workspaces w join brands b on b.id = w.client_brand_id and b.workspace_id = w.id where w.id = $1", [ws]) as unknown as Promise<{ name: string }[]>,
   ]);
   const client = clientRow[0]?.name ?? "Your team";
+  const topics = role.id === "pr" ? ((await sql.query("select label from topics where workspace_id = $1 and not coalesce(is_catch_all, false) order by sort_order, label limit 20", [ws])) as { label: string }[]).map((t) => t.label) : [];
   const badge = (c: Creation) => <i className="badge client" title={`Made by ${c.maker_name ?? c.maker_email}${c.approver && c.approver !== c.maker_email ? `, approved by ${c.approver}` : ""}`}>{client}</i>;
   const live = (k: Creation["kind"][]) => d.creations.filter((c) => k.includes(c.kind) && c.status === "approved");
   const mine = d.creations.filter((c) => c.maker_email === d.me && c.status !== "approved" && c.status !== "removed");
@@ -136,9 +138,16 @@ export default async function CompanyPage() {
         </div>
 
         <div className="dsection">
-          <header><h2>Deck templates</h2><span>Under Decks → New deck, after Fair&apos;s. Save one from any deck (⋯ → Save as template).</span></header>
+          <header><h2>Deck templates</h2><span>Under Decks → New deck, after Fair&apos;s. Save one from any deck (⋯ → Save as template), change one from a deck (Edit → also change the template, or @CeMO in a slide comment), or ask CeMO in Chats.</span></header>
           {live(["deck_template"]).length === 0 ? <div className="dcard empty">None yet.</div> : <ul className="clist">{live(["deck_template"]).map((c) => row(c))}</ul>}
         </div>
+
+        {role.id === "pr" && (
+          <div className="dsection" id="case-words">
+            <header><h2>Case words</h2><span>The words the dashboard, the crisis slides and the chronology count: brands named beside you and boycott calls. Words are counted in the database, so they cost nothing.{topics.length ? ` Topics comments are labelled with: ${topics.join(", ")}. For a topic of your own, ask CeMO ("add a topic Halal certification: halal, sertifikat, MUI"): by words it is free; CeMO reading each comment is priced before anything runs.` : ""}</span></header>
+            <div className="dcard"><CaseWords builder={d.builder} /></div>
+          </div>
+        )}
 
         <div className="dsection" id="extensions">
           <header><h2>Data extensions</h2><span>Your own data on top of Fair&apos;s, for this workspace only: grouped and filtered as ext_name in analyses, skills and decks. The core data never changes. Ask CeMO: &quot;add a Persona table&quot;.</span></header>

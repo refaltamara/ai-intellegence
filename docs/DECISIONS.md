@@ -548,3 +548,28 @@ Refal's team wanted more reports in a case deck. Six slides join the PR deck lib
 **Crisis Report** is a new PR template: day on day, repeating, with summary, chronology, pace, motion, issues, exposure, narratives, anger, moving and voices.
 
 **Chorus 1.2** is 1.1 plus that template on the role's list. Refal asked for the template; it was released staged to `fintech-id` (which already ran 1.1) and `kahf-threads`. The other PR workspaces stay on their version until it goes to everyone.
+
+## Teams build their own (Refal, 7 Oct 2026)
+
+Clients pay for CeMO with their credits, so every team can change how the product works for them: decks at any grain, their slides, templates, their own analyses and their own words, in every role (Chorus, Atlas, Spark). Fair learns from what teams build and adopts the good ones. What stays fixed: numbers are counted in SQL (CeMO drafts and names, never computes); no invented data; the core data is never edited; a team's work stays in its workspace (Fair adopts shapes, never data); a Builder's change goes live, a Member's waits for a Builder.
+
+**One change engine for a deck** (`src/decks/changes.ts`): add or drop the role's slides, add or drop the team's analyses as slides (each after a named slide, or at the end), switch day (PR only), week or month, rename, turn the schedule on or off. Preview first (+ added, − dropped, = kept, → set), then apply (`POST /api/decks/[id]/change`). The deck changes for anyone on the team (as Edit does). With `template`, the template it came from changes too: a Builder revises a team template in place (`reviseCreation`, old spec in the audit log) or turns a Fair template into the team's own copy (the deck then points at it); a Member's template change is a creation that waits for a Builder and, once approved, replaces the live one (`spec.replaces`). It is reached from three places:
+- **Chats:** CeMO's `change_deck` tool (it knows the team's decks, slides and analyses) shows a card: a Builder gets "This deck + the template" and "This deck only"; a Member gets "Apply to this deck" and "Deck + send template to my Builder". Drafting a change costs 3 credits.
+- **Edit:** "Also change the template this deck came from".
+- **Slide comments** (below).
+
+**The team's own slides in every deck.** A finding (an analysis: a recipe or a skill pinned from Chats) now draws in PR and Social decks too, not only Brand & KOL (`src/decks/teamSlide.ts`): bars over time when the rows run by day, week or month (split by a second group, negative at the bottom); a split bar for one whole; bars for a short ranked list; a table otherwise. Its title line names the peak or the biggest part, computed from the rows; the rows go on the fact sheet for Ask AI. `FindingSpec` gained `after` and `by`; `cleanFindings` keeps them on PR and Social specs (the Edit page no longer drops them).
+
+**Describe your own slide** (`src/decks/slideDraft.ts`, `POST /api/decks/slide-draft`): at the end of the slide list in New deck and Edit, a person writes what the slide should show; CeMO drafts one analysis over the query builder (comments or posts, metrics, group by, filters; never dates), it is validated (one retry with the errors), tried on the newest seven days and previewed. Kept, it is a team skill (live for a Builder, the maker's own until approved) and ticks into the deck. 3 credits a draft. A Member's own skill runs on their deck before approval (`companyRecipeByKey` reads drafts too).
+
+**`mentions` filter** in the query builder: posts whose caption or comments whose text contain any of up to twelve words (`ILIKE`, wildcards stripped). It is how "comments mentioning halal" is counted; CeMO can use it in Chats too.
+
+**Slide comments** (`slide_comments`, migration 0027; `src/decks/comments.ts`, `/api/decks/[id]/comments`). The deck viewer's side panel has two tabs, Ask AI and Comments; a slide with comments shows a pin on its thumbnail. Comments belong to the version (they go when it is replaced). A comment that mentions @CeMO gets a reply from the slide and the version's fact sheet: a sentence carrying a number the slide or sheet does not print is dropped. When the comment asks for a change, the reply carries a change card (the engine above); when it wants a slide nothing gives, CeMO drafts one and the card adds it (the analysis is saved when the change is applied). A reply costs 1 credit, a drafted change 3. Plain comments are free.
+
+**Case words** (Our Chorus → Case words, PR; `src/company/caseWords.ts`, `/api/builder/case-words`; CeMO's `change_case_words` with a card): sister brands and boycott words with what each matches in the data before saving. A Builder adds and removes the team's own (marked with who added them); Fair's entries stay. They are words counted in SQL, so free. A topic of the team's own is an extension (by words free; CeMO reading each comment priced first).
+
+**Templates at any grain.** A team template can be day on day (PR) and carries the team's analyses as slides (`findings`); New deck picks them up with the template; Save as template keeps them.
+
+**Fair adopts** (`src/company/adopt.ts`; CMS → Client creations → "Adopt into Chorus/Atlas/Spark"): a live team skill becomes one of Fair's recipes (`adopted-<key>`); a live team template becomes a data template on the role version (`template_defs`, offered beside the code's; the role tests accept it). Both go into the role's open draft (or a new one) for the usual tests and release; a Builder's matching suggestion is marked adopted. The client keeps theirs.
+
+**Learning:** `deck.changed`, `deck.slide_drafted`, `deck.comment`, `casewords.changed` (ids, counts and flags only, never the words).

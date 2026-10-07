@@ -10,6 +10,7 @@ import type { DeckOptions } from "@/decks/page";
 import type { DeckSpec } from "@/decks/spec";
 import { MultiSelect } from "../MultiSelect";
 import { PeriodPick } from "./PeriodPick";
+import { SlideDescriber, type AddedSlide } from "./SlideDescriber";
 
 type Group = DeckSpec["watchlist"][number];
 type Initial = { id: string; name: string; spec: DeckSpec; recurring: boolean; template: string | null };
@@ -40,6 +41,12 @@ export function DeckForm({ options, initial, prefill }: { options: DeckOptions; 
   const [error, setError] = useState("");
   // the team's analyses (Fair's recipes and the team's own skills) can ride in a deck as findings, run again over each version's period
   const [picked, setPicked] = useState<string[]>((initial?.spec.findings ?? []).filter((f) => f.skill.startsWith("recipe:")).map((f) => f.skill.slice(7)));
+  // slides the person described here (kept as the team's skills) join the list straight away
+  const [added, setAdded] = useState<AddedSlide[]>([]);
+  const teamSkills = [...options.team_skills, ...added.filter((a) => !options.team_skills.some((x) => x.key === a.key))];
+  const [alsoTemplate, setAlsoTemplate] = useState(false);
+  // titles of slides a template or the deck already carries, for those not in the list (another person's drafts)
+  const knownTitles = new Map([...(edit ? [] : t.findings ?? []), ...(initial?.spec.findings ?? [])].map((f) => [f.skill.replace(/^recipe:/, ""), f]));
   const chatFindings = (initial?.spec.findings ?? []).filter((f) => !f.skill.startsWith("recipe:"));
   const hasFindings = chatFindings.length > 0 || picked.length > 0;
   // a PR deck (one brand's reputation, src/reputation/) or a Social Media deck (one brand's own accounts, src/social/): a focus brand and the family's own slides
@@ -60,6 +67,8 @@ export function DeckForm({ options, initial, prefill }: { options: DeckOptions; 
     setSlides(x.slides);
     setRecurring(x.recurring);
     if (x.rep_slides ?? x.social_slides) setRepSlides((x.rep_slides ?? x.social_slides)!);
+    // a team template carries its own slides (the team's analyses)
+    setPicked((x.findings ?? []).filter((f) => f.skill.startsWith("recipe:")).map((f) => f.skill.slice(7)));
   };
   useEffect(() => {
     if (!busy) return;
@@ -77,9 +86,15 @@ export function DeckForm({ options, initial, prefill }: { options: DeckOptions; 
   const byGrain = (x: string) => (grain === "day" ? x.replace(/^(Weekly|Monthly)\b/, "Daily") : grain === "week" ? x.replace(/^Monthly\b/, "Weekly") : x.replace(/^Weekly\b/, "Monthly"));
   const tTitle = byGrain(t.title), tName = byGrain(t.name);
 
+  const teamFindings = () => picked.map((k) => {
+    const x = teamSkills.find((y) => y.key === k);
+    const was = knownTitles.get(k);
+    return { key: was?.key ?? `r_${k}`.slice(0, 20), skill: `recipe:${k}`, params: {}, question: x?.description ?? was?.question ?? k, title: x?.title ?? was?.title ?? k, ...(was?.after ? { after: was.after } : {}), ...(x?.by ? { by: x.by } : was?.by ? { by: was.by } : {}) };
+  });
   function spec(): DeckSpec {
-    if (family === "social") return { title: name.trim() || t.title, grain, platforms: [], client: null, watchlist: [], slides: ["summary"], social: { focus, platform: repPlatform, slides: repSlides as NonNullable<DeckSpec["social"]>["slides"] } };
-    if (family === "reputation") return { title: name.trim() || tTitle, grain, platforms: [], client: null, watchlist: [], slides: ["summary"], rep: { focus, platform: repPlatform, slides: repSlides as NonNullable<DeckSpec["rep"]>["slides"] } };
+    const own = [...chatFindings, ...teamFindings()];
+    if (family === "social") return { title: name.trim() || t.title, grain, platforms: [], client: null, watchlist: [], slides: ["summary"], social: { focus, platform: repPlatform, slides: repSlides as NonNullable<DeckSpec["social"]>["slides"] }, ...(own.length ? { findings: own } : {}) };
+    if (family === "reputation") return { title: name.trim() || tTitle, grain, platforms: [], client: null, watchlist: [], slides: ["summary"], rep: { focus, platform: repPlatform, slides: repSlides as NonNullable<DeckSpec["rep"]>["slides"] }, ...(own.length ? { findings: own } : {}) };
     return {
       title: name.trim() || t.title,
       grain,
@@ -87,7 +102,7 @@ export function DeckForm({ options, initial, prefill }: { options: DeckOptions; 
       client: clientOn && clientName.trim() && clientIds.length ? { name: clientName.trim(), brands: clientIds.map((id) => ({ name: brandName.get(id) ?? id, brand_ids: [id] })) } : null,
       watchlist: watch,
       slides: (picked.length && !slides.includes("findings") ? [...slides, "findings"] : slides) as DeckSpec["slides"],
-      ...(hasFindings ? { findings: [...chatFindings, ...picked.map((k) => { const x = options.team_skills.find((y) => y.key === k); return { key: `r_${k}`.slice(0, 20), skill: `recipe:${k}`, params: {}, question: x?.description ?? k, title: x?.title ?? k }; })] } : {}),
+      ...(hasFindings ? { findings: [...chatFindings, ...teamFindings()] } : {}),
     };
   }
 
@@ -109,6 +124,12 @@ export function DeckForm({ options, initial, prefill }: { options: DeckOptions; 
       const r = await fetch(`/api/decks/${initial!.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: name.trim() || initial!.name, spec: spec(), recurring }) });
       const j = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(j.error ?? "Could not save");
+      if (alsoTemplate) {
+        // the template this deck came from takes the deck as it is now (a Member's change waits for a Builder)
+        const tr = await fetch(`/api/decks/${initial!.id}/change`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ change: {}, template: true, from: "form" }) });
+        const tj = await tr.json().catch(() => ({}));
+        if (!tr.ok || tj.template?.error) throw new Error(`Saved the deck; the template did not change: ${tj.error ?? tj.template?.error}`);
+      }
       if (andBuild) {
         const v = await fetch(`/api/decks/${initial!.id}/versions`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ period: period || undefined }) });
         const o = await v.json().catch(() => ({}));
@@ -241,19 +262,18 @@ export function DeckForm({ options, initial, prefill }: { options: DeckOptions; 
         </>
       )}
 
-      {!isRep && options.team_skills.length > 0 && (
-        <section>
-          <h3>Your team&apos;s analyses <small>each runs again over every version&apos;s period, a slide each</small></h3>
-          <div className="slidepick">
-            {options.team_skills.map((x) => (
-              <label key={x.key} className={picked.includes(x.key) ? "on" : ""}>
-                <input type="checkbox" checked={picked.includes(x.key)} onChange={() => setPicked((p) => (p.includes(x.key) ? p.filter((k) => k !== x.key) : [...p, x.key].slice(0, 6)))} />
-                <span><b>{x.title}<i className={`badge ${x.badge === "Fair" ? "fair" : "client"}`} title={x.by ? `Made by ${x.by}` : undefined}>{x.badge}</i></b><em>{x.description}</em></span>
-              </label>
-            ))}
-          </div>
-        </section>
-      )}
+      <section>
+        <h3>Your team&apos;s slides <small>analyses counted again for every version&apos;s dates, a slide each{isRep ? ", after the slides above" : ""}</small></h3>
+        <div className="slidepick">
+          {teamSkills.map((x) => (
+            <label key={x.key} className={picked.includes(x.key) ? "on" : ""}>
+              <input type="checkbox" checked={picked.includes(x.key)} onChange={() => setPicked((p) => (p.includes(x.key) ? p.filter((k) => k !== x.key) : [...p, x.key].slice(0, 6)))} />
+              <span><b>{x.title}<i className={`badge ${x.badge === "Fair" ? "fair" : "client"}`} title={x.by ? `Made by ${x.by}` : undefined}>{x.badge}</i></b><em>{x.description}</em></span>
+            </label>
+          ))}
+        </div>
+        <SlideDescriber onAdd={(a) => { setAdded((x) => [...x, a]); setPicked((p) => [...p, a.key].slice(0, 6)); }} />
+      </section>
 
       <section className="cgrid">
         <label className="wf">
@@ -268,6 +288,7 @@ export function DeckForm({ options, initial, prefill }: { options: DeckOptions; 
           </select>
           )}
         </label>
+        {edit && <label className="dcheck wide"><input type="checkbox" checked={alsoTemplate} onChange={(e) => setAlsoTemplate(e.target.checked)} /> Also change the template this deck came from <small>({initial?.template?.startsWith("co-") ? "your team's template" : "saved as your team's own template; Fair's stays as it is"}; a Member&apos;s change waits for a Builder)</small></label>}
         <label className="dcheck wide"><input type="checkbox" checked={recurring} onChange={(e) => setRecurring(e.target.checked)} /> Make the next version every {grain} <small>({grain === "day" ? "each morning at 07:00 WIB, for the day before, once its data has landed" : `when a new ${grain} of data lands`}; data runs to {options.data_through})</small></label>
       </section>
 
