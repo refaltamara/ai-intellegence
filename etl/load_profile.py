@@ -14,7 +14,9 @@ with sentiment null and /api/cron/label fills them in.
 
 What gets dropped, and reported per file:
   text      - a url -> text export: fills captions that arrived empty (never overwrites)
-  contents  - listed in drop_urls (captured wrong, e.g. a different singer)
+  contents  - listed in drop_urls (captured wrong, e.g. a different singer; or a reply the posts
+              export took for a post: with "parent", it counts as a comment and what was said under
+              it moves to the parent post)
             - link spam (spam_min_links or more links in the caption, spam_platforms only)
             - no subject keyword in the caption, on keyword_platforms only
               (Threads replies rarely repeat the name, so Threads is exempt)
@@ -224,9 +226,14 @@ class Profile:
         self.spam_min_links = int(c.get("spam_min_links", 0) or 0)
         self.spam_platforms = set(c.get("spam_platforms", PLATFORMS))
         self.drop = {}
+        # a reply the posts export captured as a post: it counts once, as a comment, and what was
+        # said under it belongs to the thread it replies to (drop_urls "parent")
+        self.reply_parent = {}
         for d in c.get("drop_urls", []):
             for p in PLATFORMS:
                 self.drop[canon_url(d["url"], p)] = d.get("reason", "listed in drop_urls")
+                if d.get("parent"):
+                    self.reply_parent[canon_url(d["url"], p)] = canon_url(d["parent"], p)
         self.files = c["files"]
         self.data_dir = ROOT / c.get("data_dir", "data/raw")
         self.root_url = c.get("root_url")
@@ -448,6 +455,11 @@ def normalise_comments(df, platform, prof, known_urls, dropped_urls, source_file
         url = canon_url(urls.iloc[i], platform)
         if not url:
             drops.add("missing post url", to_str(texts.iloc[i]) or ""); continue
+        for _ in range(3):
+            # a reply to a reply sits under the thread's post
+            if url not in prof.reply_parent:
+                break
+            url = prof.reply_parent[url]
         text = to_str(texts.iloc[i])
         if not text:
             drops.add("empty text", url); continue
