@@ -1789,3 +1789,13 @@ tr.warnrow td{background:#FFFBF0}
 .pwlink input{font:inherit;font-size:11.5px;padding:4px 7px;border:1px solid var(--line-2);border-radius:8px;background:var(--surface);color:var(--text-2);width:200px;min-width:0}
 .pwlink small{font-size:11px}
 .pwlink .err{color:var(--red)}
+
+/* loading screens (each page's loading.tsx): shown at once while its numbers load */
+.pgload{padding:32px 36px;display:flex;flex-direction:column;gap:16px}
+.pgload-label{color:var(--text-3);font-size:13px;margin:0}
+.pgload-row{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.pgload-tile,.pgload-block{background:var(--line);border-radius:var(--r);animation:pulse 1.4s ease-in-out infinite}
+.pgload-tile{height:88px}
+.pgload-block{height:260px}
+.pgload-block.short{height:140px;animation-delay:.2s}
+@media (max-width:720px){.pgload{padding:20px 16px}.pgload-row{grid-template-columns:repeat(2,minmax(0,1fr))}}

@@ -618,3 +618,16 @@ A new link replaces any the account still had open. Setting the password spends 
 The numbers are unchanged. The Pulse's output was compared field by field: only which sample comment shows among comments tied on likes differs.
 
 **For new queries.** Never count per hour or per day with a subquery over the workspace; group once and join. Never write `(select … limit 1)` per row over a CTE.
+
+**Later the same day.**
+- **Switching team is one page load.** The sidebar and the team picker used to call `router.push` then `router.refresh`, which built the new team's page twice. They now do one full load.
+- **Loading screens.** Dashboard, Pulse, Decks and Weekly Reports show a loading screen (`loading.tsx`, `src/ui/PageLoading.tsx`) while their numbers load, so a click never looks stuck.
+- **Pulse totals.** The Pulse's headline totals read the comments table once instead of 16 times: same numbers, 3–4× faster.
+- **`pnpm perf`** (`scripts/perf.ts`) builds every live workspace's pages as a visit would. For each page it reports the database time, the query count and the slowest queries. Each slow query is flagged when Postgres:
+  - read a whole big table;
+  - repeated a scan thousands of times;
+  - sorted on disk;
+  - guessed a workspace's size far off.
+
+  A page over 2 seconds of database time is marked SLOW (`--strict` exits 1). Run it after touching a page's queries or after a big load.
+- **The database compute.** Neon's autoscaling here tops out at 2 CU, and the compute drops to its smallest size when idle. The first heavy page after a quiet spell is about twice as slow (the beauty ranking query: 1.8 s cold, 1.0 s warm). A floor of 1 CU and a ceiling of 4 CU on the Launch plan keeps it warm.
