@@ -6,6 +6,10 @@
 import { TIER_BANDS } from "../config/thresholds";
 import { parsePeriod } from "./period";
 
+/** the Pulse's cards; kept here (not in src/pulse/) so browser code can build links without the data layer */
+export const PULSE_CARDS = ["overview", "now", "trend", "anger", "reply", "spread", "stance", "commenters", "themes", "drivers", "seeding", "exposure", "sides", "watch"] as const;
+export type PulseCard = (typeof PULSE_CARDS)[number];
+
 /** "all" is every platform the workspace holds; the beauty panel holds TikTok and Instagram, listening workspaces Threads and X too. */
 export type PlatformFilter = "all" | "tiktok" | "instagram" | "threads" | "x" | "youtube";
 export const PLATFORMS: PlatformFilter[] = ["all", "tiktok", "instagram", "threads", "x", "youtube"];
@@ -18,12 +22,14 @@ export type AskTarget =
   | { k: "tier"; tier: string }
   | { k: "week"; brand: string; week: string }
   | { k: "creator"; creator: string }
-  | { k: "post"; url: string };
+  | { k: "post"; url: string }
+  /** a card on a case's Pulse (src/pulse/ask.ts); the Pulse has no filters, so platform, brands and period are left empty */
+  | { k: "pulse"; card: PulseCard };
 export type AskRef = AskTarget & { platform: PlatformFilter; brands: string[]; period: string };
 export type Fact = { label: string; value: string };
 /** What the chat shows above the question and what the model is told. */
 export type AskContext = {
-  source: "dashboard" | "slide";
+  source: "dashboard" | "slide" | "pulse";
   title: string;
   scope: string;
   facts: Fact[];
@@ -56,12 +62,18 @@ export function askHref(ref: AskRef): string {
   return `/?ask=${encodeAsk(ref)}`;
 }
 
+/** The chat link for a card on a case's Pulse. */
+export function pulseAskHref(card: PulseCard): string {
+  return askHref({ k: "pulse", card, platform: "all", brands: [], period: "" });
+}
+
 const str = (v: unknown, max = 200): string | null => (typeof v === "string" && v.length > 0 && v.length <= max ? v : null);
 
 /** Shape check only; whether the brand, creator or post exists is decided when it resolves. */
 export function validAsk(v: unknown): AskRef | null {
   if (!v || typeof v !== "object") return null;
   const o = v as Record<string, unknown>;
+  if (o.k === "pulse") return (PULSE_CARDS as readonly string[]).includes(String(o.card)) ? { k: "pulse", card: o.card as PulseCard, platform: "all", brands: [], period: "" } : null;
   const platform = (PLATFORMS as string[]).includes(String(o.platform)) ? (o.platform as PlatformFilter) : null;
   const period = str(o.period, 10);
   const brands = Array.isArray(o.brands) ? o.brands.filter((b): b is string => typeof b === "string" && b.length <= 80).slice(0, 20) : null;

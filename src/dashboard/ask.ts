@@ -14,6 +14,7 @@ import type { AskContext, AskRef, Fact, PlatformFilter } from "./askref";
 import { PLATFORM_NAME } from "./askref";
 import { brandHandles, brandFilter, buckets, content, filterQuery, inWindow, Params, rankings, scope, tiers, topCreators, totals, type Filters } from "./data";
 import { parsePeriod, shiftPeriod, weekOf, type Period } from "./period";
+import { resolvePulseAsk } from "../pulse/ask";
 
 const PLATFORM_LABEL: Record<PlatformFilter, string> = { all: "All platforms", tiktok: "TikTok", instagram: "Instagram", threads: "Threads", x: "X", youtube: "YouTube" };
 const METRIC_LABEL = { posts: "content", views: "views", engagements: "engagement", er: "engagement rate" } as const;
@@ -23,6 +24,8 @@ const changeOr = (now: number, prev: number | null | undefined) => (prev == null
 
 /** Re-read the figures behind a dashboard click. Null when the reference points at nothing in this workspace. */
 export async function resolveAsk(workspaceId: string, ref: AskRef): Promise<AskContext | null> {
+  // a case's Pulse has its own figures and no filters
+  if (ref.k === "pulse") return resolvePulseAsk(workspaceId, ref.card);
   const db = new SkillDb();
   const ctx = await loadContext(db, workspaceId);
   const period = parsePeriod(ref.period)!;
@@ -159,6 +162,13 @@ export function contextPreamble(c: AskContext): string {
       `What the slide shows, computed from the data:\n${s.text}`,
       `Answer about this slide and its period (${s.week.from} to ${s.week.to}). Quote the report's numbers exactly. When the question needs more than the report holds (which creators, which posts, a brand's tier mix or products), run the analyses with window from ${s.week.from} to ${s.week.to} and the brands named, and cite the evidence.]`,
     ].join("\n\n");
+  }
+  if (c.source === "pulse") {
+    return [
+      `[The person opened this chat from the Pulse, the hour-by-hour view of the case, looking at: ${c.title} (${c.scope}).`,
+      `Figures on their screen, computed from the data: ${c.facts.map((x) => `${x.label}: ${x.value}`).join("; ")}.`,
+      "Answer their question about the case. Quote these figures exactly; when the question needs more (which comments, which accounts, which posts, a day or a platform), run the analyses and cite the evidence. Do not recompute these figures.]",
+    ].join("\n");
   }
   return [
     `[The person opened this chat from the dashboard, looking at: ${c.title} (${c.scope}).`,

@@ -97,7 +97,7 @@ export function DeckViewer({ deck, items, initialId, initialSlide, periods, rang
         <button className="btn sm" onClick={() => setMenu((m) => !m)} disabled={!!busy}>New version ▾</button>
         {menu && (
           <div className="dmenu-pop">
-            <label>For<PeriodPick periods={periods} value={period} onChange={setPeriod} range={range} day={day} replaced={(k) => items.some((i) => i.iso === k)} /></label>
+            <div className="dmfor">For<PeriodPick periods={periods} value={period} onChange={setPeriod} range={range} day={day} replaced={(k) => items.some((i) => i.iso === k)} /></div>
             <button className="btn pri sm" onClick={makeVersion} disabled={!period}>Make it</button>
           </div>
         )}
