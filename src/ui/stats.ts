@@ -13,7 +13,7 @@ export async function workspaceStats(ws = DEFAULT_WORKSPACE_ID): Promise<Workspa
             (select count(*) from comments where workspace_id = $1 and sentiment is not null)::int as comments_labelled,
             (select count(distinct platform) from posts where workspace_id = $1)::int as platforms,
             (select count(distinct month) from posts where workspace_id = $1)::int as months,
-            (select to_char(max(posted_at at time zone 'Asia/Jakarta'), 'DD Mon YYYY') from posts where workspace_id = $1) as freshness,
+            (select to_char(max(posted_at) at time zone 'Asia/Jakarta', 'DD Mon YYYY') from posts where workspace_id = $1) as freshness,
             (select to_char(max(finished_at) at time zone 'Asia/Jakarta', 'DD Mon YYYY HH24:MI') from data_loads where workspace_id = $1) as last_load`,
     [ws],
   )) as any[];

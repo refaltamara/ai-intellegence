@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { NavKey } from "@/roles/model";
 import type { TeamChoice } from "@/workspace/teams";
 import { TeamIcon } from "./TeamIcon";
@@ -31,6 +31,17 @@ export function Sidebar({ recent, user, product, teams, currentWorkspace, curren
   const path = usePathname();
   const router = useRouter();
   const [switching, setSwitching] = useState<string | null>(null);
+  const [switchError, setSwitchError] = useState("");
+  const left = useRef(false);
+  useEffect(() => {
+    // Back can bring this page out of the browser's cache mid-switch, controls disabled and the
+    // team cookie already moved on: load it again so it shows the team the next click acts on
+    const back = (e: PageTransitionEvent) => {
+      if (e.persisted && left.current) window.location.reload();
+    };
+    window.addEventListener("pageshow", back);
+    return () => window.removeEventListener("pageshow", back);
+  }, []);
   const initials = user.email.slice(0, 2).toUpperCase();
   async function logout() {
     await fetch("/api/auth/logout", { method: "POST" });
@@ -40,10 +51,20 @@ export function Sidebar({ recent, user, product, teams, currentWorkspace, curren
   async function switchTo(t: TeamChoice) {
     if (t.key === team?.key) return;
     setSwitching(t.key);
-    const r = await fetch("/api/workspace/switch", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ workspace_id: t.workspace_id, role: t.role }) });
+    setSwitchError("");
+    const failed = (why: string) => {
+      setSwitching(null);
+      setSwitchError(why);
+    };
+    try {
+      const r = await fetch("/api/workspace/switch", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ workspace_id: t.workspace_id, role: t.role }) });
+      if (!r.ok) return failed(((await r.json().catch(() => ({}))) as { error?: string }).error ?? "Could not switch team.");
+    } catch {
+      return failed("Could not switch team: check the connection and try again.");
+    }
+    // one full load: push + refresh drew the new team's page twice (the second time with the sidebar);
     // the switching mark stays until the new team's page replaces this one
-    if (!r.ok) return setSwitching(null);
-    // one full load: push + refresh drew the new team's page twice (the second time with the sidebar)
+    left.current = true;
     window.location.assign(t.home);
   }
   const active = (href: string) => (href === "/" ? path === "/" : path.startsWith(href));
@@ -77,6 +98,7 @@ export function Sidebar({ recent, user, product, teams, currentWorkspace, curren
           ))}
         </div>
       )}
+      {switchError && <p className="switch-err" role="alert">{switchError}</p>}
       <nav className="nav">
         {NAV.filter((n) => nav.includes(n.key)).map((n) => (
           <Link key={n.href} href={n.href} className={active(n.href) ? "on" : ""} data-tone={n.tone}>

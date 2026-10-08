@@ -1,8 +1,10 @@
 /** Pulses (DECISIONS, 30 Sep 2026): the boards a team builds for the situation in front of it. */
+import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { currentWorkspaceId } from "@/auth/current";
 import { pulsePage } from "@/pulse/page";
 import { PulsePage } from "@/ui/PulsePage";
+import { PageLoading } from "@/ui/PageLoading";
 import { getWorkspace } from "@/workspace/store";
 import { panelWorkspace } from "@/pulses/api";
 import { editorOptions } from "@/pulses/page";
@@ -20,9 +22,13 @@ export default async function PulsesPage() {
   // a profile on the reputation dashboard keeps its crisis view here, hour by hour
   const cfg = await getWorkspace(ws);
   if (cfg?.kind === "profile" && cfg.reputation) {
-    const d = await pulsePage(ws);
-    if (!d) redirect("/data");
-    return <PulsePage d={d} title="Pulse" />;
+    // the loading screen wraps only the crisis view: a board's not-found and a panel team's redirect
+    // below are decided before anything streams, so they keep their 404 and 307
+    return (
+      <Suspense fallback={<PageLoading label="Loading the Pulse…" />}>
+        <CrisisPulse ws={ws} />
+      </Suspense>
+    );
   }
   // a team with a brand panel builds decks now (DECISIONS, 2 Oct 2026); its old boards are listed there
   if (await panelWorkspace(ws)) redirect("/decks");
@@ -45,4 +51,10 @@ export default async function PulsesPage() {
       </div>
     </section>
   );
+}
+
+async function CrisisPulse({ ws }: { ws: string }) {
+  const d = await pulsePage(ws);
+  if (!d) redirect("/data");
+  return <PulsePage d={d} title="Pulse" />;
 }

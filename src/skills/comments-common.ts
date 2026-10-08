@@ -17,8 +17,10 @@ function addDays(iso: string, days: number): string {
 
 /** Resolve a window over comments; `to_ts` is exclusive (end of the local day). */
 export async function commentWindow(db: SkillDb, ctx: Context, raw: unknown, defaultDays = 30, platforms: Platform[] | null = null): Promise<CommentWindow> {
+  // max and min of the stored time, then the local day: the (workspace, posted_at) index answers it in a lookup,
+  // where taking the max of a converted time read every comment (the same day in any zone without a midnight clock change)
   const r = await db.one<{ latest: string | null; earliest: string | null }>(
-    `select to_char(max(posted_at at time zone $2), 'YYYY-MM-DD') as latest, to_char(min(posted_at at time zone $2), 'YYYY-MM-DD') as earliest
+    `select to_char(max(posted_at) at time zone $2, 'YYYY-MM-DD') as latest, to_char(min(posted_at) at time zone $2, 'YYYY-MM-DD') as earliest
      from comments where workspace_id = $1 and posted_at is not null ${platforms ? "and platform = any($3::text[])" : ""}`,
     platforms ? [ctx.workspaceId, ctx.tz, platforms] : [ctx.workspaceId, ctx.tz],
   );

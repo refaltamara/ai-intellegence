@@ -54,8 +54,9 @@ export async function loadContext(db: SkillDb, workspaceId = DEFAULT_WORKSPACE_I
   );
   if (!ws) throw new ParamError(`Unknown workspace ${workspaceId}`);
   const range = await db.one<{ as_of: string | null; earliest: string | null; freshness: string | null }>(
-    `select to_char(max(posted_at at time zone $2), 'YYYY-MM-DD') as as_of,
-            to_char(min(posted_at at time zone $2), 'YYYY-MM-DD') as earliest,
+    // max and min of the stored time, then the local day: an index lookup, not a read of every post
+    `select to_char(max(posted_at) at time zone $2, 'YYYY-MM-DD') as as_of,
+            to_char(min(posted_at) at time zone $2, 'YYYY-MM-DD') as earliest,
             to_char(max(posted_at) at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as freshness
      from posts where workspace_id = $1`,
     [workspaceId, ws.tz],

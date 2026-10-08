@@ -31,7 +31,18 @@ export function workspacesOf(teams: TeamChoice[]): TeamChoice[] {
   return teams.filter((t) => (seen.has(t.workspace_id) ? false : (seen.add(t.workspace_id), true)));
 }
 
-/** Only same-site paths are followed after sign-in. */
+/**
+ * Only same-site paths are followed after sign-in. Browsers drop tabs and line breaks inside a URL
+ * and read a backslash as a slash, so "/\t/evil.com" would land on evil.com: a path carrying any
+ * of them is refused, and what is left must resolve to this site.
+ */
 export function safeNext(next: string | null | undefined): string | null {
-  return next && next.startsWith("/") && !next.startsWith("//") && !next.startsWith("/\\") ? next : null;
+  if (!next || !next.startsWith("/") || /[\u0000-\u001f\u007f\\]/.test(next)) return null;
+  try {
+    const base = "https://fair.invalid";
+    const u = new URL(next, base);
+    return u.origin === base ? u.pathname + u.search + u.hash : null;
+  } catch {
+    return null;
+  }
 }
