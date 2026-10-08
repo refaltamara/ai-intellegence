@@ -1800,3 +1800,5 @@ tr.warnrow td{background:#FFFBF0}
 .pgload-block.short{height:140px;animation-delay:.2s}
 @media (max-width:720px){.pgload{padding:20px 16px}.pgload-row{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .side .switch-err{color:var(--red);font-size:12px;line-height:1.4;margin:6px 14px 0}
+/* the logo mark (src/ui/LogoMark.tsx): the drawing carries its own shape and colours */
+.brand .mark.logo{display:block;flex:none;background:none;border-radius:32%;box-shadow:0 4px 14px rgba(255,98,94,.28)}

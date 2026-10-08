@@ -2,6 +2,7 @@ import { readInvite } from "@/auth/invites";
 import { ROLES, type RoleId } from "@/roles/model";
 import { DUTY_LABEL } from "@/config/staff";
 import { InviteAccept } from "@/ui/InviteAccept";
+import { LogoMark } from "@/ui/LogoMark";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +13,7 @@ export default async function InvitePage({ params }: { params: Promise<{ token: 
   return (
     <div className="login">
       <div className="box">
-        <div className="brand"><div className="mark">F</div><div><b>Fair Intelligence</b><small>Invitation</small></div></div>
+        <div className="brand"><LogoMark /><div><b>Fair Intelligence</b><small>Invitation</small></div></div>
         {inv ? (
           <InviteAccept
             token={token}

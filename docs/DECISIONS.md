@@ -647,3 +647,14 @@ The numbers are unchanged. The Pulse's output was compared field by field: only 
   - It counts a repeated query each time it ran, plus planning time, and keeps going when a page fails to build (FAIL; `--strict` exits 1).
   - It times live workspaces only (`--all` adds review), and skips role dashboards a crisis-only profile never shows.
   - It catches hash spills and parallel scans.
+
+## The logo (Refal, 8 Oct 2026)
+
+The app's mark is the Fair Listening mark Refal supplied for the pitch: an orange-to-pink rounded square (#FF9047 to #FF516A) with five sound bars, the middle one peach. It replaces the blue-and-violet "F" square in seven places:
+- the sidebar and the CMS;
+- the sign-in, password and invitation pages;
+- the connector consent page.
+
+It is drawn as a vector (`src/ui/LogoMark.tsx`), traced from the supplied PNG; the two match to within one pixel along the edge. The browser tab icon is the same drawing (`app/icon.svg`), and the home-screen icon is a 180 px PNG (`app/apple-icon.png`). Both are public paths, so the sign-in page shows them.
+
+The product's name stays "Fair Intelligence", and the rest of the app keeps its blue and violet.

@@ -3,6 +3,7 @@ import { currentActor, currentSession, currentWorkspaceId } from "@/auth/current
 import { checkAuthRequest, withParams } from "@/mcp/authorize";
 import { teamsFor, workspacesOf } from "@/workspace/teams";
 import { TeamIcon } from "@/ui/TeamIcon";
+import { LogoMark } from "@/ui/LogoMark";
 
 export const dynamic = "force-dynamic";
 
@@ -29,7 +30,7 @@ export default async function Authorize({ searchParams }: { searchParams: Promis
   return (
     <div className="login consent">
       <div className="box">
-        <div className="brand"><div className="mark">F</div><div><b>Fair Intelligence</b><small>Connect an AI assistant</small></div></div>
+        <div className="brand"><LogoMark /><div><b>Fair Intelligence</b><small>Connect an AI assistant</small></div></div>
         <form className="card" method="post" action="/api/oauth/authorize">
           <h2>{app} wants to read your Fair Intelligence data</h2>
           <p className="d">It will be able to run the same analyses you use in the app and read their results, as <b>{session.email}</b>. It cannot change anything. Each question it asks counts toward your daily limit, and you can disconnect it any time from <b>Connect Claude / ChatGPT</b> in the sidebar.</p>
