@@ -1,21 +1,35 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { TeamChoice } from "@/workspace/teams";
 import { TeamIcon } from "./TeamIcon";
 
 export function TeamPicker({ teams, email, next }: { teams: TeamChoice[]; email: string; next: string | null }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState("");
+  useEffect(() => {
+    // Back can bring this page out of the browser's cache with every button still waiting: free them
+    const back = (e: PageTransitionEvent) => {
+      if (e.persisted) setBusy(null);
+    };
+    window.addEventListener("pageshow", back);
+    return () => window.removeEventListener("pageshow", back);
+  }, []);
   async function choose(t: TeamChoice) {
     setBusy(t.key);
     setError("");
-    const r = await fetch("/api/workspace/switch", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ workspace_id: t.workspace_id, role: t.role }) });
-    if (!r.ok) {
+    try {
+      const r = await fetch("/api/workspace/switch", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ workspace_id: t.workspace_id, role: t.role }) });
+      if (!r.ok) {
+        setBusy(null);
+        setError((await r.json().catch(() => ({}))).error ?? "Could not switch");
+        return;
+      }
+    } catch {
       setBusy(null);
-      setError((await r.json().catch(() => ({}))).error ?? "Could not switch");
+      setError("Could not switch: check the connection and try again.");
       return;
     }
-    // one full load, not push + refresh (which drew the page twice)
+    // one full load, not push + refresh (which drew the page twice); next is a same-site path (safeNext)
     window.location.assign(next ?? t.home);
   }
   return (

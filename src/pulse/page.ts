@@ -113,46 +113,50 @@ async function build(ws: string): Promise<PulseData | null> {
   // The parts of the page run side by side rather than one query after another: only the arc's
   // charts wait on the arc, the reply's effect on the reply, and the timeline on all of it.
   const headPart = async () => {
-    const subject = (await db.one<{ name: string }>("select b.name from workspaces w join brands b on b.id = w.client_brand_id where w.id = $1", [ws]))?.name ?? cfg.name;
-
-    // one pass over the comments (with their post's source) and one over the posts, not a scan per number
-    const totals = await db.one<PulseData["totals"]>(
-      `with cc as (
-         select count(*) filter (where c.sentiment_source is distinct from 'subject')::int as comments,
-                count(*) filter (where c.sentiment is not null)::int as labelled,
-                count(*) filter (where c.sentiment = 'negative')::int as negative,
-                count(*) filter (where c.sentiment = 'neutral')::int as neutral,
-                count(*) filter (where c.sentiment = 'positive')::int as positive,
-                count(distinct (c.platform, c.author_handle)) filter (where c.sentiment_source is distinct from 'subject')::int as accounts,
-                count(distinct c.post_id)::int as posts_with_comments,
-                count(*) filter (where c.off_topic)::int as off_topic,
-                count(*) filter (where c.sentiment_source is distinct from 'subject' and not coalesce(c.off_topic, false))::int as on_topic,
-                count(*) filter (where not coalesce(c.off_topic, false) and c.sentiment is not null)::int as on_topic_labelled,
-                count(*) filter (where not coalesce(c.off_topic, false) and c.sentiment = 'negative')::int as on_topic_negative,
-                count(*) filter (where not coalesce(c.off_topic, false) and c.sentiment = 'positive')::int as on_topic_positive,
-                count(*) filter (where c.sentiment_source is distinct from 'subject' and not coalesce(c.off_topic, false) and p.source = 'owned')::int as owned_comments,
-                count(*) filter (where not coalesce(c.off_topic, false) and c.sentiment = 'negative' and p.source = 'owned')::int as owned_negative,
-                count(*) filter (where c.sentiment_source is distinct from 'subject' and not coalesce(c.off_topic, false) and p.source = 'earned')::int as earned_comments,
-                count(*) filter (where not coalesce(c.off_topic, false) and c.sentiment = 'negative' and p.source = 'earned')::int as earned_negative
-         from comments c left join posts p on p.id = c.post_id where c.workspace_id = $1),
-       pp as (
-         select count(*)::int as posts,
-                count(*) filter (where source = 'earned')::int as earned_posts,
-                count(*) filter (where source = 'earned' and stance is not null)::int as posts_stance_labelled,
-                count(*) filter (where source = 'earned' and stance = 'negative')::int as posts_against,
-                count(*) filter (where source = 'earned' and stance = 'neutral')::int as posts_neutral,
-                count(*) filter (where source = 'earned' and stance = 'positive')::int as posts_for,
-                count(*) filter (where source = 'earned' and caption is null)::int as posts_no_caption
-         from posts where workspace_id = $1 and content_type is distinct from 'stub' and relevant is not false)
-       select pp.posts, pp.earned_posts, cc.comments, cc.labelled, cc.negative, cc.neutral, cc.positive, cc.accounts,
-              (select count(distinct platform) from (select platform from comments where workspace_id = $1 union select platform from posts where workspace_id = $1 and relevant is not false) x)::int as platforms,
-              cc.posts_with_comments, cc.off_topic, cc.on_topic, cc.on_topic_labelled, cc.on_topic_negative, cc.on_topic_positive,
-              cc.owned_comments, cc.owned_negative, cc.earned_comments, cc.earned_negative,
-              pp.posts_stance_labelled, pp.posts_against, pp.posts_neutral, pp.posts_for, pp.posts_no_caption
-       from cc, pp`,
-      [ws],
-    );
-    const asOfRow = await db.one<{ c: string; p: string }>(`select to_char((select max(posted_at) from comments where workspace_id = $1) at time zone $2, 'YYYY-MM-DD HH24:MI') as c, to_char((select max(posted_at) from posts where workspace_id = $1 and source = 'earned') at time zone $2, 'YYYY-MM-DD HH24:MI') as p`, [ws, tz]);
+    const [subjectRow, totals, asOfRow] = await Promise.all([
+      db.one<{ name: string }>("select b.name from workspaces w join brands b on b.id = w.client_brand_id where w.id = $1", [ws]),
+      // one pass over the comments (with their post's source) and one over the posts, not a scan per number
+      db.one<PulseData["totals"]>(
+        `with cc as (
+           select count(*) filter (where c.sentiment_source is distinct from 'subject')::int as comments,
+                  count(*) filter (where c.sentiment is not null)::int as labelled,
+                  count(*) filter (where c.sentiment = 'negative')::int as negative,
+                  count(*) filter (where c.sentiment = 'neutral')::int as neutral,
+                  count(*) filter (where c.sentiment = 'positive')::int as positive,
+                  count(distinct (c.platform, c.author_handle)) filter (where c.sentiment_source is distinct from 'subject')::int as accounts,
+                  count(distinct c.post_id)::int as posts_with_comments,
+                  count(*) filter (where c.off_topic)::int as off_topic,
+                  count(*) filter (where c.sentiment_source is distinct from 'subject' and not coalesce(c.off_topic, false))::int as on_topic,
+                  count(*) filter (where not coalesce(c.off_topic, false) and c.sentiment is not null)::int as on_topic_labelled,
+                  count(*) filter (where not coalesce(c.off_topic, false) and c.sentiment = 'negative')::int as on_topic_negative,
+                  count(*) filter (where not coalesce(c.off_topic, false) and c.sentiment = 'positive')::int as on_topic_positive,
+                  count(*) filter (where c.sentiment_source is distinct from 'subject' and not coalesce(c.off_topic, false) and p.source = 'owned')::int as owned_comments,
+                  count(*) filter (where not coalesce(c.off_topic, false) and c.sentiment = 'negative' and p.source = 'owned')::int as owned_negative,
+                  count(*) filter (where c.sentiment_source is distinct from 'subject' and not coalesce(c.off_topic, false) and p.source = 'earned')::int as earned_comments,
+                  count(*) filter (where not coalesce(c.off_topic, false) and c.sentiment = 'negative' and p.source = 'earned')::int as earned_negative,
+                  array_agg(distinct c.platform) as platforms
+           from comments c left join posts p on p.id = c.post_id and p.workspace_id = $1 where c.workspace_id = $1),
+         pp as (
+           select count(*) filter (where content_type is distinct from 'stub')::int as posts,
+                  count(*) filter (where content_type is distinct from 'stub' and source = 'earned')::int as earned_posts,
+                  count(*) filter (where content_type is distinct from 'stub' and source = 'earned' and stance is not null)::int as posts_stance_labelled,
+                  count(*) filter (where content_type is distinct from 'stub' and source = 'earned' and stance = 'negative')::int as posts_against,
+                  count(*) filter (where content_type is distinct from 'stub' and source = 'earned' and stance = 'neutral')::int as posts_neutral,
+                  count(*) filter (where content_type is distinct from 'stub' and source = 'earned' and stance = 'positive')::int as posts_for,
+                  count(*) filter (where content_type is distinct from 'stub' and source = 'earned' and caption is null)::int as posts_no_caption,
+                  array_agg(distinct platform) as platforms
+           from posts where workspace_id = $1 and relevant is not false)
+         select pp.posts, pp.earned_posts, cc.comments, cc.labelled, cc.negative, cc.neutral, cc.positive, cc.accounts,
+                (select count(distinct x) from unnest(coalesce(cc.platforms, '{}') || coalesce(pp.platforms, '{}')) x)::int as platforms,
+                cc.posts_with_comments, cc.off_topic, cc.on_topic, cc.on_topic_labelled, cc.on_topic_negative, cc.on_topic_positive,
+                cc.owned_comments, cc.owned_negative, cc.earned_comments, cc.earned_negative,
+                pp.posts_stance_labelled, pp.posts_against, pp.posts_neutral, pp.posts_for, pp.posts_no_caption
+         from cc, pp`,
+        [ws],
+      ),
+      db.one<{ c: string; p: string }>(`select to_char((select max(posted_at) from comments where workspace_id = $1) at time zone $2, 'YYYY-MM-DD HH24:MI') as c, to_char((select max(posted_at) from posts where workspace_id = $1 and source = 'earned') at time zone $2, 'YYYY-MM-DD HH24:MI') as p`, [ws, tz]),
+    ]);
+    const subject = subjectRow?.name ?? cfg.name;
     const asOf = asOfRow?.c ?? "";
     const postsAsOf = asOfRow?.p ?? "";
     return { subject, totals, asOf, postsAsOf };
@@ -577,23 +581,29 @@ async function commercialExposure(db: SkillDb, ws: string, tz: string, cfg: { pa
   const like = (terms: string[]) => terms.map((t) => `%${t}%`);
   const boycott = like(cfg.boycott_terms);
   const configured = cfg.partners.length > 0;
+  // each matching post and comment is found once (ilike is the costly part), then counted by window and by day
   const totals = await db.one<Row>(
-    `with last as (select greatest((select max(posted_at) from comments where workspace_id = $1), (select max(posted_at) from posts where workspace_id = $1)) as at)
-     select (select count(*) from posts where workspace_id = $1 and source = 'earned' and content_type is distinct from 'stub' and relevant is not false and caption ilike any($2::text[]))::int as posts,
-            (select count(*) from comments where workspace_id = $1 and text ilike any($2::text[]))::int as comments,
-            (select count(*) from posts where workspace_id = $1 and source = 'earned' and content_type is distinct from 'stub' and relevant is not false and caption ilike any($2::text[]) and posted_at > (select at from last) - interval '24 hours')::int as posts_24h,
-            (select count(*) from posts where workspace_id = $1 and source = 'earned' and content_type is distinct from 'stub' and relevant is not false and caption ilike any($2::text[]) and posted_at between (select at from last) - interval '48 hours' and (select at from last) - interval '24 hours')::int as posts_prev_24h,
-            (select count(*) from comments where workspace_id = $1 and text ilike any($2::text[]) and posted_at > (select at from last) - interval '24 hours')::int as comments_24h,
-            (select count(*) from comments where workspace_id = $1 and text ilike any($2::text[]) and posted_at between (select at from last) - interval '48 hours' and (select at from last) - interval '24 hours')::int as comments_prev_24h`,
+    `with last as (select greatest((select max(posted_at) from comments where workspace_id = $1), (select max(posted_at) from posts where workspace_id = $1)) as at),
+     pm as (select posted_at from posts where workspace_id = $1 and source = 'earned' and content_type is distinct from 'stub' and relevant is not false and caption ilike any($2::text[])),
+     cm as (select posted_at from comments where workspace_id = $1 and text ilike any($2::text[]))
+     select (select count(*) from pm)::int as posts,
+            (select count(*) from cm)::int as comments,
+            (select count(*) from pm where posted_at > (select at from last) - interval '24 hours')::int as posts_24h,
+            (select count(*) from pm where posted_at between (select at from last) - interval '48 hours' and (select at from last) - interval '24 hours')::int as posts_prev_24h,
+            (select count(*) from cm where posted_at > (select at from last) - interval '24 hours')::int as comments_24h,
+            (select count(*) from cm where posted_at between (select at from last) - interval '48 hours' and (select at from last) - interval '24 hours')::int as comments_prev_24h`,
     [ws, boycott],
   );
+  // per day: grouped once and joined to the days, not three lookups over the workspace for each day
   const daily = await db.q<Row>(
-    `with ds as (select generate_series(coalesce($3::date, (now() - interval '6 days')::date), (select max(posted_at at time zone $2)::date from comments where workspace_id = $1), interval '1 day')::date as d)
-     select to_char(ds.d, 'YYYY-MM-DD') as d,
-            (select count(*) from posts p where p.workspace_id = $1 and p.source = 'earned' and p.content_type is distinct from 'stub' and p.relevant is not false and p.caption ilike any($4::text[]) and (p.posted_at at time zone $2)::date = ds.d)::int as posts,
-            (select count(*) from comments c where c.workspace_id = $1 and c.text ilike any($4::text[]) and (c.posted_at at time zone $2)::date = ds.d)::int as comments,
-            (select max(p.views) from posts p where p.workspace_id = $1 and p.source = 'earned' and p.caption ilike any($4::text[]) and (p.posted_at at time zone $2)::date = ds.d)::float8 as reach
-     from ds order by 1`,
+    `with ds as (select generate_series(coalesce($3::date, (now() - interval '6 days')::date), (select (max(posted_at) at time zone $2)::date from comments where workspace_id = $1), interval '1 day')::date as d),
+     pd as (select (p.posted_at at time zone $2)::date as d,
+                   count(*) filter (where p.content_type is distinct from 'stub' and p.relevant is not false)::int as posts, max(p.views) as reach
+            from posts p where p.workspace_id = $1 and p.source = 'earned' and p.caption ilike any($4::text[]) group by 1),
+     cd as (select (c.posted_at at time zone $2)::date as d, count(*)::int as comments
+            from comments c where c.workspace_id = $1 and c.text ilike any($4::text[]) group by 1)
+     select to_char(ds.d, 'YYYY-MM-DD') as d, coalesce(pd.posts, 0)::int as posts, coalesce(cd.comments, 0)::int as comments, pd.reach::float8 as reach
+     from ds left join pd on pd.d = ds.d left join cd on cd.d = ds.d order by 1`,
     [ws, tz, sinceIso, boycott],
   );
   const top = await db.q<Row>(

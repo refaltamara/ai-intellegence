@@ -631,3 +631,19 @@ The numbers are unchanged. The Pulse's output was compared field by field: only 
 
   A page over 2 seconds of database time is marked SLOW (`--strict` exits 1). Run it after touching a page's queries or after a big load.
 - **The database compute.** Neon's autoscaling here tops out at 2 CU, and the compute drops to its smallest size when idle. The first heavy page after a quiet spell is about twice as slow (the beauty ranking query: 1.8 s cold, 1.0 s warm). A floor of 1 CU and a ceiling of 4 CU on the Launch plan keeps it warm.
+
+**After a code review (/code-review) of the two speed PRs.**
+- **Sign-in redirect.** `safeNext` (`src/workspace/teams.ts`) refuses a path containing a tab, a line break or a backslash, and anything that does not resolve to this site. Browsers drop the first two inside a URL and read a backslash as a slash, so `/login?next=/%09/evil.com` used to land on evil.com after sign-in. This predates the speed work.
+- **Team switch.** A failed switch (offline, or a team not open to the account) frees the controls and says why. Back from the browser's cache mid-switch reloads the page, so it shows the team the cookie now names.
+- **Status codes.** Decks and the Pulse lost their `loading.tsx`, because a loading screen around a whole segment turned a deck's 404 and a panel team's redirect into a 200. The Pulse now wraps only the crisis view in `Suspense`.
+- **Pulse.**
+  - The head's three reads run together.
+  - The totals' platform count comes from the same two passes, and the posts join stays in the workspace.
+  - The case-words card finds each matching post and comment once and counts per day with one grouping, instead of three lookups per day.
+  - The comment analyses' newest-comment date (`commentWindow`) and the skills' context (`loadContext`) take `max(posted_at) at time zone tz`, which the index answers in a lookup. Before, `max(posted_at at time zone tz)` read every row, four times per Pulse. Results are the same on every workspace (all Asia/Jakarta).
+  - The Pulse's database time fell from 8.6 s to 5.1 s, with the same numbers.
+- **`pnpm perf`.**
+  - It also times the sign-in and sidebar every page loads (`--as email`).
+  - It counts a repeated query each time it ran, plus planning time, and keeps going when a page fails to build (FAIL; `--strict` exits 1).
+  - It times live workspaces only (`--all` adds review), and skips role dashboards a crisis-only profile never shows.
+  - It catches hash spills and parallel scans.
