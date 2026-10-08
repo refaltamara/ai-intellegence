@@ -12,7 +12,7 @@ import { headers } from "next/headers";
 import { sql } from "@/db/client";
 
 /** Pages that take the whole screen: sign-in, the team question, connector consent. */
-const FULL_SCREEN = ["/login", "/persona", "/oauth/", "/invite/", "/admin", "/admin/"];
+const FULL_SCREEN = ["/login", "/reset", "/reset/", "/persona", "/oauth/", "/invite/", "/admin", "/admin/"];
 
 export const dynamic = "force-dynamic";
 

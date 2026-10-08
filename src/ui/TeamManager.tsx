@@ -6,6 +6,7 @@
  */
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { PasswordLink } from "./admin/PasswordLink";
 
 type Level = "builder" | "member";
 type Levels = Record<string, Level | undefined>;
@@ -16,7 +17,9 @@ export type TeamInvite = { id: string; email: string; levels: Levels; staff: str
 const DUTY: Record<string, string> = { owner: "Owner", role_owner: "Role owner", designer: "Design", data_ops: "Data ops" };
 const day = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short" }) : "never");
 
-export function TeamManager({ workspaceId, workspaceName, roles, members, invites, canBuilders, meUid }: { workspaceId: string; workspaceName: string; roles: TeamRole[]; members: TeamMember[]; invites: TeamInvite[]; canBuilders: boolean; meUid: string }) {
+export function TeamManager({ workspaceId, workspaceName, roles, members, invites, canBuilders, meUid, passwordLinks = false }: { workspaceId: string; workspaceName: string; roles: TeamRole[]; members: TeamMember[]; invites: TeamInvite[]; canBuilders: boolean; meUid: string;
+  /** in the CMS, Fair can make a one-time link for someone to set a new password (src/auth/passwordLinks.ts); a Builder's /team never shows it */
+  passwordLinks?: boolean }) {
   const router = useRouter();
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
@@ -56,7 +59,7 @@ export function TeamManager({ workspaceId, workspaceName, roles, members, invite
       <div className="tablewrap people">
         <table>
           <thead>
-            <tr><th>Person</th>{roles.map((r) => <th key={r.id}>{r.label}<small>{r.codename}</small></th>)}<th>Last seen</th><th /></tr>
+            <tr><th>Person</th>{roles.map((r) => <th key={r.id}>{r.label}<small>{r.codename}</small></th>)}<th>Last seen</th>{passwordLinks && <th>Password</th>}<th /></tr>
           </thead>
           <tbody>
             {members.map((m) => (
@@ -72,6 +75,7 @@ export function TeamManager({ workspaceId, workspaceName, roles, members, invite
                   </td>
                 ))}
                 <td className="muted">{day(m.last_seen_at)}</td>
+                {passwordLinks && <td><PasswordLink email={m.email} /></td>}
                 <td>{m.user_id !== meUid && !locked(m) && <button className="btn sm ghost danger" disabled={!!busy} onClick={() => confirm(`Remove ${m.email} from ${workspaceName}? Their chats and decks stay.`) && call(m.user_id, `/api/team/members?workspace_id=${encodeURIComponent(workspaceId)}&user_id=${m.user_id}`, { method: "DELETE" })}>Remove</button>}</td>
               </tr>
             ))}

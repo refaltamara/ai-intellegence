@@ -2,6 +2,7 @@
 /** Fair's people and their duties; Refal and Rafli tick and untick. */
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { PasswordLink } from "./PasswordLink";
 
 const DUTIES = [
   { id: "owner", label: "Owner", hint: "release, deploy, prices, people" },
@@ -27,7 +28,7 @@ export function StaffDuties({ people, canEdit, me }: { people: { id: string; ema
     <>
       <div className="tablewrap people">
         <table>
-          <thead><tr><th>Person</th>{DUTIES.map((d) => <th key={d.id}>{d.label}<small>{d.hint}</small></th>)}<th>Last sign-in</th></tr></thead>
+          <thead><tr><th>Person</th>{DUTIES.map((d) => <th key={d.id}>{d.label}<small>{d.hint}</small></th>)}<th>Last sign-in</th>{canEdit && <th>Password</th>}</tr></thead>
           <tbody>
             {people.map((p) => (
               <tr key={p.id}>
@@ -36,6 +37,7 @@ export function StaffDuties({ people, canEdit, me }: { people: { id: string; ema
                   <td key={d.id}><input type="checkbox" checked={p.staff.includes(d.id)} disabled={!canEdit || !!busy || (p.id === me && d.id === "owner")} onChange={() => toggle(p, d.id)} aria-label={`${p.email}: ${d.label}`} /></td>
                 ))}
                 <td className="muted">{p.last_seen_at ? new Date(p.last_seen_at).toLocaleDateString("en-GB", { day: "numeric", month: "short" }) : "not since 4 Oct"}</td>
+                {canEdit && <td><PasswordLink email={p.email} /></td>}
               </tr>
             ))}
           </tbody>

@@ -6,7 +6,8 @@
 export const SESSION_COOKIE = "fi_session";
 export const SESSION_DAYS = 30;
 
-export type SessionPayload = { uid: string; email: string; role: string; ws: string; exp: number };
+/** iat: when it was signed (cookies from before 8 Oct 2026 lack it; issuedAt() works it out from exp) */
+export type SessionPayload = { uid: string; email: string; role: string; ws: string; exp: number; iat?: number };
 
 function secret(): string {
   const s = process.env.AUTH_SECRET || process.env.CRON_SECRET;
@@ -22,11 +23,17 @@ async function key(): Promise<CryptoKey> {
   return crypto.subtle.importKey("raw", enc.encode(secret()), { name: "HMAC", hash: "SHA-256" }, false, ["sign", "verify"]);
 }
 
-export async function signSession(payload: Omit<SessionPayload, "exp">, days = SESSION_DAYS): Promise<string> {
-  const full: SessionPayload = { ...payload, exp: Math.floor(Date.now() / 1000) + days * 86400 };
+export async function signSession(payload: Omit<SessionPayload, "exp" | "iat">, days = SESSION_DAYS): Promise<string> {
+  const now = Math.floor(Date.now() / 1000);
+  const full: SessionPayload = { ...payload, iat: now, exp: now + days * 86400 };
   const body = b64u(enc.encode(JSON.stringify(full)));
   const sig = await crypto.subtle.sign("HMAC", await key(), enc.encode(body));
   return `${body}.${b64u(sig)}`;
+}
+
+/** When a session was signed, in seconds; an older cookie without iat was signed SESSION_DAYS before it expires. */
+export function issuedAt(p: SessionPayload): number {
+  return p.iat ?? p.exp - SESSION_DAYS * 86400;
 }
 
 export async function verifySession(token: string | undefined | null): Promise<SessionPayload | null> {
@@ -63,7 +70,7 @@ export function readCookie(cookieHeaderValue: string | null | undefined, name = 
 
 /** Paths that never require a session. The cron route has its own secret. */
 export function isPublicPath(pathname: string): boolean {
-  return pathname === "/login" || pathname === "/api/health" || pathname.startsWith("/invite/") || pathname === "/api/invites/accept" || pathname.startsWith("/api/auth/") || pathname.startsWith("/api/cron/") || pathname.startsWith("/_next/") || pathname.startsWith("/fonts/") || pathname === "/favicon.ico" || pathname.startsWith("/icon") ||
+  return pathname === "/login" || pathname === "/reset" || pathname.startsWith("/reset/") || pathname === "/api/health" || pathname.startsWith("/invite/") || pathname === "/api/invites/accept" || pathname.startsWith("/api/auth/") || pathname.startsWith("/api/cron/") || pathname.startsWith("/_next/") || pathname.startsWith("/fonts/") || pathname === "/favicon.ico" || pathname.startsWith("/icon") ||
     // the connector: discovery, client registration, tokens and the MCP endpoint authenticate with OAuth, not the cookie
     pathname.startsWith("/.well-known/") || pathname === "/api/oauth/register" || pathname === "/api/oauth/token" || pathname === "/api/mcp";
 }

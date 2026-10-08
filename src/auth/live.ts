@@ -9,7 +9,9 @@
 import { sql } from "../db/client";
 import { forgetActors } from "./accounts";
 
-export type LiveUser = { id: string; email: string; role: string; workspace_id: string };
+export type LiveUser = { id: string; email: string; role: string; workspace_id: string; password_set_at: string | null };
+/** clocks on the database and the app may differ a little; a session this close to a password change still passes */
+const CLOCK_SLACK_S = 30;
 
 const TTL_MS = 30 * 1000;
 const cache = new Map<string, { at: number; user: LiveUser | null }>();
@@ -18,16 +20,22 @@ export async function liveUser(uid: string): Promise<LiveUser | null> {
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(uid)) return null;
   const hit = cache.get(uid);
   if (hit && Date.now() - hit.at < TTL_MS) return hit.user;
-  const rows = (await sql.query("select u.id, a.email, case when cardinality(a.staff) > 0 then 'staff' else 'member' end as role, u.workspace_id from users u join accounts a on a.id = u.account_id where u.id = $1 and a.password_hash is not null and (cardinality(a.staff) > 0 or exists (select 1 from users m join workspaces w on w.id = m.workspace_id where m.account_id = a.id and w.status = 'live'))", [uid])) as LiveUser[];
+  const rows = (await sql.query("select u.id, a.email, case when cardinality(a.staff) > 0 then 'staff' else 'member' end as role, u.workspace_id, a.password_set_at from users u join accounts a on a.id = u.account_id where u.id = $1 and a.password_hash is not null and (cardinality(a.staff) > 0 or exists (select 1 from users m join workspaces w on w.id = m.workspace_id where m.account_id = a.id and w.status = 'live'))", [uid])) as LiveUser[];
   const user = rows[0] ?? null;
   cache.set(uid, { at: Date.now(), user });
   return user;
 }
 
-/** For the request gate: a database hiccup must not lock everyone out, so only a definite "gone" says no. */
-export async function stillActive(uid: string): Promise<boolean> {
+/**
+ * For the request gate: a database hiccup must not lock everyone out, so only a definite "gone" says no.
+ * A session signed in before the account's password was last set (a reset) no longer passes.
+ */
+export async function stillActive(uid: string, issuedAt?: number): Promise<boolean> {
   try {
-    return (await liveUser(uid)) != null;
+    const u = await liveUser(uid);
+    if (!u) return false;
+    if (issuedAt != null && u.password_set_at && issuedAt + CLOCK_SLACK_S < Date.parse(u.password_set_at) / 1000) return false;
+    return true;
   } catch {
     return true;
   }

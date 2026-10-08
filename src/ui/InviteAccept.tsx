@@ -21,7 +21,7 @@ export function InviteAccept({ token, email, name, workspace, invitedBy, teams, 
     else setJoined(true);
   }
   if (joined) {
-    return <div className="card"><h2>You&apos;re in</h2><p>{workspace} is now on your account. Sign in with your usual password and pick the team.</p><a className="btn pri" href="/login">Sign in</a></div>;
+    return <div className="card"><h2>You&apos;re in</h2><p>{workspace} is now on your account. Sign in with your usual password and pick the team. Forgot it? <a href="/reset">Get a link to set a new one</a>.</p><a className="btn pri" href="/login">Sign in</a></div>;
   }
   return (
     <form onSubmit={submit} className="card">
@@ -35,7 +35,7 @@ export function InviteAccept({ token, email, name, workspace, invitedBy, teams, 
       )}
       {error && <div className="errbox">{error}</div>}
       <button className="btn pri" type="submit" disabled={busy}>{busy ? "Joining…" : hasAccount ? "Add to my account" : "Join"}</button>
-      {hasAccount && <p>You already have an account; you&apos;ll sign in with your own password next.</p>}
+      {hasAccount && <p>You already have an account; you&apos;ll sign in with your own password next. Forgot it? <a href="/reset">Get a link to set a new one</a>.</p>}
     </form>
   );
 }

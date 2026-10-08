@@ -33,7 +33,7 @@ export default async function AdminPeople({ searchParams }: { searchParams: Prom
         <h3 className="subh">Clients</h3>
         <div className="cats">{workspaces.map((w) => <Link key={w.id} href={`/admin/people?ws=${w.id}`} className={w.id === ws ? "on" : ""}>{w.name}</Link>)}</div>
         {ws && actor && (
-          <TeamManager workspaceId={ws} workspaceName={cfg?.name ?? ws} roles={roles} members={members} invites={invites} canBuilders={can(actor, "workspace.builders", { workspace: ws })} meUid={actor.uid} />
+          <TeamManager workspaceId={ws} workspaceName={cfg?.name ?? ws} roles={roles} members={members} invites={invites} canBuilders={can(actor, "workspace.builders", { workspace: ws })} meUid={actor.uid} passwordLinks={can(actor, "workspace.builders", { workspace: ws })} />
         )}
       </div>
     </section>

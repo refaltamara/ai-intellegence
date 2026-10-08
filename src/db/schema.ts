@@ -71,10 +71,32 @@ export const accounts = pgTable("accounts", {
   email: text("email").notNull().unique(),
   name: text("name"),
   passwordHash: text("password_hash"),
+  /** when the password was last set; sessions signed in before it no longer pass (src/auth/live.ts) */
+  passwordSetAt: ts("password_set_at"),
   staff: text("staff").array().notNull().default(sql`'{}'::text[]`),
   lastSeenAt: ts("last_seen_at"),
   createdAt: createdAt(),
 });
+
+/**
+ * A one-time link to set a new password (src/auth/passwordLinks.ts): made by Fair from the CMS
+ * (People) or by the person from "Forgot your password?". Only the hash of the token is kept;
+ * a link works once and expires. Account-level, like accounts: no workspace.
+ */
+export const passwordLinks = pgTable(
+  "password_links",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    accountId: uuid("account_id").notNull().references(() => accounts.id, { onDelete: "cascade" }),
+    tokenHash: text("token_hash").notNull().unique(),
+    /** the email of whoever asked for it ("self" from the sign-in page) */
+    createdBy: text("created_by").notNull(),
+    expiresAt: ts("expires_at").notNull(),
+    usedAt: ts("used_at"),
+    createdAt: createdAt(),
+  },
+  (t) => [index("password_links_account_idx").on(t.accountId, t.createdAt)],
+);
 
 /**
  * A membership: one account in one workspace (since 4 Oct 2026; before that a row was
