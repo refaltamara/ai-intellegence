@@ -294,6 +294,8 @@ export const posts = pgTable(
     index("posts_workspace_platform_posted_idx").on(t.workspaceId, t.platform, t.postedAt),
     index("posts_hashtags_gin").using("gin", t.hashtags),
     index("posts_caption_tsv_gin").using("gin", t.captionTsv),
+    // the few posts set aside as not about their brand: comment queries skip their comments without reading every post
+    index("posts_not_relevant_idx").on(t.id).where(sql`${t.relevant} = false`),
     check("posts_platform_chk", sql`${t.platform} in ('tiktok','instagram','threads','x','youtube')`),
     check("posts_source_chk", sql`${t.source} in ('owned','earned')`),
     check("posts_tier_chk", sql`${t.tier} is null or ${t.tier} in ('nano','micro','mid','macro','mega')`),

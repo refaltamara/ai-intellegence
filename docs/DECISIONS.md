@@ -592,3 +592,29 @@ Clients pay for CeMO with their credits, so every team can change how the produc
 - **The person asks for one** from the sign-in page ("Forgot your password?", `/reset`). It goes by email only and works for two hours. The answer is the same whether or not the email has an account, and there are at most three an hour.
 
 A new link replaces any the account still had open. Setting the password spends the link and sets `accounts.password_set_at`; sessions signed before it stop passing the request gate (`iat` in the cookie, `stillActive`, 30 seconds' slack between clocks). The invite page points an existing account to "Forgot your password?" too. Audit: `password_link`, `password_link_requested`, `password_set`.
+
+## Page speed: statistics, the Pulse's queries, functions next to the database (Refal, 8 Oct 2026)
+
+**What was slow.** Opening Kahf took over a minute: the PR dashboard spent 79 s in the database and the Pulse 57 s. Beauty was slow too, though less.
+
+**Why.** Three things, none of them the data's size; the whole database is under 1 GB.
+- **Stale statistics.** Postgres re-reads a table's statistics after 10% of it changes. `posts` has 300K rows, so the 2,700 Kahf posts never triggered it. The planner believed Kahf had about 29 posts and chose plans that re-read every Kahf post once per post: 8 s a query, 47 queries.
+- **Per-hour lookups on the Pulse.** Three Pulse queries counted each hour or each commenter with a lookup over the whole workspace, 300 to 20,000 times over: 29 s, 11 s and 3 s.
+- **One query after another.** The Pulse ran its 70 queries in sequence.
+
+**What we do.**
+- Every load ends with `analyze posts, comments, creators` (`src/db/refresh.sql`, run by every loader and by the CMS onboarding).
+- `posts` and `comments` re-read their statistics after 2% of rows change (migration 0029).
+- The Pulse counts per hour once and joins (`src/pulse/page.ts`). Seeding carries a post's platform instead of looking it up per commenter (`src/skills/seeding.ts`); its sample comments now break ties the same way every time.
+- The Pulse's independent parts run side by side.
+- Comment queries skip posts set aside as off-topic through a small partial index (`posts_not_relevant_idx`, migration 0029), instead of reading all 541 MB of posts each time.
+- Vercel functions run in `cle1` (Cleveland, `vercel.json`), the same AWS region as the Neon database (us-east-2, Ohio). Each page makes dozens of database round trips; from Singapore each one would cost about 200 ms.
+
+**Measured** (from a sandbox about 60–500 ms from the database, so a page on Vercel is quicker):
+- Kahf PR dashboard: 79 s → 3.5 s.
+- Kahf Pulse: 57 s → about 5 s.
+- Beauty dashboard: about 3 s.
+
+The numbers are unchanged. The Pulse's output was compared field by field: only which sample comment shows among comments tied on likes differs.
+
+**For new queries.** Never count per hour or per day with a subquery over the workspace; group once and join. Never write `(select … limit 1)` per row over a CTE.

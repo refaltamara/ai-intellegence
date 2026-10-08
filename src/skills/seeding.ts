@@ -44,12 +44,13 @@ export const seeding: SkillImpl = async (db, ctx, _def, params) => {
        from c group by author_handle having count(*) >= ${pMinR} and count(distinct post_id) >= 2
      ),
      firsts as (
-       select post_id, author_handle, min(posted_at) as first_here, count(*) over (partition by author_handle) as author_total
+       -- a post's comments share its platform, so it rides along here instead of a lookup per row
+       select post_id, author_handle, min(posted_at) as first_here, min(platform) as platform, count(*) over (partition by author_handle) as author_total
        from c group by post_id, author_handle
      ),
      only_once as (
        select post_id, author_handle, first_here from firsts f
-       where author_total = 1 and (select x.platform from c x where x.post_id = f.post_id limit 1) <> 'youtube'
+       where author_total = 1 and f.platform <> 'youtube'
      ),
      burst as (
        -- how many first-time commenters land on this post within the window, counted with a
@@ -65,7 +66,7 @@ export const seeding: SkillImpl = async (db, ctx, _def, params) => {
               row_number() over (partition by b.post_id order by b.authors desc, b.first_at) as rn
        from (
          select bb.post_id, bb.first_here as first_at, bb.authors,
-                (select (array_agg(x.id order by x.likes desc))[1:3] from c x
+                (select (array_agg(x.id order by x.likes desc, x.posted_at, x.id))[1:3] from c x
                   where x.post_id = bb.post_id and x.posted_at >= bb.first_here and x.posted_at < bb.first_here + (${pBurstMin} || ' minutes')::interval) as sample_ids,
                 (select count(*) from c x
                   where x.post_id = bb.post_id and x.posted_at >= bb.first_here and x.posted_at < bb.first_here + (${pBurstMin} || ' minutes')::interval and x.sentiment = 'negative')::int as negative,
