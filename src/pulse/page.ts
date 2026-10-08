@@ -115,31 +115,41 @@ async function build(ws: string): Promise<PulseData | null> {
   const headPart = async () => {
     const subject = (await db.one<{ name: string }>("select b.name from workspaces w join brands b on b.id = w.client_brand_id where w.id = $1", [ws]))?.name ?? cfg.name;
 
+    // one pass over the comments (with their post's source) and one over the posts, not a scan per number
     const totals = await db.one<PulseData["totals"]>(
-      `select (select count(*) from posts where workspace_id = $1 and content_type is distinct from 'stub' and relevant is not false)::int as posts,
-              (select count(*) from posts where workspace_id = $1 and source = 'earned' and content_type is distinct from 'stub' and relevant is not false)::int as earned_posts,
-              (select count(*) from comments where workspace_id = $1 and sentiment_source is distinct from 'subject')::int as comments,
-              (select count(*) from comments where workspace_id = $1 and sentiment is not null)::int as labelled,
-              (select count(*) from comments where workspace_id = $1 and sentiment = 'negative')::int as negative,
-              (select count(*) from comments where workspace_id = $1 and sentiment = 'neutral')::int as neutral,
-              (select count(*) from comments where workspace_id = $1 and sentiment = 'positive')::int as positive,
-              (select count(distinct (platform, author_handle)) from comments where workspace_id = $1 and sentiment_source is distinct from 'subject')::int as accounts,
+      `with cc as (
+         select count(*) filter (where c.sentiment_source is distinct from 'subject')::int as comments,
+                count(*) filter (where c.sentiment is not null)::int as labelled,
+                count(*) filter (where c.sentiment = 'negative')::int as negative,
+                count(*) filter (where c.sentiment = 'neutral')::int as neutral,
+                count(*) filter (where c.sentiment = 'positive')::int as positive,
+                count(distinct (c.platform, c.author_handle)) filter (where c.sentiment_source is distinct from 'subject')::int as accounts,
+                count(distinct c.post_id)::int as posts_with_comments,
+                count(*) filter (where c.off_topic)::int as off_topic,
+                count(*) filter (where c.sentiment_source is distinct from 'subject' and not coalesce(c.off_topic, false))::int as on_topic,
+                count(*) filter (where not coalesce(c.off_topic, false) and c.sentiment is not null)::int as on_topic_labelled,
+                count(*) filter (where not coalesce(c.off_topic, false) and c.sentiment = 'negative')::int as on_topic_negative,
+                count(*) filter (where not coalesce(c.off_topic, false) and c.sentiment = 'positive')::int as on_topic_positive,
+                count(*) filter (where c.sentiment_source is distinct from 'subject' and not coalesce(c.off_topic, false) and p.source = 'owned')::int as owned_comments,
+                count(*) filter (where not coalesce(c.off_topic, false) and c.sentiment = 'negative' and p.source = 'owned')::int as owned_negative,
+                count(*) filter (where c.sentiment_source is distinct from 'subject' and not coalesce(c.off_topic, false) and p.source = 'earned')::int as earned_comments,
+                count(*) filter (where not coalesce(c.off_topic, false) and c.sentiment = 'negative' and p.source = 'earned')::int as earned_negative
+         from comments c left join posts p on p.id = c.post_id where c.workspace_id = $1),
+       pp as (
+         select count(*)::int as posts,
+                count(*) filter (where source = 'earned')::int as earned_posts,
+                count(*) filter (where source = 'earned' and stance is not null)::int as posts_stance_labelled,
+                count(*) filter (where source = 'earned' and stance = 'negative')::int as posts_against,
+                count(*) filter (where source = 'earned' and stance = 'neutral')::int as posts_neutral,
+                count(*) filter (where source = 'earned' and stance = 'positive')::int as posts_for,
+                count(*) filter (where source = 'earned' and caption is null)::int as posts_no_caption
+         from posts where workspace_id = $1 and content_type is distinct from 'stub' and relevant is not false)
+       select pp.posts, pp.earned_posts, cc.comments, cc.labelled, cc.negative, cc.neutral, cc.positive, cc.accounts,
               (select count(distinct platform) from (select platform from comments where workspace_id = $1 union select platform from posts where workspace_id = $1 and relevant is not false) x)::int as platforms,
-              (select count(distinct post_id) from comments where workspace_id = $1)::int as posts_with_comments,
-              (select count(*) from comments where workspace_id = $1 and off_topic)::int as off_topic,
-              (select count(*) from comments where workspace_id = $1 and sentiment_source is distinct from 'subject' and not coalesce(off_topic, false))::int as on_topic,
-              (select count(*) from comments where workspace_id = $1 and not coalesce(off_topic, false) and sentiment is not null)::int as on_topic_labelled,
-              (select count(*) from comments where workspace_id = $1 and not coalesce(off_topic, false) and sentiment = 'negative')::int as on_topic_negative,
-              (select count(*) from comments where workspace_id = $1 and not coalesce(off_topic, false) and sentiment = 'positive')::int as on_topic_positive,
-              (select count(*) from comments c join posts p on p.id = c.post_id where c.workspace_id = $1 and c.sentiment_source is distinct from 'subject' and not coalesce(c.off_topic, false) and p.source = 'owned')::int as owned_comments,
-              (select count(*) from comments c join posts p on p.id = c.post_id where c.workspace_id = $1 and not coalesce(c.off_topic, false) and c.sentiment = 'negative' and p.source = 'owned')::int as owned_negative,
-              (select count(*) from comments c join posts p on p.id = c.post_id where c.workspace_id = $1 and c.sentiment_source is distinct from 'subject' and not coalesce(c.off_topic, false) and p.source = 'earned')::int as earned_comments,
-              (select count(*) from comments c join posts p on p.id = c.post_id where c.workspace_id = $1 and not coalesce(c.off_topic, false) and c.sentiment = 'negative' and p.source = 'earned')::int as earned_negative,
-              (select count(*) from posts where workspace_id = $1 and source = 'earned' and content_type is distinct from 'stub' and relevant is not false and stance is not null)::int as posts_stance_labelled,
-              (select count(*) from posts where workspace_id = $1 and source = 'earned' and content_type is distinct from 'stub' and relevant is not false and stance = 'negative')::int as posts_against,
-              (select count(*) from posts where workspace_id = $1 and source = 'earned' and content_type is distinct from 'stub' and relevant is not false and stance = 'neutral')::int as posts_neutral,
-              (select count(*) from posts where workspace_id = $1 and source = 'earned' and content_type is distinct from 'stub' and relevant is not false and stance = 'positive')::int as posts_for,
-              (select count(*) from posts where workspace_id = $1 and source = 'earned' and content_type is distinct from 'stub' and relevant is not false and caption is null)::int as posts_no_caption`,
+              cc.posts_with_comments, cc.off_topic, cc.on_topic, cc.on_topic_labelled, cc.on_topic_negative, cc.on_topic_positive,
+              cc.owned_comments, cc.owned_negative, cc.earned_comments, cc.earned_negative,
+              pp.posts_stance_labelled, pp.posts_against, pp.posts_neutral, pp.posts_for, pp.posts_no_caption
+       from cc, pp`,
       [ws],
     );
     const asOfRow = await db.one<{ c: string; p: string }>(`select to_char((select max(posted_at) from comments where workspace_id = $1) at time zone $2, 'YYYY-MM-DD HH24:MI') as c, to_char((select max(posted_at) from posts where workspace_id = $1 and source = 'earned') at time zone $2, 'YYYY-MM-DD HH24:MI') as p`, [ws, tz]);

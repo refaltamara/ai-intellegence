@@ -41,10 +41,10 @@ export function Sidebar({ recent, user, product, teams, currentWorkspace, curren
     if (t.key === team?.key) return;
     setSwitching(t.key);
     const r = await fetch("/api/workspace/switch", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ workspace_id: t.workspace_id, role: t.role }) });
-    setSwitching(null);
-    if (!r.ok) return;
-    router.push(t.home);
-    router.refresh();
+    // the switching mark stays until the new team's page replaces this one
+    if (!r.ok) return setSwitching(null);
+    // one full load: push + refresh drew the new team's page twice (the second time with the sidebar)
+    window.location.assign(t.home);
   }
   const active = (href: string) => (href === "/" ? path === "/" : path.startsWith(href));
   const team = teams.find((t) => t.workspace_id === currentWorkspace && t.role === currentRole) ?? teams.find((t) => t.workspace_id === currentWorkspace);

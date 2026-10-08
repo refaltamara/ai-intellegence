@@ -1,11 +1,9 @@
 "use client";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { TeamChoice } from "@/workspace/teams";
 import { TeamIcon } from "./TeamIcon";
 
 export function TeamPicker({ teams, email, next }: { teams: TeamChoice[]; email: string; next: string | null }) {
-  const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState("");
   async function choose(t: TeamChoice) {
@@ -17,8 +15,8 @@ export function TeamPicker({ teams, email, next }: { teams: TeamChoice[]; email:
       setError((await r.json().catch(() => ({}))).error ?? "Could not switch");
       return;
     }
-    router.push(next ?? t.home);
-    router.refresh();
+    // one full load, not push + refresh (which drew the page twice)
+    window.location.assign(next ?? t.home);
   }
   return (
     <div className="login persona">
