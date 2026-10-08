@@ -579,3 +579,16 @@ Clients pay for CeMO with their credits, so every team can change how the produc
 **The Pulse asks CeMO.** A case's Pulse (`/pulse`, the hour-by-hour crisis view) had three "Ask why" links at the bottom that only filled the Chats box, so there was no visible way to ask CeMO from it. It now has an ask box under the headline numbers and "Ask CeMO" on every card. Both open Chats with a reference to the Pulse (`k: "pulse"`, `card`; `pulseAskHref` in `src/dashboard/askref.ts`), never its numbers. The server reads the figures again from `pulsePage` (`src/pulse/ask.ts`), shows them in a "From the Pulse" card above the question and tells CeMO they came from the Pulse. A question typed in the box is sent at once (`go=1`); a card's link fills in a question for that card and waits. Learning: `pulse.ask` (card, typed).
 
 **A run of days in New deck.** The first-version picker of a day by day deck hid "Choose dates…" at the end of a list of single days. Every PR deck (day, week or month) now shows two buttons, "One day" and "Several days" (or "One week"/"One month" and "Chosen dates"). "Several days" starts at the last three days the data covers (6–8 Oct when the data runs to 8 Oct) and says how many days it covers. The deck page's "New version" uses the same picker. The picker no longer sits inside a `<label>`, which would pass a click on its text to the first button. A run of days makes the first version; a repeating deck then makes one day (or week, or month) each.
+
+## Password links (Refal, 8 Oct 2026)
+
+**What was missing.** An invitation asks a new person to choose a password, but someone whose email already had an account joins with the password they have, and nobody could reset a forgotten one (Laily's, 7 Oct). There was no way to set a password from the CMS and no "Forgot your password?".
+
+**What we do.** Nobody types a password for someone else, so Fair never knows anyone's password. There are two ways to get a one-time link to set a new one (`password_links`, migration 0028; `src/auth/passwordLinks.ts`):
+- **Fair makes one** from CMS → People → "Password link". It is shown to copy into a chat (WhatsApp) and emailed when email is set up. It works once, for 24 hours.
+  - Refal or Rafli can make one for anyone.
+  - Data ops can make one for a client account, when they look after every workspace it belongs to.
+  - A Builder's /team page has no such button: a Builder could otherwise take over an account that reaches other workspaces. Builders send Members to "Forgot your password?".
+- **The person asks for one** from the sign-in page ("Forgot your password?", `/reset`). It goes by email only and works for two hours. The answer is the same whether or not the email has an account, and there are at most three an hour.
+
+A new link replaces any the account still had open. Setting the password spends the link and sets `accounts.password_set_at`; sessions signed before it stop passing the request gate (`iat` in the cookie, `stillActive`, 30 seconds' slack between clocks). The invite page points an existing account to "Forgot your password?" too. Audit: `password_link`, `password_link_requested`, `password_set`.

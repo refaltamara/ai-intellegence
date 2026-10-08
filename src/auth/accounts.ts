@@ -86,8 +86,9 @@ async function allRoles(ws: string, level: Level): Promise<Partial<Record<RoleId
 export async function ensureMember(o: { email: string; name?: string | null; workspaceId: string; levels?: Partial<Record<RoleId, Level>>; password?: string; staff?: Duty[]; invitedBy?: string | null }): Promise<{ account_id: string; user_id: string }> {
   const email = o.email.trim().toLowerCase();
   const acc = (await sql.query(
-    `insert into accounts (email, name, password_hash, staff) values ($1, $2, $3, $4::text[])
+    `insert into accounts (email, name, password_hash, password_set_at, staff) values ($1, $2, $3, case when $3::text is null then null else now() end, $4::text[])
      on conflict (email) do update set name = coalesce(accounts.name, excluded.name), password_hash = coalesce(excluded.password_hash, accounts.password_hash),
+       password_set_at = case when excluded.password_hash is null then accounts.password_set_at else now() end,
        staff = (select array(select distinct unnest(accounts.staff || excluded.staff)))
      returning id`,
     [email, o.name ?? null, o.password ? hashPassword(o.password) : null, o.staff ?? []],
@@ -179,7 +180,8 @@ export async function setStaff(accountId: string, staff: Duty[]): Promise<boolea
 }
 
 export async function setAccountPassword(email: string, password: string): Promise<boolean> {
-  const rows = (await sql.query("update accounts set password_hash = $2 where email = lower($1) returning id", [email.trim(), hashPassword(password)])) as unknown[];
+  // sessions signed in before this stop passing the request gate (src/auth/live.ts)
+  const rows = (await sql.query("update accounts set password_hash = $2, password_set_at = now() where email = lower($1) returning id", [email.trim(), hashPassword(password)])) as unknown[];
   forgetActors();
   return rows.length > 0;
 }

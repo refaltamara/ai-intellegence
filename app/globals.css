@@ -833,13 +833,14 @@ th{background:linear-gradient(180deg,#F8FAFE,#F4F7FC)}
 .login::after{width:480px;height:480px;right:-120px;bottom:-160px;background:rgba(30,94,255,.2);animation-delay:-10s}
 .login .box{width:100%;max-width:400px;position:relative;z-index:1;animation:rise .6s var(--ease) both}
 .login .brand{margin-bottom:20px}
-.login form{padding:26px;display:grid;gap:14px;border-radius:20px;box-shadow:0 24px 60px -30px rgba(15,27,45,.35);border-color:rgba(231,236,244,.9);background:rgba(255,255,255,.88);backdrop-filter:blur(10px)}
+.login form,.login div.card{padding:26px;display:grid;gap:14px;border-radius:20px;box-shadow:0 24px 60px -30px rgba(15,27,45,.35);border-color:rgba(231,236,244,.9);background:rgba(255,255,255,.88);backdrop-filter:blur(10px)}
 .login h2{font-size:20px;font-weight:800;letter-spacing:-.02em}
 .login label{display:grid;gap:5px;font-size:12px;color:var(--text-3);font-weight:600}
 .login input{font:inherit;font-size:14px;padding:11px 13px;border:1px solid var(--line-2);border-radius:11px;background:#fff;width:100%;transition:border-color .2s var(--ease),box-shadow .2s var(--ease)}
 .login input:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 4px var(--blue-10)}
 .login .btn.pri{padding:11px 14px;font-size:14px}
 .login p{font-size:12px;color:var(--text-3)}
+.login div.card .btn{justify-self:start}
 
 /* ---------- teams: chosen at sign-in, switched at the top of the sidebar ---------- */
 .teamswitch{display:flex;gap:3px;padding:3px;background:rgba(255,255,255,.7);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow-xs);margin-top:-6px}
@@ -1782,3 +1783,9 @@ tr.warnrow td{background:#FFFBF0}
 .cwcheck{display:inline-flex;gap:6px;align-items:center;font-size:13px;color:var(--text-2);flex-wrap:wrap}
 .cwpending{padding:10px 12px;border:1px solid var(--violet-10);border-radius:12px;background:var(--violet-10)}
 .cwpending .crow{background:#fff}
+
+/* a one-time password link in CMS → People (src/ui/admin/PasswordLink.tsx) */
+.pwlink{display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap;max-width:360px}
+.pwlink input{font:inherit;font-size:11.5px;padding:4px 7px;border:1px solid var(--line-2);border-radius:8px;background:var(--surface);color:var(--text-2);width:200px;min-width:0}
+.pwlink small{font-size:11px}
+.pwlink .err{color:var(--red)}

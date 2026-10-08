@@ -17,6 +17,7 @@ What gets dropped, and reported per file:
   contents  - listed in drop_urls (captured wrong, e.g. a different singer; or a reply the posts
               export took for a post: with "parent", it counts as a comment and what was said under
               it moves to the parent post)
+            - from an account that only replies (reply_handles, e.g. Meta AI on Threads)
             - link spam (spam_min_links or more links in the caption, spam_platforms only)
             - no subject keyword in the caption, on keyword_platforms only
               (Threads replies rarely repeat the name, so Threads is exempt)
@@ -234,6 +235,9 @@ class Profile:
                 self.drop[canon_url(d["url"], p)] = d.get("reason", "listed in drop_urls")
                 if d.get("parent"):
                     self.reply_parent[canon_url(d["url"], p)] = canon_url(d["parent"], p)
+        # accounts whose rows in a posts export are always replies, never posts (Meta AI answers
+        # only when tagged under someone's post); their comments still load as comments
+        self.reply_handles = {p: {norm_handle(h) for h in hs} for p, hs in c.get("reply_handles", {}).items()}
         self.files = c["files"]
         self.data_dir = ROOT / c.get("data_dir", "data/raw")
         self.root_url = c.get("root_url")
@@ -258,6 +262,8 @@ class Profile:
     def why_drop(self, platform, url, handle, caption):
         if url in self.drop:
             return self.drop[url]
+        if handle in self.reply_handles.get(platform, ()):
+            return f"@{handle} only replies: a comment, not a post (reply_handles)"
         if self.is_owned(platform, handle):
             return None
         if self.spam_min_links and platform in self.spam_platforms and len(LINK.findall(caption or "")) >= self.spam_min_links:

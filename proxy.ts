@@ -4,7 +4,7 @@
  */
 import { NextResponse, type NextRequest } from "next/server";
 import { stillActive } from "@/auth/live";
-import { clearCookieHeader, isPublicPath, readCookie, verifySession } from "@/auth/session";
+import { clearCookieHeader, isPublicPath, issuedAt, readCookie, verifySession } from "@/auth/session";
 
 export default async function proxy(req: NextRequest) {
   const { pathname, search } = req.nextUrl;
@@ -14,7 +14,7 @@ export default async function proxy(req: NextRequest) {
   const pass = () => NextResponse.next({ request: { headers } });
   if (isPublicPath(pathname)) return pass();
   const session = await verifySession(readCookie(req.headers.get("cookie")));
-  if (session && (await stillActive(session.uid))) return pass();
+  if (session && (await stillActive(session.uid, issuedAt(session)))) return pass();
   const res = pathname.startsWith("/api/")
     ? NextResponse.json({ error: "unauthorized" }, { status: 401 })
     : (() => {
