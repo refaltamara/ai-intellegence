@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { historyTurns } from "../../chat/loop";
 import { contextPreamble } from "../ask";
-import { askHref, decodeAsk, encodeAsk, validAsk, type AskContext, type AskRef } from "../askref";
+import { askHref, decodeAsk, encodeAsk, pulseAskHref, validAsk, type AskContext, type AskRef } from "../askref";
 import { caveatsFor, change, filterQuery, readContentQuery, readFilters, unescapeUnicode } from "../data";
 import { daysCovered, monthOf, parsePeriod, periodOptions, shiftPeriod, weekOf } from "../period";
 
@@ -98,5 +98,21 @@ describe("Ask why references", () => {
     const { messages } = historyTurns([{ role: "user", content_json: { text: "Why did it jump?", context: c } }, { role: "assistant", content_json: { text: "Because." } }]);
     expect(String(messages[0].content)).toContain("looking at: Skintific");
     expect(String(messages[0].content)).toContain("Why did it jump?");
+  });
+});
+
+describe("Ask CeMO from the Pulse", () => {
+  it("carries only the card, and refuses any other", () => {
+    const ref = decodeAsk(pulseAskHref("themes").split("ask=")[1]);
+    expect(ref).toEqual({ k: "pulse", card: "themes", platform: "all", brands: [], period: "" });
+    expect(validAsk({ k: "pulse", card: "drop table" })).toBeNull();
+    expect(validAsk({ k: "pulse", card: "now", brands: ["x"], period: "2026-06", numbers: [1] })).toEqual({ k: "pulse", card: "now", platform: "all", brands: [], period: "" });
+  });
+  it("tells CeMO the figures came from the Pulse", () => {
+    const c: AskContext = { source: "pulse", title: "How it is going", scope: "Posts through 2026-10-08 06:00", facts: [{ label: "Last six hours", value: "112 comments about the case" }], back: "/pulse", question: "Is it cooling down?" };
+    const text = contextPreamble(c);
+    expect(text).toContain("from the Pulse");
+    expect(text).toContain("Last six hours: 112 comments about the case");
+    expect(text).not.toContain("from the dashboard");
   });
 });

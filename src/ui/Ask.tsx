@@ -50,13 +50,15 @@ type Props = {
   skills?: SkillOption[];
   /** "Ask why" from the dashboard: the click, and the figures the server read for it */
   fromDashboard?: { ref: AskRef; context: AskContext } | null;
+  /** the question was typed where the figures were (the Pulse's ask box): send it at once */
+  autoSend?: boolean;
   /** the team's role (its codename on cards), and whether this person may switch Builder mode on */
   team?: { codename: string; builder: boolean } | null;
 };
 
 const DEFAULT_COPY = { hero_title: "What's happening in Indonesian beauty?", hero_intro: "", suggested: ["What were competitors doing last week?", "Which brand grew fastest this month?", "Which campaigns ran in the last 90 days with 20 or more creators?", "Find 50 nano creators competitors used on TikTok in the last 90 days"], label: "Beauty · Indonesia", kind: "category" };
 
-export function Ask({ initialConversation, initialMessages, prefill, stats, clientName, decisionId = null, basePath = "/", initialSend, topbar = true, pane, copy = DEFAULT_COPY, skills = [], fromDashboard = null, team = null }: Props) {
+export function Ask({ initialConversation, initialMessages, prefill, stats, clientName, decisionId = null, basePath = "/", initialSend, topbar = true, pane, copy = DEFAULT_COPY, skills = [], fromDashboard = null, autoSend = false, team = null }: Props) {
   const router = useRouter();
   const [conversationId, setConversationId] = useState<string | null>(initialConversation);
   const [thread, setThread] = useState<Msg[]>(() => {
@@ -163,6 +165,7 @@ export function Ask({ initialConversation, initialMessages, prefill, stats, clie
   const sentInitial = useRef(false);
   useEffect(() => {
     if (initialSend && !sentInitial.current && thread.length === 0) { sentInitial.current = true; void send(initialSend.prompt, initialSend.followup); }
+    else if (autoSend && prefill && !sentInitial.current && thread.length === 0) { sentInitial.current = true; void send(prefill); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" }); }, [thread.length, busy]);

@@ -5,6 +5,8 @@ import { Chart } from "@/ui/Chart";
 import { TrendChart } from "@/ui/TrendChart";
 import { fmtNum } from "@/ui/format";
 import { PLATFORM_LABEL } from "@/skills/common";
+import { pulseAskHref, type PulseCard } from "@/dashboard/askref";
+import { PulseAsk } from "@/ui/pulse/PulseAsk";
 
 const label = (p: string) => PLATFORM_LABEL[p] ?? p;
 const pct = (a: number, b: number) => (b > 0 ? Math.round((a / b) * 100) : null);
@@ -30,7 +32,6 @@ export function PulsePage({ d, title = "Dashboard" }: { d: PulseData; title?: st
   const driverRows = d.drivers.rows as { url: string; platform: string; account: string; source: string; stance: string | null; views: number | null; comments: number; negative: number; positive: number; unlabelled: number; caption: string | null; posted_at: string }[];
   const againstPct = pct(t.posts_against, t.posts_stance_labelled);
   const lag = d.postsAsOf && d.asOf && d.postsAsOf > d.asOf;
-  const ask = (q: string) => `/?q=${encodeURIComponent(q)}`;
   return (
     <section className="screen">
       <div className="topbar">
@@ -45,10 +46,12 @@ export function PulsePage({ d, title = "Dashboard" }: { d: PulseData; title?: st
           <div className="stat"><b>{fmtNum(t.earned_posts)}</b><span>posts by other accounts about {d.subject}{sum.spike_started ? ` · comments spiked ${when(sum.spike_started, sum.bucket === "day")}` : ""}</span></div>
         </div>
 
+        <PulseAsk subject={d.subject} />
+
         <Now d={d} />
 
         <div className="card" style={{ marginBottom: 12 }}>
-          <h4>Comments per hour, and which way they lean <span>{trendSpan(d)} · WIB · bars are volume, the three lines are shares of the blue bar</span></h4>
+          <h4>Comments per hour, and which way they lean <span>{trendSpan(d)} · WIB · bars are volume, the three lines are shares of the blue bar</span><AskWhy card="trend" /></h4>
           <div className="body">
             <TrendChart
               x={d.trend.points.map((p) => p.h)}
@@ -70,7 +73,7 @@ export function PulsePage({ d, title = "Dashboard" }: { d: PulseData; title?: st
         </div>
 
         <div className="card" style={{ marginBottom: 12 }}>
-          <h4>Posts about {d.subject} per hour, by stance <span>what other accounts publish, not the replies under it</span></h4>
+          <h4>Posts about {d.subject} per hour, by stance <span>what other accounts publish, not the replies under it</span><AskWhy card="stance" /></h4>
           <div className="body">
             <TrendChart
               x={d.trend.points.map((p) => p.h)}
@@ -99,11 +102,11 @@ export function PulsePage({ d, title = "Dashboard" }: { d: PulseData; title?: st
 
         <div className="pulse-grid">
           <div className="card">
-            <h4>Comments per hour <span>last 72 hours of comment data · by platform · WIB</span></h4>
+            <h4>Comments per hour <span>last 72 hours of comment data · by platform · WIB</span><AskWhy card="trend" /></h4>
             <div className="body">{d.hourly.x.length >= 3 ? <Chart spec={{ type: "stacked_bar", x: d.hourly.x.map((h) => h.slice(5)), series: d.hourly.series, y_label: "comments" }} /> : <p className="quiet">Not enough hours of data yet.</p>}</div>
           </div>
           <div className="card">
-            <h4>Comments per day, since the wave started <span>by platform</span></h4>
+            <h4>Comments per day, since the wave started <span>by platform</span><AskWhy card="trend" /></h4>
             <div className="body">{d.daily.x.length >= 3 ? <Chart spec={{ type: "stacked_bar", x: d.daily.x.map((h) => h.slice(5)), series: d.daily.series, y_label: "comments" }} /> : <p className="quiet">Not enough days of data yet.</p>}</div>
             {d.daily.series.some((x) => /youtube/i.test(x.name)) && <div className="caveats">YouTube comment times older than a day come rounded from the export (“3 weeks ago”), so early days are approximate.</div>}
           </div>
@@ -111,7 +114,7 @@ export function PulsePage({ d, title = "Dashboard" }: { d: PulseData; title?: st
 
         <div className="pulse-grid">
           <div className="card">
-            <h4>Where the anger is <span>the same comments, split by whose post they sit under</span></h4>
+            <h4>Where the anger is <span>the same comments, split by whose post they sit under</span><AskWhy card="anger" /></h4>
             <div className="body">
               <div className="split">
                 <SourceBar subject={d.subject} label={`Under ${d.subject}'s own posts`} comments={t.owned_comments} negative={t.owned_negative} total={t.on_topic} />
@@ -124,7 +127,7 @@ export function PulsePage({ d, title = "Dashboard" }: { d: PulseData; title?: st
             {t.labelled < t.comments && <div className="caveats">Labelling is still running and works post by post, so some posts are labelled unevenly until it finishes.</div>}
           </div>
           <div className="card">
-            <h4>Before and after {d.subject}&apos;s reply <span>{d.reply_effect ? `${when(d.reply_effect.at)} WIB · three days either side` : "no reply from the subject in the data"}</span></h4>
+            <h4>Before and after {d.subject}&apos;s reply <span>{d.reply_effect ? `${when(d.reply_effect.at)} WIB · three days either side` : "no reply from the subject in the data"}</span><AskWhy card="reply" /></h4>
             <div className="body">
               {d.reply_effect ? (
                 <div className="tablewrap still" style={{ border: 0 }}>
@@ -145,7 +148,7 @@ export function PulsePage({ d, title = "Dashboard" }: { d: PulseData; title?: st
         </div>
 
         <div className="card" style={{ marginBottom: 12 }}>
-          <h4>How it spread <span>every platform on one clock, WIB</span></h4>
+          <h4>How it spread <span>every platform on one clock, WIB</span><AskWhy card="spread" /></h4>
           <div className="tablewrap still" style={{ border: 0 }}>
             <table>
               <thead><tr><th>When</th><th>Where</th><th>What</th><th>Reach</th></tr></thead>
@@ -167,7 +170,7 @@ export function PulsePage({ d, title = "Dashboard" }: { d: PulseData; title?: st
             )}
           </div>}
           {d.spread.length > 0 && <div className="card">
-            <h4>Per platform <span>negative share of the comments about {d.subject}</span></h4>
+            <h4>Per platform <span>negative share of the comments about {d.subject}</span><AskWhy card="spread" /></h4>
             <div className="tablewrap still" style={{ border: 0 }}>
               <table>
                 <thead><tr><th>Platform</th><th className="num">Posts</th><th className="num">About {d.subject}</th><th className="num">Negative</th><th>First post</th><th>Peak hour</th></tr></thead>
@@ -187,7 +190,7 @@ export function PulsePage({ d, title = "Dashboard" }: { d: PulseData; title?: st
 
         <div className="pulse-grid">
           <div className="card">
-            <h4>Where the contents stand <span>posts by other accounts, for or against {d.subject}, weighted by reach</span></h4>
+            <h4>Where the contents stand <span>posts by other accounts, for or against {d.subject}, weighted by reach</span><AskWhy card="stance" /></h4>
             <div className="tablewrap still" style={{ border: 0 }}>
               <table>
                 <thead><tr><th>Platform</th><th className="num">Posts</th><th className="num">Against</th><th className="num">Neutral</th><th className="num">For</th><th>Hostile share of reach</th></tr></thead>
@@ -209,7 +212,7 @@ export function PulsePage({ d, title = "Dashboard" }: { d: PulseData; title?: st
             <div className="caveats">Stance is labelled after the comments; Threads reports no views, so its reach is likes. {d.subject}&apos;s own posts carry no stance, and {fmtNum(t.posts_no_caption)} posts arrived with no text in the export, so they count for density only.</div>
           </div>
           <div className="card">
-            <h4>Who is commenting <span>{fmtNum(d.commenters.accounts)} accounts · {fmtNum(d.commenters.comments)} comments</span></h4>
+            <h4>Who is commenting <span>{fmtNum(d.commenters.accounts)} accounts · {fmtNum(d.commenters.comments)} comments</span><AskWhy card="commenters" /></h4>
             <div className="body">
               <div className="stats" style={{ gridTemplateColumns: "repeat(3, 1fr)", marginBottom: 12 }}>
                 <div className="stat" style={{ padding: 12 }}><b style={{ fontSize: 20 }}>{pct(d.commenters.once, d.commenters.accounts) ?? 0}%</b><span>commented once ({fmtNum(d.commenters.once)} accounts, {pct(d.commenters.comments_from_once, d.commenters.comments) ?? 0}% of comments)</span></div>
@@ -225,35 +228,37 @@ export function PulsePage({ d, title = "Dashboard" }: { d: PulseData; title?: st
 
         <div className="pulse-grid three">
           <div className="card">
-            <h4>What they are saying <span>{(d.themes.summary as { sentiment?: string }).sentiment === "negative" ? "in negative comments" : "all comments, labels still landing"}</span></h4>
+            <h4>What they are saying <span>{(d.themes.summary as { sentiment?: string }).sentiment === "negative" ? "in negative comments" : "all comments, labels still landing"}</span><AskWhy card="themes" /></h4>
             <div className="body">
               {d.themes.status !== "ok" || !themeRows.length ? <p className="quiet">{d.themes.message ?? "Nothing recurring yet."}</p> : (
                 <ul className="themes">{themeRows.map((r) => <li key={r.term}><b>{r.term}</b> <span>{fmtNum(r.comments)} · {r.share_pct}%</span>{r.examples[0] && <small>“{r.examples[0].slice(0, 110)}”</small>}</li>)}</ul>
               )}
-              <Link className="askit" href={ask(`What are the main complaints in the negative comments about ${d.subject}?`)}>Ask why</Link>
             </div>
           </div>
           <div className="card">
-            <h4>Who is driving it <span>posts by comments drawn</span></h4>
+            <h4>Who is driving it <span>posts by comments drawn</span><AskWhy card="drivers" /></h4>
             <div className="body">
               <ul className="themes">{driverRows.map((r) => <li key={r.url}><b>{r.source === "owned" ? `${d.subject} (own ${label(r.platform)})` : `@${r.account} · ${label(r.platform)}`}</b> <span>{fmtNum(r.comments)} comments{r.negative ? ` · ${fmtNum(r.negative)} neg` : ""}{r.stance ? ` · ${r.stance}` : ""}</span>{r.caption && <small>“{r.caption.slice(0, 100)}”</small>}</li>)}</ul>
-              <Link className="askit" href={ask(`Which posts and accounts are driving the negative comments about ${d.subject}?`)}>Ask why</Link>
             </div>
           </div>
           <div className="card">
-            <h4>Coordinated patterns <span>{(d.seeding.summary as { signal?: string }).signal ?? ""}</span></h4>
+            <h4>Coordinated patterns <span>{(d.seeding.summary as { signal?: string }).signal ?? ""}</span><AskWhy card="seeding" /></h4>
             <div className="body">
               {!seedRows.length ? <p className="quiet">No coordinated pattern found. Organic so far.</p> : (
                 <ul className="themes">{seedRows.map((r, i) => <li key={i}><b>{r.kind === "same_wording" ? `Same wording, ${r.accounts} accounts` : r.kind === "repeat_account" ? `${r.what}, ${r.comments} comments` : `Burst, ${r.accounts} first-time commenters`}</b> <span>{label(r.platform)} · {when(r.first_at)}</span><small>{r.kind === "same_wording" ? `“${r.what.slice(0, 100)}”` : r.kind === "burst" ? "on one post within ten minutes" : "across several posts"}</small></li>)}</ul>
               )}
               <p className="quiet" style={{ marginTop: 8 }}>Patterns, not proof: memes and pile-ons look like this too.</p>
-              <Link className="askit" href={ask(`Is anyone seeding the comments about ${d.subject}?`)}>Ask why</Link>
             </div>
           </div>
         </div>
       </div>
     </section>
   );
+}
+
+/** "Ask CeMO" on a card: the chat opens with this card's figures, read again on the server (src/pulse/ask.ts). */
+function AskWhy({ card }: { card: PulseCard }) {
+  return <Link className="askh" href={pulseAskHref(card)} title="Ask CeMO about this card; its figures go with the question">Ask CeMO</Link>;
 }
 
 /** A share of a base, blank where the base is too small to mean anything. */
@@ -287,7 +292,7 @@ function Now({ d }: { d: PulseData }) {
   const dStep = s.now6.positive_pct != null && s.prev6.positive_pct != null ? Math.round((s.now6.positive_pct - s.prev6.positive_pct) * 10) / 10 : null;
   return (
     <div className="card now" style={{ marginBottom: 12 }}>
-      <h4>How it is going <span>the last six hours against the six before · comments through {when(d.asOf)} WIB</span></h4>
+      <h4>How it is going <span>the last six hours against the six before · comments through {when(d.asOf)} WIB</span><AskWhy card="now" /></h4>
       <div className="body">
         <p className="now-head">{headline}</p>
         <p className="quiet" style={{ marginTop: 2 }}>
@@ -327,7 +332,7 @@ function Watchlist({ d }: { d: PulseData }) {
   const order = [...byPlatform.entries()].sort((a, b) => b[1].reduce((s, w) => s + w.last24h, 0) - a[1].reduce((s, w) => s + w.last24h, 0));
   return (
     <div className="card" style={{ marginBottom: 12 }}>
-      <h4>Most commented posts, and which are still moving <span>top three per platform · a dot means it took comments in the last six hours</span></h4>
+      <h4>Most commented posts, and which are still moving <span>top three per platform · a dot means it took comments in the last six hours</span><AskWhy card="watch" /></h4>
       <div className="tablewrap still" style={{ border: 0 }}>
         <table className="watch">
           <thead><tr><th>Post</th><th className="num">Comments</th><th className="num">Last 24h</th><th className="num">Last 6h</th><th className="num">Negative</th><th>Reach</th></tr></thead>
@@ -384,7 +389,7 @@ function Exposure({ d }: { d: PulseData }) {
   const quiet = c.posts === 0 && c.comments === 0;
   return (
     <div className="card" style={{ marginBottom: 12 }}>
-      <h4>Commercial exposure <span>calls to boycott, and the partner brands named beside {d.subject}</span></h4>
+      <h4>Commercial exposure <span>calls to boycott, and the partner brands named beside {d.subject}</span><AskWhy card="exposure" /></h4>
       <div className="body">
         {quiet ? (
           <p className="quiet">Nobody is calling for a boycott yet, and no partner brand has been named. This card counts only the words this workspace was given — the boycott vocabulary and the partner brands on its watchlist.</p>
@@ -482,14 +487,14 @@ function Sides({ d }: { d: PulseData }) {
     <div className="pulse-grid" style={d.sides.voices.length && d.sides.topics.length ? undefined : { gridTemplateColumns: "1fr" }}>
       {d.sides.voices.length > 0 && (
         <div className="card">
-          <h4>Who is talking <span>which side each post{anyComments ? " and comment" : ""} is written from, and how it leans</span></h4>
+          <h4>Who is talking <span>which side each post{anyComments ? " and comment" : ""} is written from, and how it leans</span><AskWhy card="sides" /></h4>
           {table(d.sides.voices, "Voice")}
           <div className="caveats">Read by the labeller from the words people use, flags and how they name themselves; “not clear” when it cannot tell (often English, or too short). Shares are of the posts with a stance.</div>
         </div>
       )}
       {d.sides.topics.length > 0 && (
         <div className="card">
-          <h4>What it is about <span>the workspace&apos;s topics, and how each leans</span></h4>
+          <h4>What it is about <span>the workspace&apos;s topics, and how each leans</span><AskWhy card="sides" /></h4>
           {table(d.sides.topics, "Topic")}
           <div className="caveats">Each post{anyComments ? " and comment" : ""} carries one topic; the catch-all is last.</div>
         </div>

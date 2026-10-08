@@ -276,20 +276,21 @@ export function DeckForm({ options, initial, prefill }: { options: DeckOptions; 
       </section>
 
       <section className="cgrid">
-        <label className="wf">
+        {/* a div, not a label: a label hands a click on its text to the first button inside it */}
+        <div className="wf">
           <span>{edit ? "Make a version for" : "First version"}</span>
-          {grain === "day" ? (
-            // a day by day deck names its day: one of the last days (the newest may still be filling), any day from a calendar, or a run of days
-            <PeriodPick periods={periods} value={period || periods[0]?.key || ""} onChange={setPeriod} range={{ asOf: options.data_through.slice(0, 10), first: options.data_from }} day />
+          {family === "reputation" || grain === "day" ? (
+            // a PR deck names its period: one of the last days (the newest may still be filling), weeks or months, any day from a calendar, or a run of days (6 to 8 Oct)
+            <PeriodPick key={grain} periods={periods} value={period || periods[0]?.key || ""} onChange={setPeriod} range={{ asOf: options.data_through.slice(0, 10), first: options.data_from }} day={grain === "day"} />
           ) : (
           <select value={period} onChange={(e) => setPeriod(e.target.value)}>
             <option value="">Latest {grain} the data covers{periods[0] ? ` (${periods[0].label})` : ""}</option>
             {periods.slice(1).map((p) => <option key={p.key} value={p.key}>{p.label}</option>)}
           </select>
           )}
-        </label>
+        </div>
         {edit && <label className="dcheck wide"><input type="checkbox" checked={alsoTemplate} onChange={(e) => setAlsoTemplate(e.target.checked)} /> Also change the template this deck came from <small>({initial?.template?.startsWith("co-") ? "your team's template" : "saved as your team's own template; Fair's stays as it is"}; a Member&apos;s change waits for a Builder)</small></label>}
-        <label className="dcheck wide"><input type="checkbox" checked={recurring} onChange={(e) => setRecurring(e.target.checked)} /> Make the next version every {grain} <small>({grain === "day" ? "each morning at 07:00 WIB, for the day before, once its data has landed" : `when a new ${grain} of data lands`}; data runs to {options.data_through})</small></label>
+        <label className="dcheck wide"><input type="checkbox" checked={recurring} onChange={(e) => setRecurring(e.target.checked)} /> Make the next version every {grain} <small>({grain === "day" ? "each morning at 07:00 WIB, for the day before, once its data has landed" : `when a new ${grain} of data lands`}; data runs to {options.data_through}{/\.\./.test(period) ? `; the days you chose make the first version, then one ${grain} each` : ""})</small></label>
       </section>
 
       {error && <div className="errbox">{error}</div>}
