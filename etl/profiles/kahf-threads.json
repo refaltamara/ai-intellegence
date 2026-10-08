@@ -339,6 +339,12 @@
       "parent": "https://threads.com/@rxoxo18/post/DeMJyZbk-cy"
     }
   ],
+  "reply_handles": {
+    "threads": [
+      "meta.ai"
+    ]
+  },
+  "reply_handles_note": "Meta AI answers only when someone tags it under a post, so its rows in a posts export are replies: never loaded as posts (12 such answers loaded from the 7 Oct recent-posts pulls were removed on 8 Oct). Its replies in a comments export still load as comments.",
   "files": [
     {
       "kind": "contents",
@@ -417,6 +423,12 @@
       "file": "kahf/comments_threads_1008b.csv",
       "naive_tz": "Asia/Jakarta",
       "note": "comments_batch4_structured.xlsx, 8 Oct: 1,367 comments on 58 posts, 7 Oct 20:16 to 8 Oct 06:16 WIB (plus 10 July/August comments under the dropped Watsons post). Jakarta time: no post's first comment comes before it, median 16 minutes after. 54 of these comments had been loaded as posts from the recent-posts exports (replies that name Kahf): removed as posts, listed in drop_urls with their parent, so they count once, as comments"
+    },
+    {
+      "kind": "contents",
+      "platform": "threads",
+      "file": "kahf/contents_threads_1008c.csv",
+      "note": "kahfeveryday_threads_recent.csv, 8 Oct (the same epoch export, search_keyword = kahfeveryday): 1,000 rows; left out as asked: 113 already loaded as posts (their numbers stay as loaded), 11 already loaded as comments and 56 Meta AI answers (replies, not posts), and the July Watsons post (before the case); 819 written, 2 Oct to 8 Oct 09:57 WIB"
     }
   ]
 }
