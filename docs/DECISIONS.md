@@ -650,7 +650,7 @@ The numbers are unchanged. The Pulse's output was compared field by field: only 
 
 ## The logo (Refal, 8 Oct 2026)
 
-The app's mark is the Fair Listening mark Refal supplied for the pitch: an orange-to-pink rounded square (#FF9047 to #FF516A) with five sound bars, the middle one peach. It replaces the blue-and-violet "F" square in seven places:
+The app's mark is the one Refal supplied for the pitch, now Fair Intelligence's (the pitch deck and the video say Fair Intelligence too, with the lockup "fair / intelligence" set in Outfit SemiBold like the original): an orange-to-pink rounded square (#FF9047 to #FF516A) with five sound bars, the middle one peach. It replaces the blue-and-violet "F" square in seven places:
 - the sidebar and the CMS;
 - the sign-in, password and invitation pages;
 - the connector consent page.
