@@ -1,4 +1,5 @@
 import { ForgotPassword } from "@/ui/PasswordReset";
+import { LogoMark } from "@/ui/LogoMark";
 
 export const dynamic = "force-dynamic";
 
@@ -7,7 +8,7 @@ export default function ResetPage() {
   return (
     <div className="login">
       <div className="box">
-        <div className="brand"><div className="mark">F</div><div><b>Fair Intelligence</b><small>Your password</small></div></div>
+        <div className="brand"><LogoMark /><div><b>Fair Intelligence</b><small>Your password</small></div></div>
         <ForgotPassword />
       </div>
     </div>

@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import type { NavKey } from "@/roles/model";
 import type { TeamChoice } from "@/workspace/teams";
 import { TeamIcon } from "./TeamIcon";
+import { LogoMark } from "./LogoMark";
 
 type NavItem = { key: NavKey; href: string; label: string; tone: string; icon: React.ReactNode };
 
@@ -79,7 +80,7 @@ export function Sidebar({ recent, user, product, teams, currentWorkspace, curren
   };
   return (
     <aside className="side">
-      <div className="brand"><div className="mark">{product.name.charAt(0)}</div><div><b>{product.name}</b><small>{team?.label ?? product.tagline}</small></div></div>
+      <div className="brand"><LogoMark /><div><b>{product.name}</b><small>{team?.label ?? product.tagline}</small></div></div>
       {workspaces.length > 1 && (
         <label className="wspick" title="Workspace: the data you are working on">
           <span>Workspace</span>

@@ -2,6 +2,7 @@
 /** The CMS's own sidebar: Fair's side of the product, never shown to clients. */
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { LogoMark } from "../LogoMark";
 
 const NAV = [
   { href: "/admin", label: "Home", icon: <><path d="M3 11l9-7 9 7" /><path d="M5 10v10h14V10" /></> },
@@ -18,7 +19,7 @@ export function AdminNav({ email, duties }: { email: string; duties: string }) {
   const active = (href: string) => (href === "/admin" ? path === "/admin" : path.startsWith(href));
   return (
     <aside className="side admin">
-      <div className="brand"><div className="mark">F</div><div><b>Fair CMS</b><small>The brain behind Fair Intelligence</small></div></div>
+      <div className="brand"><LogoMark /><div><b>Fair CMS</b><small>The brain behind Fair Intelligence</small></div></div>
       <nav className="nav">
         {NAV.map((n) => (
           <Link key={n.href} href={n.href} className={active(n.href) ? "on" : ""}>
