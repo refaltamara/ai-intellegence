@@ -24,7 +24,7 @@ const ACCOUNT_COLS: [string, string][] = [["platform", "text"], ["handle", "text
 const COMMENT_COLS: [string, string][] = [
   ["platform", "text"], ["url", "text"], ["brand_id", "text"], ["platform_comment_id", "text"], ["author_handle", "text"], ["author_hash", "text"], ["text", "text"],
   ["posted_at", "timestamptz"], ["likes", "int"], ["views", "bigint"], ["sentiment", "text"], ["sentiment_source", "text"], ["sentiment_confidence", "numeric"],
-  ["sentiment_detail", "text"], ["csat", "smallint"], ["theme", "text"], ["purchase_intent", "boolean"], ["translation", "text"], ["topic_id", "text"],
+  ["theme", "text"], ["purchase_intent", "boolean"], ["translation", "text"], ["topic_id", "text"],
   ["flags", "text[]"], ["source_file", "text"],
 ];
 const CAPTION_COLS: [string, string][] = [["platform", "text"], ["url", "text"], ["caption", "text"], ["hashtags", "text[]"]];

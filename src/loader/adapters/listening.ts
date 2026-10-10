@@ -70,7 +70,7 @@ export async function readListening(input: AdapterInput): Promise<Staged> {
   st.comments = cm.rows.map((r) => ({
     platform: r.platform, url: r.url, brand_id: r.brand_id, platform_comment_id: r.platform_comment_id, author_handle: r.author_handle, author_hash: r.author_hash,
     text: r.text, posted_at: r.posted_at, likes: r.likes, views: null, sentiment: r.sentiment, sentiment_source: r.sentiment_source, sentiment_confidence: r.confidence,
-    sentiment_detail: null, csat: null, theme: r.theme, purchase_intent: r.purchase_intent, translation: r.translation, topic_id: r.topic_id, flags: null,
+    theme: r.theme, purchase_intent: r.purchase_intent, translation: r.translation, topic_id: r.topic_id, flags: null,
     source_file: files._comment_.name,
   }));
   st.files.push({

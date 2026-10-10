@@ -1046,3 +1046,11 @@ The agreed design is the doc "Core data architecture and model" (https://claude.
 - **Not yet.**
   - A case's own screens.
   - A case reading its own terms for relevance.
+
+**Refal's answers, 10 Oct (after step 5).**
+- **Social keeps the latest views.** The Social team reads its own accounts by their latest reading, on its dashboard, in its decks and in Chats (`ROLE_VIEWS`). Brand & KOL stays at day 7 and PR keeps its reach.
+- **Dropped** (migration 0042), after the code stopped using them:
+  - `mv_brand_week`: nothing has read it since brand pages moved to the daily totals.
+  - CSAT and the five-point label on comments (`csat`, `sentiment_detail`, also in staging). They were on 116,366 Fintech comments and remain in the raw files. A load still counts the vendor's labels in its report.
+  - `post_snapshots_before_10_oct` (114,633 rows, 30 MB), the old table kept at step 3. `post_snapshots`, the view of the readings, returns the same rows.
+- **Kahf Threads is a case of Beauty Indonesia.** It is copied into the Beauty panel as a case, and `kahf-threads` stays as it is for now. The case gets its own screens. Creating a case from the CMS, wired to the scraper team's API, comes later.

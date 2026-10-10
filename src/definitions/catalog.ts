@@ -124,7 +124,7 @@ export type ViewsDef = "views_d7" | "views_latest";
 /**
  * Which views each role reads where it counts views in Chats, as its own screens do (a role chooses which definitions it
  * shows, never redefines one): Brand & KOL compares at day 7; PR reads reach, how far a post has spread by now (step 4,
- * third part); Social reads the latest reading on its dashboard and decks, so Chats does too until it moves.
+ * third part); Social reads its own accounts by their latest reading, on its dashboard, in decks and in Chats (Refal, 10 Oct).
  */
 export const ROLE_VIEWS: Record<string, ViewsDef> = { brand_kol: "views_d7", pr: "views_latest", social: "views_latest" };
 

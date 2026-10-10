@@ -333,20 +333,20 @@ def build_snapshots(snaps, kept_cids):
 # ---------------------------------------------------------------- comments
 COMMENT_SQL = """
   insert into comments (workspace_id, post_id, platform, platform_comment_id, author_handle, author_hash, text, posted_at, likes,
-                        sentiment, sentiment_source, sentiment_confidence, sentiment_detail, csat, theme, purchase_intent,
+                        sentiment, sentiment_source, sentiment_confidence, theme, purchase_intent,
                         translation, topic_id, classified_at)
   select $2, p.id, r.platform, r.platform_comment_id, r.author_handle, r.author_hash, r.text, r.posted_at, r.likes,
-         r.sentiment, r.sentiment_source, r.confidence, r.sentiment_detail, r.csat, r.theme, r.purchase_intent,
+         r.sentiment, r.sentiment_source, r.confidence, r.theme, r.purchase_intent,
          r.translation, r.topic_id, now()
   from jsonb_to_recordset($1::jsonb) as r(platform text, url text, brand_id text, platform_comment_id text, author_handle text,
        author_hash text, text text, posted_at timestamptz, likes int, sentiment text, sentiment_source text, confidence numeric,
-       sentiment_detail text, csat smallint, theme text, purchase_intent boolean, translation text, topic_id text)
+       theme text, purchase_intent boolean, translation text, topic_id text)
   join posts p on p.workspace_id = $2 and p.platform = r.platform and p.url = r.url and p.brand_id = r.brand_id
   on conflict (workspace_id, platform_comment_id) do update set
     post_id = excluded.post_id, platform = excluded.platform, author_handle = excluded.author_handle,
     author_hash = excluded.author_hash, text = excluded.text, posted_at = excluded.posted_at, likes = excluded.likes,
     sentiment = excluded.sentiment, sentiment_source = excluded.sentiment_source,
-    sentiment_confidence = excluded.sentiment_confidence, sentiment_detail = excluded.sentiment_detail, csat = excluded.csat,
+    sentiment_confidence = excluded.sentiment_confidence,
     theme = excluded.theme, purchase_intent = excluded.purchase_intent, translation = excluded.translation,
     topic_id = excluded.topic_id, classified_at = excluded.classified_at
 """

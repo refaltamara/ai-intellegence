@@ -63,35 +63,6 @@ group by p.workspace_id, p.platform, p.creator_id, p.brand_id;
 create unique index mv_creator_brand_history_uq on mv_creator_brand_history (workspace_id, creator_id, brand_id);
 create index mv_creator_brand_history_brand_idx on mv_creator_brand_history (workspace_id, brand_id, last_post);
 
-drop materialized view if exists mv_brand_week cascade;
-create materialized view mv_brand_week as
-with wk as (
-  select workspace_id, platform, source, brand_id,
-         (date_trunc('week', posted_at at time zone 'Asia/Jakarta'))::date as week_start,
-         count(*)::int as posts,
-         count(distinct creator_id)::int as creators,
-         sum(views)::bigint as views,
-         sum(engagements)::bigint as engagements,
-         sum(comments_count)::bigint as comments_count,
-         case when platform = 'tiktok' then count(*) filter (where has_cart) end::int as cart_posts
-  from posts
-  where relevant is not false and brought_in_by = 'panel'
-  group by workspace_id, platform, source, brand_id, week_start
-), tot as (
-  select workspace_id, platform, week_start,
-         sum(posts) as ws_posts, sum(views) as ws_views
-  from wk group by workspace_id, platform, week_start
-)
-select w.*,
-       to_char(w.week_start, 'IYYY-"W"IW') as iso_week,
-       case when t.ws_posts > 0 then round(w.posts::numeric / t.ws_posts * 100, 2) end as sov_posts_pct,
-       case when t.ws_views > 0 then round(w.views::numeric / t.ws_views * 100, 2) end as sov_views_pct,
-       case when w.views > 0 then round(w.engagements::numeric / w.views * 100, 4) end as er_pct,
-       case when w.platform = 'tiktok' and w.posts > 0 then round(w.cart_posts::numeric / w.posts * 100, 2) end as cart_pct
-from wk w join tot t using (workspace_id, platform, week_start);
-create unique index mv_brand_week_uq on mv_brand_week (workspace_id, platform, source, brand_id, week_start);
-create index mv_brand_week_brand_idx on mv_brand_week (workspace_id, brand_id, week_start);
-
 drop materialized view if exists mv_creator_cart_profile cascade;
 create materialized view mv_creator_cart_profile as
 select workspace_id, creator_id, month,

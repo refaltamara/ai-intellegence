@@ -650,13 +650,6 @@ export const comments = pgTable(
     /** 'model' (labelled by /api/cron/label) | 'listening' (came with the export) | 'subject' (the subject's own reply, never labelled) */
     sentimentSource: text("sentiment_source"),
     sentimentConfidence: numeric("sentiment_confidence"),
-    /**
-     * Listening workspaces arrive labelled (sentiment_source 'listening'): the five-point scale is kept here
-     * ('excellent' | 'good' | 'neutral' | 'average' | 'negative' | 'unknown') with its CSAT (1-5); `sentiment`
-     * holds the three-class view (excellent+good positive, average+negative negative; DECISIONS 3 Oct 2026).
-     */
-    sentimentDetail: text("sentiment_detail"),
-    csat: smallint("csat"),
     /** the listening model's free-text theme ("brand praise", "missed promo"), mapped to topic_id upstream */
     theme: text("theme"),
     purchaseIntent: boolean("purchase_intent"),
@@ -1766,8 +1759,6 @@ export const stagingComments = staging.table(
     sentiment: text("sentiment"),
     sentimentSource: text("sentiment_source"),
     sentimentConfidence: numeric("sentiment_confidence"),
-    sentimentDetail: text("sentiment_detail"),
-    csat: smallint("csat"),
     theme: text("theme"),
     purchaseIntent: boolean("purchase_intent"),
     translation: text("translation"),
