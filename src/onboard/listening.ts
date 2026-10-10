@@ -53,6 +53,8 @@ export async function table(files: Record<string, StoredFile>, name: string): Pr
   return rows;
 }
 export const clearCache = () => cache.clear();
+/** a table already parsed elsewhere (the one loader reads raw files itself, src/loader/adapters/listening.ts) */
+export const primeTable = (url: string, rows: Row[]) => void cache.set(url, rows);
 
 export const s = (v: unknown): string | null => {
   if (v == null) return null;
@@ -350,7 +352,10 @@ export async function writeBrandCaptures(ws: string, seen: Map<string, Map<strin
   if (rows.length) await sql.query("update brands b set tiktok_handle = r.tiktok, instagram_handle = r.instagram from jsonb_to_recordset($1::jsonb) as r(id text, tiktok text, instagram text) where b.id = r.id and b.workspace_id = $2", [toJson(rows), ws]);
 }
 
-export async function writeCreators(ws: string, files: Record<string, StoredFile>, posts: PostRow[]): Promise<number> {
+export type CreatorRow = { platform: string; handle: string; display_name: string | null; followers_latest: number | null; tier_latest: string | null; first_seen: string | null; last_seen: string | null };
+
+/** one creator per handle that posted (brand accounts too), with the dump's followers and when it was first and last seen */
+export async function creatorRows(files: Record<string, StoredFile>, posts: PostRow[]): Promise<CreatorRow[]> {
   const creators = await table(files, "creator");
   const cr = new Map<string, Row>();
   for (const r of creators) {
@@ -366,6 +371,11 @@ export async function writeCreators(ws: string, files: Record<string, StoredFile
     const first = r ? when(r.first_seen_at) : null, last = r ? when(r.last_seen_at) : null;
     return { platform, handle, display_name: r ? s(r.display_name) : null, followers_latest: f, tier_latest: tierForFollowers(f), first_seen: first ? first.toISOString().slice(0, 10) : null, last_seen: last ? last.toISOString().slice(0, 10) : null };
   });
+  return out;
+}
+
+export async function writeCreators(ws: string, files: Record<string, StoredFile>, posts: PostRow[]): Promise<number> {
+  const out = await creatorRows(files, posts);
   for (let at = 0; at < out.length; at += 1000) {
     await sql.query(
       `insert into creators (workspace_id, platform, handle, display_name, followers_latest, tier_latest, first_seen, last_seen)

@@ -7,6 +7,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { tierForFollowers } from "../../config/thresholds";
+import { VIDEO_TYPES } from "../../config/loads";
 import { hashtags, int, localDay, localMonth, naiveLocal, num, readCsv, str, tally, type Row } from "../parse";
 import { emptyStaged, type AdapterInput, type Staged, type StagedAccount, type StagedPost } from "../types";
 
@@ -57,8 +58,8 @@ export function normaliseFile(rows: Row[], columns: string[], platform: "tiktok"
     const rawBrand = str(r.brand);
     const brand = rawBrand ? bmap.get(rawBrand) : undefined;
     if (!brand) { drops.add(`unknown brand slug '${rawBrand}'`, url); continue; }
-    let followers = int(r.followers_numeric);
-    if (followers != null && followers <= 0) followers = null;
+    const reported = int(r.followers_numeric);
+    const followers = reported != null && reported > 0 ? reported : null;
     const handle = str(r.creator_username);
     let owned = false, accountType: string | null = null, hasCart: boolean | null = null, shares: number | null = null, saves: number | null = null, ppid: string | null;
     if (tt) {
@@ -90,6 +91,7 @@ export function normaliseFile(rows: Row[], columns: string[], platform: "tiktok"
       engagements: int(r.engagement_platform_native), engagements_lc: int(r.engagement_likes_comments_only), captured_days: null,
       relevant: null, stub: false, flags: null, source_file: sourceFile,
     };
+    post.flags = flagsOf(reported, post.views, post.content_type);
     const key = `${platform}\u0001${url}\u0001${brand}`;
     if (out.has(key)) merged++; // the old loader's upsert kept the later row
     out.set(key, post);
@@ -103,6 +105,14 @@ export function normaliseFile(rows: Row[], columns: string[], platform: "tiktok"
     return [m, { posts: d.posts, days_captured: d.days.size, days_in_month: inMonth, coverage_pct: Math.round((d.days.size / inMonth) * 1000) / 10 }];
   }));
   return { posts: [...out.values()], drops, merged, unknownCats, months };
+}
+
+/** the load's warnings on a row (DECISIONS, 10 Oct 2026): the row counts, and stays out of rates and medians */
+export function flagsOf(followersReported: number | null, views: number | null, contentType: string | null): string[] | null {
+  const f: string[] = [];
+  if (followersReported === 0) f.push("zero_followers");
+  if (views === 0 && contentType && VIDEO_TYPES.has(contentType)) f.push("zero_views");
+  return f.length ? f : null;
 }
 
 /** one creator per earned handle: the followers of their latest post, first and last seen (etl/load.py upsert_creators) */

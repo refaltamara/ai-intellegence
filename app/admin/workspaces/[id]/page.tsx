@@ -13,6 +13,8 @@ import { SourceUpload } from "@/ui/admin/onboard/SourceUpload";
 import { BrandMapper } from "@/ui/admin/onboard/BrandMapper";
 import { LabelMap } from "@/ui/admin/onboard/LabelMap";
 import { LoadPanel } from "@/ui/admin/onboard/LoadPanel";
+import { LoadsList } from "@/ui/admin/loads/LoadsList";
+import { loadsOf } from "@/loader/page";
 import { TermsEditor } from "@/ui/admin/onboard/TermsEditor";
 import { TopicsEditor } from "@/ui/admin/onboard/TopicsEditor";
 import { StatusActions } from "@/ui/admin/onboard/StatusActions";
@@ -25,7 +27,7 @@ import { ROLES, isRoleId } from "@/roles/model";
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
 
-const TABS = [["overview", "Overview"], ["source", "1 · Dump"], ["brands", "2 · Brands"], ["load", "3 · Load"], ["relevance", "Relevance"], ["topics", "Topics"], ["health", "Health"], ["signals", "Signals"]] as const;
+const TABS = [["overview", "Overview"], ["source", "1 · Dump"], ["brands", "2 · Brands"], ["load", "3 · Load"], ["loads", "Loads"], ["relevance", "Relevance"], ["topics", "Topics"], ["health", "Health"], ["signals", "Signals"]] as const;
 const STATUS: Record<string, string> = { draft: "Draft", loading: "Loading", review: "In review", live: "Live", paused: "Paused", archived: "Archived" };
 const n = (x: unknown) => Number(x ?? 0).toLocaleString("en-US");
 const kb = (b: number) => (b > 1024 ** 2 ? `${(b / 1024 ** 2).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1024))} KB`);
@@ -43,11 +45,11 @@ export default async function WorkspaceData({ params, searchParams }: { params: 
   const steps = [
     { key: "source", label: "Upload and inspect the dump", done: !!d.inspect && d.needed.every((t) => d.source.files?.[t]) },
     { key: "brands", label: "Map accounts to brands; sentiment labels", done: d.brands.length > 0 && !d.blockers.some((b) => /brand|label/i.test(b)) },
-    { key: "load", label: "Load", done: d.counts.posts > 0 && !d.jobs.some((j) => j.kind === "dump_load" && ["queued", "running"].includes(j.status)) },
+    { key: "load", label: "Load", done: d.counts.posts > 0 && !d.jobs.some((j) => (j.kind === "dump_load" || j.kind === "load") && ["queued", "running"].includes(j.status)) },
     { key: "health", label: "Read the load report and health", done: !!d.health },
     { key: "overview", label: "Switch live (Refal or Rafli)", done: d.status === "live" },
   ];
-  const running = d.jobs.find((j) => j.kind === "dump_load" && ["queued", "running"].includes(j.status));
+  const running = d.jobs.find((j) => (j.kind === "dump_load" || j.kind === "load") && ["queued", "running"].includes(j.status));
   const posts = d.loads.find((l) => l.kind === "posts");
   const comments = d.loads.find((l) => l.kind === "comments");
   const snaps = d.loads.find((l) => l.kind === "snapshots");
@@ -103,7 +105,13 @@ export default async function WorkspaceData({ params, searchParams }: { params: 
         {tab === "load" && (
           <>
             <LoadPanel ws={d.id} blockers={d.blockers} running={running?.id ?? null} canReset={["draft", "review", "loading"].includes(d.status)} />
-            {posts && (
+            {posts && posts.report.staging_load ? (
+              <div className="report">
+                <h2 className="cmsh">Load report <small className="muted">{when(posts.finished_at)}</small></h2>
+                <p>{d.loads.filter((l) => l.report.staging_load === posts.report.staging_load).map((l) => `${l.file}: ${n(l.report.rows_in)} rows, ${n(l.report.staged)} staged, ${n(l.report.merged)} merged, ${n(l.report.dropped)} dropped`).join(" · ")}.</p>
+                <p className="muted">The checks, what went in and who was told: <Link href={`/admin/workspaces/${d.id}?tab=loads`}>Loads</Link>.</p>
+              </div>
+            ) : posts && (
               <div className="report">
                 <h2 className="cmsh">Load report <small className="muted">{when(posts.finished_at)}</small></h2>
                 <p><b>{n(posts.report.posts)} posts</b> from {n(posts.report.rows_in)} captured ({n(posts.report.duplicates_merged)} duplicate captures merged{Object.keys((posts.report.drops ?? {}) as object).length ? `; dropped: ${Object.entries(posts.report.drops as Record<string, { count: number }>).map(([k, v]) => `${k} ${n(v.count)}`).join(", ")}` : ""}), {n(posts.report.creators)} accounts, {n(posts.report.views)} views.</p>
@@ -118,6 +126,21 @@ export default async function WorkspaceData({ params, searchParams }: { params: 
             {d.jobs.length > 0 && <p className="muted">Jobs: {d.jobs.map((j) => `${j.kind.replace("_", " ")} ${j.status}${j.error ? ` (${j.error.slice(0, 80)})` : ""} ${when(j.updated_at)}`).join(" · ")}</p>}
           </>
         )}
+
+        {tab === "loads" && await (async () => {
+          const { loads, raw } = await loadsOf(d.id);
+          return (
+            <>
+              <LoadsList ws={d.id} loads={loads} />
+              <h2 className="cmsh">Raw files</h2>
+              <p className="muted">Kept as received for 12 months{raw.some((f) => !f.stored) ? "; not in the store yet (no Blob store connected): " + raw.filter((f) => !f.stored).length + " of " + raw.length : ""}.</p>
+              <div className="tablewrap people"><table>
+                <thead><tr><th>File</th><th className="num">Size</th><th>Received</th><th>Stored</th></tr></thead>
+                <tbody>{raw.map((f) => <tr key={f.blob}><td>{f.path}</td><td className="num">{kb(f.bytes)}</td><td>{f.received}</td><td>{f.stored ? "yes" : <span className="muted">not yet</span>}</td></tr>)}</tbody>
+              </table></div>
+            </>
+          );
+        })()}
 
         {tab === "relevance" && (d.brands.length ? (
           <>

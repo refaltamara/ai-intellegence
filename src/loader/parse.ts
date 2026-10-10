@@ -12,13 +12,25 @@ export type Row = Record<string, string | null>;
 export function readCsv(bytes: Buffer, name: string, opts: { lowerHeaders?: boolean } = {}): Row[] {
   const text = (name.endsWith(".gz") ? gunzipSync(bytes) : bytes).toString("utf8");
   const rows = parse(text, {
-    columns: opts.lowerHeaders ? (h: string[]) => h.map((c) => String(c).trim().toLowerCase()) : true,
+    columns: opts.lowerHeaders ? (h: string[]) => pandasNames(h).map((c) => c.trim().toLowerCase()) : true,
     skip_empty_lines: true, relax_column_count: true, relax_quotes: true, bom: true,
   }) as Record<string, string>[];
   return rows.map((r) => {
     const o: Row = {};
     for (const [k, v] of Object.entries(r)) if (k && !k.startsWith("unnamed")) o[k] = v === "" ? null : v;
     return o;
+  });
+}
+
+/** a header as pandas reads it: a repeated name becomes "name.1", "name.2"; an empty one "Unnamed: i" */
+function pandasNames(h: string[]): string[] {
+  const seen = new Map<string, number>();
+  return h.map((raw, i) => {
+    let c = String(raw ?? "");
+    if (!c) c = `Unnamed: ${i}`;
+    const n = seen.get(c);
+    seen.set(c, (n ?? 0) + 1);
+    return n ? `${c}.${n}` : c;
   });
 }
 
@@ -74,8 +86,24 @@ export const handle = (v: unknown): string | null => {
 export const authorHash = (platform: string, h: string | null) => createHash("sha256").update(`${platform}${h ?? ""}`).digest("hex");
 
 // ------------------------------------------------------------------ time
+// every zone's offset is a whole number of quarter hours, so a moment's offset and local day are the same across
+// its UTC quarter hour: computing each once per quarter hour keeps a 70,000-row file from making 280,000 Intl calls
+const QUARTER = 900_000;
+const offsetMemo = new Map<string, number>();
+const dayMemo = new Map<string, string>();
+
 /** minutes a zone is ahead of UTC at a moment (Asia/Jakarta: 420, all year) */
 function offsetMinutes(at: Date, tz: string): number {
+  const key = `${tz}\u0001${Math.floor(at.getTime() / QUARTER)}`;
+  let v = offsetMemo.get(key);
+  if (v === undefined) {
+    v = offsetUncached(at, tz);
+    offsetMemo.set(key, v);
+  }
+  return v;
+}
+
+function offsetUncached(at: Date, tz: string): number {
   const p = new Intl.DateTimeFormat("en-US", { timeZone: tz, hourCycle: "h23", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit" })
     .formatToParts(at).reduce<Record<string, string>>((a, x) => ((a[x.type] = x.value), a), {});
   const asUtc = Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour, +p.minute, +p.second);
@@ -102,11 +130,21 @@ export function naiveLocal(v: unknown, tz: string): Date | null {
   return zoned(y, mo, d, h, mi, s, tz);
 }
 
-const PARTS = (tz: string) => new Intl.DateTimeFormat("en-CA", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit" });
+const formats = new Map<string, Intl.DateTimeFormat>();
 /** the local day (YYYY-MM-DD) of a moment */
-export const localDay = (d: Date, tz: string) => PARTS(tz).format(d);
+export function localDay(d: Date, tz: string): string {
+  const key = `${tz}\u0001${Math.floor(d.getTime() / QUARTER)}`;
+  let v = dayMemo.get(key);
+  if (v === undefined) {
+    let f = formats.get(tz);
+    if (!f) formats.set(tz, (f = new Intl.DateTimeFormat("en-CA", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit" })));
+    v = f.format(d);
+    dayMemo.set(key, v);
+  }
+  return v;
+}
 /** the first of the local month (YYYY-MM-01) */
-export const localMonth = (d: Date, tz: string) => PARTS(tz).format(d).slice(0, 7) + "-01";
+export const localMonth = (d: Date, tz: string) => localDay(d, tz).slice(0, 7) + "-01";
 
 // --------------------------------------------------------------- tallies
 export type Drops = Record<string, { count: number; examples: string[] }>;

@@ -24,7 +24,8 @@
     "weekly:publish": "NODE_USE_ENV_PROXY=1 tsx scripts/weekly-publish.ts",
     "onboard": "NODE_USE_ENV_PROXY=1 tsx scripts/onboard.ts",
     "perf": "NODE_USE_ENV_PROXY=1 tsx scripts/perf.ts",
-    "raw": "NODE_USE_ENV_PROXY=1 tsx scripts/raw.ts"
+    "raw": "NODE_USE_ENV_PROXY=1 tsx scripts/raw.ts",
+    "load": "NODE_USE_ENV_PROXY=1 tsx scripts/load.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "0.122.0",

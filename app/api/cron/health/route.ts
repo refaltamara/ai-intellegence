@@ -1,6 +1,10 @@
-/** Nightly health checks (CMS plan, "Health") for every workspace that is live or in review. Protected by CRON_SECRET. */
+/**
+ * Nightly health checks (CMS plan, "Health") for every workspace that is live or in review; then staged rows of loads
+ * that went in or were held more than 30 days ago are cleared (DECISIONS, 10 Oct 2026). Protected by CRON_SECRET.
+ */
 import { sql } from "@/db/client";
 import { recordHealth } from "@/onboard/health";
+import { clearOld } from "@/loader/stage";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -16,5 +20,6 @@ export async function GET(req: Request) {
     const h = await recordHealth(w.id).catch((e) => ({ error: (e as Error).message }) as never);
     out.push({ ws: w.id, ...("checks" in (h as object) ? { warn: (h as { checks: { status: string }[] }).checks.filter((c) => c.status !== "ok" && c.status !== "info").length } : h) });
   }
-  return Response.json({ ran: out });
+  const cleared = await clearOld(30).catch((e) => ({ error: (e as Error).message }));
+  return Response.json({ ran: out, staging_cleared: cleared });
 }

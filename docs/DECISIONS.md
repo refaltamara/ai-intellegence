@@ -738,3 +738,36 @@ The agreed design is the doc "Core data architecture and model" (https://claude.
   - `pnpm raw pull <workspace>` fetches files into `data/raw/`, checked against their hash, for the Python loaders or for analysis.
   - `pnpm raw check` shows where each file is, and what `raw_files` says.
   - `pnpm raw expired` lists files past their 12 months.
+
+**Step 2: one loader, staging and checks (10 Oct).**
+- **One loader, in TypeScript** (`src/loader/`, `pnpm load`). A load:
+  1. reads raw files through `readRaw`;
+  2. maps them with the source's adapter: Beauty quarterly exports, Fair Listening dumps, or profile and case exports with their contract;
+  3. lands in `staging` (its own schema: loads, posts, readings, accounts, comments, captions, topics);
+  4. is checked;
+  5. is held, or promoted to today's core.
+
+  The promotion writes what the old loaders wrote: the same columns, overwrite for Beauty and listening, fill-what-is-empty for profiles (`src/loader/columns.ts`). It writes a row only when a value changes, so loading the same files twice changes nothing and every load says what it changed. `etl/load.py` and `etl/load_profile.py` are superseded and kept for reference; the CMS's "Load the dump" now runs the one loader too.
+- **The ports were proven against the core.** Every raw file was staged and compared column by column with the core:
+  - Beauty: 278,322 posts, no difference.
+  - Fintech: 13,275 posts, 114,633 readings, 116,366 comments, no difference.
+  - Kahf: 2,683 posts and 46,643 comments, no difference.
+  - Maudy: 3,559 posts and 53,846 comments. The only differences were 261 posts whose follower, share and like counts today's profile rules fill and the 18 Sep load had left empty.
+
+  Promoting the four loads then changed exactly those 261 posts and nothing else (DATA_NOTES, "The one loader").
+- **Checks have two outcomes** (`src/loader/checks.ts`, thresholds in `src/config/loads.ts`, set so none of the four workspaces' loads would have been held). A load is **held** when:
+  - rows are missing against the file;
+  - a brand, account or sentiment label is not set up;
+  - posts are dated in the future or before 2010;
+  - over 10% of comments fall more than an hour before their post: a time zone read wrong; Kahf has 0%, Fintech 1.6%, Maudy 2.5%;
+  - the posts' time of day moved 4 hours or more from the workspace's earlier posts;
+  - one post appears under several urls for over 1% of posts;
+  - over half the posts are set aside as not about their brand, or the keyword and spam rules drop over 70% of a profile's posts file;
+  - a file yields nothing.
+
+  **Warnings** let the load in. Rows reporting 0 followers, and videos reporting 0 views, are flagged in `posts.flags`; the definitions in step 4 keep them out of rates and medians.
+- **Who hears what.** A held load is told to data ops (accounts with the data_ops duty). Warnings are told to them and to the scraper team (`SCRAPER_TEAM_EMAILS`). Every notice is kept on the load, sent or not; email needs Resend set up.
+- **In the CMS.** The workspace's new Loads tab lists every load: files, what was staged, the checks, what went in, who was told. A held load is let in (the person is recorded) or thrown away whole; any load can be loaded again from its raw files. The tab also lists the workspace's raw files and whether the store has them.
+- **Automatic loads.** When the scraper delivers into the store under `inbox/<workspace>/`, the jobs cron registers the delivered files as raw files and queues a load once every table of one dump has arrived (`src/loader/intake.ts`). This covers live listening workspaces, and does nothing until a Blob store is connected.
+- **Clearing.** Staged rows are cleared 30 days after a load goes in or is held (the nightly health cron). The four verification loads of 10 Oct take about 370 MB of staging until then.
+- **Lineage.** Each file a load writes from gets a `data_loads` row pointing at its staged load and raw file; `raw_files` (the database, not the manifest) is the registry the app reads, and files uploaded in the CMS are registered and hashed there.

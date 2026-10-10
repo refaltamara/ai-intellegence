@@ -121,6 +121,13 @@ export async function fetchStored(f: RawFile): Promise<Buffer> {
 
 /** a raw file's bytes: the local copy when it matches, else the store (loaders read through this) */
 export async function readRaw(f: RawFile): Promise<Buffer> {
+  if (/^(file|https?):\/\//.test(f.blob)) {
+    // a file uploaded in the CMS: kept where it was uploaded (private Blob, or the onboarding folder)
+    const { readStoredBytes } = await import("../onboard/storage");
+    const b = await readStoredBytes(f.blob);
+    if (sha256(b) !== f.sha256) throw new Error(`${f.path} does not match its hash: it changed after it was received.`);
+    return b;
+  }
   const local = await localCopy(f);
   if (local) return local;
   if (!storeOn()) throw new Error(`${f.path} is not here and the store is not configured: run \`pnpm raw pull ${f.workspace}\` with BLOB_READ_WRITE_TOKEN set.`);

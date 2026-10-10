@@ -6,7 +6,7 @@
  *   inspect                                                  queue the inspect step (then run it)
  *   brands     { brands: { id: { name, handles[], terms[], never[] } }, client }
  *   labels     { map: { label: positive|neutral|negative|null } }
- *   load                                                     queue the load (then run it, slice by slice)
+ *   load                                                     the dump's files become raw files; queue the one loader's load (then run it, slice by slice)
  *   run        { job_id }                                    run one slice of a job now (the cron does it every 5 minutes otherwise)
  *   preview    { brand_id, terms?, never? }                  relevance under these terms
  *   terms      { brand_id, terms, never, apply? }            save a brand's terms, and apply them
@@ -30,6 +30,7 @@ import { previewTerms, saveTerms } from "@/onboard/terms";
 import { enqueueJob } from "@/extensions/store";
 import { runSlice, type Job } from "@/extensions/jobs";
 import { recordHealth, setNotes } from "@/onboard/health";
+import { registerUpload } from "@/loader/registry";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -106,9 +107,13 @@ export async function POST(req: Request) {
     case "load": {
       const block = await loadBlockers(ws);
       if (block.length) return no(block.join(" "));
-      const running = (await sql.query("select id from cms_jobs where workspace_id = $1 and kind = 'dump_load' and status in ('queued','running')", [ws])) as { id: string }[];
+      const running = (await sql.query("select id from cms_jobs where workspace_id = $1 and kind in ('dump_load','load') and status in ('queued','running')", [ws])) as { id: string }[];
       if (running[0]) return Response.json({ ok: true, job_id: running[0].id });
-      const id = await enqueueJob(ws, "dump_load", {}, by);
+      // the dump's files become raw files (hashed, kept 12 months) and the one loader loads them through staging and its checks (src/loader/)
+      const src = await sourceOf(ws);
+      const raws = [];
+      for (const f of Object.values(src.config.files ?? {})) raws.push(await registerUpload(ws, f.name, f.url));
+      const id = await enqueueJob(ws, "load", { source: "listening", files: raws.map((r) => r.blob), promote: "auto", onboarding: true, started_by: by }, by);
       await audit({ workspace_id: ws, actor: by, area: "data", action: "load" });
       return Response.json({ ok: true, job_id: id });
     }

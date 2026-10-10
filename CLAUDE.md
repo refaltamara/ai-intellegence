@@ -10,7 +10,7 @@ Rules:
 5. Tier and affiliate thresholds live in src/config; never hardcode. Bands are in docs/DECISIONS.md.
 6. Instagram posts can belong to several brands; uniqueness is (platform, url, brand). Owned vs earned exists on TikTok only.
 7. Skills whose data layer is missing return status "unavailable" with a plain message. velocity, forecast, narrative and the topic-based comment skills (objections, questions, dupes, claims, whitespace) are unavailable in v1. sentiment, comment-themes, drivers and seeding run wherever comments are loaded (profile workspaces first).
-8. Stack: Next.js App Router + TypeScript, Drizzle, Neon Postgres, Vercel (Vercel Cron for agents), Resend email, Python/pandas ETL. Do not add Railway, pg-boss, or Redis.
+8. Stack: Next.js App Router + TypeScript, Drizzle, Neon Postgres, Vercel (Vercel Cron for agents), Resend email; loads through the TypeScript loader (`src/loader/`), Python/pandas for one-off analysis. Do not add Railway, pg-boss, or Redis.
 9. Use `pnpm skill run <name>` to verify skills before touching UI. Verification: pnpm test, pnpm smoke, pnpm db:stats; pnpm perf after touching a page's queries or a big load.
 10. Do not integrate Fair Space or Fair Hub. Never commit secrets; .env is gitignored.
 
@@ -20,7 +20,7 @@ Rules:
 - Inside a conversation, skills are internal: never a skill name, slash command, tool name, or "Running…" in the thread or in model text. The server strips slashed skill names and logs mechanism_leak for anything else. The sidebar is Dashboard, Weekly Reports, Decks, Chats for a team with a brand panel, and Dashboard, Pulse, Chats, Reports for a PR team (`src/ui/Sidebar.tsx`); what CeMO can do opens from "/" or "+" in the composer (`src/skills/team.ts`, plain titles, picking fills an example question), with the library at `/skills`.
 - Activity strings and result-card titles come from skills.registry.json (`activity`, `title`), templated from workspace counts, params_resolved and SkillResult.meta.
 - The model asks at most one clarifying question per turn (ask_user; the turn ends on it and the next user message is its tool_result). No suggested follow-ups and no <counter> block (DECISIONS, 1 Oct 2026): a pushback is one plain sentence; a stray <followups> block is still swallowed by the stream. The evidence pane opens only when asked, charts only on "Show chart".
-- Profile workspaces load through `etl/load_profile.py` with a contract in `etl/profiles/<workspace>.json` (owned handles, keywords, drop list). Comments carry `sentiment` (3 classes, labelled by `/api/cron/label` on Vercel); earned posts carry `stance`; owned posts and the subject's replies are never labelled. Off-topic contents are dropped at load and listed in the load report.
+- Profile workspaces load through the one loader (`pnpm load run <ws> profile`; `src/loader/adapters/profile.ts`, ported from `etl/load_profile.py`) with a contract in `etl/profiles/<workspace>.json` (owned handles, keywords, drop list). Comments carry `sentiment` (3 classes, labelled by `/api/cron/label` on Vercel); earned posts carry `stance`; owned posts and the subject's replies are never labelled. Off-topic contents are dropped at load and listed in the load report.
 - Client brand is workspaces.client_brand_id (Fair's owners or data ops set it on the Data page, opened from the account row; default none).
 - Each team opens on its Dashboard (`/dashboard`): fixed layout, filters only, every number from `src/dashboard/data.ts`; PR teams see the old Pulse view there. "Ask why" links carry a reference (`src/dashboard/askref.ts`), never numbers; the server re-reads the figures (`src/dashboard/ask.ts`) into a card and in front of the question. Pulses (`/pulse`, `src/pulses/`, PR teams; a panel team's `/pulse` redirects to Decks, its old boards still open) are boards: cards are Dashboard views with their own filters (numbers from `src/dashboard/data.ts` via `src/pulses/cards.ts`; `latest-month`/`latest-week` move with the data) or analyses pinned from Chats (`skill_run_id`, re-run on Refresh). Pure card metadata lives in `src/pulses/kinds.ts` so client components never import the data layer.
 - Chats (`/`) is free-form. Decisions are retired (`/decisions`, `/d/*` redirect to Chats). Reports (`/reports`, `src/ui/ReportsHome.tsx`; off a panel team's sidebar, opened from Weekly Reports → Schedule) is one list: schedules with their reports, then reports from Chats (deck versions are not listed; their links open the deck); every report and schedule is deletable there. "Turn into a report" builds from the whole conversation (`src/reports/conversation.ts`). No pg-boss; no strict tools.
@@ -47,3 +47,10 @@ Rules:
   - every number on every screen comes from one versioned definition.
 
   Raw files live in private Vercel Blob (`src/raw/store.ts`, `data/raw/MANIFEST.json`, `pnpm raw`), never in the repository: never commit a raw file.
+  Every load goes through the one loader (`src/loader/`, `pnpm load`):
+  - a source's adapter maps its files;
+  - the rows land in `staging`;
+  - the checks (`src/loader/checks.ts`, `src/config/loads.ts`) hold a broken load or let it in with flagged rows (`posts.flags`);
+  - the promotion writes only what changed (`src/loader/columns.ts` says what each source writes).
+
+  The CMS shows loads in a workspace's Loads tab. Python is for one-off analysis only.
