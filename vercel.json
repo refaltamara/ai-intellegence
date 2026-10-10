@@ -1,5 +1,6 @@
 {
   "framework": "nextjs",
+  "buildCommand": "pnpm run build",
   "regions": [
     "cle1"
   ],

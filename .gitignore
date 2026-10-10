@@ -9,3 +9,4 @@ __pycache__/
 .DS_Store
 *.tsbuildinfo
 next-env.d.ts
+.claude/settings.local.json

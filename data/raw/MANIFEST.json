@@ -1,0 +1,429 @@
+{
+  "note": "Raw files as received, kept in private Vercel Blob (DECISIONS, 10 Oct 2026). Not in the repository: `pnpm raw pull <workspace>` fetches them into data/raw/. A raw file never changes; a corrected file is a new file.",
+  "files": [
+    {
+      "path": "instagram_q1_2026.csv.gz",
+      "workspace": "beauty-id",
+      "blob": "raw/beauty-id/instagram_q1_2026.csv.gz",
+      "bytes": 10932959,
+      "sha256": "8904f4ace39aaf1491b60e5e61c468b1800bd139eb0c5e5ef45b2ead7724b201",
+      "received": "2026-09-02"
+    },
+    {
+      "path": "instagram_q2_2026.csv.gz",
+      "workspace": "beauty-id",
+      "blob": "raw/beauty-id/instagram_q2_2026.csv.gz",
+      "bytes": 10894326,
+      "sha256": "360c029b750007890542a384ecdf395b52d5b8b8258717aeb3efac5df22c6c50",
+      "received": "2026-09-02"
+    },
+    {
+      "path": "tiktok_q2_2026.csv.gz",
+      "workspace": "beauty-id",
+      "blob": "raw/beauty-id/tiktok_q2_2026.csv.gz",
+      "bytes": 10703876,
+      "sha256": "23dca9e3b7c6bb41b771fd15cbb8cf578b105df9326a9b8b0ec4606b51ca1686",
+      "received": "2026-09-02"
+    },
+    {
+      "path": "kahf/comments_threads_1007a.csv",
+      "workspace": "kahf-threads",
+      "blob": "raw/kahf-threads/comments_threads_1007a.csv",
+      "bytes": 202329,
+      "sha256": "e478bb0a8757bf11f327d13db4c8437e695319624c2a6fef1a5bf4a4308b7075",
+      "received": "2026-10-07"
+    },
+    {
+      "path": "kahf/comments_threads_1007b.csv",
+      "workspace": "kahf-threads",
+      "blob": "raw/kahf-threads/comments_threads_1007b.csv",
+      "bytes": 2087012,
+      "sha256": "1328d33d670c55f60d194be503993282894d70cfbcf1a2612c4bc95642b6d8b7",
+      "received": "2026-10-07"
+    },
+    {
+      "path": "kahf/comments_threads_1007c.csv",
+      "workspace": "kahf-threads",
+      "blob": "raw/kahf-threads/comments_threads_1007c.csv",
+      "bytes": 111021,
+      "sha256": "225ebabd77c194830f37c533374eed699de428b87509af0589cb1fad9cd71506",
+      "received": "2026-10-07"
+    },
+    {
+      "path": "kahf/comments_threads_1007d.csv",
+      "workspace": "kahf-threads",
+      "blob": "raw/kahf-threads/comments_threads_1007d.csv",
+      "bytes": 187187,
+      "sha256": "b016af42a48f003532e5687c64a5f91d72da3d25395f7298f857521d84c3db5a",
+      "received": "2026-10-07"
+    },
+    {
+      "path": "kahf/comments_threads_1007g.csv",
+      "workspace": "kahf-threads",
+      "blob": "raw/kahf-threads/comments_threads_1007g.csv",
+      "bytes": 1247716,
+      "sha256": "d0105d3866f11ebd19a81c59d63db93ace2512bfdeaf5c55506d5d34e996450e",
+      "received": "2026-10-07"
+    },
+    {
+      "path": "kahf/comments_threads_1008b.csv",
+      "workspace": "kahf-threads",
+      "blob": "raw/kahf-threads/comments_threads_1008b.csv",
+      "bytes": 261067,
+      "sha256": "0297f3c3f48a9cc9f2073a5705cddb75a0af0750e43a756c52cae9ae4edc121e",
+      "received": "2026-10-08"
+    },
+    {
+      "path": "kahf/comments_threads_1008d.csv",
+      "workspace": "kahf-threads",
+      "blob": "raw/kahf-threads/comments_threads_1008d.csv",
+      "bytes": 5781523,
+      "sha256": "40becb699167b4aced6eb1c8c45ab67c29dd5ae6ad7495c999894eeb7c60d632",
+      "received": "2026-10-08"
+    },
+    {
+      "path": "kahf/contents_threads_1007e.csv",
+      "workspace": "kahf-threads",
+      "blob": "raw/kahf-threads/contents_threads_1007e.csv",
+      "bytes": 34547,
+      "sha256": "679d958e2b410b8bbf06fe237ad6f3361edc355eb1a9bb3ff7a07c14a5c0cff1",
+      "received": "2026-10-07"
+    },
+    {
+      "path": "kahf/contents_threads_1007f.csv",
+      "workspace": "kahf-threads",
+      "blob": "raw/kahf-threads/contents_threads_1007f.csv",
+      "bytes": 20067,
+      "sha256": "eab12fc1896570d467eb7d714f4f679331090099c921ec76fbb5d8cf91c2a83d",
+      "received": "2026-10-07"
+    },
+    {
+      "path": "kahf/contents_threads_1007h.csv",
+      "workspace": "kahf-threads",
+      "blob": "raw/kahf-threads/contents_threads_1007h.csv",
+      "bytes": 168690,
+      "sha256": "9ab400f4832b3fc865aed4c4ad5745a64e88ec45681ae7ec3c81d8106bfe20ff",
+      "received": "2026-10-07"
+    },
+    {
+      "path": "kahf/contents_threads_1007i.csv",
+      "workspace": "kahf-threads",
+      "blob": "raw/kahf-threads/contents_threads_1007i.csv",
+      "bytes": 94506,
+      "sha256": "943a0949341d84ad076bea032213352f093e9a6dac30a15539dfea27542c0a41",
+      "received": "2026-10-07"
+    },
+    {
+      "path": "kahf/contents_threads_1008a.csv",
+      "workspace": "kahf-threads",
+      "blob": "raw/kahf-threads/contents_threads_1008a.csv",
+      "bytes": 139181,
+      "sha256": "f012e862ef01f968e4b8248c3827c503e0598a184a776a8ea8f8c0ddce1c9129",
+      "received": "2026-10-07"
+    },
+    {
+      "path": "kahf/contents_threads_1008c.csv",
+      "workspace": "kahf-threads",
+      "blob": "raw/kahf-threads/contents_threads_1008c.csv",
+      "bytes": 206971,
+      "sha256": "648405a048ac59643f60946e4cd85dd88a1a3b4a3c608d5e41f737df20eb0163",
+      "received": "2026-10-08"
+    },
+    {
+      "path": "kahf/contents_threads.csv",
+      "workspace": "kahf-threads",
+      "blob": "raw/kahf-threads/contents_threads.csv",
+      "bytes": 143440,
+      "sha256": "a9a163484bd77224de89cbef4c8393b3833ab5d58bbd9a14ec6d46653060da80",
+      "received": "2026-10-07"
+    },
+    {
+      "path": "kahf/post_stats_1007b.csv",
+      "workspace": "kahf-threads",
+      "blob": "raw/kahf-threads/post_stats_1007b.csv",
+      "bytes": 3829,
+      "sha256": "dc1b8a9787d477805c696fe60d36ff32b6b5076cb5fdabf86011322e606f24fe",
+      "received": "2026-10-07"
+    },
+    {
+      "path": "maudy/comments_instagram_0916.csv",
+      "workspace": "maudy-ayunda",
+      "blob": "raw/maudy-ayunda/comments_instagram_0916.csv",
+      "bytes": 2165820,
+      "sha256": "b6f8e4f2c5623df2b233157b9a94e5dcc63d5dbbe304e97b18dccf95ac354ac1",
+      "received": "2026-09-16"
+    },
+    {
+      "path": "maudy/comments_instagram_0918.csv",
+      "workspace": "maudy-ayunda",
+      "blob": "raw/maudy-ayunda/comments_instagram_0918.csv",
+      "bytes": 408561,
+      "sha256": "10820364f19d35e8948ba4b2d6ae1caf4b7601f626c33f10a65413511cec759f",
+      "received": "2026-09-18"
+    },
+    {
+      "path": "maudy/comments_instagram.csv",
+      "workspace": "maudy-ayunda",
+      "blob": "raw/maudy-ayunda/comments_instagram.csv",
+      "bytes": 326793,
+      "sha256": "f445096fca991dfcca66108d3f44c59170a01a5d2385f54b06f7b0f20d58c9e5",
+      "received": "2026-09-14"
+    },
+    {
+      "path": "maudy/comments_threads_0915.csv",
+      "workspace": "maudy-ayunda",
+      "blob": "raw/maudy-ayunda/comments_threads_0915.csv",
+      "bytes": 271679,
+      "sha256": "fe082fb068bedf3569ca9e64b34c39b9cb30fbf85d33388c92fb5e558287932d",
+      "received": "2026-09-15"
+    },
+    {
+      "path": "maudy/comments_threads_0915b.csv",
+      "workspace": "maudy-ayunda",
+      "blob": "raw/maudy-ayunda/comments_threads_0915b.csv",
+      "bytes": 712114,
+      "sha256": "f10b990773d731729ab3e913864ca8c98e817260b3b7c3db6492f12c524116df",
+      "received": "2026-09-15"
+    },
+    {
+      "path": "maudy/comments_threads_0916.csv",
+      "workspace": "maudy-ayunda",
+      "blob": "raw/maudy-ayunda/comments_threads_0916.csv",
+      "bytes": 26633,
+      "sha256": "f828c43905d1b0aecbf3e88faf6f3619b03f6630585a624db66d9debf62aa087",
+      "received": "2026-09-16"
+    },
+    {
+      "path": "maudy/comments_threads_batch2_mechanical.csv",
+      "workspace": "maudy-ayunda",
+      "blob": "raw/maudy-ayunda/comments_threads_batch2_mechanical.csv",
+      "bytes": 7279223,
+      "sha256": "08a3e5e77b568e26d576af3084fe986d143fb343a5f6c55f9436bbefcad68f22",
+      "received": "2026-09-18"
+    },
+    {
+      "path": "maudy/comments_threads_batch3.csv",
+      "workspace": "maudy-ayunda",
+      "blob": "raw/maudy-ayunda/comments_threads_batch3.csv",
+      "bytes": 839829,
+      "sha256": "51cdb37ec4c5162900b9d825043bfa56b2b20fd6417e479a97ec20335e837957",
+      "received": "2026-09-16"
+    },
+    {
+      "path": "maudy/comments_threads_compiled.csv",
+      "workspace": "maudy-ayunda",
+      "blob": "raw/maudy-ayunda/comments_threads_compiled.csv",
+      "bytes": 2106126,
+      "sha256": "114a8b9a223eaf7d3bc1e4b2d0c1ead5c66e339d7878a8775e950a65b0ac36d2",
+      "received": "2026-09-15"
+    },
+    {
+      "path": "maudy/comments_threads.csv",
+      "workspace": "maudy-ayunda",
+      "blob": "raw/maudy-ayunda/comments_threads.csv",
+      "bytes": 596441,
+      "sha256": "01856d4d1a892a125a3461e48733d8646ed0f6f61ee1a1f492c4fc80dfc8edce",
+      "received": "2026-09-14"
+    },
+    {
+      "path": "maudy/comments_tiktok.csv",
+      "workspace": "maudy-ayunda",
+      "blob": "raw/maudy-ayunda/comments_tiktok.csv",
+      "bytes": 132954,
+      "sha256": "36bf6bba3f1dd834abc3948d85ca7f8be91836f323368be663a8519a7fa7d396",
+      "received": "2026-09-14"
+    },
+    {
+      "path": "maudy/comments_x_0915.csv",
+      "workspace": "maudy-ayunda",
+      "blob": "raw/maudy-ayunda/comments_x_0915.csv",
+      "bytes": 97462,
+      "sha256": "1790e0bdc5dc91858f385647f8e1d9263b480c2cccb510f262a070c77b2a52e8",
+      "received": "2026-09-15"
+    },
+    {
+      "path": "maudy/comments_x_0915b.csv",
+      "workspace": "maudy-ayunda",
+      "blob": "raw/maudy-ayunda/comments_x_0915b.csv",
+      "bytes": 30336,
+      "sha256": "572f1b7c51bfa10929f5f0bfe064d599139d7d35a6788e71a54cfd4407701417",
+      "received": "2026-09-15"
+    },
+    {
+      "path": "maudy/comments_x_0916.csv",
+      "workspace": "maudy-ayunda",
+      "blob": "raw/maudy-ayunda/comments_x_0916.csv",
+      "bytes": 60136,
+      "sha256": "181ca0b4fe8c3d16188ac045c0aaf7b75007b7c4865b1063ace839b5162e120a",
+      "received": "2026-09-16"
+    },
+    {
+      "path": "maudy/comments_x_0918.csv",
+      "workspace": "maudy-ayunda",
+      "blob": "raw/maudy-ayunda/comments_x_0918.csv",
+      "bytes": 157274,
+      "sha256": "06821819aee6021ebf33ea2402c38380edab8bd8294cdfe94f7c098d29876ede",
+      "received": "2026-09-18"
+    },
+    {
+      "path": "maudy/comments_x.csv",
+      "workspace": "maudy-ayunda",
+      "blob": "raw/maudy-ayunda/comments_x.csv",
+      "bytes": 48456,
+      "sha256": "61d27ff857d52045d06bb33f499c3c0d828fb8ddf604a942dfa4ab232efbcf7e",
+      "received": "2026-09-14"
+    },
+    {
+      "path": "maudy/comments_youtube_0915.csv",
+      "workspace": "maudy-ayunda",
+      "blob": "raw/maudy-ayunda/comments_youtube_0915.csv",
+      "bytes": 1084706,
+      "sha256": "f4340854f9fc915820059a4a79af486b070a9d84149791b6aabcfe5219cc0ddf",
+      "received": "2026-09-15"
+    },
+    {
+      "path": "maudy/comments_youtube_0915b.csv",
+      "workspace": "maudy-ayunda",
+      "blob": "raw/maudy-ayunda/comments_youtube_0915b.csv",
+      "bytes": 462228,
+      "sha256": "5e9ea99d6d01f7f5bdf96426af993cce7d1d3aad4f7de27975f789f28243d90a",
+      "received": "2026-09-15"
+    },
+    {
+      "path": "maudy/comments_youtube_0916.csv",
+      "workspace": "maudy-ayunda",
+      "blob": "raw/maudy-ayunda/comments_youtube_0916.csv",
+      "bytes": 360320,
+      "sha256": "18b2edab47918ff04a6edd990689ef2d48324fe67ba9354d2b2ac1dd311f145e",
+      "received": "2026-09-16"
+    },
+    {
+      "path": "maudy/comments_youtube_0918.csv",
+      "workspace": "maudy-ayunda",
+      "blob": "raw/maudy-ayunda/comments_youtube_0918.csv",
+      "bytes": 740936,
+      "sha256": "0ac982109996e8d188f0cf3d5b1e7968582c001d8b870500e25b3211bc1e22cc",
+      "received": "2026-09-18"
+    },
+    {
+      "path": "maudy/comments_youtube.csv",
+      "workspace": "maudy-ayunda",
+      "blob": "raw/maudy-ayunda/comments_youtube.csv",
+      "bytes": 724334,
+      "sha256": "207be358d037a5dbf4f4367143c25019c0ef289fffa9e08998af6ec2c3588143",
+      "received": "2026-09-14"
+    },
+    {
+      "path": "maudy/contents_instagram.csv",
+      "workspace": "maudy-ayunda",
+      "blob": "raw/maudy-ayunda/contents_instagram.csv",
+      "bytes": 3100,
+      "sha256": "514ca8f8e4a3052f11edbd129cab37a2af380d0a5ce90adde8f90801b156129d",
+      "received": "2026-09-14"
+    },
+    {
+      "path": "maudy/contents_threads_0915.csv",
+      "workspace": "maudy-ayunda",
+      "blob": "raw/maudy-ayunda/contents_threads_0915.csv",
+      "bytes": 261360,
+      "sha256": "2eabaf809a56f79ac13fc890e4bebae142fcf42c9baa9824bd1ffb7cd385e1c2",
+      "received": "2026-09-15"
+    },
+    {
+      "path": "maudy/contents_threads_0915b.csv",
+      "workspace": "maudy-ayunda",
+      "blob": "raw/maudy-ayunda/contents_threads_0915b.csv",
+      "bytes": 80334,
+      "sha256": "450c48d215d9f5c629e5a94f54be5c1ee886ac9e75de58733f76998069003826",
+      "received": "2026-09-15"
+    },
+    {
+      "path": "maudy/contents_threads_0916.csv",
+      "workspace": "maudy-ayunda",
+      "blob": "raw/maudy-ayunda/contents_threads_0916.csv",
+      "bytes": 41465,
+      "sha256": "664a4ac92beef67a238cdfc26f8c7c702d3a6ac687e9ead1bf62e9854d58e9bb",
+      "received": "2026-09-16"
+    },
+    {
+      "path": "maudy/contents_threads_0918.csv",
+      "workspace": "maudy-ayunda",
+      "blob": "raw/maudy-ayunda/contents_threads_0918.csv",
+      "bytes": 161813,
+      "sha256": "bd28ca61c1341d5a54fd925eb2365fbecf76a4675a70f35734e1ae1cd65ffbd3",
+      "received": "2026-09-18"
+    },
+    {
+      "path": "maudy/contents_threads.csv",
+      "workspace": "maudy-ayunda",
+      "blob": "raw/maudy-ayunda/contents_threads.csv",
+      "bytes": 85914,
+      "sha256": "c1ecde556511c7efeb96fedc485571d5379d2072db0428db3d3d59dc3be04b41",
+      "received": "2026-09-14"
+    },
+    {
+      "path": "maudy/contents_tiktok.csv",
+      "workspace": "maudy-ayunda",
+      "blob": "raw/maudy-ayunda/contents_tiktok.csv",
+      "bytes": 4104,
+      "sha256": "65393b4a9a5e73fc817f17caac47a3525ab19db934bd81e7a378fc37a6faf43b",
+      "received": "2026-09-14"
+    },
+    {
+      "path": "maudy/contents_x_0915.csv",
+      "workspace": "maudy-ayunda",
+      "blob": "raw/maudy-ayunda/contents_x_0915.csv",
+      "bytes": 172616,
+      "sha256": "84217eb1be21f5bd5f8454efe45ac630d96b392ffc6fcd06db8f39b7683b148d",
+      "received": "2026-09-15"
+    },
+    {
+      "path": "maudy/contents_x_0915b.csv",
+      "workspace": "maudy-ayunda",
+      "blob": "raw/maudy-ayunda/contents_x_0915b.csv",
+      "bytes": 141369,
+      "sha256": "081a478ba0425b8c7da8451b1ed7034f7cbe1dd1b2ce835838ff6b55305ba934",
+      "received": "2026-09-15"
+    },
+    {
+      "path": "maudy/contents_x_0916.csv",
+      "workspace": "maudy-ayunda",
+      "blob": "raw/maudy-ayunda/contents_x_0916.csv",
+      "bytes": 184357,
+      "sha256": "7eb3653da5b45acc36be5fa6f9391080f62faaeae26a58c6fefb7653fcbd4edd",
+      "received": "2026-09-16"
+    },
+    {
+      "path": "maudy/contents_x_0918.csv",
+      "workspace": "maudy-ayunda",
+      "blob": "raw/maudy-ayunda/contents_x_0918.csv",
+      "bytes": 248978,
+      "sha256": "18ef81226fd39eaddb66a1d9b2b1ed5cf19ea1c4befb4cba6404421dcbc16c34",
+      "received": "2026-09-18"
+    },
+    {
+      "path": "maudy/contents_x.csv",
+      "workspace": "maudy-ayunda",
+      "blob": "raw/maudy-ayunda/contents_x.csv",
+      "bytes": 63869,
+      "sha256": "08c7efae54096bf9d2dcb7f75beb5bced2a9ba21286c1a93b78df707e590aeae",
+      "received": "2026-09-14"
+    },
+    {
+      "path": "maudy/contents_youtube.csv",
+      "workspace": "maudy-ayunda",
+      "blob": "raw/maudy-ayunda/contents_youtube.csv",
+      "bytes": 1358,
+      "sha256": "1d77141ecb35b40d57d0a206eeba518669c54acd54862223ed1dd4fa3e0a821e",
+      "received": "2026-09-14"
+    },
+    {
+      "path": "maudy/urltext_threads_0915.csv",
+      "workspace": "maudy-ayunda",
+      "blob": "raw/maudy-ayunda/urltext_threads_0915.csv",
+      "bytes": 302172,
+      "sha256": "30ce104375d104ce1e5d2810ddebd378f2b7a6124de20907dd5a382c127eddaf",
+      "received": "2026-09-15"
+    }
+  ]
+}
