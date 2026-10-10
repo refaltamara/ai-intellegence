@@ -52,7 +52,7 @@ export function RankTable({ rows, base, prevLabel, erFloor }: { rows: RankRow[];
           <thead>
             <tr>
               <th className="num">#</th><th>Brand</th><th>Platform</th>
-              {th("share_views", "Share of views", "The brand's views at day 7 ÷ every panel brand's, this period")}{th("views", "Views (day 7)", "Views in the reading nearest 7 days after posting; the latest reading below")}{th("share_voice", "Share of voice", "The brand's posts ÷ every panel brand's posts, this period")}{th("posts", "Content")}{th("creators", "Creators")}{th("engagements", "Engagement")}{th("er", "ER", `Engagement rate at day 7, flagged posts left out; brands with fewer than ${erFloor} posts are not ranked on it`)}{th("growth", "Growth", `Views at day 7 vs ${prevLabel}`)}
+              {th("share_views", "Share of views", "The brand's views at day 7 ÷ every panel brand's, this period")}{th("views", "Views (day 7)", "Views in the reading nearest 7 days after posting; the latest reading below")}{th("share_voice", "Share of voice", "The brand's posts ÷ every panel brand's posts, this period")}{th("posts", "Content")}{th("creators", "Creators")}{th("engagements", "Engagement")}{th("er", "ER", `Engagement rate at day 7, posts with views; brands with fewer than ${erFloor} posts are not ranked on it`)}{th("growth", "Growth", `Views at day 7 vs ${prevLabel}`)}
               <th />
             </tr>
           </thead>

@@ -121,7 +121,7 @@ export function Dashboard({ d, content, cq, view }: { d: DashboardData; content:
     { key: "posts", label: "Total content", value: int(k.now.posts), sub: `${int(k.now.creators)} creators`, tone: "blue" },
     { key: "views", label: "Views (day 7)", value: compact(k.now.views), sub: `Latest ${compact(k.now.views_latest)}${k.now.too_new ? ` · ${int(k.now.too_new)} posts too new` : ""} · ${compact(k.now.comments)} comments`, tone: "violet" },
     { key: "engagements", label: "Engagement", value: compact(k.now.engagements), sub: engNote, tone: "mint" },
-    { key: "er", label: "Engagement rate", value: pct(k.now.er, 2), sub: "Engagement ÷ views at day 7; flagged posts left out", tone: "coral" },
+    { key: "er", label: "Engagement rate", value: pct(k.now.er, 2), sub: "Engagement ÷ views at day 7, posts with views", tone: "coral" },
   ];
   const render: Record<string, (t: string) => React.ReactNode> = {
     rankings: (t) => (

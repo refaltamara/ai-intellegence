@@ -7,7 +7,10 @@
  *
  * Every number is computed here in SQL; the page only lays it out. Posts judged not
  * about their brand (posts.relevant = false) and the brands' own replies never count.
- * The alert rule comes from the role model (src/roles/model.ts).
+ * The alert rule comes from the role model (src/roles/model.ts). By the definitions
+ * (src/definitions/catalog.ts): negative share is negative ÷ labelled comments, on topic,
+ * without the subject's own replies; reach is Views (latest), the PR role's choice, since a
+ * reputation team reads how far something has spread by now (DECISIONS, 10 Oct 2026).
  */
 import { PLATFORM_LABEL } from "../skills/common";
 import { dayMonth } from "../competitor/view";

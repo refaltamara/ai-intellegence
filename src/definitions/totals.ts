@@ -4,7 +4,8 @@
  *   post_d7          each post's reading at day 7: the reading nearest day 7 after posting, from any of its links'
  *                    readings; a post that went up less than 7 days before the data's latest reading is too new
  *   daily_totals     per local day of posting, brand, platform and owned or earned: posts, flags, carts, views,
- *                    engagement (latest and at day 7), and the rated sums rates are made of; brand '*' counts each post once
+ *                    engagement (latest and at day 7), and the rated sums rates are made of (posts with views, so a
+ *                    video reporting 0 views is out); brand '*' counts each post once
  *   daily_creators   per day, brand, platform and creator: earned posts, carts, views, for creators, affiliators and the
  *                    viewership mix, which are worked out per period
  * A post set aside as not about its brand (relevant = false) never counts.
@@ -59,11 +60,11 @@ const TOTAL_COLS = `workspace_id, day, brand_id, platform, source, posts, flagge
 /** a post's numbers by the definitions: i = post_items, d = post_d7 */
 const NUMBERS = `
   i.views, ${sqlOf("engagement", "i")} as eng, ${sqlOf("engagement_lc", "i")} as eng_lc, i.comments_count as comments,
-  not ${sqlOf("flagged", "i")} and ${sqlOf("engagement_rate", "i")} as r,
-  not ${sqlOf("flagged", "i")} and ${sqlOf("engagement_rate_lc", "i")} as r_lc,
+  ${sqlOf("engagement_rate", "i")} as r,
+  ${sqlOf("engagement_rate_lc", "i")} as r_lc,
   d.day_n is not null as d7, d.views as d_views, ${sqlOf("engagement", "d")} as d_eng, ${sqlOf("engagement_lc", "d")} as d_eng_lc,
-  not ${sqlOf("flagged", "i")} and ${sqlOf("engagement_rate", "d")} as d_r,
-  not ${sqlOf("flagged", "i")} and ${sqlOf("engagement_rate_lc", "d")} as d_r_lc,
+  ${sqlOf("engagement_rate", "d")} as d_r,
+  ${sqlOf("engagement_rate_lc", "d")} as d_r_lc,
   ${sqlOf("flagged", "i")} as flagged`;
 
 /** a brand's rows count its links */
