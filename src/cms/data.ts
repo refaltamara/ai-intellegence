@@ -5,6 +5,7 @@
  */
 import { sql } from "../db/client";
 import { ROLES, type RoleId } from "../roles/model";
+import { COMMENT_IN_PANEL } from "../db/panel";
 import { listWorkspaces, getWorkspace } from "../workspace/store";
 
 export type VersionRow = { role: RoleId; version: string; status: string; stage_workspaces: string[] | null; release_note: string | null; proposed_by: string | null; released_by: string | null; released_at: string | null; rolled_back_by: string | null; rolled_back_at: string | null; created_at: string };
@@ -42,8 +43,8 @@ export type WorkspaceState = {
 export async function workspaceStates(hidden: string[] = []): Promise<WorkspaceState[]> {
   const ws = (await listWorkspaces()).filter((w) => !hidden.includes(w.id));
   const [posts, comments, loads, people, invites] = await Promise.all([
-    sql.query("select workspace_id, count(*)::int as n, count(*) filter (where relevant = false)::int as off, to_char(max(posted_at), 'YYYY-MM-DD') as through from posts group by 1") as unknown as Promise<{ workspace_id: string; n: number; off: number; through: string | null }[]>,
-    sql.query("select workspace_id, count(*)::int as n from comments group by 1") as unknown as Promise<{ workspace_id: string; n: number }[]>,
+    sql.query("select workspace_id, count(*)::int as n, count(*) filter (where relevant = false)::int as off, to_char(max(posted_at), 'YYYY-MM-DD') as through from posts where brought_in_by = 'panel' group by 1") as unknown as Promise<{ workspace_id: string; n: number; off: number; through: string | null }[]>,
+    sql.query(`select c.workspace_id, count(*)::int as n from comments c where ${COMMENT_IN_PANEL("c")} group by 1`) as unknown as Promise<{ workspace_id: string; n: number }[]>,
     sql.query("select workspace_id, to_char(max(started_at), 'YYYY-MM-DD') as last from data_loads group by 1") as unknown as Promise<{ workspace_id: string; last: string | null }[]>,
     sql.query("select workspace_id, count(*)::int as n, count(*) filter (where exists (select 1 from jsonb_each_text(levels) l where l.value = 'builder'))::int as builders from users u join accounts a on a.id = u.account_id where cardinality(a.staff) = 0 group by 1") as unknown as Promise<{ workspace_id: string; n: number; builders: number }[]>,
     sql.query("select workspace_id, count(*)::int as n from invites where accepted_at is null and revoked_at is null and expires_at > now() group by 1") as unknown as Promise<{ workspace_id: string; n: number }[]>,

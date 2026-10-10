@@ -77,7 +77,7 @@ async function callModel(client: Anthropic, req: Anthropic.MessageCreateParamsNo
 
 /** The posts worth reading in a workspace ($1), with the views floor ($2) and the first day ($3, null for all); `a` is the table alias. */
 const scope = (a: string) =>
-  `${a}.workspace_id = $1 and ${a}.caption is not null and length(btrim(${a}.caption)) >= 8 and ${a}.content_type is distinct from 'stub' and (${a}.views >= $2 or ${a}.source = 'owned')
+  `${a}.workspace_id = $1 and ${a}.brought_in_by = 'panel' and ${a}.caption is not null and length(btrim(${a}.caption)) >= 8 and ${a}.content_type is distinct from 'stub' and (${a}.views >= $2 or ${a}.source = 'owned')
    and ($3::date is null or ${a}.posted_at >= ($3::date::timestamp at time zone 'Asia/Jakarta'))`;
 
 /** The next posts to read, one per url: new ones first, the once-failed only when nothing new is waiting. */
