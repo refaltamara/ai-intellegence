@@ -3,6 +3,7 @@ import { sql } from "../db/client";
 import { contractFromDb, sourceOf, type SourceConfig } from "./contract";
 import { loadBlockers, type InspectReport } from "./load";
 import type { HealthState } from "./health";
+import { COMMENT_IN_PANEL } from "../db/panel";
 import { DUMP_TABLES, blobOn } from "./storage";
 
 export type WorkspacePage = {
@@ -28,7 +29,7 @@ export async function workspacePage(ws: string): Promise<WorkspacePage | null> {
     sql.query("select id, kind, file, rows_in, rows_loaded, rows_rejected, report, started_at, finished_at from data_loads where workspace_id = $1 and report->>'case' is null order by started_at desc limit 12", [ws]) as unknown as Promise<WorkspacePage["loads"]>,
     sql.query("select id, kind, status, progress, error, updated_at from cms_jobs where workspace_id = $1 and kind in ('dump_inspect','dump_load','load','relevance_apply') and params->>'case_id' is null order by created_at desc limit 8", [ws]) as unknown as Promise<WorkspacePage["jobs"]>,
     sql.query("select t.id, t.label, t.is_catch_all, coalesce(t.tags, '{}') as tags, t.definition, count(c.id)::int as comments from topics t left join comments c on c.topic_id = t.id and c.workspace_id = $1 where t.workspace_id = $1 and t.case_id is null group by 1 order by t.sort_order, t.label", [ws]) as unknown as Promise<Omit<WorkspacePage["topics"][number], "share">[]>,
-    sql.query("select (select count(*) from posts where workspace_id = $1)::int as posts, (select count(*) from comments where workspace_id = $1)::int as comments, (select count(*) from creators where workspace_id = $1)::int as creators, (select count(*) from post_snapshots s join posts p on p.id = s.post_id where p.workspace_id = $1)::int as snapshots", [ws]) as unknown as Promise<WorkspacePage["counts"][]>,
+    sql.query(`select (select count(*) from posts where workspace_id = $1 and brought_in_by = 'panel')::int as posts, (select count(*) from comments c where c.workspace_id = $1 and ${COMMENT_IN_PANEL("c")})::int as comments, (select count(*) from creators where workspace_id = $1 and brought_in_by = 'panel')::int as creators, (select count(*) from post_snapshots s join posts p on p.id = s.post_id where p.workspace_id = $1 and p.brought_in_by = 'panel')::int as snapshots`, [ws]) as unknown as Promise<WorkspacePage["counts"][]>,
   ]);
   const totalT = topics.reduce((a, t) => a + t.comments, 0) || 1;
   const bc = new Map(brandCounts.map((r) => [r.brand_id, r]));

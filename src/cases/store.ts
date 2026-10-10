@@ -22,6 +22,8 @@ export type CaseRow = {
   scraper_request: string | null;
   access: string[];
   status: "open" | "closed";
+  /** the case's own settings (schema.ts): brand, label, pr, commercial, notes */
+  settings: CaseSettings;
   created_by: string | null;
   created_at: string;
   updated_at: string;
@@ -29,6 +31,17 @@ export type CaseRow = {
   posts: number;
   /** of those, posts only the case brought in: they never count in the panel's everyday numbers */
   case_only: number;
+};
+
+export type CaseSettings = {
+  /** the panel brand the case is about */
+  brand?: string | null;
+  label?: Record<string, unknown> | null;
+  pr?: { hide?: string[] } | null;
+  commercial?: Record<string, unknown> | null;
+  notes?: { at: string; text: string; source: string }[];
+  subject_noun?: string | null;
+  copied_from?: string;
 };
 
 export type CaseInput = {
@@ -47,7 +60,7 @@ export type CaseInput = {
 const q = async <T>(text: string, params: unknown[] = []) => (await sql.query(text, params)) as T[];
 
 const COLS = `c.id, c.workspace_id, c.name, c.about, to_char(c.starts_on, 'YYYY-MM-DD') as starts_on, to_char(c.ends_on, 'YYYY-MM-DD') as ends_on,
-  c.terms, c.platforms, c.pace, c.scraper_request, c.access, c.status, c.created_by, c.created_at, c.updated_at,
+  c.terms, c.platforms, c.pace, c.scraper_request, c.access, c.status, c.settings, c.created_by, c.created_at, c.updated_at,
   (select count(*) from case_posts cp where cp.case_id = c.id)::int as posts,
   (select count(distinct p.item_id) from posts p where p.workspace_id = c.workspace_id and p.brought_in_by = c.id)::int as case_only`;
 

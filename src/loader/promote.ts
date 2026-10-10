@@ -46,20 +46,23 @@ async function openLedgers(l: Load): Promise<Record<string, string>> {
 }
 
 // ---------------------------------------------------------------- creators
-function creatorSql(source: SourceKind): string {
+/** an account a case's load brings is the case's until the panel's own load has it, as a link is (`$5`: 'panel' or the case) */
+const CREATOR_BY = `case when $5::text = 'panel' then 'panel' else creators.brought_in_by end`;
+
+export function creatorSql(source: SourceKind): string {
   const later = `excluded.last_seen >= coalesce(creators.last_seen, '1900-01-01')`;
   const followers = source === "beauty" ? `case when ${later} then excluded.followers_latest else creators.followers_latest end` : `coalesce(excluded.followers_latest, creators.followers_latest)`;
   const tier = source === "beauty" ? `case when ${later} then excluded.tier_latest else creators.tier_latest end` : `coalesce(excluded.tier_latest, creators.tier_latest)`;
   const display = source === "listening" ? `coalesce(excluded.display_name, creators.display_name)` : `creators.display_name`;
   return `
-    insert into creators (workspace_id, platform, handle, display_name, followers_latest, tier_latest, first_seen, last_seen)
-    select $2, s.platform, s.handle, s.display_name, s.followers_latest, s.tier_latest, s.first_seen, s.last_seen
+    insert into creators (workspace_id, platform, handle, display_name, followers_latest, tier_latest, first_seen, last_seen, brought_in_by)
+    select $2, s.platform, s.handle, s.display_name, s.followers_latest, s.tier_latest, s.first_seen, s.last_seen, $5::text
       from staging.accounts s where s.load_id = $1 and (s.platform, s.handle) > ($3, $4) order by s.platform, s.handle limit ${BATCH.creators}
     on conflict (workspace_id, platform, handle) do update set
       display_name = ${display}, followers_latest = ${followers}, tier_latest = ${tier},
-      first_seen = least(creators.first_seen, excluded.first_seen), last_seen = greatest(creators.last_seen, excluded.last_seen)
-    where (creators.display_name, creators.followers_latest, creators.tier_latest, creators.first_seen, creators.last_seen)
-          is distinct from (${display}, ${followers}, ${tier}, least(creators.first_seen, excluded.first_seen), greatest(creators.last_seen, excluded.last_seen))
+      first_seen = least(creators.first_seen, excluded.first_seen), last_seen = greatest(creators.last_seen, excluded.last_seen), brought_in_by = ${CREATOR_BY}
+    where (creators.display_name, creators.followers_latest, creators.tier_latest, creators.first_seen, creators.last_seen, creators.brought_in_by)
+          is distinct from (${display}, ${followers}, ${tier}, least(creators.first_seen, excluded.first_seen), greatest(creators.last_seen, excluded.last_seen), ${CREATOR_BY})
     returning 1`;
 }
 
@@ -318,7 +321,7 @@ export async function promote(loadId: string, from: PromoteProgress = { phase: "
         `select platform, handle from (select platform, handle from staging.accounts where load_id = $1 and (platform, handle) > ($2, $3) order by platform, handle limit ${BATCH.creators}) b order by platform desc, handle desc limit 1`,
         [loadId, pl, h]))[0];
       if (!lastRow) { next(l.source === "profile" ? "stubs" : "items"); continue; }
-      add("creators", (await q(sqlText, [loadId, ws, pl, h])).length);
+      add("creators", (await q(sqlText, [loadId, ws, pl, h, l.case_id ?? "panel"])).length);
       p.key = [lastRow.platform, lastRow.handle];
       continue;
     }

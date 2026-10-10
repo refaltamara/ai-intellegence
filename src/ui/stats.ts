@@ -7,7 +7,7 @@ export type WorkspaceStats = { brands: number; creators: number; posts: number; 
 export async function workspaceStats(ws = DEFAULT_WORKSPACE_ID): Promise<WorkspaceStats> {
   const [t] = (await sql.query(
     `select (select count(*) from brands where workspace_id = $1)::int as brands,
-            (select count(*) from creators where workspace_id = $1)::int as creators,
+            (select count(*) from creators where workspace_id = $1 and brought_in_by = 'panel')::int as creators,
             (select count(*) from posts where workspace_id = $1 and brought_in_by = 'panel')::int as posts,
             (select count(distinct (platform, url)) from posts where workspace_id = $1 and brought_in_by = 'panel')::int as unique_posts,
             (select count(*) from comments c where c.workspace_id = $1 and ${COMMENT_IN_PANEL("c")})::int as comments,

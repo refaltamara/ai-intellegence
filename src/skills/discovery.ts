@@ -83,7 +83,7 @@ export const discovery: SkillImpl = async (db, ctx, _def, params) => {
   for (const r of rows) delete r.matched;
 
   const total = await db.one<{ n: number }>(
-    `select count(*)::int as n from creators where workspace_id = $1 ${platforms ? "and platform = any($2::text[])" : ""}`,
+    `select count(*)::int as n from creators where workspace_id = $1 and brought_in_by = 'panel' ${platforms ? "and platform = any($2::text[])" : ""}`,
     platforms ? [ctx.workspaceId, platforms] : [ctx.workspaceId],
   );
 
