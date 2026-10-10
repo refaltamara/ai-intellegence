@@ -52,13 +52,20 @@ export type Action =
   /** shape the company's version of a role; approve what Members make */
   | "company.change"
   /** invite and remove Members of a workspace */
-  | "team.manage";
+  | "team.manage"
+  /** see a case inside a workspace, its posts and its numbers: only the people on its access list, Fair staff included */
+  | "case.view"
+  /** set up a case, change its access list, close it: Fair's owners and data ops, and for an existing case only those on its list */
+  | "case.manage";
 
-export type Ctx = { workspace?: string; role?: RoleId };
+/** `case`: the case acted on, by its access list (src/cases/store.ts); none when a new one is being set up */
+export type Ctx = { workspace?: string; role?: RoleId; case?: { access: string[] } };
 
 const has = (a: Actor, ...d: Duty[]) => a.staff.some((x) => d.includes(x));
 export const isStaff = (a: Pick<Actor, "staff">) => a.staff.length > 0;
 const member = (a: Actor, ws?: string) => (ws ? a.memberships.find((m) => m.workspace_id === ws) : undefined);
+/** the person is on a case's access list */
+const onList = (a: Actor, c?: { access: string[] }) => !!c && c.access.some((e) => e.trim().toLowerCase() === a.email.trim().toLowerCase());
 
 export function can(a: Actor, action: Action, ctx: Ctx = {}): boolean {
   // a restricted workspace is closed to everyone it does not name, Fair staff included
@@ -89,6 +96,10 @@ export function can(a: Actor, action: Action, ctx: Ctx = {}): boolean {
       return has(a, "owner", "data_ops") || (!!m && !!ctx.role && m.levels[ctx.role] === "builder");
     case "team.manage":
       return has(a, "owner", "data_ops") || builderAnywhere;
+    case "case.view":
+      return onList(a, ctx.case);
+    case "case.manage":
+      return has(a, "owner", "data_ops") && (!ctx.case || onList(a, ctx.case));
   }
 }
 

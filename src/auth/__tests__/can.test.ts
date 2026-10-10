@@ -67,3 +67,25 @@ describe("a workspace restricted to named people", () => {
     expect(can(rafli, "role.release")).toBe(true);
   });
 });
+
+describe("a case and its access list (DECISIONS, 10 Oct 2026, step 5)", () => {
+  const list = { access: ["refal@fair-indonesia.com", "raissa@example.com"] };
+  const as = (email: string, staff: string[]) => ({ uid: "u", account_id: "a", email, name: null, staff, home: "beauty-id", memberships: [] }) as never as Actor;
+  it("is seen only by the people on its list, Fair staff included", () => {
+    expect(can(as("Refal@fair-indonesia.com", ["owner"]), "case.view", { workspace: "beauty-id", case: list })).toBe(true);
+    expect(can(as("raissa@example.com", []), "case.view", { workspace: "beauty-id", case: list })).toBe(true);
+    expect(can(as("rafli@fair-indonesia.com", ["owner"]), "case.view", { workspace: "beauty-id", case: list })).toBe(false);
+    expect(can(as("raissa@example.com", []), "case.view", { workspace: "beauty-id" })).toBe(false);
+  });
+  it("is set up by Fair's owners and data ops, and changed only by those on its list", () => {
+    expect(can(as("laily@fair-indonesia.com", ["data_ops"]), "case.manage", { workspace: "beauty-id" })).toBe(true);
+    expect(can(as("laily@fair-indonesia.com", ["data_ops"]), "case.manage", { workspace: "beauty-id", case: list })).toBe(false);
+    expect(can(as("refal@fair-indonesia.com", ["owner"]), "case.manage", { workspace: "beauty-id", case: list })).toBe(true);
+    expect(can(as("raissa@example.com", []), "case.manage", { workspace: "beauty-id", case: list })).toBe(false);
+    expect(can(as("audia@fair-indonesia.com", ["role_owner"]), "case.manage", { workspace: "beauty-id" })).toBe(false);
+  });
+  it("stays closed inside a workspace closed to the person", () => {
+    const rafli = { ...as("rafli@fair-indonesia.com", ["owner"]), hidden: ["kahf-threads"] };
+    expect(can(rafli, "case.view", { workspace: "kahf-threads", case: { access: ["rafli@fair-indonesia.com"] } })).toBe(false);
+  });
+});
