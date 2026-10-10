@@ -1,4 +1,4 @@
-import { EvidenceList, POST_COLS, UNKNOWN_FOLLOWERS_CAVEAT, Where, postEvidence, windowCaveats } from "./common";
+import { D7, EvidenceList, POST_COLS, UNKNOWN_FOLLOWERS_CAVEAT, Where, postEvidence, windowCaveats } from "./common";
 import { limitOf, resolveBrands, resolvePlatforms, resolveWindow } from "./params";
 import type { SkillImpl } from "./runner";
 import type { Row } from "./types";
@@ -20,12 +20,12 @@ export const breakout: SkillImpl = async (db, ctx, _def, params) => {
   const pMinP = wh.next(minPer1k);
   const pLimit = wh.next(limit);
   const rows = await db.q<Row>(
-    `select ${POST_COLS}, round((p.views::numeric / (p.followers_at_post / 1000.0)), 1)::float8 as views_per_1k,
+    `select ${POST_COLS}, round((d7.views::numeric / (p.followers_at_post / 1000.0)), 1)::float8 as views_per_1k,
             count(*) over() as matched
-     from posts p
-     where ${wh.sql} and p.followers_at_post >= ${pMinF} and p.views >= ${pMinV}
-       and p.views::float8 / (p.followers_at_post / 1000.0) >= ${pMinP}
-     order by views_per_1k desc, p.views desc
+     from posts p ${D7}
+     where ${wh.sql} and p.followers_at_post >= ${pMinF} and d7.views >= ${pMinV}
+       and d7.views::float8 / (p.followers_at_post / 1000.0) >= ${pMinP}
+     order by views_per_1k desc, d7.views desc
      limit ${pLimit}`,
     wh.params,
   );

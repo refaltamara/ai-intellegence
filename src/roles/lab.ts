@@ -16,6 +16,7 @@ import { hasModelCredentials, modelId } from "../chat/loop";
 import { COMMENT_GROUP_BY, COMMENT_METRICS, ENTITIES, FILTERS, GROUP_BY, METRICS } from "../query/builder";
 import { fairRecipes, saveFairRecipe } from "../recipes/store";
 import { runRecipe } from "../recipes/run";
+import { ROLE_VIEWS } from "../definitions/catalog";
 import { RECIPE_PARAMS, validateRecipe, type RecipeSpec } from "../recipes/spec";
 import { ROLES, type RoleId } from "./model";
 import { POLICIES } from "./policy";
@@ -115,7 +116,7 @@ async function tool(name: string, input: Record<string, unknown>, role: RoleId, 
       if (errors.length) return `Not saved: ${errors.join(" ")}`;
       if ((await fairRecipes()).has(spec.key)) return `Not saved: ${spec.key} exists and released roles may use it. Use a new key.`;
       const ws = TEST_WORKSPACES[role][0];
-      const tried = await runRecipe(spec, {}, ws);
+      const tried = await runRecipe(spec, {}, ws, { views: ROLE_VIEWS[role] });
       if (tried.status !== "ok") return `Not saved: it failed on ${ws}: ${tried.message}`;
       const saved = await saveFairRecipe(spec, who.email);
       if (!saved.ok) return `Not saved: ${saved.errors.join(" ")}`;

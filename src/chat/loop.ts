@@ -35,6 +35,7 @@ import { buildTools } from "./tools";
 import { getWorkspace } from "../workspace/store";
 import { fillRole, type RoleId, type RoleModel } from "../roles/model";
 import { getRoleResolved } from "../roles/store";
+import { ROLE_VIEWS, type ViewsDef } from "../definitions/catalog";
 import { PLATFORM_LABEL } from "../skills/common";
 import { can, type Actor } from "../auth/can";
 import { companyRecipes, isBuilder, teamMemory } from "../company/creations";
@@ -360,7 +361,8 @@ async function runTurnBody(conversation: { id: string; workspace_id: string; dec
   const counter = { n: 0 };
   const toolRecords: ToolCallRecord[] = [];
   const runIds: string[] = [];
-  const toolCtx: ToolContext = { recipes, conversationId: conversation.id, userId, team: onTeam ? { actor: team!.actor, ws: workspaceId, role: roleModel, builderMode } : undefined };
+  // views as the role's own screens count them (src/definitions/catalog.ts)
+  const toolCtx: ToolContext = { recipes, conversationId: conversation.id, userId, team: onTeam ? { actor: team!.actor, ws: workspaceId, role: roleModel, builderMode } : undefined, views: ROLE_VIEWS[roleModel.id] };
 
   // A tapped follow-up carries the exact analysis; the person only ever sees the label.
   let modelText = followup?.skill
@@ -559,7 +561,7 @@ function startActivity(use: Anthropic.ToolUseBlock, counts: Awaited<ReturnType<t
   return () => clearInterval(timer);
 }
 
-type ToolContext = { conversationId: string; userId: string | null; recipes?: RecipeSpec[]; team?: { actor: Actor; ws: string; role: RoleModel; builderMode: boolean } };
+type ToolContext = { conversationId: string; userId: string | null; recipes?: RecipeSpec[]; team?: { actor: Actor; ws: string; role: RoleModel; builderMode: boolean }; views?: ViewsDef };
 
 /** A skill result as a tool record: evidence renumbered for this turn, rows kept in full for the pane. */
 function skillRecord(base: ToolCallRecord, skill: string, result: SkillResult, counter: { n: number }, turnEvidence: Map<string, Evidence>): { record: ToolCallRecord; evidence: Evidence[]; content: string } {
@@ -604,7 +606,7 @@ async function executeTool(use: Anthropic.ToolUseBlock, workspaceId: string, cou
     if (use.name === "run_recipe") {
       const recipe = ctx.recipes?.find((r) => r.key === input.recipe);
       if (!recipe) return { record: { ...base, status: "error", message: "Unknown analysis" }, evidence: [], content: JSON.stringify({ status: "error", message: "That analysis is not offered on this team." }), isError: true };
-      const result = await runRecipe(recipe, (input.params ?? {}) as RecipeInput, workspaceId);
+      const result = await runRecipe(recipe, (input.params ?? {}) as RecipeInput, workspaceId, { views: ctx.views });
       const re = renumberEvidence(result.evidence, result.rows, {}, counter);
       for (const ev of re.evidence) turnEvidence.set(ev.id, ev);
       const record: ToolCallRecord = { ...base, title: recipe.title, status: result.status, message: result.message, rows: re.rows, meta: result.meta, evidence_ids: re.evidence.map((e) => e.id) };
@@ -612,7 +614,7 @@ async function executeTool(use: Anthropic.ToolUseBlock, workspaceId: string, cou
       return { record, evidence: re.evidence, content, isError: result.status === "error" };
     }
     if (use.name === "query_metrics") {
-      const result = await queryMetrics(input as unknown as QueryMetricsInput, workspaceId);
+      const result = await queryMetrics(input as unknown as QueryMetricsInput, workspaceId, { views: ctx.views });
       const re = renumberEvidence(result.evidence, result.rows, {}, counter);
       for (const ev of re.evidence) turnEvidence.set(ev.id, ev);
       const record: ToolCallRecord = { ...base, title: "The numbers", status: result.status, message: result.message, rows: re.rows, meta: result.meta, evidence_ids: re.evidence.map((e) => e.id) };

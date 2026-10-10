@@ -11,6 +11,7 @@ import type { RoleModel } from "../roles/model";
 import { fromRowSpec } from "../roles/store";
 import { diffRoles } from "../roles/diff";
 import { runRecipe } from "../recipes/run";
+import { ROLE_VIEWS } from "../definitions/catalog";
 import type { RecipeSpec } from "../recipes/spec";
 import { companyHistory, companyState, listSuggestions, type HistoryRow, type Suggestion } from "./changes";
 import { isBuilder, listCreations, type Creation } from "./creations";
@@ -51,7 +52,7 @@ export async function companyPage(ws: string, role: RoleModel, actor: Actor): Pr
   // the approver sees a skill on the team's own data before saying yes
   const tried = await Promise.all(waiting.map(async (c) => {
     if (c.kind !== "skill") return c;
-    const r = await runRecipe(c.spec as unknown as RecipeSpec, {}, ws).catch((e) => ({ status: "error", message: (e as Error).message, rows: [] as Record<string, unknown>[] }));
+    const r = await runRecipe(c.spec as unknown as RecipeSpec, {}, ws, { views: ROLE_VIEWS[role.id] }).catch((e) => ({ status: "error", message: (e as Error).message, rows: [] as Record<string, unknown>[] }));
     return { ...c, tried: { status: r.status, message: r.message, rows: r.rows.slice(0, 8), window: "window" in r ? r.window : undefined } };
   }));
   // what Fair's next version would change: a proposal, or a release staged elsewhere first

@@ -1,4 +1,4 @@
-import { EvidenceList, POST_COLS, UNKNOWN_FOLLOWERS_CAVEAT, Where, aggregateEvidence, postEvidence, windowCaveats } from "./common";
+import { D7, ENGAGEMENT, EvidenceList, POST_COLS, RATED, UNKNOWN_FOLLOWERS_CAVEAT, Where, aggregateEvidence, postEvidence, windowCaveats } from "./common";
 import { isoWeekWindow, latestMonth, monthWindow, resolveBrand, resolvePlatforms, resolveWindow, type Window } from "./params";
 import type { SkillImpl } from "./runner";
 import type { ChartSpec, Row } from "./types";
@@ -13,21 +13,22 @@ export const brandStrategy: SkillImpl = async (db, ctx, _def, params) => {
   const totals = await db.one<Row>(
     `select count(*)::int as posts, count(distinct p.creator_id)::int as creators,
             count(*) filter (where p.source = 'owned')::int as owned_posts, count(*) filter (where p.source = 'earned')::int as earned_posts,
-            sum(p.views)::float8 as views, sum(p.views) filter (where p.source = 'owned')::float8 as owned_views, sum(p.views) filter (where p.source = 'earned')::float8 as earned_views,
-            sum(p.engagements)::float8 as engagements, sum(p.comments_count)::float8 as comments_count,
+            sum(d7.views)::float8 as views, sum(d7.views) filter (where p.source = 'owned')::float8 as owned_views, sum(d7.views) filter (where p.source = 'earned')::float8 as earned_views,
+            sum(${ENGAGEMENT})::float8 as engagements, sum(d7.comments_count)::float8 as comments_count,
+            sum(${ENGAGEMENT}) filter (where ${RATED})::float8 as rated_engagements, sum(d7.views) filter (where ${RATED})::float8 as rated_views,
             count(*) filter (where p.platform = 'tiktok')::int as tiktok_posts, count(*) filter (where p.has_cart)::int as cart_posts,
             count(*) filter (where p.is_reseller)::int as reseller_posts,
             count(*) filter (where p.platform = 'tiktok')::int as tt, count(*) filter (where p.platform = 'instagram')::int as ig
-     from posts p where ${wh.sql}`,
+     from posts p ${D7} where ${wh.sql}`,
     wh.params,
   );
   const mix = async (col: string, earnedOnly: boolean) => {
     const mw = new Where().workspace(ctx).window(w, ctx).platforms(platforms).brands([brand]);
     if (earnedOnly) mw.earned();
     return db.q<{ key: string | null; posts: number; creators: number; views: number; cart_posts: number; tiktok_posts: number }>(
-      `select ${col} as key, count(*)::int as posts, count(distinct p.creator_id)::int as creators, sum(p.views)::float8 as views,
+      `select ${col} as key, count(*)::int as posts, count(distinct p.creator_id)::int as creators, sum(d7.views)::float8 as views,
               count(*) filter (where p.has_cart)::int as cart_posts, count(*) filter (where p.platform = 'tiktok')::int as tiktok_posts
-       from posts p where ${mw.sql} group by 1 order by posts desc`,
+       from posts p ${D7} where ${mw.sql} group by 1 order by posts desc`,
       mw.params,
     );
   };
@@ -35,12 +36,12 @@ export const brandStrategy: SkillImpl = async (db, ctx, _def, params) => {
   const ww = new Where().workspace(ctx).window(w, ctx).platforms(platforms).brands([brand]);
   const pTz = ww.next(ctx.tz);
   const weekly = await db.q<{ week_start: string; posts: number; creators: number; views: number }>(
-    `select to_char((date_trunc('week', p.posted_at at time zone ${pTz}))::date, 'YYYY-MM-DD') as week_start, count(*)::int as posts, count(distinct p.creator_id)::int as creators, sum(p.views)::float8 as views
-     from posts p where ${ww.sql} group by 1 order by 1`,
+    `select to_char((date_trunc('week', p.posted_at at time zone ${pTz}))::date, 'YYYY-MM-DD') as week_start, count(*)::int as posts, count(distinct p.creator_id)::int as creators, sum(d7.views)::float8 as views
+     from posts p ${D7} where ${ww.sql} group by 1 order by 1`,
     ww.params,
   );
   const tw = new Where().workspace(ctx).window(w, ctx).platforms(platforms).brands([brand]);
-  const top = await db.q<Row>(`select ${POST_COLS} from posts p where ${tw.sql} order by p.views desc nulls last limit 10`, tw.params);
+  const top = await db.q<Row>(`select ${POST_COLS} from posts p ${D7} where ${tw.sql} order by d7.views desc nulls last limit 10`, tw.params);
 
   const ev = new EvidenceList();
   const posts = (totals?.posts as number) ?? 0;
@@ -54,7 +55,8 @@ export const brandStrategy: SkillImpl = async (db, ctx, _def, params) => {
   const earnedPosts = (totals?.earned_posts as number) ?? 0;
   const summary = {
     brand, window: w.label, posts, creators: totals?.creators ?? 0, views: totals?.views ?? 0, engagements: totals?.engagements ?? 0, comments_count: totals?.comments_count ?? 0,
-    er_pct: (totals?.views as number) > 0 ? Math.round(((totals!.engagements as number) / (totals!.views as number)) * 10000) / 100 : null,
+    // over the posts that can carry a rate (definition engagement_rate)
+    er_pct: (totals?.rated_views as number) > 0 ? Math.round(((totals!.rated_engagements as number) / (totals!.rated_views as number)) * 10000) / 100 : null,
     platforms: Object.fromEntries(platformMix.map((m) => [m.key, m.posts])),
     owned_vs_earned: (totals?.tt as number) > 0 ? { owned_posts: totals?.owned_posts, earned_posts: totals?.earned_posts, owned_share_pct: share(totals?.owned_posts as number), owned_views: totals?.owned_views, earned_views: totals?.earned_views, note: "TikTok only" } : null,
     cart_share_pct: (totals?.tiktok_posts as number) > 0 ? share(totals!.cart_posts as number, totals!.tiktok_posts as number) : null,

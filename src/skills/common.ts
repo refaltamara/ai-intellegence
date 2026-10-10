@@ -1,6 +1,18 @@
 /** Shared SQL fragments, evidence builders and caveats for skills. */
+import { d7Join, sqlOf } from "../definitions/catalog";
+import type { SkillDb } from "./db";
 import type { Context, Window } from "./params";
 import type { Evidence, Platform, Row } from "./types";
+
+/**
+ * Views and engagement are counted at day 7 (DECISIONS, 10 Oct 2026; src/definitions/catalog.ts): join each post's
+ * day-7 reading as `d7` right after `posts p`, and count `d7.views` and ENGAGEMENT, which come from one reading. A post
+ * under 7 days old counts its latest reading so far. `p.views` stays the latest reading.
+ */
+export const D7 = d7Join("p", "d7");
+export const ENGAGEMENT = sqlOf("engagement", "d7");
+/** the posts an engagement rate is counted over (definition engagement_rate): views over 0, engagement no more than views */
+export const RATED = sqlOf("engagement_rate", "d7");
 
 /** Build a WHERE fragment for posts with positional params appended to `params`. */
 export class Where {
@@ -164,9 +176,24 @@ export function windowCaveats(w: Window, platforms: Platform[] | null): string[]
   return out;
 }
 
+/** what a result counted from views at day 7 says about them; `soFar` of its `posts` count their latest reading so far */
+export function viewsNote(soFar: number, posts: number): string {
+  return `Views and engagement are at day 7: each post's reading nearest 7 days after posting (a post read once counts that reading).${soFar ? ` ${fmtInt(soFar)} of the ${fmtInt(posts)} posts went up less than 7 days before the latest reading and count their latest reading so far: their views will still grow.` : ""}`;
+}
+
+/** viewsNote for a window of the workspace: its posts, each once, and those counted so far (the daily totals' panel rows) */
+export async function viewsCaveat(db: SkillDb, workspaceId: string, w: { from: string; to: string }): Promise<string> {
+  const r = await db.one<{ posts: number; so_far: number }>(
+    "select coalesce(sum(posts), 0)::int as posts, coalesce(sum(so_far_posts), 0)::int as so_far from daily_totals where workspace_id = $1 and brand_id = '*' and day between $2::date and $3::date",
+    [workspaceId, w.from, w.to],
+  );
+  return viewsNote(r?.so_far ?? 0, r?.posts ?? 0);
+}
+
 export const NO_SNAPSHOT_CAVEAT = "No day-by-day snapshots exist; metrics are the final capture per post.";
 export const UNKNOWN_FOLLOWERS_CAVEAT = "Posts whose creator has an unknown follower count (tier null) are excluded from tier and per-follower metrics.";
 
-export const POST_COLS = `p.id, p.url, p.platform, p.brand_id, p.creator_id, p.creator_handle, p.posted_at, p.views::float8 as views, p.likes,
-  p.comments_count, p.shares, p.saves, p.engagements, p.has_cart, p.tier, p.followers_at_post, p.content_format,
+/** a post's columns for evidence and post lists; its numbers are its day-7 reading, so the query joins D7 */
+export const POST_COLS = `p.id, p.url, p.platform, p.brand_id, p.creator_id, p.creator_handle, p.posted_at, d7.views::float8 as views, d7.likes,
+  d7.comments_count, d7.shares, d7.saves, ${ENGAGEMENT} as engagements, p.has_cart, p.tier, p.followers_at_post, p.content_format,
   p.product_category, p.caption, p.source`;

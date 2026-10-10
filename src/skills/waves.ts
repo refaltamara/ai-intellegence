@@ -1,4 +1,4 @@
-import { EvidenceList, NO_SNAPSHOT_CAVEAT, POST_COLS, Where, aggregateEvidence, postEvidence, windowCaveats } from "./common";
+import { D7, EvidenceList, NO_SNAPSHOT_CAVEAT, POST_COLS, Where, aggregateEvidence, postEvidence, windowCaveats } from "./common";
 import { limitOf, resolveBrands, resolvePlatforms, resolveWindow } from "./params";
 import type { SkillImpl } from "./runner";
 import type { Row } from "./types";
@@ -70,8 +70,8 @@ export const waves: SkillImpl = async (db, ctx, _def, params) => {
     const per = withPosts.length <= 10 ? 3 : 1;
     const pPer = pw.next(per);
     const posts = await db.q<Row>(
-      `select * from (select ${POST_COLS}, row_number() over (partition by p.brand_id order by p.views desc nulls last) as rn
-                      from posts p where ${pw.sql} and p.brand_id = any(${pB}::text[])) s where rn <= ${pPer} order by brand_id, rn`,
+      `select * from (select ${POST_COLS}, row_number() over (partition by p.brand_id order by d7.views desc nulls last) as rn
+                      from posts p ${D7} where ${pw.sql} and p.brand_id = any(${pB}::text[])) s where rn <= ${pPer} order by brand_id, rn`,
       pw.params,
     );
     const byBrand = new Map<string, string[]>();

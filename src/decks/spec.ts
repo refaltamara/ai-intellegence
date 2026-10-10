@@ -11,6 +11,7 @@ import { cleanSlides, type SlideKind } from "../competitor/slides";
 import type { Platform } from "../competitor/types";
 import { cleanRepSlides, type RepSpec } from "../reputation/slides";
 import { cleanSocialSlides, type SocialSpec } from "../social/slides";
+import type { RoleId } from "../roles/model";
 
 /** Every platform a deck can cover; a deck covers the ones its workspace holds (none picked = all of them). */
 export const DECK_PLATFORMS: Platform[] = ["tiktok", "instagram", "threads", "x", "youtube"];
@@ -121,6 +122,9 @@ export function cleanSpec(input: unknown, known: Set<string>): DeckSpec | { erro
 }
 
 /** The contract the facts run on. */
+/** the role a deck belongs to: a PR deck carries `rep`, a Social deck `social`, the rest are Brand & KOL's */
+export const roleOfSpec = (spec: DeckSpec): RoleId => (spec.rep ? "pr" : spec.social ? "social" : "brand_kol");
+
 export function specContract(spec: DeckSpec, workspaceId: string): WeeklyContract {
   return {
     title: spec.title,

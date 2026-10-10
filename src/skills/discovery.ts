@@ -1,4 +1,4 @@
-import { EvidenceList, POST_COLS, UNKNOWN_FOLLOWERS_CAVEAT, Where, postEvidence, windowCaveats } from "./common";
+import { D7, ENGAGEMENT, EvidenceList, POST_COLS, RATED, UNKNOWN_FOLLOWERS_CAVEAT, Where, postEvidence, windowCaveats } from "./common";
 import { limitOf, resolveBrands, resolvePlatforms, resolveWindow } from "./params";
 import type { SkillImpl } from "./runner";
 import type { Row } from "./types";
@@ -40,8 +40,8 @@ export const discovery: SkillImpl = async (db, ctx, _def, params) => {
 
   const rows = await db.q<Row>(
     `with base as (
-       select p.creator_id, p.brand_id, p.views, p.comments_count, p.engagements, p.posted_at
-       from posts p where ${wh.sql}
+       select p.creator_id, p.brand_id, d7.views, d7.comments_count, ${ENGAGEMENT} as engagements, ${RATED} as rated, p.posted_at
+       from posts p ${D7} where ${wh.sql}
      ), per_brand as (
        select creator_id, brand_id, count(*)::int as posts, max(posted_at) as last_post
        from base group by 1, 2
@@ -54,10 +54,11 @@ export const discovery: SkillImpl = async (db, ctx, _def, params) => {
        from per_brand group by creator_id
      ), per_creator as (
        select creator_id, count(*)::int as posts, count(distinct brand_id)::int as brand_count,
-              sum(views)::float8 as views, round(avg(views)::numeric, 1)::float8 as avg_views,
-              percentile_cont(0.5) within group (order by views)::float8 as median_views,
-              case when sum(views) > 0 then round((sum(comments_count)::numeric / sum(views) * 100), 4)::float8 end as comment_rate_pct,
-              case when sum(views) > 0 then round((sum(engagements)::numeric / sum(views) * 100), 4)::float8 end as er_pct,
+              -- per view and per post only over posts with views: a video reporting 0 views has none (definition flagged)
+              sum(views)::float8 as views, round((avg(views) filter (where views > 0))::numeric, 1)::float8 as avg_views,
+              (percentile_cont(0.5) within group (order by views) filter (where views > 0))::float8 as median_views,
+              case when sum(views) > 0 then round(((sum(comments_count) filter (where views > 0))::numeric / sum(views) * 100), 4)::float8 end as comment_rate_pct,
+              case when sum(views) filter (where rated) > 0 then round(((sum(engagements) filter (where rated))::numeric / sum(views) filter (where rated) * 100), 4)::float8 end as er_pct,
               max(posted_at) as last_brand_post_at
        from base group by creator_id
      )
@@ -95,7 +96,7 @@ export const discovery: SkillImpl = async (db, ctx, _def, params) => {
     const posts = await db.q<Row>(
       `select * from (
          select ${POST_COLS}, row_number() over (partition by p.creator_id order by p.posted_at desc) as rn
-         from posts p where ${ew.sql} and p.creator_id = any(${pIds}::uuid[])
+         from posts p ${D7} where ${ew.sql} and p.creator_id = any(${pIds}::uuid[])
        ) s where rn <= ${pPer} order by creator_id, rn`,
       ew.params,
     );

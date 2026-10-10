@@ -1,4 +1,4 @@
-import { EvidenceList, POST_COLS, Where, postEvidence, windowCaveats } from "./common";
+import { D7, EvidenceList, POST_COLS, Where, postEvidence, windowCaveats } from "./common";
 import { limitOf, resolveBrands, resolvePlatforms, resolveWindow } from "./params";
 import type { SkillImpl } from "./runner";
 import type { Row } from "./types";
@@ -16,7 +16,7 @@ export const mercenaries: SkillImpl = async (db, ctx, _def, params) => {
   const pLimit = wh.next(limit);
   const rows = await db.q<Row>(
     `with base as (
-       select p.creator_id, p.brand_id, p.platform, p.posted_at, p.views, p.has_cart from posts p where ${wh.sql}
+       select p.creator_id, p.brand_id, p.platform, p.posted_at, d7.views, p.has_cart from posts p ${D7} where ${wh.sql}
      ), pb as (
        select creator_id, brand_id, count(*)::int as posts, max(posted_at) as last_post from base group by 1, 2
      ), pc as (
@@ -50,7 +50,7 @@ export const mercenaries: SkillImpl = async (db, ctx, _def, params) => {
       `select * from (
          select ${POST_COLS}, row_number() over (partition by p.creator_id, p.brand_id order by p.posted_at desc) as rb,
                 row_number() over (partition by p.creator_id order by p.posted_at desc) as rn
-         from posts p where ${ew.sql} and p.creator_id = any(${pIds}::uuid[])
+         from posts p ${D7} where ${ew.sql} and p.creator_id = any(${pIds}::uuid[])
        ) s where rb = 1 and rn <= ${pPer} * 4 order by creator_id, posted_at desc`,
       ew.params,
     );

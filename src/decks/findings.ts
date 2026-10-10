@@ -12,6 +12,7 @@ import { runSkill } from "../skills/runner";
 import { brandLabel, type FindingSpec } from "./spec";
 import { fairRecipes } from "../recipes/store";
 import { runRecipe } from "../recipes/run";
+import type { ViewsDef } from "../definitions/catalog";
 import type { RecipeInput } from "../recipes/spec";
 import { companyRecipeByKey } from "../company/creations";
 
@@ -76,8 +77,8 @@ export function periodParams(skill: string, params: Record<string, unknown>, per
   return { ...rest, ...("window" in props ? { window: { from: period.from, to: period.to } } : {}) };
 }
 
-/** Run each finding over the period; a finding that cannot run says why on its slide. */
-export async function runFindings(specs: FindingSpec[], workspaceId: string, period: { from: string; to: string }): Promise<Finding[]> {
+/** Run each finding over the period; a finding that cannot run says why on its slide. `views`: the reading the deck's role counts. */
+export async function runFindings(specs: FindingSpec[], workspaceId: string, period: { from: string; to: string }, opts: { views?: ViewsDef } = {}): Promise<Finding[]> {
   const out: Finding[] = [];
   const brands = new Map((await loadContext(new SkillDb(), workspaceId)).brands.map((b) => [b.id, brandLabel(b.name)]));
   for (const f of specs) {
@@ -87,7 +88,7 @@ export async function runFindings(specs: FindingSpec[], workspaceId: string, per
       const key = f.skill.slice("recipe:".length);
       const recipe = (await fairRecipes()).get(key) ?? (await companyRecipeByKey(workspaceId, key));
       if (!recipe) { out.push({ ...base, status: "unavailable", message: "This analysis is no longer available." }); continue; }
-      const res = await runRecipe(recipe, { ...(f.params as RecipeInput), window: { from: period.from, to: period.to } }, workspaceId);
+      const res = await runRecipe(recipe, { ...(f.params as RecipeInput), window: { from: period.from, to: period.to } }, workspaceId, opts);
       const status: Finding["status"] = res.status === "ok" ? (res.rows.length ? "ok" : "empty") : "error";
       const rows = readable(res.rows.slice(0, ROWS_KEPT), brands);
       out.push({ ...base, status, ...(status !== "ok" ? { message: status === "empty" ? `No rows for ${period.from} to ${period.to}.` : res.message ?? "The analysis could not run for this period." } : {}), columns: findingColumns(rows), rows, rows_total: res.rows.length });

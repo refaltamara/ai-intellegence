@@ -8,7 +8,7 @@ import { MultiSelect } from "./MultiSelect";
 
 export const TIERS = ["nano", "micro", "mid", "macro", "mega"];
 export const TIER_LABEL: Record<string, string> = { nano: "Nano · ≤10K", micro: "Micro · 10K–50K", mid: "Mid · 50K–500K", macro: "Macro · 500K–1M", mega: "Mega · 1M+" };
-export const RANK_LABEL: Record<string, string> = { views: "Views (total in window)", avg_views: "Avg views per post", comment_rate: "Comment rate", er_pct: "Engagement rate", views_per_1k: "Views per 1k followers", median_views: "Median views" };
+export const RANK_LABEL: Record<string, string> = { views: "Views at day 7 (total in window)", avg_views: "Avg views per post", comment_rate: "Comment rate", er_pct: "Engagement rate", views_per_1k: "Views per 1k followers", median_views: "Median views" };
 const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 /** "2026-03" -> "Mar 2026" */

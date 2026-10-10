@@ -1,4 +1,4 @@
-import { EvidenceList, POST_COLS, Where, postEvidence, windowCaveats } from "./common";
+import { D7, EvidenceList, POST_COLS, Where, postEvidence, windowCaveats } from "./common";
 import { limitOf, resolveBrand, resolvePlatforms, resolveWindow } from "./params";
 import type { SkillImpl } from "./runner";
 import type { Row } from "./types";
@@ -16,8 +16,8 @@ export const loyalists: SkillImpl = async (db, ctx, _def, params) => {
   const pLimit = wh.next(limit);
   const rows = await db.q<Row>(
     `with cm as (
-       select p.creator_id, p.month, count(*)::int as posts, sum(p.views)::float8 as views
-       from posts p where ${wh.sql} group by 1, 2
+       select p.creator_id, p.month, count(*)::int as posts, sum(d7.views)::float8 as views
+       from posts p ${D7} where ${wh.sql} group by 1, 2
      ), idx as (
        select *, (extract(year from month) * 12 + extract(month from month))::int as mi from cm
      ), isl as (
@@ -65,7 +65,7 @@ export const loyalists: SkillImpl = async (db, ctx, _def, params) => {
     const pIds = ew.next(rows.map((r) => r.creator_id));
     const posts = await db.q<Row>(
       `select * from (select ${POST_COLS}, row_number() over (partition by p.creator_id order by p.posted_at desc) as rn
-                      from posts p where ${ew.sql} and p.creator_id = any(${pIds}::uuid[])) s where rn <= 2 order by creator_id, rn`,
+                      from posts p ${D7} where ${ew.sql} and p.creator_id = any(${pIds}::uuid[])) s where rn <= 2 order by creator_id, rn`,
       ew.params,
     );
     const byCreator = new Map<string, string[]>();

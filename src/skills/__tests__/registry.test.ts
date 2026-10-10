@@ -3,6 +3,8 @@ import { impls } from "../index";
 import { describeSkillsForTool, getSkill, listSkills, registry } from "../registry";
 import { validateParams } from "../params";
 import { TIER_BANDS } from "../../config/thresholds";
+import { DEFINITIONS } from "../../definitions/catalog";
+import { viewsNote } from "../common";
 
 const PHASE1 = ["discovery", "mercenaries", "loyalists", "affiliates", "breakout", "funnel-mix", "overlap", "waves", "top-content", "compare", "launch", "brand-strategy", "hashtags", "campaigns", "themes", "products", "hashtag-overlap", "sentiment", "comment-themes", "drivers", "seeding"];
 
@@ -44,6 +46,15 @@ describe("skills.registry.json", () => {
     expect(() => validateParams(d, { nope: 1 })).toThrow(/Invalid params/);
     expect(() => validateParams(d, { tiers: ["sub"] })).toThrow(/allowed values/);
     expect(() => validateParams(getSkill("loyalists")!, {})).toThrow(/brand/);
+  });
+
+  it("names the views a skill counts by its definition: day 7, or the latest where a role reads reach", () => {
+    for (const s of listSkills()) if (s.views) expect(DEFINITIONS.has(s.views), s.name).toBe(true);
+    expect(getSkill("top-content")!.views).toBe("views_d7");
+    expect(getSkill("compare")!.views).toBe("views_d7");
+    expect(getSkill("drivers")!.views).toBe("views_latest");
+    expect(viewsNote(0, 10)).not.toMatch(/so far/);
+    expect(viewsNote(201, 23315)).toMatch(/201 of the 23,315 posts .* so far/);
   });
 
   it("builds a tool description line per skill", () => {

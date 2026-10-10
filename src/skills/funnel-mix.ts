@@ -1,4 +1,4 @@
-import { EvidenceList, POST_COLS, UNKNOWN_FOLLOWERS_CAVEAT, Where, aggregateEvidence, postEvidence, windowCaveats } from "./common";
+import { D7, EvidenceList, POST_COLS, UNKNOWN_FOLLOWERS_CAVEAT, Where, aggregateEvidence, postEvidence, windowCaveats } from "./common";
 import { latestMonth, monthWindow, resolveBrand, resolveBrands, resolvePlatforms, resolveWindow, type Window } from "./params";
 import type { SkillImpl } from "./runner";
 import type { ChartSpec, Row } from "./types";
@@ -19,9 +19,9 @@ export const funnelMix: SkillImpl = async (db, ctx, _def, params) => {
   const wh = new Where().workspace(ctx).window(w, ctx).platforms(platforms).brands(brands).earned();
   wh.add("p.tier is not null");
   const cells = await db.q<Row>(
-    `select p.brand_id, p.tier, count(*)::int as posts, count(distinct p.creator_id)::int as creators, sum(p.views)::float8 as views,
+    `select p.brand_id, p.tier, count(*)::int as posts, count(distinct p.creator_id)::int as creators, sum(d7.views)::float8 as views,
             count(*) filter (where p.platform = 'tiktok')::int as tiktok_posts, count(*) filter (where p.has_cart)::int as cart_posts
-     from posts p where ${wh.sql} group by 1, 2`,
+     from posts p ${D7} where ${wh.sql} group by 1, 2`,
     wh.params,
   );
   const totals = new Map<string, number>();
@@ -53,7 +53,7 @@ export const funnelMix: SkillImpl = async (db, ctx, _def, params) => {
     const sw = new Where().workspace(ctx).window(w, ctx).platforms(platforms).brands(brands).earned();
     sw.add("p.tier is not null");
     const samples = await db.q<Row>(
-      `select * from (select ${POST_COLS}, row_number() over (partition by p.brand_id, p.tier order by p.views desc nulls last) as rn from posts p where ${sw.sql}) s where rn = 1`,
+      `select * from (select ${POST_COLS}, row_number() over (partition by p.brand_id, p.tier order by d7.views desc nulls last) as rn from posts p ${D7} where ${sw.sql}) s where rn = 1`,
       sw.params,
     );
     for (const s of samples) {

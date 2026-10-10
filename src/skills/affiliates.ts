@@ -1,5 +1,5 @@
 import { AFFILIATE_RULE } from "../config/thresholds";
-import { EvidenceList, POST_COLS, Where, aggregateEvidence, creatorEvidence, postEvidence, windowCaveats } from "./common";
+import { D7, EvidenceList, POST_COLS, Where, aggregateEvidence, creatorEvidence, postEvidence, windowCaveats } from "./common";
 import { limitOf, monthWindow, previousWindow, resolveBrands, resolveWindow, type Window } from "./params";
 import type { SkillImpl } from "./runner";
 import type { Row } from "./types";
@@ -26,7 +26,7 @@ export const affiliates: SkillImpl = async (db, ctx, _def, params) => {
     const pSc = wh.next(rule.strict_min_cart_pct ?? null);
     return db.q<BrandRow>(
       `with base as (
-         select p.brand_id, p.creator_id, p.has_cart, p.views, p.account_type from posts p where ${wh.sql}
+         select p.brand_id, p.creator_id, p.has_cart, d7.views, p.account_type from posts p ${D7} where ${wh.sql}
        ), pc as (
          select brand_id, creator_id, count(*)::int as posts, count(*) filter (where has_cart)::int as cart_posts,
                 sum(views)::float8 as views, bool_or(account_type = 'reseller') as reseller
@@ -82,8 +82,8 @@ export const affiliates: SkillImpl = async (db, ctx, _def, params) => {
          select pc.*, c.handle as creator_handle, c.platform, c.followers_latest, c.tier_latest,
                 row_number() over (partition by pc.brand_id order by pc.cart_posts desc, pc.views desc) as rn
          from (select p.brand_id, p.creator_id, count(*)::int as posts, count(*) filter (where p.has_cart)::int as cart_posts,
-                      sum(p.views)::float8 as views, bool_or(p.account_type = 'reseller') as reseller
-               from posts p where ${aw.sql} and p.brand_id = any(${pB}::text[]) group by 1, 2 having count(*) filter (where p.has_cart) >= ${pMin}) pc
+                      sum(d7.views)::float8 as views, bool_or(p.account_type = 'reseller') as reseller
+               from posts p ${D7} where ${aw.sql} and p.brand_id = any(${pB}::text[]) group by 1, 2 having count(*) filter (where p.has_cart) >= ${pMin}) pc
          join creators c on c.id = pc.creator_id
        ) s where rn <= ${pPer} order by brand_id, rn`,
       aw.params,
@@ -104,8 +104,8 @@ export const affiliates: SkillImpl = async (db, ctx, _def, params) => {
       const pIds = sw.next(accounts.map((a) => a.creator_id));
       const pB2 = sw.next(brandIds);
       const samples = await db.q<Row>(
-        `select * from (select ${POST_COLS}, row_number() over (partition by p.creator_id, p.brand_id order by p.views desc nulls last) as rn
-                        from posts p where ${sw.sql} and p.has_cart and p.creator_id = any(${pIds}::uuid[]) and p.brand_id = any(${pB2}::text[])) s where rn = 1`,
+        `select * from (select ${POST_COLS}, row_number() over (partition by p.creator_id, p.brand_id order by d7.views desc nulls last) as rn
+                        from posts p ${D7} where ${sw.sql} and p.has_cart and p.creator_id = any(${pIds}::uuid[]) and p.brand_id = any(${pB2}::text[])) s where rn = 1`,
         sw.params,
       );
       for (const s of samples) {

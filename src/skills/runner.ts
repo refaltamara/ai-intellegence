@@ -3,7 +3,7 @@
  * data layers a skill requires, runs it, enforces the evidence rule, fills meta,
  * and persists the run to skill_runs.
  */
-import { EXPORT_CAVEAT_STARTS } from "./common";
+import { EXPORT_CAVEAT_STARTS, viewsCaveat } from "./common";
 import { DEFAULT_WORKSPACE_ID } from "../config/thresholds";
 import { SkillDb } from "./db";
 import { impls } from "./index";
@@ -127,6 +127,9 @@ export async function runSkill(req: SkillRequest): Promise<SkillResult> {
     if (status === "ok" && out.rows.length > 0 && out.evidence.length === 0) {
       throw new Error(`${def.name} returned ${out.rows.length} rows without evidence; the runner rejects results without evidence`);
     }
+    const dataWindow = out.data_window ?? { from: ctx.earliest, to: ctx.asOf };
+    // a skill counting views at day 7 says so, with how many of the window's posts count so far (DECISIONS, 10 Oct 2026)
+    const views = status === "ok" && def.views === "views_d7" ? [await viewsCaveat(db, workspaceId, dataWindow)] : [];
     result = {
       skill: def.name,
       status,
@@ -139,9 +142,9 @@ export async function runSkill(req: SkillRequest): Promise<SkillResult> {
       meta: {
         matched: out.matched ?? out.rows.length,
         returned: out.rows.length,
-        data_window: out.data_window ?? { from: ctx.earliest, to: ctx.asOf },
+        data_window: dataWindow,
         freshness: ctx.freshness,
-        caveats: await workspaceCaveats(db, workspaceId, out.caveats ?? []),
+        caveats: await workspaceCaveats(db, workspaceId, [...(out.caveats ?? []), ...views]),
         sql_hash: db.sqlHash(),
         duration_ms: Date.now() - started,
       },
