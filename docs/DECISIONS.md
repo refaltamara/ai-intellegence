@@ -896,5 +896,17 @@ The agreed design is the doc "Core data architecture and model" (https://claude.
 - **What moved.** Beauty is unchanged: each post has one reading, so its day-7 and latest views are the same but for 201 posts. Fintech moves, because its posts are read daily and keep growing after day 7:
   - **Views, September:** 121.5M at the latest reading, 57.6M at day 7. Of its 6,270 posts, 2,362 are too new.
   - **Share of views, latest → day 7:** ShopeePay 48.2% → 29.2%, GoPay 18.3% → 22.1%, BCA 16.0% → 21.0%, OVO 12.2% → 20.1%, SeaBank 4.0% → 6.3%.
-  - **Engagement rate** (likes + comments ÷ views): 3.85% → 6.38%.
+  - **Engagement rate** (likes + comments ÷ views): 3.85% → 6.06%, as corrected in the third part below (the second part first showed 6.38%).
 - **Speed.** Beauty's dashboard went from 2.1 s to 1.5 s of database time: the rankings read the daily totals, and post lists read their post's fields from the links. Fintech's takes 0.3 s.
+
+**Step 4, third part: a flag leaves a post out only where it bears on it (10 Oct).**
+- **The mistake.** The first version of the definitions took every flagged post out of every rate. Fintech's dump reports 0 followers for almost every brand account: 296 of 341 own Instagram posts and all 58 on X. So the engagement rate dropped posts whose engagement and views are sound. Applied to the Social dashboard's medians, the rule would have dropped most of Fintech's own posts.
+- **The rule now** (`flagged`, `engagement_rate`, `engagement_rate_lc`, each at version 2):
+  - A reported 0 followers is no follower count: no tier, nothing per follower.
+  - A video's 0 views is no views: nothing per view, no views median.
+  - A rate needs views over 0, so a 0-view video is already out of it.
+  - The daily totals were rebuilt under the new catalog version, and `pnpm totals check` shows 0 difference.
+- **What it changes.** Fintech's September engagement rate is 6.06%, not 6.38%. It was 3.85% before step 4; the day-7 reading explains most of the change. Beauty's stays at 6.40%.
+- **PR and Social already count by the definitions.**
+  - **PR:** negative share is negative ÷ labelled comments, on topic, without the subject's own replies or set-aside posts. Reach uses Views (latest), the PR role's choice: a reputation team reads how far something has spread by now.
+  - **Social:** medians leave out posts captured with no metrics, and views medians leave out posts without views.

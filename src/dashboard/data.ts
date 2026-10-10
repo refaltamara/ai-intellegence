@@ -14,7 +14,7 @@
  * - Engagement is platform-native on one platform; across platforms it is likes + comments, the only
  *   definition they share.
  * - Engagement rate = engagement / views from the day-7 reading, over posts that can carry a rate: views over
- *   0, engagement no more than views, not flagged.
+ *   0 (a video reporting 0 views is out), engagement no more than views.
  * - A brand move is marked unusual with the weekly report's rule (src/competitor/flags.ts), judged per platform
  *   against the brand's own previous periods.
  */
@@ -157,7 +157,7 @@ const BUCKET_NUMS = ["posts", "creators", "views", "eng", "eng_lc", "comments", 
 
 /**
  * Every brand × platform × period over the lookback, from the daily totals (src/definitions/totals.ts): the rankings,
- * their shares, growth and flags come from here. Rates use the day-7 reading's rated sums (flagged posts left out).
+ * their shares, growth and flags come from here. Rates use the day-7 reading's rated sums (posts with views).
  */
 export async function buckets(db: SkillDb, ctx: Context, f: Filters): Promise<{ rows: BucketRow[]; periods: Period[] }> {
   const periods = Array.from({ length: HISTORY + 1 }, (_, i) => shiftPeriod(f.period, i - HISTORY));
@@ -318,7 +318,7 @@ export async function chosenTotals(db: SkillDb, ctx: Context, f: Filters, prev: 
      ), d as (
        select to_char(date_trunc(${grain}, i.posted_at at time zone ${tz}), 'YYYY-MM-DD') as bucket, i.creator_id, l.earned, i.views as latest, ${eng("i")} as eng,
               i.comments_count, dd.day_n is not null as d7, dd.views as d7_views, ${eng("dd")} as d7_eng,
-              not ${sqlOf("flagged", "i")} and ${sqlOf(lc ? "engagement_rate_lc" : "engagement_rate", "dd")} as is_rated
+              ${sqlOf(lc ? "engagement_rate_lc" : "engagement_rate", "dd")} as is_rated
          from l join post_items i on i.id = l.item_id left join post_d7 dd on dd.item_id = i.id
      )
      select bucket, count(*)::int as posts, count(distinct creator_id) filter (where earned)::int as creators,
@@ -361,7 +361,7 @@ export async function tiers(db: SkillDb, ctx: Context, f: Filters): Promise<Tier
          from posts p where ${where} and p.source = 'earned' order by p.item_id
      ), d as (
        select i.tier, i.creator_id, dd.views as d7_views, ${eng("i")} as eng, ${eng("dd")} as d7_eng,
-              not ${sqlOf("flagged", "i")} and ${sqlOf(lc ? "engagement_rate_lc" : "engagement_rate", "dd")} as is_rated
+              ${sqlOf(lc ? "engagement_rate_lc" : "engagement_rate", "dd")} as is_rated
          from i left join post_d7 dd on dd.item_id = i.item_id
      )
      select tier, count(distinct creator_id)::int as creators, count(*)::int as posts,
@@ -471,7 +471,7 @@ export async function topCreators(db: SkillDb, ctx: Context, f: Filters, handles
 
 /**
  * Posts in the period, each once, sorted by views (day 7, then the latest for posts too new), engagement or engagement rate
- * (from the day-7 reading, not flagged), with keyword or @username search. `url` narrows to one post.
+ * (from the day-7 reading, posts with views), with keyword or @username search. `url` narrows to one post.
  */
 export async function content(ctx: Context, f: Filters, q: ContentQuery, url?: string): Promise<{ cards: ContentCard[]; total: number }> {
   const db = new SkillDb();
@@ -497,7 +497,7 @@ export async function content(ctx: Context, f: Filters, q: ContentQuery, url?: s
      ), u as (
        select i.url, i.platform, i.creator_handle as handle, to_char(i.posted_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as posted_at, left(i.caption, 400) as caption,
               dd.views::float8 as views, i.views::float8 as latest, (${sqlOf("engagement", "i")})::float8 as engagements, i.comments_count::float8 as comments,
-              (${sqlOf("engagement", "dd")})::float8 as d7_eng, coalesce(not ${sqlOf("flagged", "i")} and ${sqlOf("engagement_rate", "dd")}, false) as rated, l.brands
+              (${sqlOf("engagement", "dd")})::float8 as d7_eng, coalesce(${sqlOf("engagement_rate", "dd")}, false) as rated, l.brands
          from i join l using (item_id) left join post_d7 dd on dd.item_id = i.item_id
      )
      select *, count(*) over ()::int as total from u${erOnly}
