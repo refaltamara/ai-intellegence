@@ -23,11 +23,13 @@ import { Act } from "@/ui/company/Act";
 import { workspaceSignals } from "@/learning/views";
 import { INSIGHT_WINDOW_DAYS } from "@/config/learning";
 import { ROLES, isRoleId } from "@/roles/model";
+import { casesFor } from "@/cases/store";
+import { CasesEditor } from "@/ui/admin/cases/CasesEditor";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
 
-const TABS = [["overview", "Overview"], ["source", "1 · Dump"], ["brands", "2 · Brands"], ["load", "3 · Load"], ["loads", "Loads"], ["relevance", "Relevance"], ["topics", "Topics"], ["health", "Health"], ["signals", "Signals"]] as const;
+const TABS = [["overview", "Overview"], ["source", "1 · Dump"], ["brands", "2 · Brands"], ["load", "3 · Load"], ["loads", "Loads"], ["relevance", "Relevance"], ["topics", "Topics"], ["cases", "Cases"], ["health", "Health"], ["signals", "Signals"]] as const;
 const STATUS: Record<string, string> = { draft: "Draft", loading: "Loading", review: "In review", live: "Live", paused: "Paused", archived: "Archived" };
 const n = (x: unknown) => Number(x ?? 0).toLocaleString("en-US");
 const kb = (b: number) => (b > 1024 ** 2 ? `${(b / 1024 ** 2).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1024))} KB`);
@@ -152,6 +154,7 @@ export default async function WorkspaceData({ params, searchParams }: { params: 
         ) : <p className="muted">Map the brands first.</p>)}
 
         {tab === "topics" && (d.topics.length ? <TopicsEditor ws={d.id} topics={d.topics} /> : <p className="muted">Topics arrive with the load.</p>)}
+        {tab === "cases" && <CasesEditor ws={d.id} me={actor.email} canManage={can(actor, "case.manage", { workspace: d.id })} cases={(await casesFor(actor, d.id)).map(({ created_by: _c, created_at: _a, updated_at: _u, workspace_id: _w, ...c }) => c)} />}
 
         {tab === "health" && (
           <>

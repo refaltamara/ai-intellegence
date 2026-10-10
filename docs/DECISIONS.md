@@ -980,3 +980,19 @@ The agreed design is the doc "Core data architecture and model" (https://claude.
   - **Beauty:** weeks, growth, hashtags, coverage and the creator list are identical. Tier medians and rates follow the definitions. Wardah, September, mid-tier creators: median views 1,861 → 3,848, engagement rate 11.06% → 3.74%.
   - **Fintech** moves to day 7. ShopeePay's Instagram views over the last 30 days: 39.3M at the latest reading, 3.7M at day 7.
 - **Speed.** Skintific's 90-day page takes 1.2 s, as before (1.0 s). Both were measured warm.
+
+**Step 5, first part: the case and its access list (10 Oct).**
+- **A case** (`cases`, migration 0039) is an ad hoc watch inside a panel, such as a crisis or a one-off check. It holds:
+  - a name and what it is about;
+  - its dates (the end left empty while it runs on);
+  - terms beyond the panel's own, and its platforms;
+  - how often its posts are read: daily, or hourly for a crisis;
+  - the scraper request behind it, and its access list.
+
+  `case_posts` records the posts a case caught, whether or not the panel caught them too. A topic can belong to a case (`topics.case_id`).
+- **The access list.**
+  - Only the people on it see the case (`case.view` in `src/auth/can.ts`), Fair staff included, as with a restricted workspace.
+  - Fair's owners and data ops set a case up. Once it exists, only those of them on its list change it (`case.manage`).
+  - Whoever saves a case stays on its list, so nobody shuts themselves out by accident. Changes go to the audit log.
+- **Where.** CMS → a workspace → Cases lists the cases you are on, with the posts each caught and how many only it brought in. You can set one up, edit it, close it or open it again. A case you are not on stays hidden from you.
+- **Not yet.** No case holds posts yet. Loading into a case, and keeping case-only posts out of the panel's numbers, are the next parts. Kahf stays its own workspace.

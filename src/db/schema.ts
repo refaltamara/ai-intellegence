@@ -560,7 +560,64 @@ export const topics = pgTable("topics", {
   sortOrder: integer("sort_order").notNull().default(0),
   /** the catch-all bucket ("Others") */
   isCatchAll: boolean("is_catch_all").notNull().default(false),
+  /** a case's own topic (cases below); empty for the panel's */
+  caseId: text("case_id").references((): AnyPgColumn => cases.id),
 });
+
+/**
+ * A case (DECISIONS, 10 Oct 2026, step 5): an ad hoc watch inside a panel, such as a crisis or a one-off check. Its posts
+ * are stored once with the panel's and counted apart: a post only a case brought in (posts.brought_in_by = the case's id)
+ * counts in that case and never in the panel's everyday numbers, creators or tiers; a post the panel also caught counts
+ * in both. Only the people on its access list see it, Fair staff included (src/auth/can.ts).
+ */
+export const cases = pgTable(
+  "cases",
+  {
+    id: text("id").primaryKey(),
+    workspaceId: text("workspace_id").notNull().references(() => workspaces.id),
+    name: text("name").notNull(),
+    /** what the case is about, in a sentence or two */
+    about: text("about"),
+    startsOn: date("starts_on", { mode: "string" }).notNull(),
+    /** empty while the case runs on */
+    endsOn: date("ends_on", { mode: "string" }),
+    /** words the case watches beyond the panel's own brand terms */
+    terms: text("terms").array().notNull().default(sql`'{}'::text[]`),
+    /** the platforms it watches; empty means the panel's */
+    platforms: text("platforms").array(),
+    /** how often its posts are read: daily, or hourly for a crisis (hourly fetching costs more) */
+    pace: text("pace").notNull().default("daily"),
+    /** the scraper request behind it */
+    scraperRequest: text("scraper_request"),
+    /** who may see it, by email; nobody else does, Fair staff included */
+    access: text("access").array().notNull(),
+    /** open | closed */
+    status: text("status").notNull().default("open"),
+    createdBy: text("created_by"),
+    createdAt: createdAt(),
+    updatedAt: ts("updated_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("cases_workspace_idx").on(t.workspaceId),
+    check("cases_access_chk", sql`cardinality(${t.access}) > 0`),
+    check("cases_pace_chk", sql`${t.pace} in ('daily','hourly')`),
+    check("cases_status_chk", sql`${t.status} in ('open','closed')`),
+  ],
+);
+
+/** The posts a case caught, whether or not the panel caught them too: a case's numbers count these. */
+export const casePosts = pgTable(
+  "case_posts",
+  {
+    caseId: text("case_id").notNull().references(() => cases.id, { onDelete: "cascade" }),
+    itemId: uuid("item_id").notNull().references((): AnyPgColumn => postItems.id, { onDelete: "cascade" }),
+    workspaceId: text("workspace_id").notNull().references(() => workspaces.id),
+    /** the load that brought it in */
+    loadId: uuid("load_id"),
+    addedAt: ts("added_at").notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.caseId, t.itemId] }), index("case_posts_item_idx").on(t.itemId)],
+);
 
 export const comments = pgTable(
   "comments",
