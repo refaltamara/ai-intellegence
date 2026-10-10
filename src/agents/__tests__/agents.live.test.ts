@@ -24,11 +24,12 @@ d("agents (live)", () => {
   });
 
   it("promotes a discovery run with frozen, relativised params", async () => {
-    const run = await runSkill({ skill: "discovery", workspace_id: WS, params: { used_by: ["skintific_official"], tiers: ["nano"], platform: "tiktok", limit: 5, window: { from: "2026-06-01", to: "2026-06-30" } }, actor: { user_id: "test", via: "api" } });
+    // Instagram: the agent counts back 30 days from the newest data, and Beauty's newest month (September) is Instagram only
+    const run = await runSkill({ skill: "discovery", workspace_id: WS, params: { used_by: ["skintific_official"], tiers: ["nano"], platform: "instagram", limit: 5, window: { from: "2026-09-01", to: "2026-09-30" } }, actor: { user_id: "test", via: "api" } });
     expect(run.status).toBe("ok");
     const r = await agentFromBody({ from_skill_run_id: run.run_id, name: "[test] weekly nano discovery", delivery: { channels: ["email"], email: "test@example.com" } }, WS);
     if ("error" in r) throw new Error(r.error);
-    expect(r.agent.params).toMatchObject({ used_by: ["skintific_official"], tiers: ["nano"], platform: "tiktok", limit: 5, window: { last_n_days: 30 } });
+    expect(r.agent.params).toMatchObject({ used_by: ["skintific_official"], tiers: ["nano"], platform: "instagram", limit: 5, window: { last_n_days: 30 } });
     expect(r.agent.schedule_cron).toBe("0 7 * * 1");
     expect(r.agent.next_run_at).toBeTruthy();
     agent = await insertAgent(r.agent);

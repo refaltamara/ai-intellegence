@@ -10,8 +10,11 @@ import type { SkillResult } from "../types";
 const live = !!process.env.DATABASE_URL;
 const d = live ? describe : describe.skip;
 
+// Beauty's TikTok export runs April to June 2026; the Instagram one goes on to September, so a window counted back from the
+// newest data holds no TikTok post: shop carts, product names and TikTok creators are pinned to the TikTok months
+const TIKTOK = { from: "2026-04-01", to: "2026-06-30" };
 const CASES: Record<string, Record<string, unknown>> = {
-  discovery: { used_by: ["skintific_official"], tiers: ["nano"], platform: "tiktok", limit: 10 },
+  discovery: { used_by: ["skintific_official"], tiers: ["nano"], platform: "tiktok", window: TIKTOK, limit: 10 },
   mercenaries: { limit: 5 },
   loyalists: { brand: "skintific_official", limit: 5 },
   affiliates: { brand: "msglowbeauty", month: "2026-06" },
@@ -19,14 +22,14 @@ const CASES: Record<string, Record<string, unknown>> = {
   "funnel-mix": { brand: "glad2glow_id", compare_to: ["skintific_official"], month: "2026-06" },
   overlap: { brand: "timephoriaid", limit: 5 },
   waves: { limit: 5 },
-  "top-content": { has_cart: true, window: { last_n_days: 30 }, limit: 10 },
+  "top-content": { has_cart: true, window: TIKTOK, limit: 10 },
   compare: { brands: ["skintific_official", "somethincofficial", "eminacosmeticsid"], window: { last_n_days: 30 } },
   launch: { brand: "skintific_official", start_date: "2026-06-01", weeks: 4 },
   "brand-strategy": { brand: "skintific", month: "2026-06" },
   hashtags: { brands: ["wardahofficial"], window: { last_n_days: 30 }, limit: 10 },
   campaigns: { window: { last_n_days: 90 }, limit: 10 },
   themes: { brands: ["skintific_official"], window: { last_n_days: 30 }, group: "concerns" },
-  products: { keyword: "lip cream", window: { last_n_days: 90 }, limit: 10 },
+  products: { keyword: "lip cream", window: TIKTOK, limit: 10 },
   "hashtag-overlap": { brand: "somethincofficial", limit: 5 },
 };
 
