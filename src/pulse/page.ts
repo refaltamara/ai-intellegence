@@ -9,7 +9,10 @@ import { SkillDb } from "../skills/db";
 import { runSkill } from "../skills/runner";
 import type { Row, SkillResult } from "../skills/types";
 import { getWorkspace } from "../workspace/store";
-import { COMMENT_IN_PANEL, panelCommentEdge, panelPostEdge } from "../db/panel";
+import { commercialOf, type CommercialSettings, type WorkspaceConfig } from "../workspace/config";
+import { getCase } from "../cases/store";
+import { sql } from "../db/client";
+import { commentIn, PANEL, panelCommentEdge, panelPostEdge, postIn, scopeKey, type Scope } from "../db/panel";
 
 export const PLATFORMS = ["youtube", "threads", "instagram", "tiktok", "x"] as const;
 export type Platform = (typeof PLATFORMS)[number];
@@ -97,17 +100,34 @@ const label = (p: string) => PLATFORM_LABEL[p] ?? p;
 const TTL_MS = 5 * 60 * 1000;
 const cache = new Map<string, { at: number; data: PulseData }>();
 
-export async function pulsePage(ws: string): Promise<PulseData | null> {
-  const hit = cache.get(ws);
+/**
+ * The crisis view of a profile workspace, or of a case inside a panel (DECISIONS, 10 Oct 2026, step 5): the same page over
+ * the case's own posts and comments, with the case's subject and case words. Who may see a case is the caller's check.
+ */
+export async function pulsePage(ws: string, scope: Scope = PANEL): Promise<PulseData | null> {
+  const key = scopeKey(ws, scope);
+  const hit = cache.get(key);
   if (hit && Date.now() - hit.at < TTL_MS) return hit.data;
-  const data = await build(ws);
-  if (data) cache.set(ws, { at: Date.now(), data });
+  const data = await build(ws, scope);
+  if (data) cache.set(key, { at: Date.now(), data });
   return data;
 }
 
-async function build(ws: string): Promise<PulseData | null> {
+/** the configuration a scope's page reads: the workspace's, or for a case its own subject and case words */
+async function scopeConfig(ws: string, scope: Scope): Promise<(WorkspaceConfig & { subject_name: string | null }) | null> {
   const cfg = await getWorkspace(ws);
-  if (!cfg || cfg.kind !== "profile") return null;
+  if (!cfg) return null;
+  if (!scope.caseId) return cfg.kind === "profile" ? { ...cfg, subject_name: null } : null;
+  const c = await getCase(scope.caseId);
+  if (!c || c.workspace_id !== ws) return null;
+  const brand = c.settings.brand ? ((await sql.query("select name from brands where id = $1 and workspace_id = $2", [c.settings.brand, ws])) as { name: string }[])[0]?.name ?? null : null;
+  const subject = (c.settings.label as { subject?: string } | null | undefined)?.subject ?? brand ?? c.name;
+  return { ...cfg, kind: "profile", name: c.name, client_brand_id: c.settings.brand ?? null, commercial: commercialOf(c.settings.commercial as CommercialSettings | null), pr_hide: c.settings.pr?.hide ?? [], subject_name: subject };
+}
+
+async function build(ws: string, scope: Scope): Promise<PulseData | null> {
+  const cfg = await scopeConfig(ws, scope);
+  if (!cfg) return null;
   const db = new SkillDb();
   const tz = cfg.tz;
 
@@ -115,7 +135,7 @@ async function build(ws: string): Promise<PulseData | null> {
   // charts wait on the arc, the reply's effect on the reply, and the timeline on all of it.
   const headPart = async () => {
     const [subjectRow, totals, asOfRow] = await Promise.all([
-      db.one<{ name: string }>("select b.name from workspaces w join brands b on b.id = w.client_brand_id where w.id = $1", [ws]),
+      cfg.subject_name ? Promise.resolve({ name: cfg.subject_name }) : db.one<{ name: string }>("select b.name from workspaces w join brands b on b.id = w.client_brand_id where w.id = $1", [ws]),
       // one pass over the comments (with their post's source) and one over the posts, not a scan per number
       db.one<PulseData["totals"]>(
         `with cc as (
@@ -136,7 +156,7 @@ async function build(ws: string): Promise<PulseData | null> {
                   count(*) filter (where c.sentiment_source is distinct from 'subject' and not coalesce(c.off_topic, false) and p.source = 'earned')::int as earned_comments,
                   count(*) filter (where not coalesce(c.off_topic, false) and c.sentiment = 'negative' and p.source = 'earned')::int as earned_negative,
                   array_agg(distinct c.platform) as platforms
-           from comments c left join posts p on p.id = c.post_id and p.workspace_id = $1 where c.workspace_id = $1 and coalesce(p.brought_in_by, 'panel') = 'panel'),
+           from comments c left join posts p on p.id = c.post_id and p.workspace_id = $1 where c.workspace_id = $1 and ${commentIn(scope, "c")}),
          pp as (
            select count(*) filter (where content_type is distinct from 'stub')::int as posts,
                   count(*) filter (where content_type is distinct from 'stub' and source = 'earned')::int as earned_posts,
@@ -146,7 +166,7 @@ async function build(ws: string): Promise<PulseData | null> {
                   count(*) filter (where content_type is distinct from 'stub' and source = 'earned' and stance = 'positive')::int as posts_for,
                   count(*) filter (where content_type is distinct from 'stub' and source = 'earned' and caption is null)::int as posts_no_caption,
                   array_agg(distinct platform) as platforms
-           from posts where workspace_id = $1 and relevant is not false and brought_in_by = 'panel')
+           from posts where workspace_id = $1 and relevant is not false and ${postIn(scope, "posts")})
          select pp.posts, pp.earned_posts, cc.comments, cc.labelled, cc.negative, cc.neutral, cc.positive, cc.accounts,
                 (select count(distinct x) from unnest(coalesce(cc.platforms, '{}') || coalesce(pp.platforms, '{}')) x)::int as platforms,
                 cc.posts_with_comments, cc.off_topic, cc.on_topic, cc.on_topic_labelled, cc.on_topic_negative, cc.on_topic_positive,
@@ -155,7 +175,7 @@ async function build(ws: string): Promise<PulseData | null> {
          from cc, pp`,
         [ws],
       ),
-      db.one<{ c: string; p: string }>(`select to_char(${panelCommentEdge("$1", "newest")} at time zone $2, 'YYYY-MM-DD HH24:MI') as c, to_char(${panelPostEdge("$1", "newest", "and p.source = 'earned'")} at time zone $2, 'YYYY-MM-DD HH24:MI') as p`, [ws, tz]),
+      db.one<{ c: string; p: string }>(`select to_char(${panelCommentEdge("$1", "newest", "", scope)} at time zone $2, 'YYYY-MM-DD HH24:MI') as c, to_char(${panelPostEdge("$1", "newest", "and p.source = 'earned'", scope)} at time zone $2, 'YYYY-MM-DD HH24:MI') as p`, [ws, tz]),
     ]);
     const subject = subjectRow?.name ?? cfg.name;
     const asOf = asOfRow?.c ?? "";
@@ -169,14 +189,14 @@ async function build(ws: string): Promise<PulseData | null> {
   // to where the noise floor was, and start there. Capped at five days either way.
   const arcPart = async () => {
     const shape = await db.q<Row>(
-      `with last as (select date_trunc('hour', greatest(${panelCommentEdge("$1", "newest")},
-                                                        ${panelPostEdge("$1", "newest", "and p.source = 'earned'")}) at time zone $2) as h),
+      `with last as (select date_trunc('hour', greatest(${panelCommentEdge("$1", "newest", "", scope)},
+                                                        ${panelPostEdge("$1", "newest", "and p.source = 'earned'", scope)}) at time zone $2) as h),
        hrs as (select generate_series((select h from last) - interval '13 days', (select h from last), interval '1 hour') as h),
        -- counted once per hour and joined, not one scan of the workspace per hour
        ch as (select date_trunc('hour', c.posted_at at time zone $2) as h, count(*)::int as n from comments c
-              where c.workspace_id = $1 and c.sentiment_source is distinct from 'subject' and c.posted_at at time zone $2 >= (select min(h) from hrs) and ${COMMENT_IN_PANEL("c")} group by 1),
+              where c.workspace_id = $1 and c.sentiment_source is distinct from 'subject' and c.posted_at at time zone $2 >= (select min(h) from hrs) and ${commentIn(scope, "c")} group by 1),
        ph as (select date_trunc('hour', p.posted_at at time zone $2) as h, count(*)::int as n from posts p
-              where p.workspace_id = $1 and p.source = 'earned' and p.content_type is distinct from 'stub' and p.relevant is not false and p.brought_in_by = 'panel' and p.posted_at at time zone $2 >= (select min(h) from hrs) group by 1)
+              where p.workspace_id = $1 and p.source = 'earned' and p.content_type is distinct from 'stub' and p.relevant is not false and ${postIn(scope, "p")} and p.posted_at at time zone $2 >= (select min(h) from hrs) group by 1)
        select to_char(hrs.h, 'YYYY-MM-DD HH24:00:00') as h, (coalesce(ch.n, 0) + 5 * coalesce(ph.n, 0))::int as n
        from hrs left join ch on ch.h = hrs.h left join ph on ph.h = hrs.h order by 1`,
       [ws, tz],
@@ -193,7 +213,7 @@ async function build(ws: string): Promise<PulseData | null> {
               (select count(*) from comments c where c.post_id = p.id and c.sentiment_source is distinct from 'subject' and c.posted_at < p.posted_at + interval '14 days')::int as early_comments,
               (select count(*) from comments c where c.post_id = p.id and c.sentiment_source is distinct from 'subject'
                 and c.posted_at at time zone $2 >= $3::timestamp and c.posted_at at time zone $2 < $3::timestamp + interval '24 hours')::int as first_day
-       from posts p where p.workspace_id = $1 and p.brought_in_by = 'panel' and p.source = 'owned' order by first_day desc, comments desc limit 1`,
+       from posts p where p.workspace_id = $1 and ${postIn(scope, "p")} and p.source = 'owned' order by first_day desc, comments desc limit 1`,
       [ws, tz, firstH],
     );
     // A root needs comments to be one: with none loaded (or a deleted original that never
@@ -203,7 +223,7 @@ async function build(ws: string): Promise<PulseData | null> {
     // a post can sit quiet for weeks before the crowd finds it, and those weeks are a
     // flat line that squashes the days that matter.
     const sinceIso = firstH ? firstH.slice(0, 10) : root ? root.posted_at.slice(0, 10) : null;
-    const [trendPart, dailyPart, spread, commercial] = await Promise.all([trendOf(firstH, lastH), dailyOf(sinceIso), spreadOf(sinceIso), commercialOf(sinceIso)]);
+    const [trendPart, dailyPart, spread, commercial] = await Promise.all([trendOf(firstH, lastH), dailyOf(sinceIso), spreadOf(sinceIso), exposureOf(sinceIso)]);
     return { root, ...trendPart, ...dailyPart, spread, commercial };
   };
   const trendOf = async (firstH: string, lastH: string) => {
@@ -218,7 +238,7 @@ async function build(ws: string): Promise<PulseData | null> {
                 count(c.id) filter (where not coalesce(c.off_topic, false) and c.sentiment = 'negative')::int as negative,
                 count(c.id) filter (where not coalesce(c.off_topic, false) and c.sentiment = 'neutral')::int as neutral,
                 count(c.id) filter (where not coalesce(c.off_topic, false) and c.sentiment = 'positive')::int as positive
-         from hrs left join comments c on c.workspace_id = $1 and c.sentiment_source is distinct from 'subject' and ${COMMENT_IN_PANEL("c")}
+         from hrs left join comments c on c.workspace_id = $1 and c.sentiment_source is distinct from 'subject' and ${commentIn(scope, "c")}
               and date_trunc('hour', c.posted_at at time zone $2) = hrs.h
          group by 1 order by 1`,
         [ws, tz, firstH, lastH],
@@ -229,7 +249,7 @@ async function build(ws: string): Promise<PulseData | null> {
                 count(p.id) filter (where p.stance = 'negative')::int as against,
                 count(p.id) filter (where p.stance = 'positive')::int as for_,
                 count(p.id) filter (where p.stance = 'neutral')::int as neutral_posts
-         from hrs left join posts p on p.workspace_id = $1 and p.source = 'earned' and p.content_type is distinct from 'stub' and p.relevant is not false and p.brought_in_by = 'panel'
+         from hrs left join posts p on p.workspace_id = $1 and p.source = 'earned' and p.content_type is distinct from 'stub' and p.relevant is not false and ${postIn(scope, "p")}
               and date_trunc('hour', p.posted_at at time zone $2) = hrs.h
          group by 1 order by 1`,
         [ws, tz, firstH, lastH],
@@ -257,19 +277,19 @@ async function build(ws: string): Promise<PulseData | null> {
   };
   const dailyOf = async (sinceIso: string | null) => {
     const days = await db.q<Row>(
-      `with bounds as (select coalesce($3::date, ((nc.n at time zone $2) - interval '30 days')::date) as first, (greatest(nc.n, ${panelPostEdge("$1", "newest", "and p.source = 'earned'")}) at time zone $2)::date as last from (select ${panelCommentEdge("$1", "newest")} as n) nc),
+      `with bounds as (select coalesce($3::date, ((nc.n at time zone $2) - interval '30 days')::date) as first, (greatest(nc.n, ${panelPostEdge("$1", "newest", "and p.source = 'earned'", scope)}) at time zone $2)::date as last from (select ${panelCommentEdge("$1", "newest", "", scope)} as n) nc),
        ds as (select generate_series((select first from bounds), (select last from bounds), interval '1 day')::date as d)
        select to_char(ds.d, 'YYYY-MM-DD') as h, c.platform, count(c.id)::int as n
-       from ds left join comments c on c.workspace_id = $1 and c.sentiment_source is distinct from 'subject' and ${COMMENT_IN_PANEL("c")} and (c.posted_at at time zone $2)::date = ds.d
+       from ds left join comments c on c.workspace_id = $1 and c.sentiment_source is distinct from 'subject' and ${commentIn(scope, "c")} and (c.posted_at at time zone $2)::date = ds.d
        group by 1, 2 order by 1`,
       [ws, tz, sinceIso],
     );
     const daily = pivot(days, "h");
     const postDays = await db.q<Row>(
-      `with bounds as (select coalesce($3::date, ((nc.n at time zone $2) - interval '30 days')::date) as first, (greatest(nc.n, ${panelPostEdge("$1", "newest", "and p.source = 'earned'")}) at time zone $2)::date as last from (select ${panelCommentEdge("$1", "newest")} as n) nc),
+      `with bounds as (select coalesce($3::date, ((nc.n at time zone $2) - interval '30 days')::date) as first, (greatest(nc.n, ${panelPostEdge("$1", "newest", "and p.source = 'earned'", scope)}) at time zone $2)::date as last from (select ${panelCommentEdge("$1", "newest", "", scope)} as n) nc),
        ds as (select generate_series((select first from bounds), (select last from bounds), interval '1 day')::date as d)
        select to_char(ds.d, 'YYYY-MM-DD') as h, p.platform, count(p.id)::int as n
-       from ds left join posts p on p.workspace_id = $1 and p.source = 'earned' and p.content_type is distinct from 'stub' and p.relevant is not false and p.brought_in_by = 'panel' and (p.posted_at at time zone $2)::date = ds.d
+       from ds left join posts p on p.workspace_id = $1 and p.source = 'earned' and p.content_type is distinct from 'stub' and p.relevant is not false and ${postIn(scope, "p")} and (p.posted_at at time zone $2)::date = ds.d
        group by 1, 2 order by 1`,
       [ws, tz, sinceIso],
     );
@@ -281,19 +301,19 @@ async function build(ws: string): Promise<PulseData | null> {
     const spreadRows = await db.q<Row>(
       `with per_hour as (
          select c.platform, date_trunc('hour', c.posted_at at time zone $2) as h, count(*)::int as n
-         from comments c where c.workspace_id = $1 and c.sentiment_source is distinct from 'subject' and c.posted_at >= coalesce($3::date, (now() - interval '60 days')::date) and ${COMMENT_IN_PANEL("c")} group by 1, 2),
+         from comments c where c.workspace_id = $1 and c.sentiment_source is distinct from 'subject' and c.posted_at >= coalesce($3::date, (now() - interval '60 days')::date) and ${commentIn(scope, "c")} group by 1, 2),
        peak as (select distinct on (platform) platform, to_char(h, 'YYYY-MM-DD HH24:00') as peak_hour, n as peak_comments from per_hour order by platform, n desc, h),
        takeoff as (select platform, to_char(min(h), 'YYYY-MM-DD HH24:00') as takeoff from per_hour where n >= 20 group by 1),
        firstpost as (select distinct on (platform) platform, to_char(posted_at at time zone $2, 'YYYY-MM-DD HH24:MI') as first_post, creator_handle as first_post_handle, url as first_post_url
-                     from posts where workspace_id = $1 and source = 'earned' and content_type is distinct from 'stub' and relevant is not false and brought_in_by = 'panel' and posted_at >= now() - interval '60 days' order by platform, posted_at),
+                     from posts where workspace_id = $1 and source = 'earned' and content_type is distinct from 'stub' and relevant is not false and ${postIn(scope, "posts")} and posted_at >= now() - interval '60 days' order by platform, posted_at),
        agg as (select c.platform, count(*)::int as comments,
                       count(*) filter (where not coalesce(c.off_topic, false))::int as on_topic,
                       count(*) filter (where not coalesce(c.off_topic, false) and c.sentiment = 'negative')::int as negative,
                       count(*) filter (where not coalesce(c.off_topic, false) and c.sentiment = 'positive')::int as positive,
                       count(*) filter (where not coalesce(c.off_topic, false) and c.sentiment is not null)::int as labelled,
                       to_char(min(c.posted_at) filter (where c.posted_at >= coalesce($3::date, (now() - interval '60 days')::date)) at time zone $2, 'YYYY-MM-DD HH24:MI') as first_comment
-               from comments c where c.workspace_id = $1 and c.sentiment_source is distinct from 'subject' and ${COMMENT_IN_PANEL("c")} group by 1),
-       np as (select platform, count(*)::int as posts from posts where workspace_id = $1 and content_type is distinct from 'stub' and relevant is not false and brought_in_by = 'panel' group by 1)
+               from comments c where c.workspace_id = $1 and c.sentiment_source is distinct from 'subject' and ${commentIn(scope, "c")} group by 1),
+       np as (select platform, count(*)::int as posts from posts where workspace_id = $1 and content_type is distinct from 'stub' and relevant is not false and ${postIn(scope, "posts")} group by 1)
        select a.platform, f.first_post, f.first_post_handle, f.first_post_url, a.first_comment, t.takeoff, pk.peak_hour, coalesce(pk.peak_comments, 0) as peak_comments,
               coalesce(np.posts, 0) as posts, a.comments, a.on_topic, a.negative, a.positive, a.labelled
        from agg a left join firstpost f using (platform) left join takeoff t using (platform) left join peak pk using (platform) left join np using (platform)
@@ -307,10 +327,10 @@ async function build(ws: string): Promise<PulseData | null> {
   // Only the words the owner configured are counted — a brand Pulse was not told
   // about is not silently matched, and a term list that is empty means the card
   // says so rather than showing a confident zero.
-  const commercialOf = (sinceIso: string | null) => commercialExposure(db, ws, tz, cfg.commercial, sinceIso);
+  const exposureOf = (sinceIso: string | null) => commercialExposure(db, ws, tz, cfg.commercial, sinceIso, scope);
 
   const replyPart = async () => {
-    const replyRow = await db.one<Row>(`select to_char(posted_at at time zone $2, 'YYYY-MM-DD HH24:MI') as at, coalesce(likes, 0)::int as likes, text, platform from comments where workspace_id = $1 and ${COMMENT_IN_PANEL("comments")} and sentiment_source = 'subject' order by likes desc nulls last limit 1`, [ws, tz]);
+    const replyRow = await db.one<Row>(`select to_char(posted_at at time zone $2, 'YYYY-MM-DD HH24:MI') as at, coalesce(likes, 0)::int as likes, text, platform from comments where workspace_id = $1 and ${commentIn(scope, "comments")} and sentiment_source = 'subject' order by likes desc nulls last limit 1`, [ws, tz]);
     const reply = replyRow && (replyRow.likes as number) > 0 ? { at: replyRow.at as string, likes: replyRow.likes as number, text: String(replyRow.text).replace(/\s+/g, " ").slice(0, 240), platform: replyRow.platform as string } : null;
 
     // before and after the subject's reply: did the mood move?
@@ -322,8 +342,8 @@ async function build(ws: string): Promise<PulseData | null> {
                   count(*) filter (where c.posted_at < r.at and c.sentiment = 'negative')::int as b_negative,
                   count(*) filter (where c.posted_at >= r.at)::int as a_comments, count(*) filter (where c.posted_at >= r.at and c.sentiment is not null)::int as a_labelled,
                   count(*) filter (where c.posted_at >= r.at and c.sentiment = 'negative')::int as a_negative
-           from comments c, (select posted_at as at from comments where workspace_id = $1 and ${COMMENT_IN_PANEL("comments")} and sentiment_source = 'subject' order by likes desc nulls last limit 1) r
-           where c.workspace_id = $1 and c.sentiment_source is distinct from 'subject' and c.posted_at >= r.at - interval '3 days' and ${COMMENT_IN_PANEL("c")} ${platform ? "and c.platform = $2" : ""}`,
+           from comments c, (select posted_at as at from comments where workspace_id = $1 and ${commentIn(scope, "comments")} and sentiment_source = 'subject' order by likes desc nulls last limit 1) r
+           where c.workspace_id = $1 and c.sentiment_source is distinct from 'subject' and c.posted_at >= r.at - interval '3 days' and ${commentIn(scope, "c")} ${platform ? "and c.platform = $2" : ""}`,
           platform ? [ws, platform] : [ws],
         );
         return { before: { comments: r?.b_comments as number, labelled: r?.b_labelled as number, negative: r?.b_negative as number }, after: { comments: r?.a_comments as number, labelled: r?.a_labelled as number, negative: r?.a_negative as number } };
@@ -344,11 +364,11 @@ async function build(ws: string): Promise<PulseData | null> {
                 count(c.id) filter (where c.sentiment_source is distinct from 'subject' and not coalesce(c.off_topic, false))::int as on_topic,
                 count(c.id) filter (where not coalesce(c.off_topic, false) and c.sentiment = 'negative')::int as negative,
                 count(c.id) filter (where not coalesce(c.off_topic, false) and c.sentiment = 'positive')::int as positive,
-                count(c.id) filter (where c.sentiment_source is distinct from 'subject' and c.posted_at > ${panelCommentEdge("$1", "newest")} - interval '6 hours')::int as last6h,
-                count(c.id) filter (where c.sentiment_source is distinct from 'subject' and c.posted_at > ${panelCommentEdge("$1", "newest")} - interval '24 hours')::int as last24h,
+                count(c.id) filter (where c.sentiment_source is distinct from 'subject' and c.posted_at > ${panelCommentEdge("$1", "newest", "", scope)} - interval '6 hours')::int as last6h,
+                count(c.id) filter (where c.sentiment_source is distinct from 'subject' and c.posted_at > ${panelCommentEdge("$1", "newest", "", scope)} - interval '24 hours')::int as last24h,
                 to_char(max(c.posted_at) at time zone $2, 'YYYY-MM-DD HH24:MI') as latest
          from posts p join comments c on c.post_id = p.id
-         where p.workspace_id = $1 and p.content_type is distinct from 'stub' and p.relevant is not false and p.brought_in_by = 'panel'
+         where p.workspace_id = $1 and p.content_type is distinct from 'stub' and p.relevant is not false and ${postIn(scope, "p")}
          group by p.id, p.url, p.platform, p.source, p.creator_handle, p.caption, p.stance, p.views, p.likes, p.posted_at),
        ranked as (select *, row_number() over (partition by platform order by on_topic desc, comments desc) as rn from per_post)
        select * from ranked where rn <= 3 order by on_topic desc, comments desc`,
@@ -368,20 +388,20 @@ async function build(ws: string): Promise<PulseData | null> {
   // hourly, last 72 h ending at the newest comment; daily since the root post
   const hoursPart = async () => {
     const hours = await db.q<Row>(
-      `with bounds as (select date_trunc('hour', greatest(${panelCommentEdge("$1", "newest")}, ${panelPostEdge("$1", "newest", "and p.source = 'earned'")}) at time zone $2) as last),
+      `with bounds as (select date_trunc('hour', greatest(${panelCommentEdge("$1", "newest", "", scope)}, ${panelPostEdge("$1", "newest", "and p.source = 'earned'", scope)}) at time zone $2) as last),
        hrs as (select generate_series((select last from bounds) - interval '71 hours', (select last from bounds), interval '1 hour') as h)
        select to_char(hrs.h, 'YYYY-MM-DD HH24:00') as h, c.platform, count(c.id)::int as n
-       from hrs left join comments c on c.workspace_id = $1 and c.sentiment_source is distinct from 'subject' and ${COMMENT_IN_PANEL("c")} and date_trunc('hour', c.posted_at at time zone $2) = hrs.h
+       from hrs left join comments c on c.workspace_id = $1 and c.sentiment_source is distinct from 'subject' and ${commentIn(scope, "c")} and date_trunc('hour', c.posted_at at time zone $2) = hrs.h
        group by 1, 2 order by 1`,
       [ws, tz],
     );
     const hourly = pivot(hours, "h");
     // posts by other accounts per hour and per day: the density of the conversation, not only its replies
     const postHours = await db.q<Row>(
-      `with bounds as (select date_trunc('hour', greatest(${panelCommentEdge("$1", "newest")}, ${panelPostEdge("$1", "newest", "and p.source = 'earned'")}) at time zone $2) as last),
+      `with bounds as (select date_trunc('hour', greatest(${panelCommentEdge("$1", "newest", "", scope)}, ${panelPostEdge("$1", "newest", "and p.source = 'earned'", scope)}) at time zone $2) as last),
        hrs as (select generate_series((select last from bounds) - interval '71 hours', (select last from bounds), interval '1 hour') as h)
        select to_char(hrs.h, 'YYYY-MM-DD HH24:00') as h, p.platform, coalesce(p.stance, 'unlabelled') as stance, count(p.id)::int as n
-       from hrs left join posts p on p.workspace_id = $1 and p.source = 'earned' and p.content_type is distinct from 'stub' and p.relevant is not false and p.brought_in_by = 'panel' and date_trunc('hour', p.posted_at at time zone $2) = hrs.h
+       from hrs left join posts p on p.workspace_id = $1 and p.source = 'earned' and p.content_type is distinct from 'stub' and p.relevant is not false and ${postIn(scope, "p")} and date_trunc('hour', p.posted_at at time zone $2) = hrs.h
        group by 1, 2, 3 order by 1`,
       [ws, tz],
     );
@@ -398,10 +418,10 @@ async function build(ws: string): Promise<PulseData | null> {
   // negative share per hour on labelled comments; hours with fewer than 10 labelled stay blank
   const negativePart = async () => {
     const negHours = await db.q<Row>(
-      `with bounds as (select date_trunc('hour', greatest(${panelCommentEdge("$1", "newest")}, ${panelPostEdge("$1", "newest", "and p.source = 'earned'")}) at time zone $2) as last),
+      `with bounds as (select date_trunc('hour', greatest(${panelCommentEdge("$1", "newest", "", scope)}, ${panelPostEdge("$1", "newest", "and p.source = 'earned'", scope)}) at time zone $2) as last),
        hrs as (select generate_series((select last from bounds) - interval '71 hours', (select last from bounds), interval '1 hour') as h)
        select to_char(hrs.h, 'YYYY-MM-DD HH24:00') as h, count(c.id) filter (where c.sentiment is not null)::int as labelled, count(c.id) filter (where c.sentiment = 'negative')::int as negative
-       from hrs left join comments c on c.workspace_id = $1 and c.sentiment_source is distinct from 'subject' and ${COMMENT_IN_PANEL("c")} and date_trunc('hour', c.posted_at at time zone $2) = hrs.h
+       from hrs left join comments c on c.workspace_id = $1 and c.sentiment_source is distinct from 'subject' and ${commentIn(scope, "c")} and date_trunc('hour', c.posted_at at time zone $2) = hrs.h
        group by 1 order by 1`,
       [ws, tz],
     );
@@ -419,7 +439,7 @@ async function build(ws: string): Promise<PulseData | null> {
               coalesce(sum(views) filter (where stance = 'positive'), 0)::float8 as views_for, coalesce(sum(views) filter (where stance = 'neutral'), 0)::float8 as views_neutral,
               coalesce(sum(likes), 0)::int as likes_total, coalesce(sum(likes) filter (where stance = 'negative'), 0)::int as likes_against,
               coalesce(sum(likes) filter (where stance = 'positive'), 0)::int as likes_for, coalesce(sum(likes) filter (where stance = 'neutral'), 0)::int as likes_neutral
-       from posts where workspace_id = $1 and source = 'earned' and content_type is distinct from 'stub' and relevant is not false and brought_in_by = 'panel'
+       from posts where workspace_id = $1 and source = 'earned' and content_type is distinct from 'stub' and relevant is not false and ${postIn(scope, "posts")}
        group by 1 order by posts desc`,
       [ws],
     )) as unknown as StanceRow[];
@@ -432,7 +452,7 @@ async function build(ws: string): Promise<PulseData | null> {
       `with per_account as (
          select c.platform, c.author_handle, count(*)::int as n, count(distinct c.post_id)::int as posts
          from comments c where c.workspace_id = $1 and c.sentiment_source is distinct from 'subject' and c.author_handle is not null
-           and ${COMMENT_IN_PANEL("c")} group by 1, 2),
+           and ${commentIn(scope, "c")} group by 1, 2),
        handles as (select author_handle, count(distinct platform)::int as platforms from per_account group by 1)
        select (select count(*) from per_account)::int as accounts, (select sum(n) from per_account)::int as comments,
               count(*) filter (where n = 1)::int as once, count(*) filter (where n between 2 and 4)::int as few, count(*) filter (where n >= 5)::int as many,
@@ -445,16 +465,16 @@ async function build(ws: string): Promise<PulseData | null> {
     const topCommenters = await db.q<Row>(
       `select c.platform, c.author_handle as handle, count(*)::int as comments, count(distinct c.post_id)::int as posts, coalesce(sum(c.likes), 0)::int as likes,
               count(*) filter (where c.sentiment = 'negative')::int as negative
-       from comments c where c.workspace_id = $1 and c.sentiment_source is distinct from 'subject' and c.author_handle is not null and ${COMMENT_IN_PANEL("c")}
+       from comments c where c.workspace_id = $1 and c.sentiment_source is distinct from 'subject' and c.author_handle is not null and ${commentIn(scope, "c")}
        group by 1, 2 order by comments desc, likes desc limit 8`,
       [ws],
     );
     const firstTime = await db.q<Row>(
-      `with bounds as (select date_trunc('hour', greatest(${panelCommentEdge("$1", "newest")}, ${panelPostEdge("$1", "newest", "and p.source = 'earned'")}) at time zone $2) as last),
+      `with bounds as (select date_trunc('hour', greatest(${panelCommentEdge("$1", "newest", "", scope)}, ${panelPostEdge("$1", "newest", "and p.source = 'earned'", scope)}) at time zone $2) as last),
        hrs as (select generate_series((select last from bounds) - interval '71 hours', (select last from bounds), interval '1 hour') as h),
-       firsts as (select platform, author_handle, min(posted_at) as first_at from comments where workspace_id = $1 and ${COMMENT_IN_PANEL("comments")} and sentiment_source is distinct from 'subject' and author_handle is not null group by 1, 2),
+       firsts as (select platform, author_handle, min(posted_at) as first_at from comments where workspace_id = $1 and ${commentIn(scope, "comments")} and sentiment_source is distinct from 'subject' and author_handle is not null group by 1, 2),
        ch as (select date_trunc('hour', c.posted_at at time zone $2) as h, count(*)::int as n from comments c
-              where c.workspace_id = $1 and c.sentiment_source is distinct from 'subject' and c.posted_at at time zone $2 >= (select min(h) from hrs) and ${COMMENT_IN_PANEL("c")} group by 1),
+              where c.workspace_id = $1 and c.sentiment_source is distinct from 'subject' and c.posted_at at time zone $2 >= (select min(h) from hrs) and ${commentIn(scope, "c")} group by 1),
        fh as (select date_trunc('hour', f.first_at at time zone $2) as h, count(*)::int as n from firsts f where f.first_at at time zone $2 >= (select min(h) from hrs) group by 1)
        select to_char(hrs.h, 'YYYY-MM-DD HH24:00') as h, coalesce(ch.n, 0)::int as comments, coalesce(fh.n, 0)::int as first_timers
        from hrs left join ch on ch.h = hrs.h left join fh on fh.h = hrs.h order by 1`,
@@ -478,10 +498,10 @@ async function build(ws: string): Promise<PulseData | null> {
         `with pp as (
            select coalesce(${col}, '') as k, count(*)::int as posts, count(*) filter (where stance = 'negative')::int as against, count(*) filter (where stance = 'neutral')::int as neutral,
                   count(*) filter (where stance = 'positive')::int as for_, count(stance)::int as stanced
-           from posts where workspace_id = $1 and source = 'earned' and content_type is distinct from 'stub' and relevant is not false and brought_in_by = 'panel' and stance_source = 'model' group by 1),
+           from posts where workspace_id = $1 and source = 'earned' and content_type is distinct from 'stub' and relevant is not false and ${postIn(scope, "posts")} and stance_source = 'model' group by 1),
          cc as (
            select coalesce(${col}, '') as k, count(*)::int as comments, count(*) filter (where sentiment = 'negative')::int as c_negative, count(*) filter (where sentiment = 'positive')::int as c_positive, count(sentiment)::int as c_labelled
-           from comments where workspace_id = $1 and ${COMMENT_IN_PANEL("comments")} and sentiment_source is distinct from 'subject' and not coalesce(off_topic, false) and sentiment is not null group by 1)
+           from comments where workspace_id = $1 and ${commentIn(scope, "comments")} and sentiment_source is distinct from 'subject' and not coalesce(off_topic, false) and sentiment is not null group by 1)
          select nullif(coalesce(pp.k, cc.k), '') as k, ${col === "topic_id" ? "t.label, t.is_catch_all, t.sort_order" : "null as label, false as is_catch_all, 0 as sort_order"},
                 coalesce(pp.posts, 0) as posts, coalesce(pp.against, 0) as against, coalesce(pp.neutral, 0) as neutral, coalesce(pp.for_, 0) as for_, coalesce(pp.stanced, 0) as stanced,
                 coalesce(cc.comments, 0) as comments, coalesce(cc.c_negative, 0) as c_negative, coalesce(cc.c_positive, 0) as c_positive, coalesce(cc.c_labelled, 0) as c_labelled
@@ -512,12 +532,12 @@ async function build(ws: string): Promise<PulseData | null> {
   const skillsPart = async () => {
     const actor = { user_id: "pulse", via: "api" as const };
     const [sentiment, drivers, themesNeg, seeding] = await Promise.all([
-      runSkill({ skill: "sentiment", workspace_id: ws, params: { window: { last_n_days: 30 } }, actor, persist: false }),
-      runSkill({ skill: "drivers", workspace_id: ws, params: { limit: 10, sort: "comments" }, actor, persist: false }),
-      runSkill({ skill: "comment-themes", workspace_id: ws, params: { sentiment: "negative", limit: 12 }, actor, persist: false }),
-      runSkill({ skill: "seeding", workspace_id: ws, params: { limit: 8 }, actor, persist: false }),
+      runSkill({ skill: "sentiment", workspace_id: ws, scope, params: { window: { last_n_days: 30 } }, actor, persist: false }),
+      runSkill({ skill: "drivers", workspace_id: ws, scope, params: { limit: 10, sort: "comments" }, actor, persist: false }),
+      runSkill({ skill: "comment-themes", workspace_id: ws, scope, params: { sentiment: "negative", limit: 12 }, actor, persist: false }),
+      runSkill({ skill: "seeding", workspace_id: ws, scope, params: { limit: 8 }, actor, persist: false }),
     ]);
-    const themes = themesNeg.status === "ok" && themesNeg.rows.length ? themesNeg : await runSkill({ skill: "comment-themes", workspace_id: ws, params: { sentiment: "all", limit: 12 }, actor, persist: false });
+    const themes = themesNeg.status === "ok" && themesNeg.rows.length ? themesNeg : await runSkill({ skill: "comment-themes", workspace_id: ws, scope, params: { sentiment: "all", limit: 12 }, actor, persist: false });
     return { sentiment, drivers, themes, seeding };
   };
 
@@ -538,7 +558,7 @@ async function build(ws: string): Promise<PulseData | null> {
   // The subject's own posts once the wave is under way (a statement, an apology).
   const firsts = await db.q<Row>(
     `select distinct on (p.platform) p.platform, to_char(p.posted_at at time zone $2, 'YYYY-MM-DD HH24:MI') as at, p.creator_handle, p.url
-     from posts p where p.workspace_id = $1 and p.source = 'earned' and p.content_type is distinct from 'stub' and p.relevant is not false and p.brought_in_by = 'panel'
+     from posts p where p.workspace_id = $1 and p.source = 'earned' and p.content_type is distinct from 'stub' and p.relevant is not false and ${postIn(scope, "p")}
      order by p.platform, p.posted_at`,
     [ws, tz],
   );
@@ -548,7 +568,7 @@ async function build(ws: string): Promise<PulseData | null> {
   if (firstEarned) {
     const own = await db.q<Row>(
       `select to_char(p.posted_at at time zone $2, 'YYYY-MM-DD HH24:MI') as at, p.platform, p.creator_handle, p.url, p.likes, p.comments_count, p.caption
-       from posts p where p.workspace_id = $1 and p.brought_in_by = 'panel' and p.source = 'owned' and p.content_type is distinct from 'stub'
+       from posts p where p.workspace_id = $1 and ${postIn(scope, "p")} and p.source = 'owned' and p.content_type is distinct from 'stub'
          and p.posted_at at time zone $2 >= $3::timestamp and p.url is distinct from $4
        order by p.posted_at limit 5`,
       [ws, tz, firstEarned, root?.url ?? null],
@@ -558,7 +578,7 @@ async function build(ws: string): Promise<PulseData | null> {
   if (reply) events.push({ at: reply.at, platform: reply.platform, what: `${subject} replies`, detail: `${fmt(reply.likes)} likes · “${reply.text.slice(0, 90)}…”`, kind: "reply" });
   const tops = await db.q<Row>(
     `select to_char(p.posted_at at time zone $2, 'YYYY-MM-DD HH24:MI') as at, p.platform, p.creator_handle, p.url, p.views::float8 as views, p.likes, p.comments_count, p.caption
-     from posts p where p.workspace_id = $1 and p.source = 'earned' and p.content_type is distinct from 'stub' and p.relevant is not false and p.brought_in_by = 'panel'
+     from posts p where p.workspace_id = $1 and p.source = 'earned' and p.content_type is distinct from 'stub' and p.relevant is not false and ${postIn(scope, "p")}
      order by coalesce(p.views, 0) + coalesce(p.likes, 0) * 20 desc limit 6`,
     [ws, tz],
   );
@@ -579,15 +599,15 @@ async function build(ws: string): Promise<PulseData | null> {
  * relative to the newest comment rather than the wall clock, so "the last 24 hours"
  * means the last 24 hours of data and does not quietly empty out when a load is late.
  */
-async function commercialExposure(db: SkillDb, ws: string, tz: string, cfg: { partners: { name: string; terms: string[] }[]; boycott_terms: string[] }, sinceIso: string | null): Promise<Commercial> {
+async function commercialExposure(db: SkillDb, ws: string, tz: string, cfg: { partners: { name: string; terms: string[] }[]; boycott_terms: string[] }, sinceIso: string | null, scope: Scope): Promise<Commercial> {
   const like = (terms: string[]) => terms.map((t) => `%${t}%`);
   const boycott = like(cfg.boycott_terms);
   const configured = cfg.partners.length > 0;
   // each matching post and comment is found once (ilike is the costly part), then counted by window and by day
   const totals = await db.one<Row>(
-    `with last as (select greatest(${panelCommentEdge("$1", "newest")}, ${panelPostEdge("$1", "newest")}) as at),
-     pm as (select posted_at from posts where workspace_id = $1 and source = 'earned' and content_type is distinct from 'stub' and relevant is not false and brought_in_by = 'panel' and caption ilike any($2::text[])),
-     cm as (select posted_at from comments where workspace_id = $1 and ${COMMENT_IN_PANEL("comments")} and text ilike any($2::text[]))
+    `with last as (select greatest(${panelCommentEdge("$1", "newest", "", scope)}, ${panelPostEdge("$1", "newest", "", scope)}) as at),
+     pm as (select posted_at from posts where workspace_id = $1 and source = 'earned' and content_type is distinct from 'stub' and relevant is not false and ${postIn(scope, "posts")} and caption ilike any($2::text[])),
+     cm as (select posted_at from comments where workspace_id = $1 and ${commentIn(scope, "comments")} and text ilike any($2::text[]))
      select (select count(*) from pm)::int as posts,
             (select count(*) from cm)::int as comments,
             (select count(*) from pm where posted_at > (select at from last) - interval '24 hours')::int as posts_24h,
@@ -598,12 +618,12 @@ async function commercialExposure(db: SkillDb, ws: string, tz: string, cfg: { pa
   );
   // per day: grouped once and joined to the days, not three lookups over the workspace for each day
   const daily = await db.q<Row>(
-    `with ds as (select generate_series(coalesce($3::date, (now() - interval '6 days')::date), ((${panelCommentEdge("$1", "newest")}) at time zone $2)::date, interval '1 day')::date as d),
+    `with ds as (select generate_series(coalesce($3::date, (now() - interval '6 days')::date), ((${panelCommentEdge("$1", "newest", "", scope)}) at time zone $2)::date, interval '1 day')::date as d),
      pd as (select (p.posted_at at time zone $2)::date as d,
-                   count(*) filter (where p.content_type is distinct from 'stub' and p.relevant is not false and p.brought_in_by = 'panel')::int as posts, max(p.views) as reach
-            from posts p where p.workspace_id = $1 and p.brought_in_by = 'panel' and p.source = 'earned' and p.caption ilike any($4::text[]) group by 1),
+                   count(*) filter (where p.content_type is distinct from 'stub' and p.relevant is not false and ${postIn(scope, "p")})::int as posts, max(p.views) as reach
+            from posts p where p.workspace_id = $1 and ${postIn(scope, "p")} and p.source = 'earned' and p.caption ilike any($4::text[]) group by 1),
      cd as (select (c.posted_at at time zone $2)::date as d, count(*)::int as comments
-            from comments c where c.workspace_id = $1 and ${COMMENT_IN_PANEL("c")} and c.text ilike any($4::text[]) group by 1)
+            from comments c where c.workspace_id = $1 and ${commentIn(scope, "c")} and c.text ilike any($4::text[]) group by 1)
      select to_char(ds.d, 'YYYY-MM-DD') as d, coalesce(pd.posts, 0)::int as posts, coalesce(cd.comments, 0)::int as comments, pd.reach::float8 as reach
      from ds left join pd on pd.d = ds.d left join cd on cd.d = ds.d order by 1`,
     [ws, tz, sinceIso, boycott],
@@ -611,25 +631,25 @@ async function commercialExposure(db: SkillDb, ws: string, tz: string, cfg: { pa
   const top = await db.q<Row>(
     `select url, platform, creator_handle as handle, caption, to_char(posted_at at time zone $2, 'YYYY-MM-DD HH24:MI') as posted_at,
             views::float8 as views, likes, stance
-     from posts where workspace_id = $1 and source = 'earned' and content_type is distinct from 'stub' and relevant is not false and brought_in_by = 'panel' and caption ilike any($3::text[])
+     from posts where workspace_id = $1 and source = 'earned' and content_type is distinct from 'stub' and relevant is not false and ${postIn(scope, "posts")} and caption ilike any($3::text[])
      order by coalesce(views, 0) + coalesce(likes, 0) * 20 desc limit 5`,
     [ws, tz, boycott],
   );
   const partners = configured
     ? await db.q<Row>(
-        `with last as (select greatest(${panelCommentEdge("$1", "newest")}, ${panelPostEdge("$1", "newest")}) as at),
+        `with last as (select greatest(${panelCommentEdge("$1", "newest", "", scope)}, ${panelPostEdge("$1", "newest", "", scope)}) as at),
          pat as (select name, terms from jsonb_to_recordset($2::jsonb) as p(name text, terms text[])),
          per_partner as (
          select pat.name,
-                (select count(*) from posts p where p.workspace_id = $1 and p.source = 'earned' and p.content_type is distinct from 'stub' and p.relevant is not false and p.brought_in_by = 'panel' and p.caption ilike any(pat.terms))::int as posts,
-                (select count(*) from comments c where c.workspace_id = $1 and ${COMMENT_IN_PANEL("c")} and c.text ilike any(pat.terms))::int as comments,
-                (select count(*) from posts p where p.workspace_id = $1 and p.source = 'earned' and p.content_type is distinct from 'stub' and p.relevant is not false and p.brought_in_by = 'panel' and p.caption ilike any(pat.terms) and p.posted_at > (select at from last) - interval '24 hours')::int as posts_24h,
-                (select count(*) from comments c where c.workspace_id = $1 and ${COMMENT_IN_PANEL("c")} and c.text ilike any(pat.terms) and c.posted_at > (select at from last) - interval '24 hours')::int as comments_24h,
-                (select max(p.views) from posts p where p.workspace_id = $1 and p.brought_in_by = 'panel' and p.source = 'earned' and p.caption ilike any(pat.terms))::float8 as top_views,
-                to_char((select min(t) from (select min(p.posted_at) t from posts p where p.workspace_id = $1 and p.brought_in_by = 'panel' and p.source = 'earned' and p.caption ilike any(pat.terms)
-                         union all select ${panelCommentEdge("$1", "oldest", "and c.text ilike any(pat.terms)")}) s) at time zone $3, 'YYYY-MM-DD HH24:MI') as first_at,
-                to_char((select max(t) from (select max(p.posted_at) t from posts p where p.workspace_id = $1 and p.brought_in_by = 'panel' and p.source = 'earned' and p.caption ilike any(pat.terms)
-                         union all select ${panelCommentEdge("$1", "newest", "and c.text ilike any(pat.terms)")}) s) at time zone $3, 'YYYY-MM-DD HH24:MI') as last_at
+                (select count(*) from posts p where p.workspace_id = $1 and p.source = 'earned' and p.content_type is distinct from 'stub' and p.relevant is not false and ${postIn(scope, "p")} and p.caption ilike any(pat.terms))::int as posts,
+                (select count(*) from comments c where c.workspace_id = $1 and ${commentIn(scope, "c")} and c.text ilike any(pat.terms))::int as comments,
+                (select count(*) from posts p where p.workspace_id = $1 and p.source = 'earned' and p.content_type is distinct from 'stub' and p.relevant is not false and ${postIn(scope, "p")} and p.caption ilike any(pat.terms) and p.posted_at > (select at from last) - interval '24 hours')::int as posts_24h,
+                (select count(*) from comments c where c.workspace_id = $1 and ${commentIn(scope, "c")} and c.text ilike any(pat.terms) and c.posted_at > (select at from last) - interval '24 hours')::int as comments_24h,
+                (select max(p.views) from posts p where p.workspace_id = $1 and ${postIn(scope, "p")} and p.source = 'earned' and p.caption ilike any(pat.terms))::float8 as top_views,
+                to_char((select min(t) from (select min(p.posted_at) t from posts p where p.workspace_id = $1 and ${postIn(scope, "p")} and p.source = 'earned' and p.caption ilike any(pat.terms)
+                         union all select ${panelCommentEdge("$1", "oldest", "and c.text ilike any(pat.terms)", scope)}) s) at time zone $3, 'YYYY-MM-DD HH24:MI') as first_at,
+                to_char((select max(t) from (select max(p.posted_at) t from posts p where p.workspace_id = $1 and ${postIn(scope, "p")} and p.source = 'earned' and p.caption ilike any(pat.terms)
+                         union all select ${panelCommentEdge("$1", "newest", "and c.text ilike any(pat.terms)", scope)}) s) at time zone $3, 'YYYY-MM-DD HH24:MI') as last_at
          from pat)
          select * from per_partner order by comments + posts desc, name`,
         [ws, toJson(cfg.partners.map((p) => ({ name: p.name, terms: like(p.terms) }))), tz],

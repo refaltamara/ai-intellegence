@@ -62,7 +62,7 @@ const q = async <T>(text: string, params: unknown[] = []) => (await sql.query(te
 const COLS = `c.id, c.workspace_id, c.name, c.about, to_char(c.starts_on, 'YYYY-MM-DD') as starts_on, to_char(c.ends_on, 'YYYY-MM-DD') as ends_on,
   c.terms, c.platforms, c.pace, c.scraper_request, c.access, c.status, c.settings, c.created_by, c.created_at, c.updated_at,
   (select count(*) from case_posts cp where cp.case_id = c.id)::int as posts,
-  (select count(distinct p.item_id) from posts p where p.workspace_id = c.workspace_id and p.brought_in_by = c.id)::int as case_only`;
+  (select count(distinct p.item_id) from case_posts k join posts p on p.item_id = k.item_id where k.case_id = c.id and p.brought_in_by = c.id)::int as case_only`;
 
 /** the statements that write a case (kept here so the live test plans exactly these) */
 export const CASE_SQL = {
@@ -82,6 +82,12 @@ export async function casesOf(ws: string): Promise<CaseRow[]> {
 /** the cases of a workspace this person may see */
 export async function casesFor(actor: Actor, ws: string): Promise<CaseRow[]> {
   return (await casesOf(ws)).filter((c) => can(actor, "case.view", { workspace: ws, case: c }));
+}
+
+/** the cases of a workspace this person may see, by name only (the sidebar asks on every page, so no counts) */
+export async function caseNamesFor(actor: Actor, ws: string): Promise<{ id: string; name: string; status: string }[]> {
+  const rows = await q<{ id: string; name: string; status: string; access: string[] }>("select id, name, status, access from cases where workspace_id = $1 order by starts_on desc, name", [ws]);
+  return rows.filter((c) => can(actor, "case.view", { workspace: ws, case: c })).map(({ access: _a, ...c }) => c);
 }
 
 export async function getCase(id: string): Promise<CaseRow | null> {

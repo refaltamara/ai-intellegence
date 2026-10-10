@@ -2,6 +2,7 @@
 import { d7Join, sqlOf } from "../definitions/catalog";
 import type { SkillDb } from "./db";
 import type { Context, Window } from "./params";
+import { PANEL, postIn } from "../db/panel";
 import type { Evidence, Platform, Row } from "./types";
 
 /**
@@ -33,7 +34,7 @@ export class Where {
 
   /** the workspace, and only posts about their brand: a listening post that does not name it never counts (DECISIONS 3 Oct 2026) */
   workspace(ctx: Context): this {
-    return this.add(`${this.alias}.workspace_id = ? and ${this.alias}.relevant is not false and ${this.alias}.brought_in_by = 'panel'`, ctx.workspaceId);
+    return this.add(`${this.alias}.workspace_id = ? and ${this.alias}.relevant is not false and ${postIn(ctx.scope ?? PANEL, this.alias)}`, ctx.workspaceId);
   }
 
   window(w: Window, ctx: Context): this {

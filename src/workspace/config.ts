@@ -154,11 +154,16 @@ export function workspaceConfig(row: WorkspaceRow, clientName: string | null = n
     team_override: s.team,
     reputation: kind !== "profile" || s.dashboard === "reputation",
     pr_hide: (s.pr?.hide ?? []).filter((x): x is string => typeof x === "string"),
-    commercial: {
-      // A partner with no terms of its own is matched on its name, which is what an
-      // owner typing "Oatside" into the Data page expects.
-      partners: (s.commercial?.partners ?? []).filter((p) => p.name?.trim()).map((p) => ({ name: p.name.trim(), terms: (p.terms?.length ? p.terms : [p.name]).map((t) => t.trim()).filter(Boolean) })),
-      boycott_terms: s.commercial?.boycott_terms?.length ? s.commercial.boycott_terms.map((t) => t.trim()).filter(Boolean) : BOYCOTT_TERMS,
-    },
+    commercial: commercialOf(s.commercial),
+  };
+}
+
+/** a workspace's or a case's case words: partners, and the words a boycott uses */
+export function commercialOf(c: CommercialSettings | undefined | null): Commercial {
+  return {
+    // A partner with no terms of its own is matched on its name, which is what an
+    // owner typing "Oatside" into the Data page expects.
+    partners: (c?.partners ?? []).filter((p) => p.name?.trim()).map((p) => ({ name: p.name.trim(), terms: (p.terms?.length ? p.terms : [p.name]).map((t) => t.trim()).filter(Boolean) })),
+    boycott_terms: c?.boycott_terms?.length ? c.boycott_terms.map((t) => t.trim()).filter(Boolean) : BOYCOTT_TERMS,
   };
 }

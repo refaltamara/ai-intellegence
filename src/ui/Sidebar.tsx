@@ -28,7 +28,7 @@ const NAV: NavItem[] = [
 
 type Product = { name: string; tagline: string; label: string; kind: string };
 
-export function Sidebar({ recent, user, product, teams, currentWorkspace, currentRole }: { recent: { id: string; title: string; href: string }[]; user: { email: string; role: string; team?: boolean; cms?: boolean; company?: { label: string; waiting: number } }; product: Product; teams: TeamChoice[]; currentWorkspace: string; currentRole: string }) {
+export function Sidebar({ recent, user, product, teams, currentWorkspace, currentRole }: { recent: { id: string; title: string; href: string }[]; user: { email: string; role: string; team?: boolean; cms?: boolean; company?: { label: string; waiting: number }; cases?: number }; product: Product; teams: TeamChoice[]; currentWorkspace: string; currentRole: string }) {
   const path = usePathname();
   const router = useRouter();
   const [switching, setSwitching] = useState<string | null>(null);
@@ -107,6 +107,12 @@ export function Sidebar({ recent, user, product, teams, currentWorkspace, curren
             {n.label}
           </Link>
         ))}
+        {(user.cases ?? 0) > 0 && (
+          <Link href="/cases" className={active("/cases") ? "on" : ""} data-tone="coral" title="Cases: watches inside this panel that only the people on each case's list see">
+            <span className="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 21V4h12l-2 4.5 2 4.5H5" /></svg></span>
+            Cases
+          </Link>
+        )}
         {user.company && (
           <Link href="/company" className={`ours ${active("/company") ? "on" : ""}`} data-tone="violet" title="Your team's own version: what it changed, made and approved">
             <span className="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.4 6.8 19.1l1-5.8L3.5 9.2l5.9-.9z" /></svg></span>
