@@ -724,10 +724,11 @@ The agreed design is the doc "Core data architecture and model" (https://claude.
   - the day it arrived, from git.
 - **The upload.** The files go to private Vercel Blob from Vercel's own production build, which already holds the store's token, so no token passes through a laptop or a chat.
   - `pnpm raw sync --build` is the first step of `pnpm build`, and `vercel.json` pins the build command.
-  - That build fails unless every file is confirmed in the store.
+  - The sync never fails the build. Each file's outcome goes to the `raw_files` table (`src/raw/files.ts`, migration 0030): stored, with the time it was confirmed, or why not and where. A file that is not stored stays where it was.
+  - The first production build failed on the earlier version of the sync, which stopped the build when the store could not be reached. Its logs are only on Vercel, and this session cannot reach Vercel, which is why the outcome now goes to the database instead.
 - **Out of the repository.** Then the repository stops tracking the files: `data/raw/*` is gitignored except this README and the manifest. Old commits still hold them; Refal decides later about the history and the repository's visibility.
 - **Reading them back.** Loaders read a raw file through `readRaw` (`src/raw/store.ts`): the local copy if its hash matches, else the store.
 - **Commands.**
   - `pnpm raw pull <workspace>` fetches files into `data/raw/`, checked against their hash, for the Python loaders or for analysis.
-  - `pnpm raw check` shows where each file is.
+  - `pnpm raw check` shows where each file is, and what `raw_files` says.
   - `pnpm raw expired` lists files past their 12 months.

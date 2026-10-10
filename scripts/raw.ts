@@ -3,10 +3,11 @@
  *   pnpm raw manifest                 add the files under data/raw to the manifest (size, hash, the day they arrived)
  *   pnpm raw sync                     put every listed file that is here into the store, if it is not there yet
  *   pnpm raw pull [workspace|path]    fetch listed files into data/raw (checked against their hash)
- *   pnpm raw check                    each file: here, and in the store
+ *   pnpm raw check                    each file: here, in the store, and what raw_files says
  *   pnpm raw expired                  files past their 12 months
- * The store needs BLOB_READ_WRITE_TOKEN (`vercel env pull`). `sync --build` runs in Vercel's production build,
- * where the store's token already is: it fails the build unless every file found here is confirmed in the store.
+ * The store needs BLOB_READ_WRITE_TOKEN (`vercel env pull`). `sync --build` runs in Vercel's production build, where
+ * the store's token already is. It never fails the build: each file's outcome (stored, or why not) goes to the
+ * raw_files table (src/raw/files.ts), which anyone with the database can read; a file not stored stays where it was.
  */
 import { execFileSync } from "node:child_process";
 import { readdirSync, statSync } from "node:fs";
@@ -66,26 +67,41 @@ async function sync(build: boolean) {
     if (b) here.push({ f, b });
   }
   if (!here.length) return console.log("raw sync: no listed raw file is here, nothing to do");
-  if (!storeOn()) throw new Error("raw sync: the store is not configured (BLOB_READ_WRITE_TOKEN).");
+  // the outcome goes to raw_files when the database is reachable; writing it never stops the sync
+  const files = process.env.DATABASE_URL ? await import("../src/raw/files") : null;
+  // where and when an outcome was written, so a failure reads as "the production build, at 03:40", not just "failed"
+  const where = `[${process.env.VERCEL ? `vercel ${process.env.VERCEL_ENV} build` : "local"} ${new Date().toISOString().slice(0, 16)}Z]`;
+  const record = async (what: string, fn: () => Promise<void>) => {
+    try { await fn(); } catch (e) { console.error(`raw sync: could not record ${what} in raw_files: ${(e as Error).message}`); }
+  };
+  if (files) await record("the files", () => files.registerFiles(m.files));
+  if (!storeOn()) {
+    const why = "No Blob store in this environment: BLOB_READ_WRITE_TOKEN is not set.";
+    if (files) await record("the outcome", () => files.markFailed(here.map((x) => x.f.blob), `${where} ${why}`));
+    if (build) return console.log(`raw sync: ${why} Nothing stored; the files stay where they are.`);
+    throw new Error(`raw sync: ${why} (\`vercel env pull\`)`);
+  }
   let put = 0, there = 0;
   const failed: string[] = [];
   for (const { f, b } of here) {
     try {
       const size = await storedSize(f.blob);
-      if (size === f.bytes) { there++; continue; }
-      if (size !== null) throw new Error(`a different file (${size} bytes) already sits at ${f.blob}`);
-      await store(f, b);
-      if ((await storedSize(f.blob)) !== f.bytes) throw new Error(`${f.blob} did not arrive whole`);
-      put++;
+      if (size !== null && size !== f.bytes) throw new Error(`a different file (${size} bytes) already sits at ${f.blob}`);
+      if (size === null) {
+        await store(f, b);
+        if ((await storedSize(f.blob)) !== f.bytes) throw new Error(`${f.blob} did not arrive whole`);
+        put++;
+      } else there++;
+      if (files) await record(f.blob, () => files.markStored(f.blob));
     } catch (e) {
-      failed.push(`${f.path}: ${(e as Error).message}`);
+      const msg = `${(e as Error).name}: ${(e as Error).message}`;
+      failed.push(`${f.path}: ${msg}`);
+      if (files) await record(f.blob, () => files.markFailed([f.blob], `${where} ${msg}`));
     }
   }
   console.log(`raw sync: ${put} stored, ${there} already there, ${failed.length} failed, of ${here.length} files here (${m.files.length} listed)`);
-  if (failed.length) {
-    for (const x of failed) console.error(`  ${x}`);
-    process.exitCode = 1;
-  }
+  for (const x of failed) console.error(`  ${x}`);
+  if (failed.length && !build) process.exitCode = 1;
 }
 
 async function pull(which?: string) {
@@ -113,6 +129,11 @@ async function check() {
     console.log(`${here ? "here" : "    "}  ${there === null ? "?    " : there ? "store" : "     "}  ${f.path}`);
   }
   console.log(`${m.files.length} listed; ${missingHere} not here; ${on ? `${missingThere} not in the store` : "store not checked (no token)"}`);
+  if (!process.env.DATABASE_URL) return;
+  const { storedState } = await import("../src/raw/files");
+  const rows = await storedState();
+  const errors = [...new Set(rows.filter((r) => !r.stored_at && r.store_error).map((r) => r.store_error))];
+  console.log(`raw_files: ${rows.length} known, ${rows.filter((r) => r.stored_at).length} stored${errors.length ? `; not stored because: ${errors.join(" | ")}` : ""}`);
 }
 
 async function main() {
