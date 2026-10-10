@@ -15,7 +15,7 @@ export async function workspaceStats(ws = DEFAULT_WORKSPACE_ID): Promise<Workspa
             (select count(distinct platform) from posts where workspace_id = $1 and brought_in_by = 'panel')::int as platforms,
             (select count(distinct month) from posts where workspace_id = $1 and brought_in_by = 'panel')::int as months,
             to_char(${panelPostEdge("$1", "newest")} at time zone 'Asia/Jakarta', 'DD Mon YYYY') as freshness,
-            (select to_char(max(finished_at) at time zone 'Asia/Jakarta', 'DD Mon YYYY HH24:MI') from data_loads where workspace_id = $1) as last_load`,
+            (select to_char(max(finished_at) at time zone 'Asia/Jakarta', 'DD Mon YYYY HH24:MI') from data_loads where workspace_id = $1 and report->>'case' is null) as last_load`,
     [ws],
   )) as any[];
   const per_platform = (await sql.query(
@@ -32,7 +32,7 @@ export async function workspaceStats(ws = DEFAULT_WORKSPACE_ID): Promise<Workspa
   )) as any[];
   const loads = (await sql.query(
     `select file, platform, rows_in, rows_loaded, rows_rejected, to_char(finished_at at time zone 'Asia/Jakarta', 'DD Mon YYYY HH24:MI') as finished_at
-     from data_loads where workspace_id = $1 order by started_at desc limit 12`,
+     from data_loads where workspace_id = $1 and report->>'case' is null order by started_at desc limit 12`,
     [ws],
   )) as any[];
   return { ...t, per_platform, per_month, loads };

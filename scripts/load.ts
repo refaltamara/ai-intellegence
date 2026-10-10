@@ -4,6 +4,8 @@
  *                                                      workspace's files), stage them, and show what they would change in the core
  *   pnpm load compare <load id>                         what a staged load would change in the core
  *   pnpm load run <workspace> <source> [file ...]       stage, check, and promote unless held (--stage-only stops after the checks)
+ *   ... --case <case id>                                 stage or run the load for an open case of the workspace (step 5): the posts
+ *                                                      it brings that the panel does not have count in that case only
  *   pnpm load check <load id>                           run the checks again
  *   pnpm load promote <load id> [--anyway]              promote a staged load (--anyway lets a held load in, recorded as the CLI's)
  *   pnpm load discard <load id>                         throw a staged load away whole
@@ -22,6 +24,7 @@ import { discardLoad, openLoad, writeStaged } from "../src/loader/stage";
 import { runChecks } from "../src/loader/checks";
 import { promote } from "../src/loader/promote";
 import { afterPromote, letIn, stageAndCheck } from "../src/loader/run";
+import { assertOpenCase } from "../src/cases/store";
 import { rawFilesFor } from "../src/loader/registry";
 import type { Check } from "../src/loader/checks";
 import { compareAccounts, compareComments, comparePosts, compareReadings, type Diff } from "../src/loader/compare";
@@ -47,8 +50,9 @@ async function compare(loadId: string) {
   if (l.source === "listening") show("readings", await compareReadings(loadId, l.workspace_id));
 }
 
-async function stage(ws: string, source: SourceKind, paths: string[]) {
+async function stage(ws: string, source: SourceKind, paths: string[], caseId: string | null) {
   if (!SOURCES.includes(source)) throw new Error(`source is one of ${SOURCES.join(", ")}`);
+  if (caseId) await assertOpenCase(ws, caseId);
   const m = await readManifest();
   const order = !paths.length && source === "profile" ? (() => { const c = readContract(ws); return c.files.map((f) => rawPathOf(c, f.file)); })() : paths;
   const picked = order.length ? order.map((p) => m.files.find((f) => f.path === p) ?? (() => { throw new Error(`${p} is not in the manifest`); })()) : m.files.filter((f) => f.workspace === ws);
@@ -64,7 +68,7 @@ async function stage(ws: string, source: SourceKind, paths: string[]) {
   for (const f of st.files) f.raw_file_id = known.get(picked.find((p) => p.path.endsWith(f.file))?.blob ?? "") ?? null;
   console.log(`read ${picked.length} files in ${((Date.now() - t0) / 1000).toFixed(1)} s`);
   for (const f of st.files) console.log(`  ${f.file}: ${f.rows_in} rows, ${f.staged} staged, ${f.merged} merged, ${f.dropped} dropped ${JSON.stringify(Object.fromEntries(Object.entries(f.drops).map(([k, v]) => [k, v.count])))}`);
-  const loadId = await openLoad(ws, source, picked.map((f) => ({ raw_file_id: known.get(f.blob) ?? null, path: f.path, sha256: f.sha256 })), "cli");
+  const loadId = await openLoad(ws, source, picked.map((f) => ({ raw_file_id: known.get(f.blob) ?? null, path: f.path, sha256: f.sha256 })), "cli", caseId);
   const t1 = Date.now();
   const counts = await writeStaged(loadId, st);
   console.log(`staged as load ${loadId} in ${((Date.now() - t1) / 1000).toFixed(1)} s: ${JSON.stringify(counts)}`);
@@ -84,8 +88,14 @@ async function runPromote(loadId: string) {
 }
 
 async function main() {
-  const [, , cmd, a, b, ...rest] = process.argv;
-  if (cmd === "stage") return stage(a, b as SourceKind, rest);
+  // --case <id> may sit anywhere after the command; it is not a file
+  const argv = [...process.argv];
+  const at = argv.indexOf("--case");
+  const caseId = at > 0 ? argv[at + 1] ?? null : null;
+  if (at > 0) argv.splice(at, 2);
+  if (at > 0 && !caseId) throw new Error("--case takes a case id");
+  const [, , cmd, a, b, ...rest] = argv;
+  if (cmd === "stage") return stage(a, b as SourceKind, rest, caseId);
   if (cmd === "compare") return compare(a);
   if (cmd === "backfill-readings") { const { backfillReadings } = await import("../src/loader/backfillReadings"); return backfillReadings((x) => console.log(x)); }
   if (cmd === "backfill-items") { const { backfillItems } = await import("../src/loader/backfillItems"); await backfillItems(a ?? null, (x) => console.log(x)); return; }
@@ -101,7 +111,7 @@ async function main() {
   if (cmd === "run") {
     const files = rest.filter((x) => !x.startsWith("--"));
     const order = !files.length && b === "profile" ? (() => { const c = readContract(a); return c.files.map((f) => rawPathOf(c, f.file)); })() : files.length ? files : (await readManifest()).files.filter((f) => f.workspace === a).map((f) => f.path);
-    const r = await stageAndCheck(a, b as SourceKind, await rawFilesFor(order), "cli");
+    const r = await stageAndCheck(a, b as SourceKind, await rawFilesFor(order), "cli", caseId);
     console.log(`load ${r.loadId}: ${r.held ? "held" : "passed"}`);
     showChecks(r.checks);
     if (r.held || process.argv.includes("--stage-only")) return;

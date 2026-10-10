@@ -11,6 +11,7 @@ import { sql } from "@/db/client";
 import { audit } from "@/roles/store";
 import { enqueueJob } from "@/extensions/store";
 import { letIn } from "@/loader/run";
+import { getCase } from "@/cases/store";
 import { discardLoad } from "@/loader/stage";
 
 export const runtime = "nodejs";
@@ -24,14 +25,20 @@ export async function POST(req: Request) {
   const b = (await req.json().catch(() => ({}))) as Record<string, unknown>;
   const ws = String(b.workspace_id ?? "");
   if (!ws || !can(actor, "workspace.data", { workspace: ws })) return no("Unknown workspace.", 404);
-  const l = ((await sql.query(`select id, source, status, files from staging.loads where id = $1 and workspace_id = $2`, [String(b.load_id ?? ""), ws])) as { id: string; source: string; status: string; files: { path: string }[] }[])[0];
+  const l = ((await sql.query(`select id, source, status, files, case_id from staging.loads where id = $1 and workspace_id = $2`, [String(b.load_id ?? ""), ws])) as { id: string; source: string; status: string; files: { path: string }[]; case_id: string | null }[])[0];
   if (!l) return no("No such load.", 404);
+  // a case's load is handled by Fair's owners and data ops on that case's list; to anyone else it is not there (step 5)
+  if (l.case_id) {
+    const c = await getCase(l.case_id);
+    if (!c || !can(actor, "case.manage", { workspace: ws, case: c })) return no("No such load.", 404);
+  }
+  const forCase = l.case_id ? { case_id: l.case_id } : {};
   const by = actor.email;
   switch (b.action) {
     case "let_in": {
       if (l.status !== "held") return no("Only a held load can be let in.");
       await letIn(l.id, by);
-      const job = await enqueueJob(ws, "load", { source: l.source, files: l.files.map((f) => f.path), load_id: l.id, started_by: by }, by);
+      const job = await enqueueJob(ws, "load", { source: l.source, files: l.files.map((f) => f.path), load_id: l.id, started_by: by, ...forCase }, by);
       await audit({ workspace_id: ws, actor: by, area: "data", action: "load_let_in", new: { load: l.id } });
       return Response.json({ ok: true, job_id: job });
     }
@@ -42,7 +49,7 @@ export async function POST(req: Request) {
       return Response.json({ ok: true });
     }
     case "reload": {
-      const job = await enqueueJob(ws, "load", { source: l.source, files: l.files.map((f) => f.path), promote: "auto", started_by: by }, by);
+      const job = await enqueueJob(ws, "load", { source: l.source, files: l.files.map((f) => f.path), promote: "auto", started_by: by, ...forCase }, by);
       await audit({ workspace_id: ws, actor: by, area: "data", action: "load_again", new: { from: l.id } });
       return Response.json({ ok: true, job_id: job });
     }

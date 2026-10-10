@@ -1021,3 +1021,28 @@ The agreed design is the doc "Core data architecture and model" (https://claude.
   - The daily totals check finds no difference in any of the four workspaces.
   - 46 screens and skill results, built with the old code and the new, give the same numbers. Only the order of tied rows differs.
 - **Next.** Loading into a case (third part).
+
+**Step 5, third part: loading into a case (10 Oct).**
+- **A load can be a case's** (`staging.loads.case_id`, migration 0041). It starts in one of two ways:
+  - from the command line: `pnpm load run <workspace> <source> [file ...] --case <case id>`;
+  - by itself, when the scraper delivers under `inbox/<workspace>/cases/<case id>/`, while the case is open. This waits on the Blob store being connected, as the panel's own deliveries do.
+- **What a case's load writes.**
+  - Every post it carries goes into `case_posts`, whether or not the panel has it. The case counts these.
+  - A link the panel does not have is brought in by the case (`brought_in_by` = the case's id), so it never counts in the panel.
+  - A link the panel has stays the panel's. Its numbers and readings are refreshed as by any load: one real post, one row.
+  - The panel's own load takes back every link it carries. A post a case found first counts in the panel from the day the panel catches it too.
+  - It leaves the panel's setup alone. New topics are the case's own (`topics.case_id`); the brands' captured handles and a profile's subject stay as they are.
+- **Checks** are the same, with one difference: a case watches beyond the brands' terms, so for a case's load the share set aside is reported, never held. A profile keeps only posts that name its subject, a case's posts too.
+- **A closed case takes nothing.** A load for it stops when it is staged, and again before it goes in.
+- **Who sees a case's loads.**
+  - The Loads tab shows a case's loads and raw files only to the people on its list. Letting one in, throwing it away or loading it again needs `case.manage`.
+  - Notices go to the owners and data ops on the case's list, and to the scraper team when rows were flagged.
+  - The panel's own lists leave a case's loads out: the Data page's loads and last load, the brief, brand pages, the CMS's load report and jobs.
+  - The panel's topic lists leave a case's own topics out: the labeller, the Topics tab, health, slide drafts and Our Chorus.
+- **Checked.**
+  - Tests cover what brought a link in, the case's posts, who is told, and where a delivery lands.
+  - A case's load statements are planned against the live database, which runs nothing. The rule for what brought a link in is checked on values.
+  - Nothing has been loaded into a case yet.
+- **Not yet.**
+  - A case's own screens.
+  - A case reading its own terms for relevance.

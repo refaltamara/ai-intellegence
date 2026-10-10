@@ -130,7 +130,7 @@ export default async function WorkspaceData({ params, searchParams }: { params: 
         )}
 
         {tab === "loads" && await (async () => {
-          const { loads, raw } = await loadsOf(d.id);
+          const { loads, raw } = await loadsOf(d.id, (await casesFor(actor, d.id)).map((c) => c.id));
           return (
             <>
               <LoadsList ws={d.id} loads={loads} />

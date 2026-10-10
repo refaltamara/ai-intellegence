@@ -38,7 +38,7 @@ function addDays(iso: string, d: number): string {
 export async function dataKey(workspaceId = DEFAULT_WORKSPACE_ID): Promise<string> {
   const [r] = (await sql.query(
     `select to_char(${panelPostEdge("$1", "newest")}, 'YYYY-MM-DD"T"HH24:MI:SS') as freshness,
-            (select to_char(max(finished_at), 'YYYY-MM-DD"T"HH24:MI:SS') from data_loads where workspace_id = $1) as last_load`,
+            (select to_char(max(finished_at), 'YYYY-MM-DD"T"HH24:MI:SS') from data_loads where workspace_id = $1 and report->>'case' is null) as last_load`,
     [workspaceId],
   )) as { freshness: string | null; last_load: string | null }[];
   return `${r?.freshness ?? "none"}|${r?.last_load ?? "none"}`;

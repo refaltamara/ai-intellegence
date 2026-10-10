@@ -249,7 +249,7 @@ export async function labelContext(workspaceId: string, subject: string): Promis
   if (!l || typeof l !== "object") return { subject };
   const str = (k: string) => (typeof l[k] === "string" && (l[k] as string).trim() ? (l[k] as string).trim() : undefined);
   const topics = l.topics === false ? [] : ((await sql.query(
-    "select id, label, definition, is_catch_all as catch_all from topics where workspace_id = $1 order by is_catch_all, sort_order, label",
+    "select id, label, definition, is_catch_all as catch_all from topics where workspace_id = $1 and case_id is null order by is_catch_all, sort_order, label",
     [workspaceId],
   )) as LabelTopic[]);
   const voices = Array.isArray(l.voices) ? (l.voices as unknown[]).filter((v): v is string => typeof v === "string" && /^[\w' -]{2,30}$/.test(v)) : [];
