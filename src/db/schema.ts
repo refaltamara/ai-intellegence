@@ -425,16 +425,18 @@ export const postReadings = pgTable(
 /**
  * Each post's reading at day 7 (DECISIONS, 10 Oct 2026; definition views_d7 in src/definitions/catalog.ts): the reading
  * nearest day 7 after posting, from any of its links' readings. A post that went up less than 7 days before the
- * workspace's latest reading is too new: its row is kept with day_n and the numbers empty. Rebuilt from post_readings by
- * src/definitions/totals.ts.
+ * workspace's latest reading counts its latest reading so far (so_far): its views will still grow. Rebuilt from
+ * post_readings by src/definitions/totals.ts.
  */
 export const postD7 = pgTable(
   "post_d7",
   {
     itemId: uuid("item_id").primaryKey().references(() => postItems.id, { onDelete: "cascade" }),
     workspaceId: text("workspace_id").notNull().references(() => workspaces.id),
-    /** the day index of the reading used; null when the post is too new */
+    /** the day index of the reading used */
     dayN: smallint("day_n"),
+    /** the post is under 7 days old at the workspace's latest reading: this is its latest reading, so far */
+    soFar: boolean("so_far").notNull().default(false),
     readAt: ts("read_at"),
     views: bigint("views", { mode: "number" }),
     likes: integer("likes"),
@@ -452,7 +454,7 @@ export const postD7 = pgTable(
  * each post once, for the whole panel. Posts set aside as not about their brand never count; flagged posts count, but
  * stay out of the rated sums that rates are made of. Rebuilt per workspace by src/definitions/totals.ts.
  *   views, engagement, ...       the latest reading
- *   d7_*                         the reading at day 7 (d7_posts: posts read at day 7 or later; the rest are too new)
+ *   d7_*                         the reading at day 7, or the latest so far for posts under 7 days old (so_far_posts)
  *   rated_* / rated_lc_*         posts that can carry a rate: not flagged, views over 0, engagement no more than views
  */
 export const dailyTotals = pgTable(
@@ -477,6 +479,8 @@ export const dailyTotals = pgTable(
     ratedLcViews: bigint("rated_lc_views", { mode: "number" }).notNull(),
     ratedLcEngagement: bigint("rated_lc_engagement", { mode: "number" }).notNull(),
     d7Posts: integer("d7_posts").notNull(),
+    /** posts under 7 days old at the latest reading, counted at their latest reading so far */
+    soFarPosts: integer("so_far_posts").notNull().default(0),
     d7Views: bigint("d7_views", { mode: "number" }).notNull(),
     d7Engagement: bigint("d7_engagement", { mode: "number" }).notNull(),
     d7EngagementLc: bigint("d7_engagement_lc", { mode: "number" }).notNull(),

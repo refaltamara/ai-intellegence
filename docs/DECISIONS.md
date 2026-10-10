@@ -910,3 +910,18 @@ The agreed design is the doc "Core data architecture and model" (https://claude.
 - **PR and Social already count by the definitions.**
   - **PR:** negative share is negative ÷ labelled comments, on topic, without the subject's own replies or set-aside posts. Reach uses Views (latest), the PR role's choice: a reputation team reads how far something has spread by now.
   - **Social:** medians leave out posts captured with no metrics, and views medians leave out posts without views.
+
+**Step 4, fourth part: "so far" for posts under 7 days old (Refal, 10 Oct).**
+- **The question.** A weekly report goes out right after its week ends, when most of its posts are under 7 days old. Refal chose "so far" from three options: a one-week lag, "so far", or decks staying on latest views.
+- **The rule** (`views_d7` at version 2). A post that went up less than 7 days before the data's latest reading counts its latest reading so far, and a period holding such posts says "so far": its views will still grow. Posts that have reached day 7 count their day-7 reading.
+
+  The rule applies everywhere views at day 7 are shown, the dashboard included. Until now the dashboard counted those posts with 0 views; it now counts them at their latest reading.
+- **Stored with it.** `post_d7.so_far` marks a post counted so far, and `daily_totals.so_far_posts` counts them (migration 0038).
+- **What shows.**
+  - The views tile reads "Views (day 7, so far)" while the period holds young posts, with how many.
+  - A brand row shows "so far" under its views.
+  - A post card says "Views so far".
+  - A caveat says the period's views will still grow.
+- **Numbers, September 2026.**
+  - **Fintech:** views 75.6M (it was 57.6M with young posts at 0; 121.5M at the latest reading). Share of views: ShopeePay 25.1%, BCA 24.8%, GoPay 24.6%, OVO 17.1%, SeaBank 6.4%. Engagement rate 5.53%.
+  - **Beauty:** its figures equal its latest readings (one reading per post).
