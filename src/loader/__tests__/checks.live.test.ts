@@ -24,7 +24,7 @@ function comment(i: number, at: Date): StagedComment {
   return {
     platform: "threads", url: `https://threads.com/@check.test/post/T${i}`, brand_id: "maudyayunda", platform_comment_id: `threads:check-test-${i}`, author_handle: "someone",
     author_hash: "x", text: "a comment", posted_at: at.toISOString(), likes: 0, views: null, sentiment: null, sentiment_source: null, sentiment_confidence: null,
-    sentiment_detail: null, csat: null, theme: null, purchase_intent: null, translation: null, topic_id: null, flags: null, source_file: "check_test_comments.csv",
+    theme: null, purchase_intent: null, translation: null, topic_id: null, flags: null, source_file: "check_test_comments.csv",
   };
 }
 const file = (rows: number, over: Partial<FileReport> = {}): FileReport => ({ file: "check_test.csv", kind: "posts", platform: "threads", rows_in: rows, staged: rows, merged: 0, dropped: 0, drops: {}, ...over });

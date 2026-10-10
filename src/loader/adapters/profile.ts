@@ -461,7 +461,7 @@ export async function readProfile(input: AdapterInput): Promise<Staged> {
           platform: p, url, brand_id: prof.brandId, platform_comment_id: cid, author_handle: handle, author_hash: authorHash(p, handle), text,
           posted_at: w.when ? w.when.toISOString() : null, likes: firstInt(col(r, "like", "like_count", "likes"), col(r, "reply", "reply_count", "replies")),
           views: toInt(col(r, "views")), sentiment: owned ? null : sent, sentiment_source: owned ? "subject" : sent ? "listening" : null, sentiment_confidence: null,
-          sentiment_detail: null, csat: null, theme: null, purchase_intent: null, translation: null, topic_id: null, flags: null, source_file: name,
+          theme: null, purchase_intent: null, translation: null, topic_id: null, flags: null, source_file: name,
         };
         if (comments.has(cid)) mergedComments++;
         comments.set(cid, row); // a later file's row replaces an earlier one, as the old loader's upsert did

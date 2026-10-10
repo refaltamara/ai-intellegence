@@ -244,7 +244,7 @@ export async function loadSlice(ws: string, p: Progress, budgetMs = 40_000): Pro
       const rep = {
         rows_in: (await table(files, "_comment_")).length, comments: cm.rows.length, upserted: prog.counts!.comments, drops: cm.drops,
         brand_replies: cm.rows.length - counted.length, without_label: cm.rows.filter((r) => r.sentiment_source == null).length,
-        sentiment: countBy(counted, (r) => r.sentiment ?? "-"), detail: countBy(cm.rows, (r) => r.sentiment_detail ?? "-"), with_topic: cm.rows.filter((r) => r.topic_id).length,
+        sentiment: countBy(counted, (r) => r.sentiment ?? "-"), detail: countBy(cm.rows, (r) => r.label ?? "-"), with_topic: cm.rows.filter((r) => r.topic_id).length,
         without_text: cm.rows.filter((r) => !r.text).length, posts_with_comments: new Set(cm.rows.map((r) => `${r.platform}${r.url}${r.brand_id}`)).size, by_platform: countBy(cm.rows, (r) => r.platform),
       };
       await closeLoad(prog.loads!.comments!, cm.rows.length, Object.values(cm.drops).reduce((a, n) => a + n, 0), rep);

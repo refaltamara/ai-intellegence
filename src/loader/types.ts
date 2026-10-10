@@ -28,7 +28,7 @@ export type StagedAccount = { platform: string; handle: string; display_name: st
 export type StagedComment = {
   platform: string; url: string; brand_id: string; platform_comment_id: string; author_handle: string | null; author_hash: string; text: string | null;
   posted_at: string | null; likes: number | null; views: number | null; sentiment: string | null; sentiment_source: string | null;
-  sentiment_confidence: number | null; sentiment_detail: string | null; csat: number | null; theme: string | null; purchase_intent: boolean | null;
+  sentiment_confidence: number | null; theme: string | null; purchase_intent: boolean | null;
   translation: string | null; topic_id: string | null; flags: string[] | null; source_file: string;
 };
 

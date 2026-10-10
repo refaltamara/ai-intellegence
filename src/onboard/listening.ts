@@ -236,8 +236,9 @@ export async function buildSnapshots(files: Record<string, StoredFile>, kept: Ma
 
 export type CommentRow = {
   platform: string; url: string; brand_id: string; platform_comment_id: string; author_handle: string | null; author_hash: string; text: string | null;
-  posted_at: string | null; likes: number | null; sentiment: string | null; sentiment_source: string | null; confidence: number | null; sentiment_detail: string | null;
-  csat: number | null; theme: string | null; purchase_intent: boolean | null; translation: string | null; topic_id: string | null;
+  posted_at: string | null; likes: number | null; sentiment: string | null; sentiment_source: string | null; confidence: number | null;
+  /** the vendor's own label, before the sentiment map: counted in the load report, never stored (DECISIONS, 10 Oct 2026) */
+  label: string | null; theme: string | null; purchase_intent: boolean | null; translation: string | null; topic_id: string | null;
 };
 
 export async function buildComments(k: Contract, files: Record<string, StoredFile>, keyOf: Map<number, string>, topicIds: Map<number, string>): Promise<{ rows: CommentRow[]; drops: Record<string, number>; unknownLabels: string[] }> {
@@ -266,7 +267,7 @@ export async function buildComments(k: Contract, files: Record<string, StoredFil
       posted_at: posted ? posted.toISOString() : null, likes: i(r.like_count),
       sentiment: reply ? null : detail != null ? k.sentiment_map[detail] ?? null : null,
       sentiment_source: reply ? "subject" : l ? "listening" : null,
-      confidence: l && s(l.csat_confidence) ? Number(l.csat_confidence) : null, sentiment_detail: detail, csat: l ? i(l.csat) : null,
+      confidence: l && s(l.csat_confidence) ? Number(l.csat_confidence) : null, label: detail,
       theme: l ? s(l.theme) : null, purchase_intent: l ? b(l.purchase_intent) : null, translation: l ? s(l.translation) : null,
       topic_id: l ? topicIds.get(i(l.topic_id) ?? -1) ?? null : null,
     };
@@ -313,17 +314,17 @@ const SNAP_SQL = `
   returning 1`;
 const COMMENT_SQL = `
   insert into comments (workspace_id, post_id, platform, platform_comment_id, author_handle, author_hash, text, posted_at, likes,
-                        sentiment, sentiment_source, sentiment_confidence, sentiment_detail, csat, theme, purchase_intent, translation, topic_id, classified_at)
+                        sentiment, sentiment_source, sentiment_confidence, theme, purchase_intent, translation, topic_id, classified_at)
   select $2, p.id, r.platform, r.platform_comment_id, r.author_handle, r.author_hash, r.text, r.posted_at, r.likes,
-         r.sentiment, r.sentiment_source, r.confidence, r.sentiment_detail, r.csat, r.theme, r.purchase_intent, r.translation, r.topic_id, now()
+         r.sentiment, r.sentiment_source, r.confidence, r.theme, r.purchase_intent, r.translation, r.topic_id, now()
   from jsonb_to_recordset($1::jsonb) as r(platform text, url text, brand_id text, platform_comment_id text, author_handle text, author_hash text, text text,
-       posted_at timestamptz, likes int, sentiment text, sentiment_source text, confidence numeric, sentiment_detail text, csat smallint, theme text,
+       posted_at timestamptz, likes int, sentiment text, sentiment_source text, confidence numeric, theme text,
        purchase_intent boolean, translation text, topic_id text)
   join posts p on p.workspace_id = $2 and p.platform = r.platform and p.url = r.url and p.brand_id = r.brand_id
   on conflict (workspace_id, platform_comment_id) do update set
     post_id = excluded.post_id, platform = excluded.platform, author_handle = excluded.author_handle, author_hash = excluded.author_hash, text = excluded.text,
     posted_at = excluded.posted_at, likes = excluded.likes, sentiment = excluded.sentiment, sentiment_source = excluded.sentiment_source,
-    sentiment_confidence = excluded.sentiment_confidence, sentiment_detail = excluded.sentiment_detail, csat = excluded.csat, theme = excluded.theme,
+    sentiment_confidence = excluded.sentiment_confidence, theme = excluded.theme,
     purchase_intent = excluded.purchase_intent, translation = excluded.translation, topic_id = excluded.topic_id, classified_at = excluded.classified_at
   returning 1`;
 
