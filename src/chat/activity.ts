@@ -20,7 +20,7 @@ export async function workspaceCounts(workspaceId: string, db = new SkillDb()): 
   const hit = countCache.get(workspaceId);
   if (hit && Date.now() - hit.at < COUNT_TTL_MS) return hit.counts;
   const r = await db.one<{ creators: number; posts: number; brands: number }>(
-    `select (select count(*) from creators where workspace_id = $1)::int as creators,
+    `select (select count(*) from creators where workspace_id = $1 and brought_in_by = 'panel')::int as creators,
             (select count(*) from posts where workspace_id = $1 and brought_in_by = 'panel')::int as posts,
             (select count(*) from brands where workspace_id = $1)::int as brands`,
     [workspaceId],

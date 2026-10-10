@@ -302,6 +302,13 @@
       "when": 1791638506559,
       "tag": "0042_brown_skreet",
       "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1791638869212,
+      "tag": "0043_tired_rumiko_fujikawa",
+      "breakpoints": true
     }
   ]
 }

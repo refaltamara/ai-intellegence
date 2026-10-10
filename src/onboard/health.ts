@@ -71,7 +71,7 @@ export async function healthChecks(ws: string): Promise<Check[]> {
 
   // follower history
   const fol = ((await sql.query(
-    `select count(*)::int as creators, count(*) filter (where (select count(*) from creator_snapshots s where s.creator_id = c.id) > 1)::int as history, count(*) filter (where followers_latest is not null)::int as with_followers from creators c where workspace_id = $1`,
+    `select count(*)::int as creators, count(*) filter (where (select count(*) from creator_snapshots s where s.creator_id = c.id) > 1)::int as history, count(*) filter (where followers_latest is not null)::int as with_followers from creators c where workspace_id = $1 and brought_in_by = 'panel'`,
     [ws],
   )) as { creators: number; history: number; with_followers: number }[])[0];
   out.push({ key: "followers", label: "Follower history", status: fol.history < Math.max(1, fol.creators * 0.05) ? "warn" : "ok", detail: `${fol.with_followers.toLocaleString("en-US")} of ${fol.creators.toLocaleString("en-US")} accounts have a follower count; ${fol.history.toLocaleString("en-US")} have more than one capture${fol.history < fol.creators * 0.05 ? ", so follower growth is shown as unavailable" : ""}.`, ...(fol.history < fol.creators * 0.05 ? { note: "Follower counts are one capture per account: follower growth is not available." } : {}) });

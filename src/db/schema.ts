@@ -183,6 +183,8 @@ export const creators = pgTable(
     location: text("location"),
     firstSeen: date("first_seen"),
     lastSeen: date("last_seen"),
+    /** what brought the account in (step 5, as posts.brought_in_by): 'panel', or a case's id until the panel's own load has it */
+    broughtInBy: text("brought_in_by").notNull().default("panel"),
     createdAt: createdAt(),
   },
   (t) => [
@@ -595,6 +597,11 @@ export const cases = pgTable(
     access: text("access").array().notNull(),
     /** open | closed */
     status: text("status").notNull().default("open"),
+    /**
+     * the case's own settings, as a workspace's: `brand` (the panel brand it is about), `label` (the labeller's case context),
+     * `pr.hide`, `commercial` (partners and boycott words), `notes` (what CeMO reads about the case's data)
+     */
+    settings: jsonb("settings").notNull().default(sql`'{}'::jsonb`),
     createdBy: text("created_by"),
     createdAt: createdAt(),
     updatedAt: ts("updated_at").notNull().defaultNow(),
