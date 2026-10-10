@@ -107,7 +107,10 @@ export async function applyRelevance(ws: string, brandId: string, by: string): P
     ...on.map((id) => ({ target: "post" as const, target_id: id, kind: "relevant", value: "yes" })),
     ...off.map((id) => ({ target: "post" as const, target_id: id, kind: "relevant", value: "no" })),
   ]).catch((e) => console.error("[labels]", (e as Error).message));
-  if (on.length || off.length) await refreshViews();
+  if (on.length || off.length) {
+    await refreshViews();
+    await (await import("../definitions/totals")).refreshServing(ws);
+  }
   const before = { posts: p.total.now, views: p.total.views_now };
   const after = { posts: p.total.after, views: p.total.views_after };
   await audit({ workspace_id: ws, actor: by, area: "data", action: "relevance", path: brandId, old: before, new: { ...after, counting: on.length, not_counting: off.length } });

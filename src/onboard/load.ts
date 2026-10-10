@@ -254,6 +254,7 @@ export async function loadSlice(ws: string, p: Progress, budgetMs = 40_000): Pro
     }
     if (prog.phase === "finish") {
       await refreshViews();
+      await (await import("../definitions/totals")).refreshServing(ws);
       const st = ((await sql.query("select status from workspaces where id = $1", [ws])) as { status: string }[])[0]?.status;
       if (st === "loading") await setStatus(ws, "review");
       // the load report's health checks, for data ops to read in review (src/onboard/health.ts)

@@ -100,6 +100,7 @@ function chunk<T>(rows: T[], size: number): T[][] {
 
 export async function labelWorkspace(workspaceId: string, opts: LabelOptions = {}): Promise<LabelOutcome> {
   const started = Date.now();
+  let setAside = 0;
   const budget = opts.budgetMs ?? DEFAULT_BUDGET_MS;
   const batch = opts.batchSize ?? DEFAULT_BATCH;
   const parallel = Math.max(1, opts.parallel ?? DEFAULT_PARALLEL);
@@ -204,6 +205,7 @@ export async function labelWorkspace(workspaceId: string, opts: LabelOptions = {
         );
         await recordLabels(workspaceId, modelLabeller(modelId()), promptVersion(stanceSystem(ctx)), labels.flatMap(postLabelRows)).catch((e) => console.error("[labels]", (e as Error).message));
         out.posts_labelled += labels.length;
+        setAside += labels.filter((l) => l.sentiment === "off_topic").length;
       }
       if (missing.length) {
         await sql.query(`update posts set stance_source = $3 where workspace_id = $1 and id = any($2::uuid[])`, [workspaceId, missing, retry ? "model_failed_final" : "model_failed"]);
@@ -223,6 +225,8 @@ export async function labelWorkspace(workspaceId: string, opts: LabelOptions = {
   out.comments_remaining = rem[0]?.c ?? 0;
   out.posts_remaining = rem[0]?.p ?? 0;
   if (out.stopped === "done" && (out.comments_remaining || out.posts_remaining)) out.stopped = "budget";
+  // a post set aside leaves the counts: the numbers every screen reads are counted again (src/definitions/totals.ts)
+  if (setAside) await (await import("../definitions/totals")).refreshServing(workspaceId).catch((e) => console.error("[serving]", (e as Error).message));
   out.duration_ms = Date.now() - started;
   // leave a trace on the Data page (data_loads) whenever the run did or tried anything
   if (out.calls > 0 || out.error) {

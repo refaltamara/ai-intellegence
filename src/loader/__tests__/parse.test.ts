@@ -97,3 +97,14 @@ describe("scraper deliveries", () => {
     expect(got[0].files).toHaveLength(9);
   });
 });
+
+describe("a profile file's read time (readTimeOf)", () => {
+  it("is the file's own export time, else no earlier than its latest post or the contract's time", async () => {
+    const { readTimeOf } = await import("../adapters/profile");
+    const anchor = new Date("2026-09-14T05:15:00Z");
+    expect(readTimeOf({ export_time: "2026-09-14T12:15:00+07:00" }, anchor, ["2026-09-18T03:43:28Z"]).toISOString()).toBe("2026-09-14T05:15:00.000Z");
+    expect(readTimeOf({}, anchor, ["2026-09-15T11:02:57Z", "2026-09-14T23:13:56Z"]).toISOString()).toBe("2026-09-15T11:02:57.000Z");
+    expect(readTimeOf({}, anchor, ["2026-09-14T03:21:38Z"]).toISOString()).toBe("2026-09-14T05:15:00.000Z");
+    expect(readTimeOf({}, anchor, []).toISOString()).toBe("2026-09-14T05:15:00.000Z");
+  });
+});
