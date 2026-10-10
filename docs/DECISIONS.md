@@ -1054,3 +1054,25 @@ The agreed design is the doc "Core data architecture and model" (https://claude.
   - CSAT and the five-point label on comments (`csat`, `sentiment_detail`, also in staging). They were on 116,366 Fintech comments and remain in the raw files. A load still counts the vendor's labels in its report.
   - `post_snapshots_before_10_oct` (114,633 rows, 30 MB), the old table kept at step 3. `post_snapshots`, the view of the readings, returns the same rows.
 - **Kahf Threads is a case of Beauty Indonesia.** It is copied into the Beauty panel as a case, and `kahf-threads` stays as it is for now. The case gets its own screens. Creating a case from the CMS, wired to the scraper team's API, comes later.
+
+**Kahf Threads copied into Beauty Indonesia as a case (10 Oct).**
+- **The copy.** `pnpm case copy kahf-threads beauty-id --case kahf-threads-boycott --brand kahf=kahfeveryday` copied Kahf into the Beauty panel's brand `kahfeveryday`. It ran in one transaction in 23.5 s, and every count matches the source:
+  - 2,683 posts and their links, with 2,683 readings;
+  - 46,643 comments and 174,293 labels, with their author;
+  - 5 topics, now the case's (`kahf-threads-boycott:*`);
+  - 2,464 accounts, brought in by the case.
+
+  The case "Kahf · Threads boycott" is seen by Refal and Raissa only. It keeps Kahf's case context, hidden fields and case words in `cases.settings`. `kahf-threads` stays as it is.
+- **The panel did not move.**
+  - The daily totals check finds no difference.
+  - Beauty's dashboards, skills, weekly report, brand page, Data page and CMS give the same numbers before and after.
+  - The only changes are the caption reader's own 10-minute loads, and tied rows that swap places.
+- **Leaks the copy showed, fixed.** These read a workspace's posts without the panel rule:
+  - the check that drops the beauty export's caveats;
+  - the CMS's per-brand post counts and its overview;
+  - the health checks, whose notes CeMO reads;
+  - the relevance preview and apply;
+  - the labeller's queue and counts;
+  - the caption reader. It read Kahf's 8 own posts once, before the fix went live.
+
+  A case's new comments and posts are labelled with its own context when loading into a case begins.

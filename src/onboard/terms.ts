@@ -25,7 +25,7 @@ export type TermsPreview = {
 
 async function brandPosts(ws: string, brandId: string): Promise<PostLite[]> {
   return (await sql.query(
-    "select id, platform, url, caption, source, tagged_handles, views, relevant, creator_handle from posts where workspace_id = $1 and brand_id = $2",
+    "select id, platform, url, caption, source, tagged_handles, views, relevant, creator_handle from posts where workspace_id = $1 and brand_id = $2 and brought_in_by = 'panel'",
     [ws, brandId],
   )) as PostLite[];
 }

@@ -63,7 +63,7 @@ async function workspaceCaveats(db: SkillDb, workspaceId: string, caveats: strin
   if (!caveats.length) return caveats;
   let hit = listeningCache.get(workspaceId);
   if (!hit || Date.now() - hit.at > 5 * 60_000) {
-    const r = await db.one<{ l: boolean }>("select exists (select 1 from posts where workspace_id = $1 and relevant is not null) as l", [workspaceId]);
+    const r = await db.one<{ l: boolean }>("select exists (select 1 from posts where workspace_id = $1 and brought_in_by = 'panel' and relevant is not null) as l", [workspaceId]);
     hit = { at: Date.now(), v: !!r?.l };
     listeningCache.set(workspaceId, hit);
   }

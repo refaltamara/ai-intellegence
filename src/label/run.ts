@@ -17,6 +17,7 @@ import { sql } from "../db/client";
 import { getWorkspace } from "../workspace/store";
 import { COMMENT_CLASSES, SENTIMENTS, commentBatchPrompt, commentSystem, labelTool, parseLabels, stanceBatchPrompt, stanceSystem, type CommentForLabel, type LabelContext, type LabelTopic, type PostForLabel } from "./prompt";
 import { toJson } from "../db/json";
+import { COMMENT_IN_PANEL } from "../db/panel";
 import { commentLabelRows, modelLabeller, postLabelRows, promptVersion, recordLabels } from "../labels/record";
 
 export type LabelOutcome = {
@@ -71,7 +72,7 @@ async function nextComments(workspaceId: string, limit: number): Promise<{ rows:
   const pick = (where: string) =>
     `select c.id, c.text, c.platform, c.likes, p.url as post_url, p.caption as post_caption, p.source as post_source, p.creator_handle as post_handle
      from comments c join posts p on p.id = c.post_id
-     where c.workspace_id = $1 and c.text is not null and c.sentiment is null and ${where}
+     where c.workspace_id = $1 and p.brought_in_by = 'panel' and c.text is not null and c.sentiment is null and ${where}
      order by p.id, c.likes desc nulls last, c.posted_at
      limit $2`;
   const fresh = (await sql.query(pick("c.sentiment_source is null"), [workspaceId, limit])) as CommentForLabel[];
@@ -83,7 +84,7 @@ async function nextComments(workspaceId: string, limit: number): Promise<{ rows:
 async function nextPosts(workspaceId: string, limit: number): Promise<{ rows: PostForLabel[]; retry: boolean }> {
   const pick = (where: string) =>
     `select id, platform, creator_handle as handle, caption, url from posts
-     where workspace_id = $1 and source = 'earned' and stance is null and caption is not null and content_type is distinct from 'stub' and ${where}
+     where workspace_id = $1 and brought_in_by = 'panel' and source = 'earned' and stance is null and caption is not null and content_type is distinct from 'stub' and ${where}
      order by views desc nulls last, posted_at
      limit $2`;
   // 'awaiting_context': loaded before this labeller (with workspace context and topics) was deployed, held back from the old one
@@ -218,8 +219,8 @@ export async function labelWorkspace(workspaceId: string, opts: LabelOptions = {
     out.error = (e as Error).message;
   }
   const rem = (await sql.query(
-    `select (select count(*) from comments where workspace_id = $1 and sentiment is null and coalesce(sentiment_source, '') in ('', 'model_failed') and text is not null)::int as c,
-            (select count(*) from posts where workspace_id = $1 and source = 'earned' and stance is null and coalesce(stance_source, '') in ('', 'model_failed', 'awaiting_context') and caption is not null and content_type is distinct from 'stub')::int as p`,
+    `select (select count(*) from comments c where c.workspace_id = $1 and ${COMMENT_IN_PANEL("c")} and sentiment is null and coalesce(sentiment_source, '') in ('', 'model_failed') and text is not null)::int as c,
+            (select count(*) from posts where workspace_id = $1 and brought_in_by = 'panel' and source = 'earned' and stance is null and coalesce(stance_source, '') in ('', 'model_failed', 'awaiting_context') and caption is not null and content_type is distinct from 'stub')::int as p`,
     [workspaceId],
   )) as { c: number; p: number }[];
   out.comments_remaining = rem[0]?.c ?? 0;
@@ -273,14 +274,14 @@ async function clientName(workspaceId: string): Promise<string | null> {
 /** Label counts per workspace for the Data page and the cron response. */
 export async function labelStatus(workspaceId: string): Promise<{ comments: number; labelled: number; off_topic: number; failed: number; failed_final: number; subject_replies: number; posts_earned: number; stances: number }> {
   const rows = (await sql.query(
-    `select (select count(*) from comments where workspace_id = $1)::int as comments,
-            (select count(*) from comments where workspace_id = $1 and sentiment is not null)::int as labelled,
-            (select count(*) from comments where workspace_id = $1 and off_topic)::int as off_topic,
-            (select count(*) from comments where workspace_id = $1 and sentiment_source = 'model_failed')::int as failed,
-            (select count(*) from comments where workspace_id = $1 and sentiment_source = 'model_failed_final')::int as failed_final,
-            (select count(*) from comments where workspace_id = $1 and sentiment_source = 'subject')::int as subject_replies,
-            (select count(*) from posts where workspace_id = $1 and source = 'earned' and content_type is distinct from 'stub')::int as posts_earned,
-            (select count(*) from posts where workspace_id = $1 and stance is not null)::int as stances`,
+    `select (select count(*) from comments c where c.workspace_id = $1 and ${COMMENT_IN_PANEL("c")})::int as comments,
+            (select count(*) from comments c where c.workspace_id = $1 and ${COMMENT_IN_PANEL("c")} and sentiment is not null)::int as labelled,
+            (select count(*) from comments c where c.workspace_id = $1 and ${COMMENT_IN_PANEL("c")} and off_topic)::int as off_topic,
+            (select count(*) from comments c where c.workspace_id = $1 and ${COMMENT_IN_PANEL("c")} and sentiment_source = 'model_failed')::int as failed,
+            (select count(*) from comments c where c.workspace_id = $1 and ${COMMENT_IN_PANEL("c")} and sentiment_source = 'model_failed_final')::int as failed_final,
+            (select count(*) from comments c where c.workspace_id = $1 and ${COMMENT_IN_PANEL("c")} and sentiment_source = 'subject')::int as subject_replies,
+            (select count(*) from posts where workspace_id = $1 and brought_in_by = 'panel' and source = 'earned' and content_type is distinct from 'stub')::int as posts_earned,
+            (select count(*) from posts where workspace_id = $1 and brought_in_by = 'panel' and stance is not null)::int as stances`,
     [workspaceId],
   )) as { comments: number; labelled: number; off_topic: number; failed: number; failed_final: number; subject_replies: number; posts_earned: number; stances: number }[];
   return rows[0];
