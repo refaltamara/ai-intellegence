@@ -34,6 +34,7 @@ export const SECTIONS: Record<RoleId, SectionDef[]> = {
   ],
   brand_kol: [
     { key: "rankings", label: "Brand performance rankings", width: "full" },
+    { key: "mix", label: "Viewership mix", width: "full" },
     { key: "tiers", label: "Creator tiers", width: "full" },
     { key: "trend", label: "Mentions over time", width: "full" },
     { key: "creators", label: "Top creators", width: "full" },

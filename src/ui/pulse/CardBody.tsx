@@ -42,13 +42,14 @@ export function CardBody({ card, names, onRefresh, refreshing }: { card: Rendere
     case "rankings":
       return d.rows.length ? (
         <table className="pc-table">
-          <thead><tr><th>#</th><th>Brand</th><th className="num">Views</th><th className="num">Content</th><th className="num">ER</th><th className="num">Growth</th><th /></tr></thead>
+          <thead><tr><th>#</th><th>Brand</th><th className="num">Share of views</th><th className="num">Views (day 7)</th><th className="num">Content</th><th className="num">ER</th><th className="num">Growth</th><th /></tr></thead>
           <tbody>
             {d.rows.map((r, i) => (
               <tr key={r.brand_id}>
                 <td className="muted">{i + 1}</td>
                 <td><Link href={`/data/${r.brand_id}`} className="bn">{r.name}</Link>{r.flags.length > 0 && <span className="umark" title="Unusual for this brand" />}</td>
-                <td className="num strong">{compact(r.views)}</td>
+                <td className="num strong">{pct(r.share_views, 1)}</td>
+                <td className="num">{compact(r.views)}</td>
                 <td className="num">{int(r.posts)}</td>
                 <td className={`num ${r.er_ranked ? "" : "muted"}`}>{pct(r.er, 2)}</td>
                 <td className={`num gr ${r.views_change?.isNew ? "new" : (r.views_change?.pct ?? 0) >= 0 ? "up" : "down"}`}>{r.prev ? changeText(r.views, r.prev.views) : "–"}</td>
@@ -67,7 +68,7 @@ export function CardBody({ card, names, onRefresh, refreshing }: { card: Rendere
             <Link key={t.tier} className="pc-tier" data-tone={TIER_TONE[t.tier]} href={askHref({ ...base, k: "tier", tier: t.tier })} title="Ask why">
               <span className="top"><b>{TIER_SHORT[t.tier]}</b><span>{pct(t.share_pct)}</span></span>
               <span className="bar"><i style={{ width: `${Math.min(100, t.share_pct ?? 0)}%` }} /></span>
-              <small>{int(t.creators)} creators · {int(t.posts)} posts · {compact(t.views)} views · ER {pct(t.er, 2)}</small>
+              <small>{int(t.creators)} creators · {int(t.posts)} posts · {compact(t.views)} views at day 7 · ER {pct(t.er, 2)}</small>
             </Link>
           ))}
         </div>
@@ -82,7 +83,7 @@ export function CardBody({ card, names, onRefresh, refreshing }: { card: Rendere
                 {c.profile_url ? <a href={c.profile_url} target="_blank" rel="noreferrer">@{c.handle}</a> : <b>@{c.handle}</b>}
                 <small><span className={`pf ${c.platform}`}>{c.platform === "tiktok" ? "TT" : "IG"}</span>{c.tier ? TIER_SHORT[c.tier] : "Unknown tier"} · {int(c.posts)} post{c.posts === 1 ? "" : "s"} · {c.brands.slice(0, 2).map((b) => names.get(b) ?? b).join(", ")}</small>
               </div>
-              <span className="v">{card.config.by === "comments" ? int(c.comments) : compact(c.views)}<small>{card.config.by === "comments" ? "comments" : "views"}</small></span>
+              <span className="v">{card.config.by === "comments" ? int(c.comments) : compact(c.views)}<small>{card.config.by === "comments" ? "comments" : "views (day 7)"}</small></span>
               <Link className="askwhy" href={askHref({ ...base, k: "creator", creator: c.creator_id })}>Ask why</Link>
             </li>
           ))}
@@ -96,7 +97,7 @@ export function CardBody({ card, names, onRefresh, refreshing }: { card: Rendere
               <header><span className={`pf ${c.platform}`}>{c.platform === "tiktok" ? "TT" : "IG"}</span><b>{c.handle ? `@${c.handle}` : "Unknown account"}</b><time>{dayMonth(c.posted_at)}</time></header>
               <p>{c.caption || <i className="muted">No caption</i>}</p>
               <div className="tags">{c.brands.slice(0, 3).map((b) => <span key={b} className="tag">{names.get(b) ?? b}</span>)}</div>
-              <dl><div><dt>Views</dt><dd>{compact(c.views)}</dd></div><div><dt>Engagement</dt><dd>{c.engagements == null ? "–" : compact(c.engagements)}</dd></div><div><dt>ER</dt><dd>{pct(c.er, 2)}</dd></div></dl>
+              <dl><div><dt>Views (day 7)</dt><dd title={`Latest reading: ${compact(c.views_latest)}`}>{c.views == null ? "Too new" : compact(c.views)}</dd></div><div><dt>Engagement</dt><dd>{c.engagements == null ? "–" : compact(c.engagements)}</dd></div><div><dt>ER</dt><dd>{pct(c.er, 2)}</dd></div></dl>
               <footer><a href={c.url} target="_blank" rel="noreferrer">Open post ↗</a><Link className="askwhy" href={askHref({ ...base, k: "post", url: c.url })}>Ask why</Link></footer>
             </article>
           ))}

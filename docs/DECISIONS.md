@@ -880,3 +880,21 @@ The agreed design is the doc "Core data architecture and model" (https://claude.
   - The existing readings were moved to their right time in place (`pnpm load move-readings`): 3,146 in Maudy, 2,128 in Kahf.
   - Fresh loads of both then changed only those posts' read times, and both compare clean.
 - **Engagement by its definition.** The totals count engagement from its parts (likes + comments + shares + saves), not the stored column. The two are equal on Beauty and Fintech. On Kahf and Maudy the stored column differs on 541 and 55 posts; screens keep the stored column until they move onto the totals (4c).
+
+**Step 4, second part: the Brand & KOL dashboard reads the definitions (10 Oct).**
+- **Rankings** come from the daily totals. They lead with share of views (day 7), with share of voice beside it, then:
+  - views at day 7, with the latest reading under them;
+  - content, creators, engagement and the engagement rate.
+
+  Growth, and the marks for unusual moves, are judged on views at day 7. "Ask why" on a brand also gives its share of engagement.
+- **Headline tiles.**
+  - Views are at day 7, with the latest reading and the number of posts too new beside them; a caveat says the same.
+  - The engagement rate comes from the day-7 reading, with flagged posts left out.
+  - Creators are accounts with an earned post. With no brand chosen, the tiles read the panel rows; with brands chosen, those brands' posts, each once. The two agree to the post on Beauty and Fintech.
+- **Viewership mix**, a new section after the rankings. It shows each brand's views at day 7 from its own accounts, from affiliators (creators with a cart post in the period), and from other creators. Builders can hide or move it like any section.
+- **Tiers, top creators and trending content** use views at day 7 (a card shows "Too new" until then) and the day-7 rate without flagged posts. Pulse cards built from dashboard views, and "Ask why", follow the same numbers.
+- **What moved.** Beauty is unchanged: each post has one reading, so its day-7 and latest views are the same but for 201 posts. Fintech moves, because its posts are read daily and keep growing after day 7:
+  - **Views, September:** 121.5M at the latest reading, 57.6M at day 7. Of its 6,270 posts, 2,362 are too new.
+  - **Share of views, latest → day 7:** ShopeePay 48.2% → 29.2%, GoPay 18.3% → 22.1%, BCA 16.0% → 21.0%, OVO 12.2% → 20.1%, SeaBank 4.0% → 6.3%.
+  - **Engagement rate** (likes + comments ÷ views): 3.85% → 6.38%.
+- **Speed.** Beauty's dashboard went from 2.1 s to 1.5 s of database time: the rankings read the daily totals, and post lists read their post's fields from the links. Fintech's takes 0.3 s.

@@ -1,13 +1,15 @@
 /**
  * The Brand & KOL dashboard (DECISIONS, 30 Sep 2026). Fixed layout, adjustable
- * filters: headline tiles, brand rankings, creator tiers, mentions over time, top
- * creators, trending content. Every figure comes from src/dashboard/data.ts, and
- * every figure can be asked about: "Ask why" opens Chats with it.
+ * filters: headline tiles, brand rankings, viewership mix, creator tiers, mentions
+ * over time, top creators, trending content. Every figure comes from
+ * src/dashboard/data.ts by the definitions (src/definitions/catalog.ts): views are
+ * at day 7 with the latest beside them, and share of views leads (DECISIONS, 10 Oct
+ * 2026). Every figure can be asked about: "Ask why" opens Chats with it.
  */
 import Link from "next/link";
 import { compact, dayMonth, int, pct, pts } from "@/competitor/view";
 import { askHref, PLATFORM_SHORT, type AskRef } from "@/dashboard/askref";
-import { CONTENT_PAGE, ER_MIN_POSTS, ER_MIN_VIEWS, filterQuery, type ContentCard, type ContentQuery, type CreatorRow, type DashboardData } from "@/dashboard/data";
+import { CONTENT_PAGE, ER_MIN_POSTS, ER_MIN_VIEWS, filterQuery, type ContentCard, type ContentQuery, type CreatorRow, type DashboardData, type MixRow } from "@/dashboard/data";
 import { DashFilters } from "./DashFilters";
 import { Sections } from "./Sections";
 import { Customise } from "./Customise";
@@ -41,12 +43,43 @@ function CreatorTable({ title, rows, metric, base, names }: { title: string; row
                 {c.profile_url ? <a href={c.profile_url} target="_blank" rel="noreferrer">@{c.handle}</a> : <b>@{c.handle}</b>}
                 <small><span className={`pf ${c.platform}`}>{PLATFORM_SHORT[c.platform] ?? c.platform}</span>{c.tier ? TIER_SHORT[c.tier] : "Unknown tier"}{c.followers != null ? ` · ${compact(c.followers)} followers` : ""} · {int(c.posts)} post{c.posts === 1 ? "" : "s"} · {c.brands.slice(0, 2).map((b) => names.get(b) ?? b).join(", ")}{c.brands.length > 2 ? ` +${c.brands.length - 2}` : ""}</small>
               </div>
-              <span className="v">{metric === "views" ? compact(c.views) : int(c.comments)}<small>{metric}</small></span>
+              <span className="v">{metric === "views" ? compact(c.views) : int(c.comments)}<small>{metric === "views" ? "views (day 7)" : metric}</small></span>
               <Link className="askwhy" href={askHref({ ...base, k: "creator", creator: c.creator_id })}>Ask why</Link>
             </li>
           ))}
         </ol>
       )}
+    </div>
+  );
+}
+
+const MIX_PAGE = 12;
+
+function MixTable({ rows, base }: { rows: MixRow[]; base: Omit<AskRef, "k"> }) {
+  if (!rows.length) return <div className="empty">No views at day 7 in this period.</div>;
+  const share = (n: number, of: number) => (of > 0 ? (n / of) * 100 : 0);
+  return (
+    <div className="rank mix">
+      <div className="mixkey"><span className="own">Own accounts</span><span className="aff">Affiliators</span><span className="cre">Other creators</span></div>
+      <div className="tablewrap">
+        <table>
+          <thead><tr><th>Brand</th><th className="num">Views (day 7)</th><th>Mix</th><th className="num">Own</th><th className="num">Affiliators</th><th className="num">Creators</th><th /></tr></thead>
+          <tbody>
+            {rows.slice(0, MIX_PAGE).map((r) => (
+              <tr key={r.brand_id}>
+                <td><span className="bname"><Link href={`/data/${r.brand_id}`}>{r.name}</Link></span></td>
+                <td className="num strong">{compact(r.total)}</td>
+                <td><span className="mixbar" aria-hidden><i className="own" style={{ width: `${share(r.own, r.total)}%` }} /><i className="aff" style={{ width: `${share(r.affiliators, r.total)}%` }} /><i className="cre" style={{ width: `${share(r.creators, r.total)}%` }} /></span></td>
+                <td className="num">{pct(share(r.own, r.total), 0)}</td>
+                <td className="num">{pct(share(r.affiliators, r.total), 0)}</td>
+                <td className="num">{pct(share(r.creators, r.total), 0)}</td>
+                <td className="askcell"><Link className="askwhy" href={askHref({ ...base, k: "brand", brand: r.brand_id })}>Ask why</Link></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {rows.length > MIX_PAGE && <p className="hint">The {MIX_PAGE} brands with the most views at day 7 of {rows.length}.</p>}
     </div>
   );
 }
@@ -62,7 +95,7 @@ function PostCard({ c, base, names }: { c: ContentCard; base: Omit<AskRef, "k">;
       <p>{c.caption || <i className="muted">No caption</i>}</p>
       <div className="tags">{c.brands.slice(0, 3).map((b) => <span key={b} className="tag">{names.get(b) ?? b}</span>)}</div>
       <dl>
-        <div><dt>Views</dt><dd>{compact(c.views)}</dd></div>
+        <div><dt>Views (day 7)</dt><dd title={`Latest reading: ${compact(c.views_latest)}`}>{c.views == null ? "Too new" : compact(c.views)}</dd></div>
         <div><dt>Engagement</dt><dd>{c.engagements == null ? "–" : compact(c.engagements)}</dd></div>
         <div><dt>ER</dt><dd>{pct(c.er, 2)}</dd></div>
       </dl>
@@ -86,15 +119,21 @@ export function Dashboard({ d, content, cq, view }: { d: DashboardData; content:
   const pages = Math.ceil(content.total / CONTENT_PAGE);
   const tiles: { key: "posts" | "views" | "engagements" | "er"; label: string; value: string; sub: string; tone: string }[] = [
     { key: "posts", label: "Total content", value: int(k.now.posts), sub: `${int(k.now.creators)} creators`, tone: "blue" },
-    { key: "views", label: "Views", value: compact(k.now.views), sub: `${compact(k.now.comments)} comments`, tone: "violet" },
+    { key: "views", label: "Views (day 7)", value: compact(k.now.views), sub: `Latest ${compact(k.now.views_latest)}${k.now.too_new ? ` · ${int(k.now.too_new)} posts too new` : ""} · ${compact(k.now.comments)} comments`, tone: "violet" },
     { key: "engagements", label: "Engagement", value: compact(k.now.engagements), sub: engNote, tone: "mint" },
-    { key: "er", label: "Engagement rate", value: pct(k.now.er, 2), sub: "Engagement ÷ views, posts with views", tone: "coral" },
+    { key: "er", label: "Engagement rate", value: pct(k.now.er, 2), sub: "Engagement ÷ views at day 7; flagged posts left out", tone: "coral" },
   ];
   const render: Record<string, (t: string) => React.ReactNode> = {
     rankings: (t) => (
       <div className="dsection">
-        <header><h2>{t}</h2><AddToDeck className="btn sm ghost pin" payload={{ slide: "scoreboard", brands: pin.brands, grain: f.period.grain }} /><span>Every brand with content in {f.period.label}; growth is views against {f.prev.label}.</span></header>
+        <header><h2>{t}</h2><AddToDeck className="btn sm ghost pin" payload={{ slide: "scoreboard", brands: pin.brands, grain: f.period.grain }} /><span>Every brand with content in {f.period.label}, by share of views at day 7, with share of voice beside it; growth is views at day 7 against {f.prev.label}.</span></header>
         <RankTable rows={d.rankings} base={base} prevLabel={f.prev.label} erFloor={ER_MIN_POSTS} />
+      </div>
+    ),
+    mix: (t) => (
+      <div className="dsection">
+        <header><h2>{t}</h2><span>Whose posts brought each brand&apos;s views at day 7 in {f.period.label}: its own accounts, affiliators (creators with a cart post in the period) or other creators.</span></header>
+        <div className="dcard"><MixTable rows={d.mix} base={base} /></div>
       </div>
     ),
     tiers: (t) => (
@@ -109,7 +148,7 @@ export function Dashboard({ d, content, cq, view }: { d: DashboardData; content:
                 <div><dt>Creators</dt><dd>{int(t.creators)}</dd></div>
                 <div><dt>Content</dt><dd>{int(t.posts)}</dd></div>
                 <div><dt>Posts per creator</dt><dd>{t.posts_per_creator == null ? "–" : t.posts_per_creator.toFixed(1)}</dd></div>
-                <div><dt>Views</dt><dd>{compact(t.views)}</dd></div>
+                <div><dt>Views (day 7)</dt><dd>{compact(t.views)}</dd></div>
                 <div><dt>Engagement</dt><dd>{compact(t.engagements)}</dd></div>
                 <div><dt>ER</dt><dd>{pct(t.er, 2)}</dd></div>
               </dl>
