@@ -11,6 +11,7 @@
 import { sql } from "drizzle-orm";
 import {
   bigint,
+  bigserial,
   boolean,
   check,
   date,
@@ -21,6 +22,8 @@ import {
   pgSchema,
   pgTable,
   primaryKey,
+  real,
+  serial,
   smallint,
   text,
   timestamp,
@@ -288,6 +291,8 @@ export const posts = pgTable(
      * 'zero_views' (a video reported 0 views). The row counts as a post; it stays out of rates and medians.
      */
     flags: text("flags").array(),
+    /** when this post's numbers (views, likes, …) were read: they are its latest reading (post_readings keeps them all) */
+    readAt: ts("read_at"),
     sourceFile: text("source_file"),
     loadId: uuid("load_id"),
     createdAt: createdAt(),
@@ -310,21 +315,33 @@ export const posts = pgTable(
   ],
 );
 
-/** Day-by-day tracking: listening workspaces only (etl/load_listening.py); the beauty exports carry one final capture per post. */
-export const postSnapshots = pgTable(
-  "post_snapshots",
+/**
+ * A post's numbers at a moment (DECISIONS, 10 Oct 2026, "Readings keep their time"): every reading a source gives, kept
+ * with when it was read and the post's age then; the latest is copied onto the post (posts.views, …, posts.read_at).
+ * Split by month of reading (migration 0033: range partitions on read_at). A Fair Listening dump gives day 0 to 30 with
+ * its own day index (day_n); an export gives one reading, read when the file was made. post_snapshots is a view of the
+ * readings that carry a day index, for the code that reads them so.
+ */
+export const postReadings = pgTable(
+  "post_readings",
   {
     postId: uuid("post_id").notNull().references(() => posts.id, { onDelete: "cascade" }),
+    readAt: ts("read_at").notNull(),
+    /** hours since the post went up, at the reading */
+    ageHours: integer("age_hours"),
+    /** the day of the reading: a dump's own day index (0 to 30), else whole days since the post went up */
     dayN: smallint("day_n").notNull(),
-    capturedAt: ts("captured_at").notNull(),
+    /** 'listening' (a dump's day-by-day tracking) | 'export' (one reading, when the file was made) */
+    source: text("source").notNull(),
     views: bigint("views", { mode: "number" }),
     likes: integer("likes"),
     commentsCount: integer("comments_count"),
     shares: integer("shares"),
     saves: integer("saves"),
+    loadId: uuid("load_id"),
   },
-  // Listening workspaces track a post for up to 30 days (etl/load_listening.py).
-  (t) => [primaryKey({ columns: [t.postId, t.dayN] }), check("post_snapshots_day_chk", sql`${t.dayN} between 0 and 30`)],
+  // a dump sometimes gives two day indices one fetch time: both are kept
+  (t) => [primaryKey({ columns: [t.postId, t.readAt, t.dayN] }), index("post_readings_post_day_idx").on(t.postId, t.dayN)],
 );
 
 /** Aggregated imports for months without post-level data. Skills flag reduced confidence. */
@@ -415,6 +432,50 @@ export const comments = pgTable(
     index("comments_post_idx").on(t.postId),
     index("comments_workspace_posted_idx").on(t.workspaceId, t.postedAt),
     check("comments_sentiment_chk", sql`${t.sentiment} is null or ${t.sentiment} in ('positive','neutral','negative')`),
+  ],
+);
+
+// ------------------------------------------------------------------- labels
+/**
+ * Who made a judgment (DECISIONS, 10 Oct 2026, "Judgments keep their author"): 'vendor:fair-listening' (labels that come
+ * with a dump), 'model:<model id>' with the fingerprint of the instructions it ran with, 'rule:<name>' (relevance terms,
+ * one spelling per name), 'person:<email>' (a check by hand). Labels made before 10 Oct carry version 'before 10 Oct 2026'.
+ */
+export const labellers = pgTable(
+  "labellers",
+  {
+    id: serial("id").primaryKey(),
+    name: text("name").notNull(),
+    version: text("version").notNull().default(""),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("labellers_name_version_uq").on(t.name, t.version)],
+);
+
+/**
+ * Every judgment is its own row (DECISIONS, 10 Oct 2026): what it labels, the kind, the value, its confidence, who made
+ * it and when. A new labeller adds rows and never overwrites; the newest of each kind is copied onto the post or comment
+ * (posts.stance, comments.sentiment, …) for speed. Kinds: sentiment, off_topic, topic, voice, theme, intent, translation
+ * (comments); stance, relevant, topic, voice, caption_* (posts).
+ */
+export const labels = pgTable(
+  "labels",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    workspaceId: text("workspace_id").notNull().references(() => workspaces.id),
+    /** 'post' | 'comment' */
+    target: text("target").notNull(),
+    targetId: uuid("target_id").notNull(),
+    kind: text("kind").notNull(),
+    value: text("value"),
+    confidence: real("confidence"),
+    labellerId: integer("labeller_id").notNull().references(() => labellers.id),
+    labelledAt: ts("labelled_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("labels_target_idx").on(t.target, t.targetId, t.kind, t.labelledAt),
+    index("labels_ws_kind_idx").on(t.workspaceId, t.kind, t.labelledAt),
+    check("labels_target_chk", sql`${t.target} in ('post','comment')`),
   ],
 );
 
@@ -1400,6 +1461,8 @@ export const stagingPosts = staging.table(
     /** a post only known from its comments (profiles): written only when the post is not there yet */
     stub: boolean("stub").notNull().default(false),
     flags: text("flags").array(),
+    /** when the source read these numbers (a dump's last snapshot, an export's time) */
+    readAt: ts("read_at"),
     sourceFile: text("source_file"),
   },
   (t) => [uniqueIndex("staging_posts_uq").on(t.loadId, t.platform, t.url, t.brandId)],

@@ -12,17 +12,17 @@ export const POST_WRITE: Record<SourceKind, { cols: string[]; mode: "overwrite" 
     mode: "overwrite",
     cols: ["platform_post_id", "creator_handle", "source", "collection", "account_type", "posted_at", "month", "caption", "hashtags", "has_cart", "is_reseller",
       "followers_at_post", "tier", "universe", "category_broad", "product_category", "content_format", "content_type", "product_name", "product_url", "price",
-      "price_original", "discount_percent", "views", "likes", "comments_count", "shares", "saves", "engagements", "engagements_lc", "source_file"],
+      "price_original", "discount_percent", "views", "likes", "comments_count", "shares", "saves", "engagements", "engagements_lc", "source_file", "read_at"],
   },
   listening: {
     mode: "overwrite",
     cols: ["platform_post_id", "creator_handle", "source", "collection", "posted_at", "month", "caption", "hashtags", "is_paid", "followers_at_post", "tier",
-      "content_type", "views", "likes", "comments_count", "shares", "saves", "engagements", "engagements_lc", "captured_days", "relevant", "tagged_handles", "source_file"],
+      "content_type", "views", "likes", "comments_count", "shares", "saves", "engagements", "engagements_lc", "captured_days", "relevant", "tagged_handles", "source_file", "read_at"],
   },
   profile: {
     mode: "coalesce",
     cols: ["platform_post_id", "creator_handle", "source", "collection", "posted_at", "month", "caption", "hashtags", "followers_at_post", "tier", "content_type",
-      "views", "likes", "comments_count", "shares", "engagements", "engagements_lc", "source_file"],
+      "views", "likes", "comments_count", "shares", "engagements", "engagements_lc", "source_file", "read_at"],
   },
 };
 
@@ -32,12 +32,13 @@ export const POST_TYPES: Record<string, string> = {
   caption: "text", hashtags: "text[]", tagged_handles: "text[]", is_paid: "boolean", has_cart: "boolean", is_reseller: "boolean", followers_at_post: "int",
   tier: "text", universe: "text", category_broad: "text", product_category: "text", content_format: "text", content_type: "text", product_name: "text",
   product_url: "text", price: "numeric", price_original: "numeric", discount_percent: "numeric", views: "bigint", likes: "int", comments_count: "int",
-  shares: "int", saves: "int", engagements: "int", engagements_lc: "int", captured_days: "int", relevant: "boolean", source_file: "text",
+  shares: "int", saves: "int", engagements: "int", engagements_lc: "int", captured_days: "int", relevant: "boolean", source_file: "text", read_at: "timestamptz",
 };
 
 /** comment columns per source: listening comments arrive labelled and replace what is there; profile comments keep the model's label */
 export const COMMENT_WRITE: Record<"listening" | "profile", string[]> = {
-  listening: ["platform", "author_handle", "author_hash", "text", "posted_at", "likes", "sentiment", "sentiment_source", "sentiment_confidence", "sentiment_detail",
-    "csat", "theme", "purchase_intent", "translation", "topic_id"],
+  // the five-point label and CSAT are not loaded (DECISIONS, 10 Oct 2026: three classes only); what earlier loads wrote stays until the raw files are stored
+  listening: ["platform", "author_handle", "author_hash", "text", "posted_at", "likes", "sentiment", "sentiment_source", "sentiment_confidence", "theme",
+    "purchase_intent", "translation", "topic_id"],
   profile: ["platform", "author_handle", "author_hash", "text", "posted_at", "likes", "views", "sentiment", "sentiment_source"],
 };

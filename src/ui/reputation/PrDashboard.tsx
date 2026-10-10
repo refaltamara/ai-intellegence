@@ -149,11 +149,10 @@ export function PrDashboard({ d, client, view, hide = [] }: { d: PrDashboardData
     { key: "reach", label: "Reach", value: k.reach.now == null ? "–" : compact(k.reach.now), delta: k.reach.now == null ? <span className="delta flat">Not reported</span> : <Delta k={k.reach} kind="count" />, sub: k.reach.now == null ? "These platforms report no views" : "Views of those posts", tone: "violet" },
     { key: "comments", label: withPosts ? "Posts and comments" : "Comments", value: int(k.comments.now ?? 0), delta: <Delta k={k.comments} kind="count" />, sub: withPosts ? `${int(d.voice_posts)} posts with a stance, and the comments under them; ${who}'s own replies left out` : "Under those posts; brand replies left out", tone: "mint" },
     { key: "neg", label: "Negative", value: pct(k.neg_pct.now), delta: <Delta k={k.neg_pct} kind="pct" good="down" />, sub: `Share of labelled ${said}`, tone: "coral" },
-    { key: "csat", label: "CSAT", value: k.csat.now == null ? "–" : k.csat.now.toFixed(2), delta: <Delta k={k.csat} kind="score" />, sub: "Average of 1 to 5, per comment", tone: "blue" },
     { key: "intent", label: "Purchase intent", value: pct(k.intent_pct.now), delta: <Delta k={k.intent_pct} kind="pct" />, sub: "Comments that want to buy or sign up", tone: "mint" },
   ];
-  const extra = tilesBase.filter((t) => ["reach", "csat", "intent"].includes(t.key));
-  // a case workspace leaves out what does not apply (settings.pr.hide: status, reach, csat, intent)
+  const extra = tilesBase.filter((t) => ["reach", "intent"].includes(t.key));
+  // a case workspace leaves out what does not apply (settings.pr.hide: status, reach, intent)
   const tiles = (withPosts ? [...caseTiles, ...extra] : tilesBase).filter((t) => !hide.includes(t.key));
   const showStatus = !hide.includes("status");
   const ampViews = d.amplifiers.some((a) => a.views > 0);
@@ -235,7 +234,7 @@ export function PrDashboard({ d, client, view, hide = [] }: { d: PrDashboardData
       <div className="dsection">
         <header><h2>{t}</h2><span>What people say about {who}, by topic: how much of the conversation each holds, and how it leans.</span></header>
         <div className="dcard tablewrap still">
-          <table className="prnarr"><thead><tr><th>Topic</th>{withPosts ? <><th className="num">Posts</th><th className="num">Against</th><th className="num">Comments</th><th className="num">Negative</th></> : <th className="num">Comments</th>}<th className="num">Share</th><th className="num">Change</th>{!withPosts && <th className="num">Negative</th>}{!hide.includes("csat") && <th className="num">CSAT</th>}<th>In their words</th></tr></thead>
+          <table className="prnarr"><thead><tr><th>Topic</th>{withPosts ? <><th className="num">Posts</th><th className="num">Against</th><th className="num">Comments</th><th className="num">Negative</th></> : <th className="num">Comments</th>}<th className="num">Share</th><th className="num">Change</th>{!withPosts && <th className="num">Negative</th>}<th>In their words</th></tr></thead>
             <tbody>{d.narratives.filter((x) => x.comments > 0).map((x) => (
               <tr key={x.topic_id}>
                 <td><b>{x.catch_all ? `${x.topic} (no topic fits)` : x.topic}</b></td>
@@ -246,7 +245,6 @@ export function PrDashboard({ d, client, view, hide = [] }: { d: PrDashboardData
                 <td className="num">{pct(x.share)}</td>
                 <td className="num">{change(x.comments, x.comments_prev)}</td>
                 {!withPosts && <td className="num">{pct(x.neg_pct)} <small className={x.neg_pct != null && x.neg_pct_prev != null && x.neg_pct > x.neg_pct_prev ? "down" : "up"}>{pts(x.neg_pct, x.neg_pct_prev)}</small></td>}
-                {!hide.includes("csat") && <td className="num">{x.csat == null ? "–" : x.csat.toFixed(2)}</td>}
                 <td className="q">{x.quote ? <a href={x.quote.url} target="_blank" rel="noreferrer">“{x.quote.text.length > 110 ? x.quote.text.slice(0, 108) + "…" : x.quote.text}”</a> : "–"}</td>
               </tr>))}
             </tbody>
@@ -299,13 +297,13 @@ export function PrDashboard({ d, client, view, hide = [] }: { d: PrDashboardData
       <div className="dsection">
         <header><h2>{t}</h2><span>Every brand on the same measures, {range}{scopeWord}. Share of voice is of posts about the brands; negative is of labelled comments.</span></header>
         <div className="dcard tablewrap still">
-          <table><thead><tr><th>Brand</th><th className="num">Posts</th><th className="num">Share of voice</th><th className="num">Reach</th><th className="num">Comments</th><th className="num">Negative</th><th className="num">CSAT</th><th className="num">Purchase intent</th><th>Issue building</th></tr></thead>
+          <table><thead><tr><th>Brand</th><th className="num">Posts</th><th className="num">Share of voice</th><th className="num">Reach</th><th className="num">Comments</th><th className="num">Negative</th><th className="num">Purchase intent</th><th>Issue building</th></tr></thead>
             <tbody>{d.competitive.map((b) => (
               <tr key={b.id} className={b.is_focus ? "me" : ""}>
                 <td><b>{b.name}</b>{b.is_client ? <span className="tag me">you</span> : null}</td>
                 <td className="num">{int(b.posts)}</td><td className="num">{pct(b.sov)}</td><td className="num">{compact(b.views)}</td><td className="num">{int(b.comments)}</td>
                 <td className="num">{pct(b.neg_pct)} <small className={b.neg_pct != null && b.neg_pct_prev != null && b.neg_pct > b.neg_pct_prev ? "down" : "up"}>{pts(b.neg_pct, b.neg_pct_prev)}</small></td>
-                <td className="num">{b.csat == null ? "–" : b.csat.toFixed(2)}</td><td className="num">{pct(b.intent_pct)}</td>
+                <td className="num">{pct(b.intent_pct)}</td>
                 <td>{b.top_issue ? <>{b.top_issue.topic} <small className="muted">{int(b.top_issue.negative)} negative, {change(b.top_issue.negative, b.top_issue.negative_prev)}</small></> : <span className="muted">–</span>}</td>
               </tr>))}
             </tbody>

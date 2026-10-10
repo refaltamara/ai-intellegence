@@ -144,12 +144,15 @@ export function readBeauty(input: AdapterInput): Staged {
     if (missing.length) throw new Error(`${name}: missing required columns ${missing.join(", ")}`);
     const extra = columns.filter((x) => !c.required.includes(x) && !c.optional.includes(x));
     const f = normaliseFile(rows, columns, platform, maps[platform], name, input.tz);
+    // the exports carry no time of reading: the numbers were read by the day the file reached us, at the latest
+    const readAt = naiveLocal(raw.received, input.tz)?.toISOString() ?? null;
+    for (const p of f.posts) p.read_at = readAt;
     // creators per file, as the old loader upserted them file by file (the promotion keeps the latest by last seen)
     accounts.push(...creatorsOf(f.posts));
     st.posts.push(...f.posts);
     st.files.push({
       file: name, raw_file_id: null, kind: "posts", platform, rows_in: rows.length, staged: f.posts.length, merged: f.merged, dropped: f.drops.total(), drops: f.drops.d,
-      notes: { months: f.months, unknown_categories_kept_as_is: f.unknownCats, extra_columns_ignored: extra, source_tz_assumed: input.tz },
+      notes: { months: f.months, unknown_categories_kept_as_is: f.unknownCats, extra_columns_ignored: extra, source_tz_assumed: input.tz, naive_times: f.posts.length },
     });
   }
   st.accounts = foldLatest(accounts);

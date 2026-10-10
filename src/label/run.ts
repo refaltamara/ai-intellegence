@@ -17,6 +17,7 @@ import { sql } from "../db/client";
 import { getWorkspace } from "../workspace/store";
 import { COMMENT_CLASSES, SENTIMENTS, commentBatchPrompt, commentSystem, labelTool, parseLabels, stanceBatchPrompt, stanceSystem, type CommentForLabel, type LabelContext, type LabelTopic, type PostForLabel } from "./prompt";
 import { toJson } from "../db/json";
+import { commentLabelRows, modelLabeller, postLabelRows, promptVersion, recordLabels } from "../labels/record";
 
 export type LabelOutcome = {
   workspace: string;
@@ -154,6 +155,8 @@ export async function labelWorkspace(workspaceId: string, opts: LabelOptions = {
            from jsonb_to_recordset($1::jsonb) as l(id uuid, sentiment text, confidence numeric, topic text, voice text) where c.id = l.id and c.workspace_id = $2`,
           [toJson(labels), workspaceId],
         );
+        // each judgment also kept with its author: this model, and the instructions it ran with
+        await recordLabels(workspaceId, modelLabeller(modelId()), promptVersion(commentSystem(ctx)), labels.flatMap(commentLabelRows)).catch((e) => console.error("[labels]", (e as Error).message));
         out.comments_labelled += labels.length;
       }
       if (missing.length) {
@@ -198,6 +201,7 @@ export async function labelWorkspace(workspaceId: string, opts: LabelOptions = {
            from jsonb_to_recordset($1::jsonb) as l(id uuid, sentiment text, confidence numeric, topic text, voice text) where p.id = l.id and p.workspace_id = $2`,
           [toJson(labels), workspaceId],
         );
+        await recordLabels(workspaceId, modelLabeller(modelId()), promptVersion(stanceSystem(ctx)), labels.flatMap(postLabelRows)).catch((e) => console.error("[labels]", (e as Error).message));
         out.posts_labelled += labels.length;
       }
       if (missing.length) {

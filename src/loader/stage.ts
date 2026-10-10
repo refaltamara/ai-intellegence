@@ -17,7 +17,7 @@ const POST_COLS: [string, string][] = [
   ["content_format", "text"], ["content_type", "text"], ["product_name", "text"], ["product_url", "text"], ["price", "numeric"],
   ["price_original", "numeric"], ["discount_percent", "numeric"], ["views", "bigint"], ["likes", "int"], ["comments_count", "int"],
   ["shares", "int"], ["saves", "int"], ["engagements", "int"], ["engagements_lc", "int"], ["captured_days", "int"], ["relevant", "boolean"],
-  ["stub", "boolean"], ["flags", "text[]"], ["source_file", "text"],
+  ["stub", "boolean"], ["flags", "text[]"], ["source_file", "text"], ["read_at", "timestamptz"],
 ];
 const READING_COLS: [string, string][] = [["platform", "text"], ["url", "text"], ["brand_id", "text"], ["day_n", "smallint"], ["captured_at", "timestamptz"], ["views", "bigint"], ["likes", "int"], ["comments_count", "int"], ["shares", "int"], ["saves", "int"]];
 const ACCOUNT_COLS: [string, string][] = [["platform", "text"], ["handle", "text"], ["display_name", "text"], ["followers_latest", "int"], ["tier_latest", "text"], ["first_seen", "date"], ["last_seen", "date"]];

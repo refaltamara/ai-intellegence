@@ -326,6 +326,7 @@ export async function readProfile(input: AdapterInput): Promise<Staged> {
       const last = new Map<string, number>();
       urls.forEach((u, i) => { if (u) last.set(u, i); });
       const fileRows: StagedPost[] = [];
+      let naiveTimes = 0;
       const drop = dropped.get(p) ?? dropped.set(p, new Set()).get(p)!;
       for (let i = 0; i < rows.length; i++) {
         const r = rows[i];
@@ -341,6 +342,7 @@ export async function readProfile(input: AdapterInput): Promise<Staged> {
           if (sf) w = { when: sf, how: "snowflake_id" };
         }
         if (!w.when) { drops.add(`unparseable date_posted (${w.how})`, `${url} ${JSON.stringify(rawDate)}`); continue; }
+        const naive = w.how.startsWith("naive");
         const why = prof.whyDrop(p, url, handle, cap);
         if (why) { drops.add(why, `@${handle} ${url}`); drop.add(url); continue; }
         const owned = prof.isOwned(p, handle);
@@ -361,6 +363,8 @@ export async function readProfile(input: AdapterInput): Promise<Staged> {
           engagements: parts.length ? parts.reduce((a, x) => a + x, 0) : null, engagements_lc: lc.length ? lc.reduce((a, x) => a + x, 0) : null, source_file: name,
         }));
         const added = fileRows[fileRows.length - 1];
+        if (naive) naiveTimes++;
+        added.read_at = anchor.toISOString(); // the export's time: when these numbers were read
         added.flags = flagsOf(fol == null ? reported : null, added.views, added.content_type);
       }
       // creators from this file: the first row's followers, then a later post's when it has some
@@ -393,6 +397,7 @@ export async function readProfile(input: AdapterInput): Promise<Staged> {
         caption.set(k, { handle: r.creator_handle ?? cur?.handle ?? null, caption: r.caption ?? cur?.caption ?? null });
       }
       report.staged = fileRows.length;
+      report.notes = { naive_times: naiveTimes };
     } else {
       if (!known.has(p)) known.set(p, new Set(coreUrls.get(p) ?? []));
       const kn = known.get(p)!;

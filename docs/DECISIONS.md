@@ -771,3 +771,46 @@ The agreed design is the doc "Core data architecture and model" (https://claude.
 - **Automatic loads.** When the scraper delivers into the store under `inbox/<workspace>/`, the jobs cron registers the delivered files as raw files and queues a load once every table of one dump has arrived (`src/loader/intake.ts`). This covers live listening workspaces, and does nothing until a Blob store is connected.
 - **Clearing.** Staged rows are cleared 30 days after a load goes in or is held (the nightly health cron). The four verification loads of 10 Oct take about 370 MB of staging until then.
 - **Lineage.** Each file a load writes from gets a `data_loads` row pointing at its staged load and raw file; `raw_files` (the database, not the manifest) is the registry the app reads, and files uploaded in the CMS are registered and hashed there.
+
+**Step 3, first part: CSAT out, labels with their author, readings with their time (10 Oct).**
+- **CSAT and the five-point label are out.**
+  - Out of every screen and deck: the PR dashboard's CSAT tile and its CSAT columns (narratives, competitors), the PR decks' tiles, tables, footers and fact sheet, and the competitive slide's description.
+  - New loads no longer bring them: the listening adapter stages neither, and the promotion writes neither.
+  - The values earlier loads wrote stay in `comments.csat` and `comments.sentiment_detail`, unread. They go with the columns once the Fintech dump is safely in the store, since the dump is their only other copy. `settings.pr.hide` no longer needs "csat".
+- **Labels keep their author** (`labels`, `labellers`; migration 0032; `src/labels/record.ts`).
+  - Every judgment is a row: what it labels, the kind, the value, its confidence, who made it and when. The newest is still copied onto the post or comment.
+  - Who made it:
+    - `vendor:fair-listening`, labels a dump brings;
+    - `model:<model id>`, versioned by a fingerprint of the exact instructions it ran with;
+    - `rule:terms`, a brand's relevance terms, versioned by the terms;
+    - `rule:one-spelling`, caption names made one spelling;
+    - `person:<email>`, kept for checks by hand.
+  - Writers:
+    - the labeller (sentiment, off-topic, topic, voice, stance, set aside);
+    - caption reading and its renames;
+    - the loader, for vendor labels and a dump's relevance;
+    - applying relevance terms in the CMS.
+  - **Backfill** (`pnpm labels backfill`, version "before 10 Oct 2026"), about 850,000 rows:
+    - Fintech's vendor labels: 114,857 sentiment, 116,366 each of theme, intent and topic, 51,732 translations;
+    - our model's: 68,859 sentiment, 92,628 off-topic, 43,642 topics and 46,637 voices on comments; 5,949 stances, 219 set aside, 2,372 topics and 2,657 voices on posts; 58,272 caption tags;
+    - the terms rule's 13,275 Fintech relevance judgments.
+
+    It is safe to run again. (An early run attributed Kahf's 219 set-aside posts to the terms rule as well; those 219 rows were removed at once, and the rule now covers listening panels only.)
+- **Readings keep their time** (`post_readings`; migrations 0033 and 0034).
+  - The table is split by month of reading from the start: 28 partitions, Oct 2025 to Dec 2027, plus a default.
+  - Each reading keeps:
+    - when it was read;
+    - the post's age then;
+    - its day index: a dump's own 0 to 30, else whole days since posting;
+    - where it came from: `listening` (a dump's day by day) or `export` (one reading when a file was made).
+  - The key is post, time and day: a dump sometimes gives two day indices one fetch time (60 cases), and both are kept.
+  - `posts.read_at` says when a post's numbers were read:
+    - a dump's latest reading;
+    - an export's own time (profiles: the contract's per file);
+    - Beauty: the day the file reached us, at the latest, since its exports carry no time.
+  - **Moved and added:**
+    - Fintech's 114,633 day-by-day readings moved over unchanged.
+    - Every Beauty, Kahf and Maudy post got its export reading: 278,322, 2,683 and 3,559.
+  - `post_snapshots` is now a view (the latest reading per post and day index) that returns exactly the old table's 114,633 rows. The old table is kept as `post_snapshots_before_10_oct`.
+  - The loader writes readings to `post_readings`. Loading the same file again changes nothing: proven on Maudy's 18 Sep X file, with 0 posts and 0 readings changed.
+- **One check made narrower.** The time-of-day check now judges only files whose times came without a zone, since a time from an X status id or an ISO time with Z cannot be read in the wrong zone. It had held Maudy's 18 Sep X file, whose posts peak 4.4 hours from earlier ones because a news cycle moved, not a zone. A held load that passes when checked again is ready to go in.

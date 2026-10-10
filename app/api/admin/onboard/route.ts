@@ -165,7 +165,7 @@ export async function POST(req: Request) {
     case "reset": {
       if (!["draft", "review", "loading"].includes(w.status)) return no("Only a workspace that is not live can be emptied.");
       await sql.query("delete from comments where workspace_id = $1", [ws]);
-      await sql.query("delete from post_snapshots where post_id in (select id from posts where workspace_id = $1)", [ws]);
+      await sql.query("delete from post_readings where post_id in (select id from posts where workspace_id = $1)", [ws]);
       await sql.query("delete from posts where workspace_id = $1", [ws]);
       await sql.query("delete from creators where workspace_id = $1", [ws]);
       await sql.query("delete from data_loads where workspace_id = $1", [ws]);

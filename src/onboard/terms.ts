@@ -100,6 +100,12 @@ export async function applyRelevance(ws: string, brandId: string, by: string): P
   }
   if (on.length) await sql.query("update posts set relevant = true where id = any($1::uuid[])", [on]);
   if (off.length) await sql.query("update posts set relevant = false where id = any($1::uuid[])", [off]);
+  // the rule's judgment, kept with which terms made it (labels; who applied them is in the audit log)
+  const { recordLabels, ruleVersion } = await import("../labels/record");
+  await recordLabels(ws, "rule:terms", ruleVersion({ brand: brandId, terms: base!.terms, never: base!.never, handles: base!.handles }), [
+    ...on.map((id) => ({ target: "post" as const, target_id: id, kind: "relevant", value: "yes" })),
+    ...off.map((id) => ({ target: "post" as const, target_id: id, kind: "relevant", value: "no" })),
+  ]).catch((e) => console.error("[labels]", (e as Error).message));
   if (on.length || off.length) await refreshViews();
   const before = { posts: p.total.now, views: p.total.views_now };
   const after = { posts: p.total.after, views: p.total.views_after };

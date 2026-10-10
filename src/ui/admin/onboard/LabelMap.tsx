@@ -22,7 +22,7 @@ export function LabelMap({ ws, labels, current }: { ws: string; labels: { label:
             )}</td></tr>
         ))}</tbody>
       </table></div>
-      <p className="muted">With this map: {["positive", "neutral", "negative"].map((s) => `${sum(s).toLocaleString("en-US")} ${s}`).join(", ")}. The five-point label and CSAT are kept on every comment.</p>
+      <p className="muted">With this map: {["positive", "neutral", "negative"].map((s) => `${sum(s).toLocaleString("en-US")} ${s}`).join(", ")}. Only the three classes are kept: the five-point label and CSAT stay in the raw file (DECISIONS, 10 Oct 2026).</p>
       <div className="row end">
         {error && <span className="err">{error}</span>}
         {saved && <span className="ok">Saved.</span>}

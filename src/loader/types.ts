@@ -17,6 +17,8 @@ export type StagedPost = {
   price_original: number | null; discount_percent: number | null; views: number | null; likes: number | null; comments_count: number | null;
   shares: number | null; saves: number | null; engagements: number | null; engagements_lc: number | null; captured_days: number | null;
   relevant: boolean | null; stub: boolean; flags: string[] | null; source_file: string;
+  /** when these numbers were read: a dump's latest reading, an export's time, else the day the file reached us */
+  read_at?: string | null;
 };
 
 export type StagedReading = { platform: string; url: string; brand_id: string; day_n: number; captured_at: string; views: number | null; likes: number | null; comments_count: number | null; shares: number | null; saves: number | null };
