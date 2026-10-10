@@ -8,7 +8,7 @@
  * - Brand rows come from the daily totals and count links: a post about two brands counts for both. Totals
  *   (headline tiles, tiers, top creators, content) count each post once.
  * - Views are Views (day 7), with the latest beside them; a post that went up less than 7 days before the
- *   data's latest reading is too new, and counted as such.
+ *   data's latest reading counts its latest reading so far, and its period says "so far".
  * - Share of views leads, with share of voice (posts) and share of engagement (comparable) beside it, each a
  *   brand's links over all panel brands' links, same platforms and period.
  * - Engagement is platform-native on one platform; across platforms it is likes + comments, the only
@@ -41,14 +41,14 @@ const HISTORY = 8;
 const TREND_WEEKS = 12;
 const TREND_BRANDS = 8;
 
-/** views: Views (day 7); views_latest beside them; too_new: posts not yet read at day 7 */
-export type Totals = { posts: number; creators: number; views: number; views_latest: number; too_new: number; engagements: number; comments: number; er: number | null };
+/** views: Views (day 7); views_latest beside them; so_far: posts under 7 days old, counted at their latest reading so far */
+export type Totals = { posts: number; creators: number; views: number; views_latest: number; so_far: number; engagements: number; comments: number; er: number | null };
 export type Change = { pct: number | null; isNew: boolean } | null;
 export type Kpis = { now: Totals; prev: Totals; change: Record<"posts" | "views" | "engagements" | "er", Change> };
 export type RankFlag = { platform: string; metric: Metric; direction: "up" | "down"; change: number; unit: Flag["unit"] };
 export type RankRow = {
   brand_id: string; name: string; is_client: boolean; platforms: string[];
-  posts: number; creators: number; views: number; views_latest: number; too_new: number; engagements: number; comments: number; er: number | null; er_ranked: boolean;
+  posts: number; creators: number; views: number; views_latest: number; so_far: number; engagements: number; comments: number; er: number | null; er_ranked: boolean;
   /** shares of the panel, in percent: views (day 7), posts, comparable engagement */
   share_views: number | null; share_voice: number | null; share_eng: number | null;
   prev: { posts: number; views: number } | null;
@@ -58,8 +58,8 @@ export type RankRow = {
 export type TierCard = { tier: string; label: string; creators: number; share_pct: number | null; posts: number; posts_per_creator: number | null; views: number; engagements: number; er: number | null };
 export type TrendSeries = { brand_id: string; name: string; posts: number[]; views: number[] };
 export type CreatorRow = { creator_id: string; handle: string; platform: string; followers: number | null; tier: string | null; posts: number; views: number; comments: number; engagements: number; brands: string[]; profile_url: string | null };
-/** views: Views (day 7), null while the post is too new; views_latest beside them */
-export type ContentCard = { url: string; platform: string; handle: string | null; posted_at: string; caption: string; views: number | null; views_latest: number; engagements: number | null; comments: number; er: number | null; brands: string[] };
+/** views: Views (day 7), the latest so far while the post is under 7 days old (so_far); views_latest beside them */
+export type ContentCard = { url: string; platform: string; handle: string | null; posted_at: string; caption: string; views: number | null; views_latest: number; so_far: boolean; engagements: number | null; comments: number; er: number | null; brands: string[] };
 /** a brand's Views (day 7) in the period, split by who brought them (definition viewership_mix) */
 export type MixRow = { brand_id: string; name: string; total: number; own: number; affiliators: number; creators: number };
 
@@ -150,10 +150,10 @@ export async function brandHandles(db: SkillDb, ws: string): Promise<string[]> {
 
 type BucketRow = {
   brand_id: string; platform: string; bucket: string; posts: number; creators: number; views: number; eng: number; eng_lc: number; comments: number;
-  d7_posts: number; d7_views: number; d7_eng: number; d7_eng_lc: number;
+  d7_posts: number; so_far: number; d7_views: number; d7_eng: number; d7_eng_lc: number;
   n_rated: number; v_rated: number; e_rated: number; n_rated_lc: number; v_rated_lc: number; e_rated_lc: number;
 };
-const BUCKET_NUMS = ["posts", "creators", "views", "eng", "eng_lc", "comments", "d7_posts", "d7_views", "d7_eng", "d7_eng_lc", "n_rated", "v_rated", "e_rated", "n_rated_lc", "v_rated_lc", "e_rated_lc"] as const;
+const BUCKET_NUMS = ["posts", "creators", "views", "eng", "eng_lc", "comments", "d7_posts", "so_far", "d7_views", "d7_eng", "d7_eng_lc", "n_rated", "v_rated", "e_rated", "n_rated_lc", "v_rated_lc", "e_rated_lc"] as const;
 
 /**
  * Every brand × platform × period over the lookback, from the daily totals (src/definitions/totals.ts): the rankings,
@@ -172,7 +172,7 @@ export async function buckets(db: SkillDb, ctx: Context, f: Filters): Promise<{ 
     `with t as (
        select brand_id, platform, to_char(date_trunc(${grain}, day), 'YYYY-MM-DD') as bucket,
               sum(posts)::int as posts, sum(views)::float8 as views, sum(engagement)::float8 as eng, sum(engagement_lc)::float8 as eng_lc,
-              sum(comments)::float8 as comments, sum(d7_posts)::int as d7_posts, sum(d7_views)::float8 as d7_views,
+              sum(comments)::float8 as comments, sum(d7_posts)::int as d7_posts, sum(so_far_posts)::int as so_far, sum(d7_views)::float8 as d7_views,
               sum(d7_engagement)::float8 as d7_eng, sum(d7_engagement_lc)::float8 as d7_eng_lc,
               sum(d7_rated_posts)::int as n_rated, sum(d7_rated_views)::float8 as v_rated, sum(d7_rated_engagement)::float8 as e_rated,
               sum(d7_rated_lc_posts)::int as n_rated_lc, sum(d7_rated_lc_views)::float8 as v_rated_lc, sum(d7_rated_lc_engagement)::float8 as e_rated_lc
@@ -255,7 +255,7 @@ export function rankings(rows: BucketRow[], periods: Period[], f: Filters, names
     out.push({
       brand_id: brandId, name: meta?.name ?? brandId, is_client: meta?.is_client ?? false,
       platforms: [...new Set(cur.map((r) => r.platform))].sort(),
-      posts, creators: sum(cur, "creators"), views, views_latest: sum(cur, "views"), too_new: posts - sum(cur, "d7_posts"),
+      posts, creators: sum(cur, "creators"), views, views_latest: sum(cur, "views"), so_far: sum(cur, "so_far"),
       engagements: sum(cur, lc ? "eng_lc" : "eng"), comments: sum(cur, "comments"),
       er, er_ranked: posts >= ER_MIN_POSTS && er != null,
       share_views: ratio(views, whole.views), share_voice: ratio(posts, whole.posts), share_eng: ratio(sum(cur, "eng_lc"), whole.eng_lc),
@@ -268,14 +268,14 @@ export function rankings(rows: BucketRow[], periods: Period[], f: Filters, names
   return out.sort((a, b) => b.views - a.views || b.posts - a.posts);
 }
 
-type TotalsRow = { bucket: string; posts: number; creators: number; views: number; views_latest: number; too_new: number; eng: number; comments: number; v_rated: number; e_rated: number };
+type TotalsRow = { bucket: string; posts: number; creators: number; views: number; views_latest: number; so_far: number; eng: number; comments: number; v_rated: number; e_rated: number };
 
 /** The headline numbers of one period: views at day 7 with the latest beside them, the rate from the day-7 reading. */
 function pickTotals(rows: TotalsRow[], from: string): Totals {
   const r = rows.find((x) => x.bucket === from);
   return r
-    ? { posts: num(r.posts), creators: num(r.creators), views: num(r.views), views_latest: num(r.views_latest), too_new: num(r.too_new), engagements: num(r.eng), comments: num(r.comments), er: ratio(num(r.e_rated), num(r.v_rated)) }
-    : { posts: 0, creators: 0, views: 0, views_latest: 0, too_new: 0, engagements: 0, comments: 0, er: null };
+    ? { posts: num(r.posts), creators: num(r.creators), views: num(r.views), views_latest: num(r.views_latest), so_far: num(r.so_far), engagements: num(r.eng), comments: num(r.comments), er: ratio(num(r.e_rated), num(r.v_rated)) }
+    : { posts: 0, creators: 0, views: 0, views_latest: 0, so_far: 0, engagements: 0, comments: 0, er: null };
 }
 
 /** Headline totals of the whole panel, each post once: the daily totals' panel rows (brand '*') and creator days. */
@@ -290,7 +290,7 @@ export async function panelTotals(db: SkillDb, ctx: Context, f: Filters, prev: P
   return db.q<TotalsRow>(
     `with t as (
        select to_char(date_trunc(${grain}, day), 'YYYY-MM-DD') as bucket, sum(posts)::int as posts, sum(d7_views)::float8 as views, sum(views)::float8 as views_latest,
-              (sum(posts) - sum(d7_posts))::int as too_new, sum(${lc ? "engagement_lc" : "engagement"})::float8 as eng, sum(comments)::float8 as comments,
+              sum(so_far_posts)::int as so_far, sum(${lc ? "engagement_lc" : "engagement"})::float8 as eng, sum(comments)::float8 as comments,
               sum(${lc ? "d7_rated_lc_views" : "d7_rated_views"})::float8 as v_rated, sum(${lc ? "d7_rated_lc_engagement" : "d7_rated_engagement"})::float8 as e_rated
          from daily_totals where workspace_id = ${ws} and brand_id = '*' and day >= ${from}::date and day <= ${to}::date${platform}
         group by 1
@@ -317,12 +317,12 @@ export async function chosenTotals(db: SkillDb, ctx: Context, f: Filters, prev: 
        select p.item_id, bool_or(p.source = 'earned') as earned from posts p where ${where} group by p.item_id
      ), d as (
        select to_char(date_trunc(${grain}, i.posted_at at time zone ${tz}), 'YYYY-MM-DD') as bucket, i.creator_id, l.earned, i.views as latest, ${eng("i")} as eng,
-              i.comments_count, dd.day_n is not null as d7, dd.views as d7_views, ${eng("dd")} as d7_eng,
+              i.comments_count, coalesce(dd.so_far, false) as so_far, dd.views as d7_views, ${eng("dd")} as d7_eng,
               ${sqlOf(lc ? "engagement_rate_lc" : "engagement_rate", "dd")} as is_rated
          from l join post_items i on i.id = l.item_id left join post_d7 dd on dd.item_id = i.id
      )
      select bucket, count(*)::int as posts, count(distinct creator_id) filter (where earned)::int as creators,
-            coalesce(sum(d7_views), 0)::float8 as views, coalesce(sum(latest), 0)::float8 as views_latest, count(*) filter (where not d7)::int as too_new,
+            coalesce(sum(d7_views), 0)::float8 as views, coalesce(sum(latest), 0)::float8 as views_latest, count(*) filter (where so_far)::int as so_far,
             coalesce(sum(eng), 0)::float8 as eng, coalesce(sum(comments_count), 0)::float8 as comments,
             coalesce(sum(d7_views) filter (where is_rated), 0)::float8 as v_rated, coalesce(sum(d7_eng) filter (where is_rated), 0)::float8 as e_rated
        from d group by 1`,
@@ -470,7 +470,7 @@ export async function topCreators(db: SkillDb, ctx: Context, f: Filters, handles
 }
 
 /**
- * Posts in the period, each once, sorted by views (day 7, then the latest for posts too new), engagement or engagement rate
+ * Posts in the period, each once, sorted by views (day 7, or the latest so far for posts under 7 days old), engagement or engagement rate
  * (from the day-7 reading, posts with views), with keyword or @username search. `url` narrows to one post.
  */
 export async function content(ctx: Context, f: Filters, q: ContentQuery, url?: string): Promise<{ cards: ContentCard[]; total: number }> {
@@ -487,7 +487,7 @@ export async function content(ctx: Context, f: Filters, q: ContentQuery, url?: s
   const erOnly = q.sort === "er" ? ` where rated and views >= ${P.add(ER_MIN_VIEWS)}` : "";
   const lim = P.add(CONTENT_PAGE);
   const off = P.add(q.page * CONTENT_PAGE);
-  const rows = await db.q<{ url: string; platform: string; handle: string | null; posted_at: string; caption: string | null; views: number | null; latest: number | null; engagements: number | null; comments: number | null; d7_eng: number | null; rated: boolean; brands: string; total: number }>(
+  const rows = await db.q<{ url: string; platform: string; handle: string | null; posted_at: string; caption: string | null; views: number | null; latest: number | null; engagements: number | null; comments: number | null; d7_eng: number | null; rated: boolean; so_far: boolean; brands: string; total: number }>(
     `with l as (
        select p.item_id, string_agg(distinct p.brand_id, ',') as brands from posts p where ${where} group by p.item_id
      ), i as (
@@ -497,7 +497,7 @@ export async function content(ctx: Context, f: Filters, q: ContentQuery, url?: s
      ), u as (
        select i.url, i.platform, i.creator_handle as handle, to_char(i.posted_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as posted_at, left(i.caption, 400) as caption,
               dd.views::float8 as views, i.views::float8 as latest, (${sqlOf("engagement", "i")})::float8 as engagements, i.comments_count::float8 as comments,
-              (${sqlOf("engagement", "dd")})::float8 as d7_eng, coalesce(${sqlOf("engagement_rate", "dd")}, false) as rated, l.brands
+              (${sqlOf("engagement", "dd")})::float8 as d7_eng, coalesce(${sqlOf("engagement_rate", "dd")}, false) as rated, coalesce(dd.so_far, false) as so_far, l.brands
          from i join l using (item_id) left join post_d7 dd on dd.item_id = i.item_id
      )
      select *, count(*) over ()::int as total from u${erOnly}
@@ -511,7 +511,7 @@ export async function content(ctx: Context, f: Filters, q: ContentQuery, url?: s
       const views = r.views == null ? null : num(r.views);
       return {
         url: r.url, platform: r.platform, handle: r.handle, posted_at: r.posted_at, caption: unescapeUnicode(r.caption ?? "").replace(/\s+/g, " ").trim(),
-        views, views_latest: num(r.latest), engagements: r.engagements == null ? null : num(r.engagements), comments: num(r.comments),
+        views, views_latest: num(r.latest), so_far: r.so_far, engagements: r.engagements == null ? null : num(r.engagements), comments: num(r.comments),
         er: r.rated && views ? (num(r.d7_eng) / views) * 100 : null,
         brands: (r.brands ?? "").split(",").filter(Boolean),
       };
@@ -588,13 +588,12 @@ export function caveatsFor(cap: { platform: string; bucket: string; days: number
   return out;
 }
 
-/** what "day 7" is in this period: posts too new for it, said once */
+/** what "day 7" is in this period: posts under 7 days old count so far, said once */
 export function dayCaveats(now: Totals): string[] {
-  if (!now.posts || !now.too_new) return [];
-  return [`${int(now.too_new)} of ${int(now.posts)} posts went up less than 7 days before the latest reading: too new for views at day 7, so they count with 0 views there (${compactViews(now.views_latest - now.views)} more views in their latest reading and older posts' later ones).`];
+  if (!now.posts || !now.so_far) return [];
+  return [`${int(now.so_far)} of ${int(now.posts)} posts went up less than 7 days before the latest reading: they count their latest reading so far, so views at day 7 for this period will still grow.`];
 }
 const int = (n: number) => Math.round(n).toLocaleString("en-US");
-const compactViews = (n: number) => (n >= 1e9 ? `${(n / 1e9).toFixed(1)}B` : n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${(n / 1e3).toFixed(1)}K` : String(Math.round(n)));
 
 export async function dashboardData(workspaceId: string, sp: Record<string, string | string[] | undefined>): Promise<DashboardData> {
   const db = new SkillDb();

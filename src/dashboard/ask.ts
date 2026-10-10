@@ -49,7 +49,7 @@ export async function resolveAsk(workspaceId: string, ref: AskRef): Promise<AskC
         : [{ label: `Total ${METRIC_LABEL[metric]}, ${period.label}`, value: metric === "posts" ? int(now as number) : compact(now as number) }, { label: prev.label, value: metric === "posts" ? int(before as number) : compact(before as number) }, { label: "Change", value: changeOr(now as number, before as number) }];
       if (metric === "views") {
         facts.push({ label: "Views (latest)", value: compact(k.now.views_latest) });
-        if (k.now.too_new) facts.push({ label: "Too new for day 7", value: `${int(k.now.too_new)} of ${int(k.now.posts)} posts (counted with 0 views at day 7)` });
+        if (k.now.so_far) facts.push({ label: "So far", value: `${int(k.now.so_far)} of ${int(k.now.posts)} posts are under 7 days old and count their latest reading so far` });
       }
       if (metric === "posts" || metric === "views") {
         const ranked = rankings(rows, periods, f, names).filter((r) => r.prev);
@@ -71,7 +71,7 @@ export async function resolveAsk(workspaceId: string, ref: AskRef): Promise<AskC
         { label: `Share of views (day 7), ${period.label}`, value: pct(row.share_views, 1) },
         { label: "Share of voice (posts)", value: pct(row.share_voice, 1) },
         { label: "Share of engagement", value: pct(row.share_eng, 1) },
-        { label: "Views (day 7)", value: `${compact(row.views)} (${row.prev ? changeOr(row.views, row.prev.views) : "no earlier period"}); latest ${compact(row.views_latest)}${row.too_new ? `, ${int(row.too_new)} posts too new for day 7` : ""}` },
+        { label: "Views (day 7)", value: `${compact(row.views)} (${row.prev ? changeOr(row.views, row.prev.views) : "no earlier period"}); latest ${compact(row.views_latest)}${row.so_far ? `; ${int(row.so_far)} posts under 7 days old count so far` : ""}` },
         { label: "Content", value: `${int(row.posts)} (${row.prev ? changeOr(row.posts, row.prev.posts) : "no earlier period"})` },
         { label: "Creators", value: int(row.creators) },
         { label: "Engagement rate", value: pct(row.er, 2) },
@@ -128,7 +128,7 @@ export async function resolveAsk(workspaceId: string, ref: AskRef): Promise<AskC
       const c = cards[0];
       if (!c) return null;
       return make(`Post by ${c.handle ? `@${c.handle}` : "an unknown account"}`, [
-        { label: "Views (day 7)", value: c.views == null ? "too new: posted less than 7 days before the latest reading" : compact(c.views) },
+        { label: c.so_far ? "Views so far (under 7 days old)" : "Views (day 7)", value: compact(c.views) },
         { label: "Views (latest)", value: compact(c.views_latest) },
         { label: "Engagement", value: c.engagements == null ? "–" : compact(c.engagements) },
         { label: "Engagement rate", value: pct(c.er, 2) },

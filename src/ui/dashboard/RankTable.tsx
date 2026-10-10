@@ -69,7 +69,7 @@ export function RankTable({ rows, base, prevLabel, erFloor }: { rows: RankRow[];
                 </td>
                 <td><span className="pfs">{r.platforms.map((p) => <span key={p} className={`pf ${p}`}>{PLATFORM_SHORT[p] ?? p}</span>)}</span></td>
                 <td className="num strong">{pct(r.share_views, 1)}</td>
-                <td className="num" title={r.too_new ? `${int(r.too_new)} of ${int(r.posts)} posts are too new for day 7` : undefined}>{compact(r.views)}<small>latest {compact(r.views_latest)}</small></td>
+                <td className="num" title={r.so_far ? `${int(r.so_far)} of ${int(r.posts)} posts are under 7 days old and count their latest reading so far` : undefined}>{compact(r.views)}<small>{r.so_far ? "so far · " : ""}latest {compact(r.views_latest)}</small></td>
                 <td className="num">{pct(r.share_voice, 1)}</td>
                 <td className="num">{int(r.posts)}</td>
                 <td className="num">{int(r.creators)}</td>

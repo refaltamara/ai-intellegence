@@ -2,7 +2,8 @@
  * The serving layer (DECISIONS, 10 Oct 2026, step 4): what every screen's numbers are made of, counted once by the
  * definitions in catalog.ts and rebuilt per workspace after every load, every change of relevance, and each night.
  *   post_d7          each post's reading at day 7: the reading nearest day 7 after posting, from any of its links'
- *                    readings; a post that went up less than 7 days before the data's latest reading is too new
+ *                    readings; a post that went up less than 7 days before the data's latest reading counts its
+ *                    latest reading so far
  *   daily_totals     per local day of posting, brand, platform and owned or earned: posts, flags, carts, views,
  *                    engagement (latest and at day 7), and the rated sums rates are made of (posts with views, so a
  *                    video reporting 0 views is out); brand '*' counts each post once
@@ -16,32 +17,42 @@ import { CATALOG_VERSION, sqlOf } from "./catalog";
 const q = async <T>(text: string, params: unknown[] = []) => (await sql.query(text, params)) as T[];
 
 /**
- * The reading nearest day 7; on a tie the later one, then the latest read, then the most views. A post is too new when it
- * went up less than 7 days before the workspace's latest reading (the data's as-of, not the clock, so a rebuild without
- * new data changes nothing). A post whose reading came before day 7 and was never read again keeps that reading.
+ * The reading nearest day 7; on a tie the later one, then the latest read, then the most views. A post that went up less
+ * than 7 days before the workspace's latest reading (the data's as-of, not the clock, so a rebuild without new data
+ * changes nothing) counts its latest reading so far (DECISIONS, 10 Oct 2026: "so far"). A post whose reading came before
+ * day 7 and was never read again keeps that reading.
  */
 const D7_SQL = `
-  with r as (
+  with near as (
     select distinct on (p.item_id) p.item_id, r.day_n, r.read_at, r.views, r.likes, r.comments_count, r.shares, r.saves
       from posts p join post_readings r on r.post_id = p.id
      where p.workspace_id = $1
      order by p.item_id, abs(r.day_n - 7), r.day_n desc, r.read_at desc, r.views desc nulls last
+  ), latest as (
+    select distinct on (p.item_id) p.item_id, r.day_n, r.read_at, r.views, r.likes, r.comments_count, r.shares, r.saves
+      from posts p join post_readings r on r.post_id = p.id
+     where p.workspace_id = $1
+     order by p.item_id, r.read_at desc, r.day_n desc, r.views desc nulls last
   ), asof as (
     select max(r.read_at) as t from posts p join post_readings r on r.post_id = p.id where p.workspace_id = $1
   ), v as (
-    select r.*, i.posted_at <= (select t from asof) - interval '7 days' as ok from r join post_items i on i.id = r.item_id
+    select n.item_id, s.so_far,
+           case when s.so_far then l.day_n else n.day_n end as day_n, case when s.so_far then l.read_at else n.read_at end as read_at,
+           case when s.so_far then l.views else n.views end as views, case when s.so_far then l.likes else n.likes end as likes,
+           case when s.so_far then l.comments_count else n.comments_count end as comments_count,
+           case when s.so_far then l.shares else n.shares end as shares, case when s.so_far then l.saves else n.saves end as saves
+      from near n join latest l using (item_id) join post_items i on i.id = n.item_id
+      cross join lateral (select i.posted_at > (select t from asof) - interval '7 days' as so_far) s
   ), w as (
-    insert into post_d7 (item_id, workspace_id, day_n, read_at, views, likes, comments_count, shares, saves)
-    select item_id, $1, case when ok then day_n end, case when ok then read_at end, case when ok then views end, case when ok then likes end,
-           case when ok then comments_count end, case when ok then shares end, case when ok then saves end
-      from v
-    on conflict (item_id) do update set day_n = excluded.day_n, read_at = excluded.read_at, views = excluded.views, likes = excluded.likes,
-      comments_count = excluded.comments_count, shares = excluded.shares, saves = excluded.saves
-    where (post_d7.day_n, post_d7.read_at, post_d7.views, post_d7.likes, post_d7.comments_count, post_d7.shares, post_d7.saves)
-          is distinct from (excluded.day_n, excluded.read_at, excluded.views, excluded.likes, excluded.comments_count, excluded.shares, excluded.saves)
+    insert into post_d7 (item_id, workspace_id, day_n, so_far, read_at, views, likes, comments_count, shares, saves)
+    select item_id, $1, day_n, so_far, read_at, views, likes, comments_count, shares, saves from v
+    on conflict (item_id) do update set day_n = excluded.day_n, so_far = excluded.so_far, read_at = excluded.read_at, views = excluded.views,
+      likes = excluded.likes, comments_count = excluded.comments_count, shares = excluded.shares, saves = excluded.saves
+    where (post_d7.day_n, post_d7.so_far, post_d7.read_at, post_d7.views, post_d7.likes, post_d7.comments_count, post_d7.shares, post_d7.saves)
+          is distinct from (excluded.day_n, excluded.so_far, excluded.read_at, excluded.views, excluded.likes, excluded.comments_count, excluded.shares, excluded.saves)
     returning 1
   )
-  select (select count(*) from v)::int as posts, (select count(*) from v where not ok)::int as too_new, (select count(*) from w)::int as changed`;
+  select (select count(*) from v)::int as posts, (select count(*) from v where so_far)::int as so_far, (select count(*) from w)::int as changed`;
 
 /** the sums one group of posts gives: `x` carries a post's numbers (latest as i_*, day 7 as d_*), its flag and its cart */
 const SUMS = `
@@ -49,20 +60,20 @@ const SUMS = `
   coalesce(sum(views), 0), coalesce(sum(eng), 0), coalesce(sum(eng_lc), 0), coalesce(sum(comments), 0),
   count(*) filter (where r)::int, coalesce(sum(views) filter (where r), 0), coalesce(sum(eng) filter (where r), 0),
   count(*) filter (where r_lc)::int, coalesce(sum(views) filter (where r_lc), 0), coalesce(sum(eng_lc) filter (where r_lc), 0),
-  count(*) filter (where d7)::int, coalesce(sum(d_views), 0), coalesce(sum(d_eng), 0), coalesce(sum(d_eng_lc), 0),
+  count(*) filter (where d7)::int, count(*) filter (where so_far)::int, coalesce(sum(d_views), 0), coalesce(sum(d_eng), 0), coalesce(sum(d_eng_lc), 0),
   count(*) filter (where d_r)::int, coalesce(sum(d_views) filter (where d_r), 0), coalesce(sum(d_eng) filter (where d_r), 0),
   count(*) filter (where d_r_lc)::int, coalesce(sum(d_views) filter (where d_r_lc), 0), coalesce(sum(d_eng_lc) filter (where d_r_lc), 0)`;
 
 const TOTAL_COLS = `workspace_id, day, brand_id, platform, source, posts, flagged, cart_posts, views, engagement, engagement_lc, comments,
   rated_posts, rated_views, rated_engagement, rated_lc_posts, rated_lc_views, rated_lc_engagement,
-  d7_posts, d7_views, d7_engagement, d7_engagement_lc, d7_rated_posts, d7_rated_views, d7_rated_engagement, d7_rated_lc_posts, d7_rated_lc_views, d7_rated_lc_engagement, definitions`;
+  d7_posts, so_far_posts, d7_views, d7_engagement, d7_engagement_lc, d7_rated_posts, d7_rated_views, d7_rated_engagement, d7_rated_lc_posts, d7_rated_lc_views, d7_rated_lc_engagement, definitions`;
 
 /** a post's numbers by the definitions: i = post_items, d = post_d7 */
 const NUMBERS = `
   i.views, ${sqlOf("engagement", "i")} as eng, ${sqlOf("engagement_lc", "i")} as eng_lc, i.comments_count as comments,
   ${sqlOf("engagement_rate", "i")} as r,
   ${sqlOf("engagement_rate_lc", "i")} as r_lc,
-  d.day_n is not null as d7, d.views as d_views, ${sqlOf("engagement", "d")} as d_eng, ${sqlOf("engagement_lc", "d")} as d_eng_lc,
+  d.item_id is not null as d7, coalesce(d.so_far, false) as so_far, d.views as d_views, ${sqlOf("engagement", "d")} as d_eng, ${sqlOf("engagement_lc", "d")} as d_eng_lc,
   ${sqlOf("engagement_rate", "d")} as d_r,
   ${sqlOf("engagement_rate_lc", "d")} as d_r_lc,
   ${sqlOf("flagged", "i")} as flagged`;
@@ -95,14 +106,14 @@ const CREATORS_SQL = `
    where p.workspace_id = $1 and p.relevant is not false and p.source = 'earned' and i.creator_id is not null
    group by 2, 3, 4, 5`;
 
-export type ServingReport = { workspace: string; posts: number; too_new: number; d7_changed: number; totals: number; creators: number; ms: number };
+export type ServingReport = { workspace: string; posts: number; so_far: number; d7_changed: number; totals: number; creators: number; ms: number };
 
 /** rebuild one workspace's serving rows; readers see the old rows until the new ones are in (one transaction) */
 export async function refreshServing(ws: string): Promise<ServingReport> {
   const started = Date.now();
   const tz = (await q<{ tz: string }>(`select tz from workspaces where id = $1`, [ws]))[0]?.tz;
   if (!tz) throw new Error(`no workspace ${ws}`);
-  const d7 = (await q<{ posts: number; too_new: number; changed: number }>(D7_SQL, [ws]))[0];
+  const d7 = (await q<{ posts: number; so_far: number; changed: number }>(D7_SQL, [ws]))[0];
   const r = (await sql.transaction([
     sql.query(`delete from daily_totals where workspace_id = $1`, [ws]),
     sql.query(`delete from daily_creators where workspace_id = $1`, [ws]),
@@ -110,7 +121,7 @@ export async function refreshServing(ws: string): Promise<ServingReport> {
     sql.query(`with i as (${PANEL_SQL} returning 1) select count(*)::int as n from i`, [ws, tz, CATALOG_VERSION]),
     sql.query(`with i as (${CREATORS_SQL} returning 1) select count(*)::int as n from i`, [ws, tz, CATALOG_VERSION]),
   ])) as unknown as [unknown, unknown, { n: number }[], { n: number }[], { n: number }[]];
-  return { workspace: ws, posts: d7.posts, too_new: d7.too_new, d7_changed: d7.changed, totals: r[2][0].n + r[3][0].n, creators: r[4][0].n, ms: Date.now() - started };
+  return { workspace: ws, posts: d7.posts, so_far: d7.so_far, d7_changed: d7.changed, totals: r[2][0].n + r[3][0].n, creators: r[4][0].n, ms: Date.now() - started };
 }
 
 /** every workspace that has posts, or only those `which` names */
@@ -120,7 +131,7 @@ export async function refreshAll(which: string[] | null = null, log: (s: string)
   for (const { id } of ws) {
     const r = await refreshServing(id);
     out.push(r);
-    log(`${id}: ${r.posts} posts (${r.too_new} too new for day 7, ${r.d7_changed} day-7 readings written), ${r.totals} daily totals, ${r.creators} creator days (${r.ms} ms)`);
+    log(`${id}: ${r.posts} posts (${r.so_far} under 7 days old, counted so far; ${r.d7_changed} day-7 readings written), ${r.totals} daily totals, ${r.creators} creator days (${r.ms} ms)`);
   }
   return out;
 }

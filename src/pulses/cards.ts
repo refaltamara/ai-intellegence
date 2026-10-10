@@ -135,7 +135,7 @@ export async function renderCard(card: CardRow, ctx: Context, shared: Shared): P
       case "kpi": {
         const k = await totals(db, ctx, f, prev);
         const m = card.config.metric ?? "views";
-        return { ...base, data: { kind: "kpi", metric: m, now: k.now[m], prev: k.prev[m], change: k.change[m], sub: m === "posts" ? `${k.now.creators.toLocaleString("en-US")} creators` : m === "views" ? `Views at day 7 · latest ${Math.round(k.now.views_latest).toLocaleString("en-US")}${k.now.too_new ? ` · ${k.now.too_new.toLocaleString("en-US")} posts too new` : ""}` : m === "er" ? "Engagement ÷ views at day 7, posts with views" : f.platform === "all" ? "Likes + comments" : "Platform-native" } };
+        return { ...base, data: { kind: "kpi", metric: m, now: k.now[m], prev: k.prev[m], change: k.change[m], sub: m === "posts" ? `${k.now.creators.toLocaleString("en-US")} creators` : m === "views" ? `Views at day 7${k.now.so_far ? ", so far" : ""} · latest ${Math.round(k.now.views_latest).toLocaleString("en-US")}${k.now.so_far ? ` · ${k.now.so_far.toLocaleString("en-US")} posts under 7 days, counted so far` : ""}` : m === "er" ? "Engagement ÷ views at day 7, posts with views" : f.platform === "all" ? "Likes + comments" : "Platform-native" } };
       }
       case "rankings": {
         const { rows, periods } = await buckets(db, ctx, f);

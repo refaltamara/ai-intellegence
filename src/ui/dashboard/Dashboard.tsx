@@ -95,7 +95,7 @@ function PostCard({ c, base, names }: { c: ContentCard; base: Omit<AskRef, "k">;
       <p>{c.caption || <i className="muted">No caption</i>}</p>
       <div className="tags">{c.brands.slice(0, 3).map((b) => <span key={b} className="tag">{names.get(b) ?? b}</span>)}</div>
       <dl>
-        <div><dt>Views (day 7)</dt><dd title={`Latest reading: ${compact(c.views_latest)}`}>{c.views == null ? "Too new" : compact(c.views)}</dd></div>
+        <div><dt>{c.so_far ? "Views so far" : "Views (day 7)"}</dt><dd title={c.so_far ? "Under 7 days old: its latest reading so far" : `Latest reading: ${compact(c.views_latest)}`}>{compact(c.views)}</dd></div>
         <div><dt>Engagement</dt><dd>{c.engagements == null ? "–" : compact(c.engagements)}</dd></div>
         <div><dt>ER</dt><dd>{pct(c.er, 2)}</dd></div>
       </dl>
@@ -119,7 +119,7 @@ export function Dashboard({ d, content, cq, view }: { d: DashboardData; content:
   const pages = Math.ceil(content.total / CONTENT_PAGE);
   const tiles: { key: "posts" | "views" | "engagements" | "er"; label: string; value: string; sub: string; tone: string }[] = [
     { key: "posts", label: "Total content", value: int(k.now.posts), sub: `${int(k.now.creators)} creators`, tone: "blue" },
-    { key: "views", label: "Views (day 7)", value: compact(k.now.views), sub: `Latest ${compact(k.now.views_latest)}${k.now.too_new ? ` · ${int(k.now.too_new)} posts too new` : ""} · ${compact(k.now.comments)} comments`, tone: "violet" },
+    { key: "views", label: k.now.so_far ? "Views (day 7, so far)" : "Views (day 7)", value: compact(k.now.views), sub: `Latest ${compact(k.now.views_latest)}${k.now.so_far ? ` · ${int(k.now.so_far)} posts under 7 days, counted so far` : ""} · ${compact(k.now.comments)} comments`, tone: "violet" },
     { key: "engagements", label: "Engagement", value: compact(k.now.engagements), sub: engNote, tone: "mint" },
     { key: "er", label: "Engagement rate", value: pct(k.now.er, 2), sub: "Engagement ÷ views at day 7, posts with views", tone: "coral" },
   ];

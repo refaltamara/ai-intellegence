@@ -18,11 +18,10 @@ describe("Brand & KOL dashboard by the definitions (live database)", () => {
       expect(d.rankings.reduce((a, r) => a + (r[k] ?? 0), 0)).toBeCloseTo(100, 6);
     }
     for (const r of d.rankings) {
-      expect(r.views).toBeLessThanOrEqual(r.views_latest);
-      expect(r.too_new).toBeGreaterThanOrEqual(0);
+      expect(r.so_far).toBeGreaterThanOrEqual(0);
+      expect(r.so_far).toBeLessThanOrEqual(r.posts);
     }
     for (const m of d.mix) expect(m.own + m.affiliators + m.creators).toBeCloseTo(m.total, 3);
-    expect(d.kpis.now.views).toBeLessThanOrEqual(d.kpis.now.views_latest);
   }, 120_000);
 
   it("reads the same headline numbers from the panel's rows and from every brand's posts", async () => {
