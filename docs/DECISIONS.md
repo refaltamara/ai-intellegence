@@ -728,6 +728,12 @@ The agreed design is the doc "Core data architecture and model" (https://claude.
   - The first production build failed on the earlier version of the sync, which stopped the build when the store could not be reached. Its logs are only on Vercel, and this session cannot reach Vercel, which is why the outcome now goes to the database instead.
 - **Out of the repository.** Then the repository stops tracking the files: `data/raw/*` is gitignored except this README and the manifest. Old commits still hold them; Refal decides later about the history and the repository's visibility.
 - **Reading them back.** Loaders read a raw file through `readRaw` (`src/raw/store.ts`): the local copy if its hash matches, else the store.
+- **Not stored yet.** The production build on 10 Oct recorded "No Blob store in this environment": the Vercel project has no Blob store connected. The CMS's dump upload needs the same store. Connecting a private Blob store to the project, in all environments, lets the next production build store the files.
+- **Files never in the repository.** Fourteen raw files were never in the repository, and the only copies we know of sit in a Claude session's sandbox:
+  - the Fintech dump: 13 tables, 110 MB, first loaded 3 Oct;
+  - the converted Q3 Instagram file for Beauty: 29 MB, first loaded 6 Oct.
+
+  They are listed in the manifest too, 67 files in all. The production build cannot store them, because they are not in its checkout. They go to the store with `pnpm raw sync`, run where the files and the store's token both are. `/data/raw/*` is gitignored, apart from the README and the manifest, so a raw file cannot be committed by accident.
 - **Commands.**
   - `pnpm raw pull <workspace>` fetches files into `data/raw/`, checked against their hash, for the Python loaders or for analysis.
   - `pnpm raw check` shows where each file is, and what `raw_files` says.
