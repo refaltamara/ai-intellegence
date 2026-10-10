@@ -1,13 +1,13 @@
 /**
  * The daily totals against what they are counted from (src/definitions/totals.ts): every difference is 0 when the
- * serving layer is in step with the core. Also checks them against the Brand & KOL dashboard's own monthly numbers
- * (src/dashboard/data.ts, which counts straight from posts), so a screen moved onto the totals shows what it showed.
+ * serving layer is in step with the core. Also checks them against brand × platform × month posts and views counted
+ * straight from posts, the way the Brand & KOL dashboard counted them before it read the totals (10 Oct 2026), so a
+ * screen moved onto the totals shows what it showed.
  */
 import { sql } from "../db/client";
 import { SkillDb } from "../skills/db";
 import { loadContext } from "../skills/params";
-import { buckets } from "../dashboard/data";
-import { monthOf } from "../dashboard/period";
+import { monthOf, shiftPeriod } from "../dashboard/period";
 import { sqlOf } from "./catalog";
 
 const q = async <T>(text: string, params: unknown[] = []) => (await sql.query(text, params)) as T[];
@@ -20,7 +20,7 @@ export type TotalsCheck = {
   panel_posts: number; panel_views: number; d7_posts: number; d7_views: number;
   /** creator days against the earned links with a creator */
   creator_posts: number;
-  /** the dashboard's brand × platform × month posts and views, nine months back from its latest month */
+  /** brand × platform × month posts and views counted from posts, nine months back from the latest month */
   dashboard: number;
 };
 
@@ -48,15 +48,22 @@ export async function checkTotals(which: string[] | null = null): Promise<Totals
               b.carts - l.carts as carts, pn.posts - it.posts as panel_posts, pn.views - it.views as panel_views, pn.d7_posts - it.d7_posts as d7_posts,
               pn.d7_views - it.d7_views as d7_views, c.posts - l.creator_posts as creator_posts
          from b, pn, l, it, c`, [id]);
-    // the dashboard, counted its own way, month by month
+    // counted straight from posts, month by month, as the dashboard counted before it read the totals
     const db = new SkillDb();
     const ctx = await loadContext(db, id);
-    const { rows } = await buckets(db, ctx, { platform: "all", brands: [], period: monthOf(ctx.asOf) });
-    const from = rows.reduce((m, r) => (r.bucket < m ? r.bucket : m), "9999-12-31");
+    const last = monthOf(ctx.asOf);
+    const from = shiftPeriod(last, -8).from;
+    const rows = await q<{ brand_id: string; platform: string; bucket: string; posts: number; views: number }>(
+      `select p.brand_id, p.platform, to_char(date_trunc('month', p.posted_at at time zone $2), 'YYYY-MM-DD') as bucket, count(*)::int as posts, coalesce(sum(p.views), 0)::float8 as views
+         from posts p
+        where p.workspace_id = $1 and p.relevant is not false
+          and p.posted_at >= ($3::date::timestamp at time zone $2) and p.posted_at < (($4::date + 1)::timestamp at time zone $2)
+        group by 1, 2, 3`,
+      [id, ctx.tz, from, last.to]);
     const mine = await q<{ brand_id: string; platform: string; bucket: string; posts: number; views: number }>(
       `select brand_id, platform, to_char(date_trunc('month', day), 'YYYY-MM-DD') as bucket, sum(posts)::int as posts, sum(views)::float8 as views
          from daily_totals where workspace_id = $1 and brand_id <> '*' and day >= $2::date and day <= $3::date group by 1, 2, 3`,
-      [id, from, monthOf(ctx.asOf).to]);
+      [id, from, last.to]);
     const key = (r: { brand_id: string; platform: string; bucket: string }) => `${r.brand_id}|${r.platform}|${r.bucket}`;
     const theirs = new Map(rows.map((r) => [key(r), r]));
     const ours = new Map(mine.map((r) => [key(r), r]));

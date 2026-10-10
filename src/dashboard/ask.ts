@@ -12,12 +12,12 @@ import { SkillDb } from "../skills/db";
 import { loadContext, type Context } from "../skills/params";
 import type { AskContext, AskRef, Fact, PlatformFilter } from "./askref";
 import { PLATFORM_NAME } from "./askref";
-import { brandHandles, brandFilter, buckets, content, filterQuery, inWindow, Params, rankings, scope, tiers, topCreators, totals, type Filters } from "./data";
+import { brandHandles, buckets, content, filterQuery, Params, rankings, tiers, topCreators, totals, type Filters } from "./data";
 import { parsePeriod, shiftPeriod, weekOf, type Period } from "./period";
 import { resolvePulseAsk } from "../pulse/ask";
 
 const PLATFORM_LABEL: Record<PlatformFilter, string> = { all: "All platforms", tiktok: "TikTok", instagram: "Instagram", threads: "Threads", x: "X", youtube: "YouTube" };
-const METRIC_LABEL = { posts: "content", views: "views", engagements: "engagement", er: "engagement rate" } as const;
+const METRIC_LABEL = { posts: "content", views: "views (day 7)", engagements: "engagement", er: "engagement rate" } as const;
 
 const up = (n: number | null | undefined) => (n == null ? "moved" : n >= 0 ? "rise" : "fall");
 const changeOr = (now: number, prev: number | null | undefined) => (prev == null ? "no earlier period" : changeText(now, prev));
@@ -47,6 +47,10 @@ export async function resolveAsk(workspaceId: string, ref: AskRef): Promise<AskC
       const facts: Fact[] = metric === "er"
         ? [{ label: `Engagement rate, ${period.label}`, value: pct(now as number | null, 2) }, { label: prev.label, value: pct(before as number | null, 2) }, { label: "Change", value: pts(now as number | null, before as number | null, 2) }]
         : [{ label: `Total ${METRIC_LABEL[metric]}, ${period.label}`, value: metric === "posts" ? int(now as number) : compact(now as number) }, { label: prev.label, value: metric === "posts" ? int(before as number) : compact(before as number) }, { label: "Change", value: changeOr(now as number, before as number) }];
+      if (metric === "views") {
+        facts.push({ label: "Views (latest)", value: compact(k.now.views_latest) });
+        if (k.now.too_new) facts.push({ label: "Too new for day 7", value: `${int(k.now.too_new)} of ${int(k.now.posts)} posts (counted with 0 views at day 7)` });
+      }
       if (metric === "posts" || metric === "views") {
         const ranked = rankings(rows, periods, f, names).filter((r) => r.prev);
         const key = metric;
@@ -64,7 +68,10 @@ export async function resolveAsk(workspaceId: string, ref: AskRef): Promise<AskC
       const row = rankings(rows, periods, { ...f, brands: [ref.brand] }, names)[0];
       if (!row) return null;
       const facts: Fact[] = [
-        { label: `Views, ${period.label}`, value: `${compact(row.views)} (${row.prev ? changeOr(row.views, row.prev.views) : "no earlier period"})` },
+        { label: `Share of views (day 7), ${period.label}`, value: pct(row.share_views, 1) },
+        { label: "Share of voice (posts)", value: pct(row.share_voice, 1) },
+        { label: "Share of engagement", value: pct(row.share_eng, 1) },
+        { label: "Views (day 7)", value: `${compact(row.views)} (${row.prev ? changeOr(row.views, row.prev.views) : "no earlier period"}); latest ${compact(row.views_latest)}${row.too_new ? `, ${int(row.too_new)} posts too new for day 7` : ""}` },
         { label: "Content", value: `${int(row.posts)} (${row.prev ? changeOr(row.posts, row.prev.posts) : "no earlier period"})` },
         { label: "Creators", value: int(row.creators) },
         { label: "Engagement rate", value: pct(row.er, 2) },
@@ -85,7 +92,7 @@ export async function resolveAsk(workspaceId: string, ref: AskRef): Promise<AskC
       return make(`${band.label} creators`, [
         { label: `Creators, ${period.label}`, value: `${int(t.creators)} (${pct(t.share_pct)} of creators; ${changeOr(t.creators, p.creators)} vs ${prev.label})` },
         { label: "Content", value: `${int(t.posts)} (${changeOr(t.posts, p.posts)})` },
-        { label: "Views", value: `${compact(t.views)} (${changeOr(t.views, p.views)})` },
+        { label: "Views (day 7)", value: `${compact(t.views)} (${changeOr(t.views, p.views)})` },
         { label: "Engagement rate", value: pct(t.er, 2) },
       ], `What are ${band.label.toLowerCase()} creators doing in ${period.label}, which brands use them most, and what works?`);
     }
@@ -100,7 +107,7 @@ export async function resolveAsk(workspaceId: string, ref: AskRef): Promise<AskC
       const avgViews = before.length ? before.reduce((a, x) => a + x.views, 0) / before.length : null;
       return make(`${nameOf(ref.brand)}, week of ${week.label}`, [
         { label: "Content that week", value: `${int(cur.posts)} (${avg == null ? "no earlier weeks" : `${changeOr(cur.posts, avg)} vs its ${before.length}-week average of ${int(avg)}`})` },
-        { label: "Views that week", value: `${compact(cur.views)} (${avgViews == null ? "no earlier weeks" : `${changeOr(cur.views, avgViews)} vs average`})` },
+        { label: "Views (day 7) that week", value: `${compact(cur.views)} (${avgViews == null ? "no earlier weeks" : `${changeOr(cur.views, avgViews)} vs average`})` },
         { label: "Creators", value: int(cur.creators) },
       ], `What happened with ${nameOf(ref.brand)} in the week of ${week.label}?`);
     }
@@ -110,7 +117,7 @@ export async function resolveAsk(workspaceId: string, ref: AskRef): Promise<AskC
       if (!r) return null;
       return make(`@${r.handle}`, [
         { label: `Content, ${period.label}`, value: int(r.posts) },
-        { label: "Views", value: compact(r.views) },
+        { label: "Views (day 7)", value: compact(r.views) },
         { label: "Comments", value: int(r.comments) },
         { label: "Followers", value: r.followers == null ? "unknown" : compact(r.followers) },
         { label: "Posted for", value: r.brands.slice(0, 4).map(nameOf).join(", ") || "–" },
@@ -121,7 +128,8 @@ export async function resolveAsk(workspaceId: string, ref: AskRef): Promise<AskC
       const c = cards[0];
       if (!c) return null;
       return make(`Post by ${c.handle ? `@${c.handle}` : "an unknown account"}`, [
-        { label: "Views", value: compact(c.views) },
+        { label: "Views (day 7)", value: c.views == null ? "too new: posted less than 7 days before the latest reading" : compact(c.views) },
+        { label: "Views (latest)", value: compact(c.views_latest) },
         { label: "Engagement", value: c.engagements == null ? "–" : compact(c.engagements) },
         { label: "Engagement rate", value: pct(c.er, 2) },
         { label: "Brands", value: c.brands.map(nameOf).join(", ") },
@@ -132,16 +140,24 @@ export async function resolveAsk(workspaceId: string, ref: AskRef): Promise<AskC
   }
 }
 
-/** One brand's weekly content and views for the week asked about and up to four weeks before it. */
+/** One brand's weekly content, views (day 7) and creators for the week asked about and up to four weeks before it (daily totals). */
 async function brandWeeks(db: SkillDb, ctx: Context, f: Filters, brand: string, week: Period): Promise<{ week: string; posts: number; views: number; creators: number }[]> {
   const first = shiftPeriod(week, -4);
   const P = new Params();
-  const tz = P.add(ctx.tz);
-  const where = `${scope(ctx.workspaceId, f, P)} and ${inWindow(first.from, week.to, ctx.tz, P)}${brandFilter([brand], P)}`;
+  const platform = f.platform === "all" ? "" : ` and platform = ${P.add(f.platform)}`;
+  const ws = P.add(ctx.workspaceId);
+  const b = P.add(brand);
+  const from = P.add(first.from);
+  const to = P.add(week.to);
   const rows = await db.q<{ week: string; posts: number; views: number; creators: number }>(
-    `select to_char(date_trunc('week', p.posted_at at time zone ${tz}), 'YYYY-MM-DD') as week, count(*)::int as posts,
-            coalesce(sum(p.views), 0)::float8 as views, count(distinct p.creator_id)::int as creators
-     from posts p where ${where} group by 1`,
+    `with t as (
+       select to_char(date_trunc('week', day), 'YYYY-MM-DD') as week, sum(posts)::int as posts, sum(d7_views)::float8 as views
+         from daily_totals where workspace_id = ${ws} and brand_id = ${b} and day >= ${from}::date and day <= ${to}::date${platform} group by 1
+     ), c as (
+       select to_char(date_trunc('week', day), 'YYYY-MM-DD') as week, count(distinct creator_id)::int as creators
+         from daily_creators where workspace_id = ${ws} and brand_id = ${b} and day >= ${from}::date and day <= ${to}::date${platform} group by 1
+     )
+     select t.*, coalesce(c.creators, 0)::int as creators from t left join c using (week)`,
     P.values,
   );
   const weeks = Array.from({ length: 5 }, (_, i) => shiftPeriod(week, i - 4).from);
