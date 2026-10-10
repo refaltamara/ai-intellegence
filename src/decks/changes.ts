@@ -21,7 +21,7 @@ import { by, signal } from "../learning/signals";
 import { nextRun } from "./generate";
 import { DECK_TEMPLATES } from "./templates";
 import { getDeck, updateDeck, type DeckRow } from "./store";
-import type { DeckSpec, FindingSpec } from "./spec";
+import { roleOfSpec, type DeckSpec, type FindingSpec } from "./spec";
 import type { RecipeSpec } from "../recipes/spec";
 
 export type DeckChange = {
@@ -44,7 +44,7 @@ export type ChangeLine = { sign: "+" | "−" | "=" | "→"; text: string; note?:
 export type DeckChangeProposal = { deck_id: string; deck_name: string; change: DeckChange; lines: ChangeLine[]; dropped: string[]; template: boolean; team_template: boolean; builder: boolean };
 export type DeckPreview = { spec: DeckSpec; name: string; recurring: boolean; lines: ChangeLine[]; dropped: string[]; changed: boolean };
 
-export const roleOfSpec = (spec: DeckSpec): RoleId => (spec.rep ? "pr" : spec.social ? "social" : "brand_kol");
+export { roleOfSpec };
 
 /** The role's slide library for this deck. */
 export function libraryOf(spec: DeckSpec): { kind: string; title: string }[] {

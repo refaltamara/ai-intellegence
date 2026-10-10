@@ -1,9 +1,9 @@
-import { EvidenceList, POST_COLS, Where, aggregateEvidence, postEvidence, windowCaveats } from "./common";
+import { D7, ENGAGEMENT, EvidenceList, POST_COLS, RATED, Where, aggregateEvidence, postEvidence, windowCaveats } from "./common";
 import { previousWindow, resolveBrands, resolvePlatforms, resolveWindow, type Window } from "./params";
 import type { SkillImpl } from "./runner";
 import type { ChartSpec, Row } from "./types";
 
-type Agg = { brand_id: string; source: string; posts: number; creators: number; views: number; engagements: number; comments_count: number; cart_posts: number; tiktok_posts: number };
+type Agg = { brand_id: string; source: string; posts: number; creators: number; views: number; engagements: number; comments_count: number; rated_views: number; rated_engagements: number; cart_posts: number; tiktok_posts: number };
 
 /** /compare — brands side by side on volume, creators, views, engagements, cart share and share of voice. */
 export const compare: SkillImpl = async (db, ctx, _def, params) => {
@@ -18,13 +18,14 @@ export const compare: SkillImpl = async (db, ctx, _def, params) => {
     const wh = new Where().workspace(ctx).window(win, ctx).platforms(platforms).brands(brands);
     const rows = await db.q<Agg>(
       `select p.brand_id, ${split ? "p.source" : "'all'"} as source, count(*)::int as posts, count(distinct p.creator_id)::int as creators,
-              sum(p.views)::float8 as views, sum(p.engagements)::float8 as engagements, sum(p.comments_count)::float8 as comments_count,
+              sum(d7.views)::float8 as views, sum(${ENGAGEMENT})::float8 as engagements, sum(d7.comments_count)::float8 as comments_count,
+              coalesce(sum(d7.views) filter (where ${RATED}), 0)::float8 as rated_views, coalesce(sum(${ENGAGEMENT}) filter (where ${RATED}), 0)::float8 as rated_engagements,
               count(*) filter (where p.has_cart)::int as cart_posts, count(*) filter (where p.platform = 'tiktok')::int as tiktok_posts
-       from posts p where ${wh.sql} group by 1, 2`,
+       from posts p ${D7} where ${wh.sql} group by 1, 2`,
       wh.params,
     );
     const tw = new Where().workspace(ctx).window(win, ctx).platforms(platforms);
-    const tot = await db.one<{ posts: number; views: number }>(`select count(*)::int as posts, sum(views)::float8 as views from posts p where ${tw.sql}`, tw.params);
+    const tot = await db.one<{ posts: number; views: number }>(`select count(*)::int as posts, coalesce(sum(d7.views), 0)::float8 as views from posts p ${D7} where ${tw.sql}`, tw.params);
     return { rows, total: tot ?? { posts: 0, views: 0 } };
   };
 
@@ -37,6 +38,8 @@ export const compare: SkillImpl = async (db, ctx, _def, params) => {
 
   const brandPosts = new Map<string, number>();
   for (const r of cur.rows) brandPosts.set(r.brand_id, (brandPosts.get(r.brand_id) ?? 0) + r.posts);
+  const brandViews = new Map<string, number>();
+  for (const r of cur.rows) brandViews.set(r.brand_id, (brandViews.get(r.brand_id) ?? 0) + (r.views ?? 0));
   const prevBrandPosts = new Map<string, number>();
   for (const r of prev?.rows ?? []) prevBrandPosts.set(r.brand_id, (prevBrandPosts.get(r.brand_id) ?? 0) + r.posts);
 
@@ -49,12 +52,14 @@ export const compare: SkillImpl = async (db, ctx, _def, params) => {
       if (!r && s === "owned") continue; // Instagram has no owned posts
       const p = prevMap.get(`${b}|${s}`);
       const sov = pct(brandPosts.get(b) ?? 0, cur.total.posts);
+      const shareViews = pct(brandViews.get(b) ?? 0, cur.total.views);
       const prevSov = prev ? pct(prevBrandPosts.get(b) ?? 0, prev.total.posts) : null;
       const row: Row = {
         brand_id: b, source: s,
         posts: r?.posts ?? 0, creators: r?.creators ?? 0, views: r?.views ?? 0, engagements: r?.engagements ?? 0, comments_count: r?.comments_count ?? 0,
-        er_pct: r ? pct(r.engagements, r.views, 4) : null,
-        share_of_voice_pct: sov, cart_share_pct: r && r.tiktok_posts > 0 ? pct(r.cart_posts, r.tiktok_posts) : null,
+        // over the posts that can carry a rate (definition engagement_rate)
+        er_pct: r ? pct(r.rated_engagements, r.rated_views, 4) : null,
+        share_of_voice_pct: sov, share_of_views_pct: shareViews, cart_share_pct: r && r.tiktok_posts > 0 ? pct(r.cart_posts, r.tiktok_posts) : null,
         positive_pct: null, negative_pct: null, top_topics: null,
       };
       if (prev) {
@@ -64,7 +69,7 @@ export const compare: SkillImpl = async (db, ctx, _def, params) => {
         row.creators_delta_pct = delta(r?.creators ?? 0, p?.creators ?? 0);
         row.share_of_voice_delta_pts = sov != null && prevSov != null ? Math.round((sov - prevSov) * 100) / 100 : null;
       }
-      const id = ev.push((eid) => aggregateEvidence(eid, `posts where brand_id=${b} source=${s} window ${w.from}..${w.to}`, `${b} · ${s} · ${w.label}`, { posts: row.posts as number, creators: row.creators as number, views: row.views as number, engagements: row.engagements as number, share_of_voice_pct: sov, cart_share_pct: row.cart_share_pct as number | null }));
+      const id = ev.push((eid) => aggregateEvidence(eid, `posts where brand_id=${b} source=${s} window ${w.from}..${w.to}`, `${b} · ${s} · ${w.label}`, { posts: row.posts as number, creators: row.creators as number, views: row.views as number, engagements: row.engagements as number, share_of_voice_pct: sov, share_of_views_pct: shareViews, cart_share_pct: row.cart_share_pct as number | null }));
       row.evidence_ids = id ? [id] : [];
       rows.push(row);
     }
@@ -72,7 +77,7 @@ export const compare: SkillImpl = async (db, ctx, _def, params) => {
 
   const pw = new Where().workspace(ctx).window(w, ctx).platforms(platforms).brands(brands);
   const top = await db.q<Row>(
-    `select * from (select ${POST_COLS}, row_number() over (partition by p.brand_id order by p.views desc nulls last) as rn from posts p where ${pw.sql}) s where rn <= 3 order by brand_id, rn`,
+    `select * from (select ${POST_COLS}, row_number() over (partition by p.brand_id order by d7.views desc nulls last) as rn from posts p ${D7} where ${pw.sql}) s where rn <= 3 order by brand_id, rn`,
     pw.params,
   );
   for (const t of top) {
@@ -99,12 +104,12 @@ export const compare: SkillImpl = async (db, ctx, _def, params) => {
 
   return {
     params_resolved: { ...params, brands, window: { from: w.from, to: w.to }, platform: params.platform ?? "all", split_owned_earned: split, compare_prev: comparePrev },
-    summary: { window: w.label, previous_window: prev ? previousWindow(w).label : null, workspace_posts_in_window: cur.total.posts, brands: Object.fromEntries(brands.map((b) => [b, { posts: brandPosts.get(b) ?? 0, share_of_voice_pct: pct(brandPosts.get(b) ?? 0, cur.total.posts) }])) },
+    summary: { window: w.label, previous_window: prev ? previousWindow(w).label : null, workspace_posts_in_window: cur.total.posts, brands: Object.fromEntries(brands.map((b) => [b, { posts: brandPosts.get(b) ?? 0, share_of_voice_pct: pct(brandPosts.get(b) ?? 0, cur.total.posts), share_of_views_pct: pct(brandViews.get(b) ?? 0, cur.total.views) }])) },
     rows,
     chart,
     evidence: ev.list,
     matched: rows.length,
     data_window: { from: w.from, to: w.to },
-    caveats: [...windowCaveats(w, platforms), "Share of voice = the brand's share of all tracked posts on the selected platform(s) in the window. Owned vs earned exists on TikTok only. Sentiment and topics arrive in Phase 2."],
+    caveats: [...windowCaveats(w, platforms), "Share of voice = the brand's share of all tracked posts on the selected platform(s) in the window; share of views = its share of their views at day 7. Owned vs earned exists on TikTok only. Sentiment and topics arrive in Phase 2."],
   };
 };

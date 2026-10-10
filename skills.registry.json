@@ -149,7 +149,7 @@
               "median_views"
             ],
             "default": "views",
-            "description": "views = total views across the creator's posts in the window (default); avg_views = per post; comment_rate/er_pct are rates on views; views_per_1k normalises by followers"
+            "description": "views = total views at day 7 across the creator's posts in the window (default); avg_views = per post with views; comment_rate/er_pct are rates on views; views_per_1k normalises by followers"
           },
           "min_followers": {
             "type": "integer",
@@ -165,7 +165,7 @@
             "type": "integer",
             "default": 1000,
             "minimum": 0,
-            "description": "Minimum total views across the creator's posts in the window; keeps rate rankings (comment_rate, er_pct) from surfacing accounts with a few hundred views"
+            "description": "Minimum total views at day 7 across the creator's posts in the window; keeps rate rankings (comment_rate, er_pct) from surfacing accounts with a few hundred views"
           }
         },
         "required": [],
@@ -180,6 +180,7 @@
         "posts",
         "creators"
       ],
+      "views": "views_d7",
       "activity": {
         "start": "Looking through {creator_count} creators",
         "steps": [
@@ -262,6 +263,7 @@
         "posts",
         "creators"
       ],
+      "views": "views_d7",
       "activity": {
         "start": "Checking who has worked for more than one brand",
         "steps": [
@@ -353,6 +355,7 @@
         "posts",
         "creators"
       ],
+      "views": "views_d7",
       "activity": {
         "start": "Looking for creators who came back",
         "steps": [
@@ -461,6 +464,7 @@
         "posts",
         "creators"
       ],
+      "views": "views_d7",
       "platforms": [
         "tiktok"
       ],
@@ -570,6 +574,7 @@
         "posts",
         "creators"
       ],
+      "views": "views_d7",
       "activity": {
         "start": "Scanning small accounts for outsized reach",
         "steps": [
@@ -663,6 +668,7 @@
         "posts",
         "creators"
       ],
+      "views": "views_d7",
       "activity": {
         "start": "Working out where reach and carts come from",
         "steps": [
@@ -1001,6 +1007,7 @@
         "posts",
         "creators"
       ],
+      "views": "views_d7",
       "activity": {
         "start": "Looking for sudden creator surges",
         "steps": [
@@ -1015,7 +1022,7 @@
       "phase": 1,
       "first_release": true,
       "title": "Top content",
-      "description": "Best posts by views, comment rate, or engagement rate, filtered by brand, affiliate (cart) tag, content format, product category, tier and platform. The evidence is the posts themselves.",
+      "description": "Best posts by views at day 7, comment rate, or engagement rate, filtered by brand, affiliate (cart) tag, content format, product category, tier and platform. The evidence is the posts themselves.",
       "example": "Most performing content with affiliate tags last month",
       "input_schema": {
         "type": "object",
@@ -1134,6 +1141,7 @@
       "requires": [
         "posts"
       ],
+      "views": "views_d7",
       "activity": {
         "start": "Sorting {post_count} posts by performance",
         "steps": [
@@ -1147,7 +1155,7 @@
       "layer": "brands",
       "phase": 1,
       "title": "Brand compare",
-      "description": "Any brands side by side on volume, creators, views, engagements, cart share, and (Phase 2) sentiment and top comment topics. Owned and earned reported separately.",
+      "description": "Any brands side by side on volume, creators, views at day 7, engagements, share of voice and share of views, cart share, and (Phase 2) sentiment and top comment topics. Owned and earned reported separately.",
       "example": "My brand vs Skintific, Somethinc and Emina, last 30 days",
       "input_schema": {
         "type": "object",
@@ -1228,6 +1236,7 @@
         "posts",
         "creators"
       ],
+      "views": "views_d7",
       "phase2_columns": [
         "positive_pct",
         "negative_pct",
@@ -1331,6 +1340,7 @@
         "posts",
         "creators"
       ],
+      "views": "views_d7",
       "phase2_columns": [
         "top_questions",
         "topics"
@@ -1427,6 +1437,7 @@
         "posts",
         "creators"
       ],
+      "views": "views_d7",
       "activity": {
         "start": "Reading a month of the brand's activity",
         "steps": [
@@ -1442,7 +1453,7 @@
       "phase": 1,
       "first_release": true,
       "title": "Hashtag leaderboard",
-      "description": "Top and rising hashtags for a brand, a platform or the whole category, ranked by views with the change against the previous window of the same length. Reach tags (fyp, viral) are excluded by default.",
+      "description": "Top and rising hashtags for a brand, a platform or the whole category, ranked by views at day 7 with the change against the previous window of the same length. Reach tags (fyp, viral) are excluded by default.",
       "example": "What hashtags is Wardah pushing this month, and which are rising across the category?",
       "input_schema": {
         "type": "object",
@@ -1543,6 +1554,7 @@
       "requires": [
         "posts"
       ],
+      "views": "views_d7",
       "activity": {
         "start": "Reading hashtags across {post_count} posts",
         "steps": [
@@ -1647,6 +1659,7 @@
         "posts",
         "creators"
       ],
+      "views": "views_d7",
       "activity": {
         "start": "Looking for hashtags that cluster on one brand",
         "steps": [
@@ -1770,6 +1783,7 @@
       "requires": [
         "posts"
       ],
+      "views": "views_d7",
       "activity": {
         "start": "Reading captions for what they claim",
         "steps": [
@@ -1882,6 +1896,7 @@
       "requires": [
         "posts"
       ],
+      "views": "views_d7",
       "activity": {
         "start": "Reading tagged products",
         "steps": [
@@ -1975,6 +1990,7 @@
       "requires": [
         "posts"
       ],
+      "views": "views_d7",
       "activity": {
         "start": "Comparing hashtag sets between brands",
         "steps": [
@@ -2234,6 +2250,7 @@
         "comments",
         "posts"
       ],
+      "views": "views_latest",
       "activity": {
         "start": "Lining up every post by the comments it drew",
         "steps": [

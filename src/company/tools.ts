@@ -13,6 +13,7 @@ import { COMMENT_GROUP_BY, COMMENT_METRICS, ENTITIES, GROUP_BY, METRICS } from "
 import { FILTER_SCHEMA } from "../chat/tools";
 import { RECIPE_PARAMS, type RecipeInput, type RecipeSpec } from "../recipes/spec";
 import { runRecipe } from "../recipes/run";
+import { ROLE_VIEWS } from "../definitions/catalog";
 import { SECTIONS } from "../dashboard/sections";
 import { templatesFor } from "../decks/templates";
 import { SLIDES } from "../competitor/slides";
@@ -331,7 +332,7 @@ export async function executeTeamTool(name: string, input: Record<string, unknow
     };
   }
   if (kind === "skill") {
-    const r = await runRecipe(c.spec as unknown as RecipeSpec, {} as RecipeInput, ctx.ws).catch((e) => ({ status: "error", message: (e as Error).message, rows: [], evidence: [], meta: {} }) as unknown as Awaited<ReturnType<typeof runRecipe>>);
+    const r = await runRecipe(c.spec as unknown as RecipeSpec, {} as RecipeInput, ctx.ws, { views: ROLE_VIEWS[ctx.role.id] }).catch((e) => ({ status: "error", message: (e as Error).message, rows: [], evidence: [], meta: {} }) as unknown as Awaited<ReturnType<typeof runRecipe>>);
     return {
       content: JSON.stringify({ status: "drafted", title: c.title, tried: { status: r.status, message: r.message, rows: r.rows.slice(0, 10), rows_total: r.rows.length }, note: `Drafted and tried on the team's data; ${next} Say what it shows in one or two sentences, citing evidence ids from the try.` }),
       isError: false,

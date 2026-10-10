@@ -20,6 +20,7 @@ import type { RoleId, RoleModel } from "./model";
 import { recipesFor, fairRecipes } from "../recipes/store";
 import { validateRecipe } from "../recipes/spec";
 import { runRecipe } from "../recipes/run";
+import { ROLE_VIEWS } from "../definitions/catalog";
 import { hasModelCredentials } from "../chat/loop";
 
 export type TestKind = "guard" | "screen" | "question";
@@ -154,7 +155,7 @@ async function screen(check: "dashboard" | "recipes", ws: string, spec: RoleMode
     const out: Record<string, unknown> = {};
     let failed = false;
     for (const r of list) {
-      const res = await runRecipe(r, {}, ws);
+      const res = await runRecipe(r, {}, ws, { views: ROLE_VIEWS[spec.id] });
       out[r.key] = { status: res.status, rows: res.rows.length, message: res.message };
       if (res.status !== "ok" || res.rows.some((row) => !(row.evidence_ids as unknown[] | undefined)?.length)) failed = true;
     }

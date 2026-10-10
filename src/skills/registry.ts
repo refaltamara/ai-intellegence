@@ -19,6 +19,8 @@ export type SkillDef = {
   requires: string[];
   platforms?: string[];
   gate?: { platforms_present?: string[] };
+  /** which views the skill counts (src/definitions/catalog.ts): at day 7, the default, or the latest reading where its role reads reach */
+  views?: "views_d7" | "views_latest";
   /** plain-language progress lines shown while the skill runs; templated with {creator_count} {post_count} {brand_count} {matched} {n} */
   activity?: { start: string; steps: string[]; done: string };
   [k: string]: unknown;

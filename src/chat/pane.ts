@@ -208,7 +208,8 @@ export function describeParams(p: Record<string, unknown>, names: Record<string,
 const LABELS: Record<string, string> = {
   creator_handle: "Creator", brand_id: "Brand", brand_a: "Brand A", brand_b: "Brand B", platform: "Platform", tier: "Tier", followers: "Followers", posts: "Posts", creators: "Creators", views: "Views",
   avg_views: "Avg views per post", median_views: "Median views", engagements: "Engagements", er_pct: "Engagement rate (%)", comment_rate_pct: "Comment rate (%)", cart_pct: "Cart share (%)", cart_share_pct: "Cart share (%)",
-  share_of_voice_pct: "Share of voice (%)", views_per_1k: "Views per 1k followers", for_you: "For you", used_by: "Worked for", last_brand_post_at: "Last brand post", brand_count: "Brands worked for", url: "URL",
+  share_of_voice_pct: "Share of voice (%)", share_of_views_pct: "Share of views (%)", share_of_voice: "Share of voice (%)", share_of_views: "Share of views (%)",
+  sum_views: "Views (day 7)", sum_views_latest: "Views (latest)", views_per_1k: "Views per 1k followers", for_you: "For you", used_by: "Worked for", last_brand_post_at: "Last brand post", brand_count: "Brands worked for", url: "URL",
   posted_at: "Posted", caption: "Caption", hashtag: "Hashtag", theme: "Theme", product: "Product", week: "Week", month: "Month", multiple: "Multiple", in_wave: "In wave", jaccard: "Overlap (Jaccard)", shared_creators: "Shared creators",
 };
 export function columnLabel(key: string): string {

@@ -1,5 +1,5 @@
 import { GENERIC_HASHTAGS } from "../config/hashtags";
-import { EvidenceList, POST_COLS, Where, aggregateEvidence, postEvidence, windowCaveats } from "./common";
+import { D7, EvidenceList, POST_COLS, Where, aggregateEvidence, postEvidence, windowCaveats } from "./common";
 import { limitOf, resolveBrand, resolveBrands, resolvePlatforms, resolveWindow } from "./params";
 import type { SkillImpl } from "./runner";
 import type { Row } from "./types";
@@ -24,8 +24,8 @@ export const hashtagOverlap: SkillImpl = async (db, ctx, _def, params) => {
   const pLimit = wh.next(limit);
   const rows = await db.q<Row>(
     `with bt as (
-       select p.brand_id, h as tag, count(*)::int as posts, sum(p.views)::float8 as views
-       from posts p, unnest(p.hashtags) h
+       select p.brand_id, h as tag, count(*)::int as posts, sum(d7.views)::float8 as views
+       from posts p ${D7}, unnest(p.hashtags) h
        where ${wh.sql} and h <> all(${pGeneric}::text[])
        group by 1, 2 having count(*) >= ${pMinTag}
      ), bc as (select brand_id, count(*)::int as tags, sum(posts)::int as tag_posts from bt group by 1),
@@ -89,8 +89,8 @@ export const hashtagOverlap: SkillImpl = async (db, ctx, _def, params) => {
     const pKeys = ew.next(lead.flatMap((r) => { const tag = (r.shared_list as string[])[0]; return [`${r.brand_a}|${tag}`, `${r.brand_b}|${tag}`]; }));
     const posts = await db.q<Row>(
       `select * from (
-         select ${POST_COLS}, h as tag, p.brand_id || '|' || h as key, row_number() over (partition by p.brand_id, h order by p.views desc nulls last) as rn
-         from posts p, unnest(p.hashtags) h where ${ew.sql} and (p.brand_id || '|' || h) = any(${pKeys}::text[])
+         select ${POST_COLS}, h as tag, p.brand_id || '|' || h as key, row_number() over (partition by p.brand_id, h order by d7.views desc nulls last) as rn
+         from posts p ${D7}, unnest(p.hashtags) h where ${ew.sql} and (p.brand_id || '|' || h) = any(${pKeys}::text[])
        ) s where rn = 1`,
       ew.params,
     );

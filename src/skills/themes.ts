@@ -1,5 +1,5 @@
 import { THEMES, THEME_GROUPS, themeQuery, type Theme } from "../config/themes";
-import { EvidenceList, POST_COLS, Where, aggregateEvidence, postEvidence, windowCaveats } from "./common";
+import { D7, EvidenceList, POST_COLS, Where, aggregateEvidence, postEvidence, windowCaveats } from "./common";
 import { limitOf, ParamError, resolveBrands, resolvePlatforms, resolveWindow } from "./params";
 import type { SkillImpl } from "./runner";
 import type { ChartSpec, Row } from "./types";
@@ -31,15 +31,15 @@ export const themes: SkillImpl = async (db, ctx, _def, params) => {
      tot as (
        select count(distinct (p.platform, p.url))::float8 as posts_all, sum(p.views) filter (where rn = 1)::float8 as views_all,
               count(distinct (p.platform, p.url)) filter (where in_brand)::float8 as posts_brand, sum(p.views) filter (where in_brand and rn = 1)::float8 as views_brand
-       from (select p.platform, p.url, p.views, (${pBrands}::text[] is null or p.brand_id = any(${pBrands}::text[])) as in_brand,
+       from (select p.platform, p.url, d7.views, (${pBrands}::text[] is null or p.brand_id = any(${pBrands}::text[])) as in_brand,
                     row_number() over (partition by p.platform, p.url order by p.brand_id) as rn
-             from posts p where ${wh.sql}) p
+             from posts p ${D7} where ${wh.sql}) p
      ), m as (
        select tq.theme, tq.ord, x.platform, x.url, x.brand_id, x.creator_id, x.views,
               (${pBrands}::text[] is null or x.brand_id = any(${pBrands}::text[])) as in_brand,
               row_number() over (partition by tq.theme, x.platform, x.url order by x.brand_id) as rn
        from tq cross join lateral (
-         select p.platform, p.url, p.brand_id, p.creator_id, p.views from posts p
+         select p.platform, p.url, p.brand_id, p.creator_id, d7.views from posts p ${D7}
          where ${wh.sql} and p.caption_tsv @@ to_tsquery('simple', tq.q)
        ) x
      ), per as (
@@ -80,8 +80,8 @@ export const themes: SkillImpl = async (db, ctx, _def, params) => {
     const posts = await db.q<Row>(
       `select s.* from unnest(${pK}::text[], ${pQ}::text[]) as t(theme, q)
        cross join lateral (
-         select ${POST_COLS}, t.theme as theme from posts p where ${ew.sql} and p.caption_tsv @@ to_tsquery('simple', t.q)
-         order by p.views desc nulls last limit ${pPer}
+         select ${POST_COLS}, t.theme as theme from posts p ${D7} where ${ew.sql} and p.caption_tsv @@ to_tsquery('simple', t.q)
+         order by d7.views desc nulls last limit ${pPer}
        ) s`,
       ew.params,
     );

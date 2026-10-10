@@ -5,7 +5,8 @@
  */
 import { SkillDb } from "../skills/db";
 import { loadContext, resolveBrands, type Context } from "../skills/params";
-import { aggregateEvidence, EvidenceList } from "../skills/common";
+import { aggregateEvidence, D7, EvidenceList, viewsNote } from "../skills/common";
+import { sqlOf, type ViewsDef } from "../definitions/catalog";
 import type { Evidence, Row } from "../skills/types";
 import { liveDefs } from "../extensions/store";
 import { NONE, NOT_TAGGED, isExtDim, keyOf, matchValue, type ExtDef } from "../extensions/spec";
@@ -56,10 +57,13 @@ const capDim = (col: string, none: string) => `case when p.cap_source = 'model' 
 const list = (v: unknown) => (Array.isArray(v) ? v : [v]).map((s) => String(s).toLowerCase());
 /** Words a post or comment must contain (any of them), for an analysis about a name or a word ("halal", "wardah"): up to 12, each 2 to 40 characters, matched anywhere in the text. */
 export const mentionPatterns = (v: unknown) => [...new Set(list(v).map((s) => s.replace(/[%_\\]/g, "").trim()).filter((s) => s.length >= 2 && s.length <= 40))].slice(0, 12).map((s) => `%${s}%`);
-export const METRICS = ["count_posts", "count_creators", "sum_views", "median_views", "avg_views", "sum_engagements", "sum_comments", "er_pct", "comment_rate_pct", "cart_pct", "share_of_voice"] as const;
+/** views and engagement are at day 7 by default (src/definitions/catalog.ts); sum_views_latest is the latest reading */
+export const METRICS = ["count_posts", "count_creators", "sum_views", "sum_views_latest", "median_views", "avg_views", "sum_engagements", "sum_comments", "er_pct", "comment_rate_pct", "cart_pct", "share_of_voice", "share_of_views"] as const;
+/** the metrics counted from views or engagement, which say how many posts count so far */
+const VIEW_METRICS = new Set(["sum_views", "median_views", "avg_views", "sum_engagements", "sum_comments", "er_pct", "comment_rate_pct", "share_of_views"]);
 
-/** filter name -> SQL fragment builder (over alias p = posts) */
-export const FILTERS: Record<string, (v: unknown, add: (val: unknown) => string, ctx: Context) => string | null> = {
+/** filter name -> SQL fragment builder (over alias p = posts, and r = the reading views are counted from: d7 or p) */
+export const FILTERS: Record<string, (v: unknown, add: (val: unknown) => string, ctx: Context, r?: Reading) => string | null> = {
   brand_id: (v, add, ctx) => {
     const ids = resolveBrands(Array.isArray(v) ? v : [v], ctx);
     return ids ? `p.brand_id = any(${add(ids)}::text[])` : null;
@@ -74,7 +78,7 @@ export const FILTERS: Record<string, (v: unknown, add: (val: unknown) => string,
   creator_handle: (v, add) => `p.creator_handle = any(${add((Array.isArray(v) ? v : [v]).map((s) => String(s).replace(/^@/, "")))}::text[])`,
   date_from: (v, add, ctx) => `p.posted_at >= (${add(String(v))}::date::timestamp at time zone ${add(ctx.tz)})`,
   date_to: (v, add, ctx) => `p.posted_at < ((${add(String(v))}::date + 1)::timestamp at time zone ${add(ctx.tz)})`,
-  min_views: (v, add) => `p.views >= ${add(Number(v))}`,
+  min_views: (v, add, _ctx, r = "d7") => `${r}.views >= ${add(Number(v))}`,
   min_followers: (v, add) => `p.followers_at_post >= ${add(Number(v))}`,
   earned_only: (v) => (v ? "p.creator_id is not null and p.source = 'earned'" : null),
   // read from captions (src/captions/prompt.ts names the classes)
@@ -112,19 +116,30 @@ const DIM_SQL: Record<(typeof GROUP_BY)[number], (ctx: Context) => string> = {
   voice: () => "coalesce(p.voice, 'unknown')",
 };
 
-const METRIC_SQL: Record<(typeof METRICS)[number], string> = {
-  count_posts: "count(*)::int",
-  count_creators: "count(distinct p.creator_id)::int",
-  sum_views: "sum(p.views)::float8",
-  median_views: "percentile_cont(0.5) within group (order by p.views)::float8",
-  avg_views: "round(avg(p.views)::numeric, 1)::float8",
-  sum_engagements: "sum(p.engagements)::float8",
-  sum_comments: "sum(p.comments_count)::float8",
-  er_pct: "case when sum(p.views) > 0 then round((sum(p.engagements)::numeric / sum(p.views) * 100), 4)::float8 end",
-  comment_rate_pct: "case when sum(p.views) > 0 then round((sum(p.comments_count)::numeric / sum(p.views) * 100), 4)::float8 end",
-  cart_pct: "case when count(*) filter (where p.platform = 'tiktok') > 0 then round((count(*) filter (where p.has_cart))::numeric / count(*) filter (where p.platform = 'tiktok') * 100, 2)::float8 end",
-  share_of_voice: "round(count(*)::numeric / sum(count(*)) over () * 100, 2)::float8",
-};
+/** the reading views and engagement are counted from: each post's day-7 reading (d7, the default) or its latest (p) */
+type Reading = "d7" | "p";
+
+/** the metrics over reading `r`: views and engagement from that one reading; per post and per view only over posts with views (definition flagged) */
+function metricSql(r: Reading): Record<(typeof METRICS)[number], string> {
+  const eng = sqlOf("engagement", r);
+  const rated = sqlOf("engagement_rate", r);
+  return {
+    count_posts: "count(*)::int",
+    count_creators: "count(distinct p.creator_id)::int",
+    sum_views: `sum(${r}.views)::float8`,
+    sum_views_latest: "sum(p.views)::float8",
+    median_views: `(percentile_cont(0.5) within group (order by ${r}.views) filter (where ${r}.views > 0))::float8`,
+    avg_views: `round((avg(${r}.views) filter (where ${r}.views > 0))::numeric, 1)::float8`,
+    sum_engagements: `sum(${eng})::float8`,
+    sum_comments: `sum(${r}.comments_count)::float8`,
+    // definition engagement_rate: over the posts that can carry a rate
+    er_pct: `case when sum(${r}.views) filter (where ${rated}) > 0 then round(((sum(${eng}) filter (where ${rated}))::numeric / sum(${r}.views) filter (where ${rated}) * 100), 4)::float8 end`,
+    comment_rate_pct: `case when sum(${r}.views) > 0 then round(((sum(${r}.comments_count) filter (where ${r}.views > 0))::numeric / sum(${r}.views) * 100), 4)::float8 end`,
+    cart_pct: "case when count(*) filter (where p.platform = 'tiktok') > 0 then round((count(*) filter (where p.has_cart))::numeric / count(*) filter (where p.platform = 'tiktok') * 100, 2)::float8 end",
+    share_of_voice: "round(count(*)::numeric / sum(count(*)) over () * 100, 2)::float8",
+    share_of_views: `round((coalesce(sum(${r}.views), 0) / nullif(sum(coalesce(sum(${r}.views), 0)) over (), 0) * 100)::numeric, 2)::float8`,
+  };
+}
 
 export type QueryMetricsInput = {
   entity: (typeof ENTITIES)[number];
@@ -250,7 +265,11 @@ async function queryComments(input: QueryMetricsInput, workspaceId: string, db: 
   };
 }
 
-export async function queryMetrics(input: QueryMetricsInput, workspaceId: string): Promise<QueryMetricsResult> {
+/**
+ * `views` is the reading the person's role counts (ROLE_VIEWS in src/definitions/catalog.ts): day 7 unless a role reads the
+ * latest, as PR does for reach.
+ */
+export async function queryMetrics(input: QueryMetricsInput, workspaceId: string, opts: { views?: ViewsDef } = {}): Promise<QueryMetricsResult> {
   const started = Date.now();
   const db = new SkillDb();
   const fail = (message: string): QueryMetricsResult => ({ status: "error", message, rows: [], evidence: [], meta: { entity: input.entity, filters: input.filters ?? {}, group_by: input.group_by ?? [], metrics: input.metrics ?? [], matched: 0, returned: 0, sql_hash: db.sqlHash(), duration_ms: Date.now() - started, caveats: [] } });
@@ -270,6 +289,7 @@ export async function queryMetrics(input: QueryMetricsInput, workspaceId: string
     };
     // posts judged not about their brand (listening workspaces, DECISIONS 3 Oct 2026) never count
     const where: string[] = [`p.workspace_id = ${add(ctx.workspaceId)}`, "p.relevant is not false"];
+    const r: Reading = opts.views === "views_latest" ? "p" : "d7";
     const filters = { ...(input.filters ?? {}) } as Record<string, unknown>;
     // entity presets
     if (input.entity === "creators" || input.entity === "creator_brand_months") filters.earned_only = true;
@@ -294,25 +314,33 @@ export async function queryMetrics(input: QueryMetricsInput, workspaceId: string
       if (v === undefined || v === null || isExtDim(k)) continue;
       const f = FILTERS[k];
       if (!f) return fail(`Unknown filter '${k}'. Use one of ${Object.keys(FILTERS).join(", ")}.`);
-      const clause = f(v, add, ctx);
+      const clause = f(v, add, ctx, r);
       if (clause) where.push(clause);
     }
     const dims = groupBy.map((g) => `${ext.dims.get(g) ?? DIM_SQL[g](ctx)} as ${g}`);
-    const mets = metrics.map((m) => `${METRIC_SQL[m]} as ${m}`);
+    const sqlOfMetric = metricSql(r);
+    const mets = metrics.map((m) => `${sqlOfMetric[m]} as ${m}`);
     const orderRaw = (input.order_by ?? metrics[0]).trim();
     const [orderCol, orderDir] = orderRaw.split(/\s+/);
     if (![...metrics, ...groupBy].includes(orderCol as any)) return fail(`order_by must be one of the selected metrics or group_by dimensions, got '${orderCol}'.`);
     const dir = (orderDir ?? "desc").toLowerCase() === "asc" ? "asc" : "desc";
     const limit = Math.max(1, Math.min(200, Number(input.limit ?? 50) || 50));
+    // views at day 7 come with how many of the posts counted so far, over every group (not only the rows returned)
+    const viewsAsked = metrics.some((m) => VIEW_METRICS.has(m));
+    const soFarAsked = viewsAsked && r === "d7";
     const sql = `select ${[...dims, ...mets].join(", ")}, count(*) over() as matched
-      from posts p left join topics pt on pt.id = p.topic_id ${ext.joins.join(" ")} where ${where.join(" and ")}
+      ${soFarAsked ? ", sum(count(*) filter (where d7.so_far)) over () as so_far_all, sum(count(*)) over () as posts_all" : ""}
+      from posts p ${r === "d7" ? D7 : ""} left join topics pt on pt.id = p.topic_id ${ext.joins.join(" ")} where ${where.join(" and ")}
       ${groupBy.length ? `group by ${groupBy.map((_, i) => i + 1).join(", ")}` : ""}
       order by ${orderCol} ${dir} nulls last limit ${add(limit)}`;
     const rows = await db.q<Row>(sql, params);
     const matched = rows.length ? Number(rows[0].matched) : 0;
+    const soFar = { n: Number(rows[0]?.so_far_all ?? 0), of: Number(rows[0]?.posts_all ?? 0) };
     const ev = new EvidenceList(60);
     for (const r of rows) {
       delete r.matched;
+      delete r.so_far_all;
+      delete r.posts_all;
       const label = groupBy.length ? groupBy.map((g) => `${g}=${r[g]}`).join(" · ") : `all ${input.entity}`;
       const id = ev.push((eid) => aggregateEvidence(eid, `${input.entity} where ${JSON.stringify(filters)} group ${label}`, label, Object.fromEntries(metrics.map((m) => [m, r[m] as number]))));
       r.evidence_ids = id ? [id] : [];
@@ -323,6 +351,9 @@ export async function queryMetrics(input: QueryMetricsInput, workspaceId: string
       evidence: ev.list,
       meta: { entity: input.entity, filters, group_by: groupBy, metrics, matched, returned: rows.length, sql_hash: db.sqlHash(), duration_ms: Date.now() - started, caveats: [
         "Aggregates over posts; owned-account posts are included unless earned_only or source=earned is set.",
+        ...(soFarAsked ? [viewsNote(soFar.n, soFar.of)] : []),
+        ...(viewsAsked && r === "p" ? ["Views and engagement are each post's latest reading: how far it has spread by now, so posts read at different ages."] : []),
+        ...(metrics.includes("sum_views_latest") && r === "d7" ? ["sum_views_latest is each post's latest reading: posts read at different ages, so not comparable between periods."] : []),
         ...(groupBy.some((g) => CAPTION_DIMS.has(g)) || Object.keys(filters).some((f) => f.startsWith("caption")) ? ["Products, campaigns, offers and hooks are read from captions by the model, for posts with 10K+ views and brand-account posts; other posts show as \"not read\"."] : []),
         ...ext.caveats,
       ] },

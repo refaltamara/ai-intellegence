@@ -944,3 +944,28 @@ The agreed design is the doc "Core data architecture and model" (https://claude.
   - **Beauty:** the Paragon weekly report for the weeks of 15 and 22 Sep is identical to the old code's, field by field.
   - **Fintech:** a deck on September moves most on Instagram. ShopeePay's own posts kept growing long after day 7: one went from 1.35M views at day 8 to 21.8M at day 23. ShopeePay's Instagram views were 39.3M at the latest reading and are 3.7M at day 7. Its share of the panel's Instagram views goes from 88.0% to 45.4%, and its engagement rate from 0.71% to 5.31%.
 - **A saved section order outlives a release.** The viewership mix (second part) made Beauty's saved Dashboard order invalid. The order was saved on 8 Oct and names the five sections there were then, so the whole order was dropped. Now an order names known sections once each, and a section it leaves out goes right after the section it follows by default: Beauty's mix shows after its rankings. A section a release removes leaves the order.
+
+**Step 4, sixth part: Chats and the connector read the definitions (10 Oct).**
+- **Skills.** Sixteen skills now count views and engagement from each post's day-7 reading: affiliates, brand-strategy, breakout, campaigns, compare, discovery, funnel-mix, hashtag-overlap, hashtags, launch, loyalists, mercenaries, products, themes, top-content and waves.
+  - Posts are ranked by views at day 7, and evidence shows that reading.
+  - The registry names the views each skill counts (`views`). Drivers keeps `views_latest`: it reads how far a post has spread by now.
+  - A result counted at day 7 says so in its caveats, with how many of the window's posts count their latest reading so far.
+- **Rates and per-post figures follow the definitions.**
+  - An engagement rate covers only the posts that can carry one: views over 0, and engagement no more than views.
+  - Average and median views, and the comment rate, leave out posts without views.
+  - Compare gains share of views beside share of voice.
+- **The query builder** serves CeMO's own questions, recipes and the connector.
+  - Views and engagement are at day 7 by default.
+  - New metrics: `sum_views_latest` and `share_of_views`. `min_views` filters on the same reading.
+  - A team counts the views its role reads on its own screens (`ROLE_VIEWS` in `src/definitions/catalog.ts`): Brand & KOL at day 7, PR the latest (its reach), and Social the latest, as its dashboard and decks do now. Team slides, slide drafts, the team page, the Lab and the role tests follow the same choice.
+  - The connector has no role, so it counts at day 7.
+- **CeMO** calls a period's views "so far" once when the result says some of its posts count so far.
+- **What changed.**
+  - **Beauty:** views are unchanged (one reading per post). Rates change where they took in posts without views or impossible rows.
+    - Compare, September earned posts: Skintific 7.12% → 6.65%, Somethinc 8.04% → 3.66%, Emina 17.28% → 7.47%.
+    - Instagram median views in June: 690 → 746.
+    - Top content by engagement rate no longer starts with posts rated 184% and 169%.
+  - **Fintech:**
+    - September share of views in Chats matches the dashboard to the decimal: ShopeePay 25.11%, BCA 24.79%, GoPay 24.62%, SeaBank 6.38%.
+    - GoPay's earned views against the 24 days before were −64% at the latest reading and are +136% at day 7: the earlier posts had longer to grow.
+  - **Kahf (PR, latest):** engagement in Chats now follows the definition: 888,878, against 829,893 in the stored column. The stored column added a share count where the export has one. The definition adds the shares column, which holds reposts on Threads and X.

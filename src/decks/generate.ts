@@ -20,7 +20,8 @@ import { runFindings } from "./findings";
 import { canSpend, charge } from "../credits/ledger";
 import { CREDIT_PRICES } from "../config/credits";
 import { sql } from "../db/client";
-import { specContract, type DeckSpec } from "./spec";
+import { roleOfSpec, specContract, type DeckSpec } from "./spec";
+import { ROLE_VIEWS } from "../definitions/catalog";
 import { markDeckRun, pruneVersions, type DeckRow } from "./store";
 import { reputationReport, writeRep } from "../reputation/deck";
 import { storeReputation } from "../reputation/store";
@@ -98,7 +99,7 @@ export async function generateDeckVersion(deck: DeckRow, opts: { period?: string
 }
 
 /** A PR or Social deck's own slides (the team's analyses), run over the version's period. */
-const teamFindings = (spec: DeckSpec, ws: string) => (p: { from: string; to: string }) => (spec.findings?.length ? runFindings(spec.findings, ws, { from: p.from, to: p.to }) : Promise.resolve(undefined));
+const teamFindings = (spec: DeckSpec, ws: string) => (p: { from: string; to: string }) => (spec.findings?.length ? runFindings(spec.findings, ws, { from: p.from, to: p.to }, { views: ROLE_VIEWS[roleOfSpec(spec)] }) : Promise.resolve(undefined));
 
 async function makeVersion(deck: DeckRow, opts: { period?: string; reason: "create" | "manual" | "schedule" }): Promise<DeckOutcome> {
   const spec = deck.spec;
@@ -142,7 +143,7 @@ async function makeVersion(deck: DeckRow, opts: { period?: string; reason: "crea
       return { status: "ok", message: `${period.label}: ${r.status.level}, ${r.issues.length} issue${r.issues.length === 1 ? "" : "s"}, words by ${written.by === "model" ? "CeMO" : "the plain template"}`, report_id: stored.reportId, period: period.key, narrative_by: written.by };
     }
     if (grain === "day") throw new Error("a day-by-day deck is a PR deck; pick a week or a month for this one");
-    const findings = spec.findings?.length && spec.slides.includes("findings") ? await runFindings(spec.findings, deck.workspace_id, { from: period.from, to: period.to }) : undefined;
+    const findings = spec.findings?.length && spec.slides.includes("findings") ? await runFindings(spec.findings, deck.workspace_id, { from: period.from, to: period.to }, { views: ROLE_VIEWS[roleOfSpec(spec)] }) : undefined;
     const r = await weeklyReport(specContract(spec, deck.workspace_id), period.from, { findings });
     const written = await writeNarrative(r);
     const stored = await storeWeekly({ workspaceId: deck.workspace_id, runId: null, report: r, narrative: written.narrative, by: written.by, problems: written.problems, formats: FORMATS, deck: { id: deck.id, name: deck.name } });

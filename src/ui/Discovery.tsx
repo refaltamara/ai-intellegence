@@ -102,7 +102,7 @@ export function Discovery({ brands, months }: { brands: { id: string; name: stri
             </div>
             <div className="tablewrap">
               <table>
-                <thead><tr><th>#</th><th>Creator</th><th className="num">Followers</th><th>Used by</th><th>Last brand post</th><th className="num">Views</th><th className="num">Avg views</th><th className="num">Comment rate</th><th className="num">ER</th><th className="num">Views / 1k</th><th>For you</th></tr></thead>
+                <thead><tr><th>#</th><th>Creator</th><th className="num">Followers</th><th>Used by</th><th>Last brand post</th><th className="num">Views (day 7)</th><th className="num">Avg views</th><th className="num">Comment rate</th><th className="num">ER</th><th className="num">Views / 1k</th><th>For you</th></tr></thead>
                 <tbody>
                   {result.rows.map((r, i) => (
                     <tr key={String(r.creator_id)} onClick={() => setOpenRow(openRow === r.creator_id ? null : String(r.creator_id))}>

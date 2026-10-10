@@ -115,6 +115,16 @@ export function def(key: string): Definition {
  */
 export const d7Join = (p = "p", d = "d7") => `left join post_d7 ${d} on ${d}.item_id = ${p}.item_id`;
 
+/** the two views a screen or an answer can count */
+export type ViewsDef = "views_d7" | "views_latest";
+
+/**
+ * Which views each role reads where it counts views in Chats, as its own screens do (a role chooses which definitions it
+ * shows, never redefines one): Brand & KOL compares at day 7; PR reads reach, how far a post has spread by now (step 4,
+ * third part); Social reads the latest reading on its dashboard and decks, so Chats does too until it moves.
+ */
+export const ROLE_VIEWS: Record<string, ViewsDef> = { brand_kol: "views_d7", pr: "views_latest", social: "views_latest" };
+
 /** a definition's SQL over row `x` */
 export function sqlOf(key: string, x: string): string {
   const d = def(key);

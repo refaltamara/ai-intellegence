@@ -1,9 +1,10 @@
-import { EvidenceList, POST_COLS, Where, postEvidence, windowCaveats } from "./common";
+import { D7, ENGAGEMENT, EvidenceList, POST_COLS, RATED, Where, postEvidence, windowCaveats } from "./common";
 import { limitOf, resolveBrands, resolvePlatforms, resolveWindow } from "./params";
 import type { SkillImpl } from "./runner";
 import type { Row } from "./types";
 
-const RANK: Record<string, string> = { views: "p.views", comment_rate: "comment_rate_pct", er_pct: "er_pct", engagements: "p.engagements" };
+/** views and engagement at day 7 (src/definitions/catalog.ts) */
+const RANK: Record<string, string> = { views: "d7.views", comment_rate: "comment_rate_pct", er_pct: "er_pct", engagements: `(${ENGAGEMENT})` };
 
 /** /top-content — best posts by views, comment rate or engagement rate, with content filters. */
 export const topContent: SkillImpl = async (db, ctx, _def, params) => {
@@ -12,7 +13,7 @@ export const topContent: SkillImpl = async (db, ctx, _def, params) => {
   const brands = resolveBrands(params.brands, ctx);
   const limit = limitOf(params);
   const rankBy = String(params.rank_by ?? "views");
-  const order = RANK[rankBy] ?? "p.views";
+  const order = RANK[rankBy] ?? "d7.views";
   const minViews = Number(params.min_views ?? 1000);
 
   const wh = new Where().workspace(ctx).window(w, ctx).platforms(platforms).brands(brands).tiers(params.tiers);
@@ -20,15 +21,16 @@ export const topContent: SkillImpl = async (db, ctx, _def, params) => {
   if (params.has_cart === false) wh.add("p.has_cart is not true");
   if ((params.content_format as string[] | undefined)?.length) wh.add("p.content_format = any(?::text[])", params.content_format);
   if ((params.product_category as string[] | undefined)?.length) wh.add("p.product_category = any(?::text[])", (params.product_category as string[]).map((s) => s.toLowerCase()));
-  if (rankBy !== "views" && rankBy !== "engagements") wh.add("p.views >= ?", minViews);
+  if (rankBy !== "views" && rankBy !== "engagements") wh.add("d7.views >= ?", minViews);
   const pLimit = wh.next(limit);
   const rows = await db.q<Row>(
     `select ${POST_COLS}, p.content_type, p.product_name,
-            case when p.views > 0 then round(p.comments_count::numeric / p.views * 100, 4)::float8 end as comment_rate_pct,
-            case when p.views > 0 then round(p.engagements::numeric / p.views * 100, 4)::float8 end as er_pct,
+            case when d7.views > 0 then round(d7.comments_count::numeric / d7.views * 100, 4)::float8 end as comment_rate_pct,
+            -- a rate only where the post can carry one (definition engagement_rate)
+            case when ${RATED} then round((${ENGAGEMENT})::numeric / d7.views * 100, 4)::float8 end as er_pct,
             count(*) over() as matched
-     from posts p where ${wh.sql}
-     order by ${order} desc nulls last, p.views desc nulls last
+     from posts p ${D7} where ${wh.sql}
+     order by ${order} desc nulls last, d7.views desc nulls last
      limit ${pLimit}`,
     wh.params,
   );

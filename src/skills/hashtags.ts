@@ -1,5 +1,5 @@
 import { GENERIC_HASHTAGS } from "../config/hashtags";
-import { EvidenceList, POST_COLS, Where, aggregateEvidence, postEvidence, windowCaveats } from "./common";
+import { D7, EvidenceList, POST_COLS, Where, aggregateEvidence, postEvidence, windowCaveats } from "./common";
 import { limitOf, resolveBrands, resolvePlatforms, resolveWindow } from "./params";
 import type { SkillImpl } from "./runner";
 import type { ChartSpec, Row } from "./types";
@@ -41,9 +41,9 @@ export const hashtags: SkillImpl = async (db, ctx, _def, params) => {
   const pLimit = wh.next(limit);
   const rows = await db.q<Row>(
     `with raw as (
-       select p.platform, p.url, p.brand_id, p.creator_id, p.views, p.hashtags,
+       select p.platform, p.url, p.brand_id, p.creator_id, d7.views, p.hashtags,
               (p.posted_at >= (${pCur}::date::timestamp at time zone ${pTz})) as is_current
-       from posts p where ${wh.sql}
+       from posts p ${D7} where ${wh.sql}
      ), tags as (
        select r.platform, r.url, r.brand_id, r.creator_id, r.views, r.is_current, h as tag
        from raw r, unnest(r.hashtags) h where h <> all(${pGeneric}::text[])
@@ -82,8 +82,8 @@ export const hashtags: SkillImpl = async (db, ctx, _def, params) => {
     const pPer = ew.next(per);
     const posts = await db.q<Row>(
       `select * from (
-         select ${POST_COLS}, h as tag, row_number() over (partition by h order by p.views desc nulls last) as rn
-         from posts p, unnest(p.hashtags) h where ${ew.sql} and h = any(${pTags}::text[])
+         select ${POST_COLS}, h as tag, row_number() over (partition by h order by d7.views desc nulls last) as rn
+         from posts p ${D7}, unnest(p.hashtags) h where ${ew.sql} and h = any(${pTags}::text[])
        ) s where rn <= ${pPer} order by tag, rn`,
       ew.params,
     );

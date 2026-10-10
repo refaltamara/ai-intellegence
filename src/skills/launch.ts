@@ -1,4 +1,4 @@
-import { EvidenceList, POST_COLS, Where, aggregateEvidence, postEvidence, windowCaveats } from "./common";
+import { D7, ENGAGEMENT, EvidenceList, POST_COLS, Where, aggregateEvidence, postEvidence, windowCaveats } from "./common";
 import { ParamError, resolveBrand, resolvePlatforms } from "./params";
 import type { SkillImpl } from "./runner";
 import type { Row } from "./types";
@@ -26,14 +26,15 @@ export const launch: SkillImpl = async (db, ctx, _def, params) => {
   const pTz = wh.next(ctx.tz);
   const rows = await db.q<Row>(
     `with base as (
-       select p.*, floor(extract(epoch from (p.posted_at - (${pStart}::date::timestamp at time zone ${pTz}))) / (7 * 86400))::int + 1 as week
-       from posts p where ${wh.sql}
+       select p.*, d7.views as d7_views, ${ENGAGEMENT} as d7_engagements, d7.comments_count as d7_comments,
+              floor(extract(epoch from (p.posted_at - (${pStart}::date::timestamp at time zone ${pTz}))) / (7 * 86400))::int + 1 as week
+       from posts p ${D7} where ${wh.sql}
      ), first_seen as (
        select creator_id, min(posted_at) as first_post from posts
        where workspace_id = $1 and relevant is not false and brand_id = any($6::text[]) and source = 'earned' and creator_id is not null group by 1
      )
      select b.week, count(*)::int as posts, count(distinct b.creator_id)::int as creators,
-            sum(b.views)::float8 as views, sum(b.engagements)::float8 as engagements, sum(b.comments_count)::float8 as comments_count,
+            sum(b.d7_views)::float8 as views, sum(b.d7_engagements)::float8 as engagements, sum(b.d7_comments)::float8 as comments_count,
             count(*) filter (where b.platform = 'tiktok')::int as tiktok_posts, count(*) filter (where b.has_cart)::int as cart_posts,
             count(distinct b.creator_id) filter (where floor(extract(epoch from (f.first_post - (${pStart}::date::timestamp at time zone ${pTz}))) / (7 * 86400))::int + 1 = b.week)::int as new_creators
      from base b left join first_seen f on f.creator_id = b.creator_id
@@ -70,8 +71,8 @@ export const launch: SkillImpl = async (db, ctx, _def, params) => {
   const pTz2 = tw.next(ctx.tz);
   const top = await db.q<Row>(
     `select * from (select ${POST_COLS}, floor(extract(epoch from (p.posted_at - (${pS2}::date::timestamp at time zone ${pTz2}))) / (7 * 86400))::int + 1 as week,
-                           row_number() over (partition by floor(extract(epoch from (p.posted_at - (${pS2}::date::timestamp at time zone ${pTz2}))) / (7 * 86400)) order by p.views desc nulls last) as rn
-                    from posts p where ${tw.sql}) s where rn <= 3 order by week, rn`,
+                           row_number() over (partition by floor(extract(epoch from (p.posted_at - (${pS2}::date::timestamp at time zone ${pTz2}))) / (7 * 86400)) order by d7.views desc nulls last) as rn
+                    from posts p ${D7} where ${tw.sql}) s where rn <= 3 order by week, rn`,
     tw.params,
   );
   for (const t of top) {

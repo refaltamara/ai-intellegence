@@ -93,6 +93,6 @@ export const drivers: SkillImpl = async (db, ctx, _def, params) => {
     evidence: ev.list,
     matched,
     data_window: { from: w.from, to: w.to },
-    caveats: [...labelCaveat(totals?.comments ?? 0, totals?.unlabelled ?? 0), ...offTopicCaveat(offTopic), SUBJECT_REPLIES_CAVEAT, "Stance is the post's own position toward the subject (earned posts only); views are the export's single capture."],
+    caveats: [...labelCaveat(totals?.comments ?? 0, totals?.unlabelled ?? 0), ...offTopicCaveat(offTopic), SUBJECT_REPLIES_CAVEAT, "Stance is the post's own position toward the subject (earned posts only); views are the latest reading, how far a post has spread by now (Views (latest), the reach a conversation is read by)."],
   };
 };

@@ -1,5 +1,5 @@
 import { GENERIC_HASHTAGS } from "../config/hashtags";
-import { EvidenceList, POST_COLS, Where, aggregateEvidence, postEvidence, windowCaveats } from "./common";
+import { D7, EvidenceList, POST_COLS, Where, aggregateEvidence, postEvidence, windowCaveats } from "./common";
 import { limitOf, resolveBrands, resolvePlatforms, resolveWindow, type Context } from "./params";
 import type { SkillImpl } from "./runner";
 import type { Row } from "./types";
@@ -54,8 +54,8 @@ export const campaigns: SkillImpl = async (db, ctx, _def, params) => {
   const pLimit = wh.next(limit);
   const rows = await db.q<Row>(
     `with raw as (
-       select p.platform, p.url, p.brand_id, p.creator_id, p.views, p.tier, p.hashtags, p.posted_at
-       from posts p where ${wh.sql}
+       select p.platform, p.url, p.brand_id, p.creator_id, d7.views, p.tier, p.hashtags, p.posted_at
+       from posts p ${D7} where ${wh.sql}
      ), bk as (select * from unnest(${pBkIds}::text[], ${pBkKeys}::text[]) as t(brand_id, key)),
      tags as (
        select r.*, h as tag from raw r, unnest(r.hashtags) h
@@ -107,8 +107,8 @@ export const campaigns: SkillImpl = async (db, ctx, _def, params) => {
     const pPer = ew.next(per);
     const posts = await db.q<Row>(
       `select * from (
-         select ${POST_COLS}, p.brand_id || '|' || h as campaign_id, row_number() over (partition by p.brand_id, h order by p.views desc nulls last) as rn
-         from posts p, unnest(p.hashtags) h where ${ew.sql} and (p.brand_id || '|' || h) = any(${pKeys}::text[])
+         select ${POST_COLS}, p.brand_id || '|' || h as campaign_id, row_number() over (partition by p.brand_id, h order by d7.views desc nulls last) as rn
+         from posts p ${D7}, unnest(p.hashtags) h where ${ew.sql} and (p.brand_id || '|' || h) = any(${pKeys}::text[])
        ) s where rn <= ${pPer} order by campaign_id, rn`,
       ew.params,
     );

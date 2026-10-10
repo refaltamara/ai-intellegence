@@ -1,4 +1,4 @@
-import { EvidenceList, POST_COLS, Where, aggregateEvidence, postEvidence, windowCaveats } from "./common";
+import { D7, EvidenceList, POST_COLS, Where, aggregateEvidence, postEvidence, windowCaveats } from "./common";
 import { limitOf, resolveBrands, resolvePlatforms, resolveWindow } from "./params";
 import type { SkillImpl } from "./runner";
 import type { Row } from "./types";
@@ -41,14 +41,14 @@ export const products: SkillImpl = async (db, ctx, _def, params) => {
   const pLimit = wh.next(limit);
   const rows = await db.q<Row>(
     `select p.brand_id, p.product_name as product_id, count(*)::int as posts, count(distinct p.creator_id)::int as creators,
-            sum(p.views)::float8 as views, round(avg(p.views)::numeric, 0)::float8 as avg_views,
+            sum(d7.views)::float8 as views, round((avg(d7.views) filter (where d7.views > 0))::numeric, 0)::float8 as avg_views,
             count(*) filter (where p.has_cart)::int as cart_posts,
             round((count(*) filter (where p.has_cart)::numeric / count(*) * 100), 1)::float8 as cart_share_pct,
             count(*) filter (where p.source = 'owned')::int as owned_posts,
             min(p.price)::float8 as price_min, max(p.price)::float8 as price_max, max(p.discount_percent)::float8 as discount_max_pct,
             min(p.posted_at) as first_seen, max(p.posted_at) as last_seen, max(p.product_url) as product_url,
             count(*) over() as matched
-     from posts p where ${wh.sql}
+     from posts p ${D7} where ${wh.sql}
      group by p.brand_id, p.product_name
      having count(*) >= ${pMin}
      order by ${order} desc nulls last, posts desc
@@ -65,7 +65,7 @@ export const products: SkillImpl = async (db, ctx, _def, params) => {
     const mw = new Where().workspace(ctx).window(w, ctx).platforms(platforms).brands(brands).tiers(params.tiers);
     mw.add("p.caption_tsv @@ to_tsquery('simple', ?)", tsq);
     mentions = (await db.one<Row>(`select count(distinct (p.platform, p.url))::int as posts, count(distinct p.creator_id)::int as creators, count(distinct p.brand_id)::int as brands from posts p where ${mw.sql}`, mw.params)) ?? null;
-    mentionBrands = await db.q<Row>(`select p.brand_id, count(distinct (p.platform, p.url))::int as posts, sum(p.views)::float8 as views from posts p where ${mw.sql} group by 1 order by 2 desc limit 10`, mw.params);
+    mentionBrands = await db.q<Row>(`select p.brand_id, count(distinct (p.platform, p.url))::int as posts, sum(d7.views)::float8 as views from posts p ${D7} where ${mw.sql} group by 1 order by 2 desc limit 10`, mw.params);
   }
 
   const ev = new EvidenceList();
@@ -76,8 +76,8 @@ export const products: SkillImpl = async (db, ctx, _def, params) => {
     const pPer = ew.next(per);
     const posts = await db.q<Row>(
       `select * from (
-         select ${POST_COLS}, p.product_name, p.brand_id || '|' || p.product_name as key, row_number() over (partition by p.brand_id, p.product_name order by p.views desc nulls last) as rn
-         from posts p where ${ew.sql} and p.product_name is not null and (p.brand_id || '|' || p.product_name) = any(${pKeys}::text[])
+         select ${POST_COLS}, p.product_name, p.brand_id || '|' || p.product_name as key, row_number() over (partition by p.brand_id, p.product_name order by d7.views desc nulls last) as rn
+         from posts p ${D7} where ${ew.sql} and p.product_name is not null and (p.brand_id || '|' || p.product_name) = any(${pKeys}::text[])
        ) s where rn <= ${pPer} order by key, rn`,
       ew.params,
     );

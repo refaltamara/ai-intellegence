@@ -15,6 +15,7 @@ import { CREDIT_PRICES } from "../config/credits";
 import { canSpend, charge } from "../credits/ledger";
 import { COMMENT_GROUP_BY, COMMENT_METRICS, GROUP_BY, METRICS } from "../query/builder";
 import { runRecipe } from "../recipes/run";
+import { ROLE_VIEWS } from "../definitions/catalog";
 import { validateRecipe, type RecipeSpec } from "../recipes/spec";
 import type { RoleId } from "../roles/model";
 import { SkillDb } from "../skills/db";
@@ -122,7 +123,7 @@ export async function draftSlide(ws: string, role: RoleId, text: string, actor: 
   const from = new Date(ctx.asOf + "T00:00:00Z");
   from.setUTCDate(from.getUTCDate() - 6);
   const window = { from: from.toISOString().slice(0, 10), to: ctx.asOf };
-  const res = await runRecipe(recipe, { window }, ws);
+  const res = await runRecipe(recipe, { window }, ws, { views: ROLE_VIEWS[role] });
   if (res.status === "error") return { ok: false, error: `The draft did not run: ${res.message ?? "unknown error"}` };
   const rows = res.rows.map(({ evidence_ids: _e, ...r }) => r);
   const columns = findingColumns(rows);
