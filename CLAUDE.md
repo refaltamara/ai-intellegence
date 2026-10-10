@@ -54,3 +54,5 @@ Rules:
   - the promotion writes only what changed (`src/loader/columns.ts` says what each source writes).
 
   The CMS shows loads in a workspace's Loads tab. Python is for one-off analysis only.
+  Labels keep their author: whoever writes a label onto a post or comment also adds its row (`labels`, `src/labels/record.ts`: `recordLabels` with a labeller and version).
+  Readings keep their time (`post_readings`, split by month; `posts.read_at`); `post_snapshots` is a view of a dump's readings. CSAT and the five-point label are no longer shown or loaded.

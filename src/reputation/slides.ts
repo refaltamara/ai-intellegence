@@ -15,7 +15,7 @@ export const REP_SLIDES: { kind: RepSlide; title: string; description: string }[
   { kind: "narratives", title: "Narratives", description: "What people say, by topic: share of the conversation, how it leans, in their words." },
   { kind: "anger", title: "Where the anger is", description: "Comments under our own posts against comments everywhere else, and how each of our posts was received." },
   { kind: "moving", title: "Most commented posts, still moving", description: "The posts that drew the most comments, and how many they still took in the last 24 and 6 hours." },
-  { kind: "competitive", title: "Competitive reputation", description: "Every brand on share of voice, negative share, CSAT and purchase intent." },
+  { kind: "competitive", title: "Competitive reputation", description: "Every brand on share of voice, negative share and purchase intent." },
   { kind: "voices", title: "Amplifiers and own channels", description: "Who carried the conversation, and how our own posts were received." },
   { kind: "service", title: "For customer service", description: "Service complaints to hand over, in the customers' words." },
 ];

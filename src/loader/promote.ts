@@ -7,10 +7,11 @@
 import { sql } from "../db/client";
 import { toJson } from "../db/json";
 import { POST_WRITE } from "./columns";
+import { labellerId } from "../labels/record";
 import type { FileReport, SourceKind } from "./types";
 
 export type PromoteProgress = {
-  phase: "prepare" | "creators" | "stubs" | "posts" | "readings" | "comments" | "captions" | "finish" | "done";
+  phase: "prepare" | "creators" | "stubs" | "posts" | "export_readings" | "readings" | "comments" | "captions" | "finish" | "done";
   key?: string[];
   ledgers?: Record<string, string>;
   changed?: Record<string, number>;
@@ -78,9 +79,14 @@ function postSql(source: SourceKind): string {
         ${cols.map((c) => `${c} = ${val(c)}`).join(", ")}
       where (posts.creator_id, posts.flags, ${cols.map((c) => `posts.${c}`).join(", ")})
             is distinct from (excluded.creator_id, excluded.flags, ${cols.map(val).join(", ")})
+      returning posts.id, ${cols.includes("relevant") ? "posts.relevant" : "null::boolean as relevant"}
+    ), lb as (
+      -- a listening post's relevance is the terms rule's judgment, kept with its author (labels)
+      insert into labels (workspace_id, target, target_id, kind, value, labeller_id)
+      select $2, 'post', w.id, 'relevant', case when w.relevant then 'yes' else 'no' end, $7::int from w where w.relevant is not null and $7::int is not null
       returning 1
     )
-    select (select count(*) from w)::int as changed, (select count(*) from b)::int as rows,
+    select (select count(*) from w)::int as changed, (select count(*) from b)::int as rows, (select count(*) from lb)::int as labels,
            (select array[platform, url, brand_id] from b order by platform desc, url desc, brand_id desc limit 1) as last`;
 }
 
@@ -94,18 +100,39 @@ const STUB_SQL = (cols: string[]) => `
   returning 1`;
 
 // ----------------------------------------------------------------- readings
+/** an export's one reading per post: its numbers, when the file was made (Beauty: the day the file reached us, at the latest) */
+const EXPORT_READING_SQL = `
+  with b as (
+    select s.platform, s.url, s.brand_id, s.read_at, s.views, s.likes, s.comments_count, s.shares, s.saves from staging.posts s
+     where s.load_id = $1 and not s.stub and s.read_at is not null and (s.platform, s.url, s.brand_id) > ($3, $4, $5)
+     order by s.platform, s.url, s.brand_id limit ${BATCH.posts}
+  ), w as (
+    insert into post_readings (post_id, read_at, age_hours, day_n, source, views, likes, comments_count, shares, saves, load_id)
+    select p.id, b.read_at, round(extract(epoch from (b.read_at - p.posted_at)) / 3600)::int, greatest(0, floor(extract(epoch from (b.read_at - p.posted_at)) / 86400))::smallint,
+           'export', b.views, b.likes, b.comments_count, b.shares, b.saves, $1::uuid
+      from b join posts p on p.workspace_id = $2 and p.platform = b.platform and p.url = b.url and p.brand_id = b.brand_id
+    on conflict (post_id, read_at, day_n) do update set views = excluded.views, likes = excluded.likes, comments_count = excluded.comments_count, shares = excluded.shares, saves = excluded.saves
+    where (post_readings.views, post_readings.likes, post_readings.comments_count, post_readings.shares, post_readings.saves)
+          is distinct from (excluded.views, excluded.likes, excluded.comments_count, excluded.shares, excluded.saves)
+    returning 1
+  )
+  select (select count(*) from w)::int as changed, (select count(*) from b)::int as rows,
+         (select array[platform, url, brand_id] from b order by platform desc, url desc, brand_id desc limit 1) as last`;
+
 const READING_SQL = `
   with b as (
     select r.* from staging.readings r where r.load_id = $1 and (r.platform, r.url, r.brand_id, r.day_n) > ($3, $4, $5, $6::smallint)
      order by r.platform, r.url, r.brand_id, r.day_n limit ${BATCH.readings}
   ), w as (
-    insert into post_snapshots (post_id, day_n, captured_at, views, likes, comments_count, shares, saves)
-    select p.id, b.day_n, b.captured_at, b.views, b.likes, b.comments_count, b.shares, b.saves
+    -- every reading is kept with its time (post_readings); the same reading loaded again changes nothing
+    insert into post_readings (post_id, read_at, age_hours, day_n, source, views, likes, comments_count, shares, saves, load_id)
+    select p.id, b.captured_at, round(extract(epoch from (b.captured_at - p.posted_at)) / 3600)::int, b.day_n, 'listening',
+           b.views, b.likes, b.comments_count, b.shares, b.saves, $1::uuid
       from b join posts p on p.workspace_id = $2 and p.platform = b.platform and p.url = b.url and p.brand_id = b.brand_id
-    on conflict (post_id, day_n) do update set captured_at = excluded.captured_at, views = excluded.views, likes = excluded.likes,
+    on conflict (post_id, read_at, day_n) do update set views = excluded.views, likes = excluded.likes,
       comments_count = excluded.comments_count, shares = excluded.shares, saves = excluded.saves
-    where (post_snapshots.captured_at, post_snapshots.views, post_snapshots.likes, post_snapshots.comments_count, post_snapshots.shares, post_snapshots.saves)
-          is distinct from (excluded.captured_at, excluded.views, excluded.likes, excluded.comments_count, excluded.shares, excluded.saves)
+    where (post_readings.views, post_readings.likes, post_readings.comments_count, post_readings.shares, post_readings.saves)
+          is distinct from (excluded.views, excluded.likes, excluded.comments_count, excluded.shares, excluded.saves)
     returning 1
   )
   select (select count(*) from w)::int as changed, (select count(*) from b)::int as rows,
@@ -114,22 +141,30 @@ const READING_SQL = `
 // ----------------------------------------------------------------- comments
 function commentSql(source: SourceKind): string {
   if (source === "listening") {
-    const cols = ["post_id", "platform", "author_handle", "author_hash", "text", "posted_at", "likes", "sentiment", "sentiment_source", "sentiment_confidence", "sentiment_detail", "csat", "theme", "purchase_intent", "translation", "topic_id"];
+    const cols = ["post_id", "platform", "author_handle", "author_hash", "text", "posted_at", "likes", "sentiment", "sentiment_source", "sentiment_confidence", "theme", "purchase_intent", "translation", "topic_id"];
     return `
       with b as (
         select s.* from staging.comments s where s.load_id = $1 and s.platform_comment_id > $3 order by s.platform_comment_id limit ${BATCH.comments}
       ), w as (
         insert into comments (workspace_id, post_id, platform, platform_comment_id, author_handle, author_hash, text, posted_at, likes,
-                              sentiment, sentiment_source, sentiment_confidence, sentiment_detail, csat, theme, purchase_intent, translation, topic_id, classified_at)
+                              sentiment, sentiment_source, sentiment_confidence, theme, purchase_intent, translation, topic_id, classified_at)
         select $2, p.id, b.platform, b.platform_comment_id, b.author_handle, b.author_hash, b.text, b.posted_at, b.likes,
-               b.sentiment, b.sentiment_source, b.sentiment_confidence, b.sentiment_detail, b.csat, b.theme, b.purchase_intent, b.translation, b.topic_id, now()
+               b.sentiment, b.sentiment_source, b.sentiment_confidence, b.theme, b.purchase_intent, b.translation, b.topic_id, now()
           from b join posts p on p.workspace_id = $2 and p.platform = b.platform and p.url = b.url and p.brand_id = b.brand_id
         on conflict (workspace_id, platform_comment_id) do update set
           ${cols.map((c) => `${c} = excluded.${c}`).join(", ")}, classified_at = excluded.classified_at
         where (${cols.map((c) => `comments.${c}`).join(", ")}) is distinct from (${cols.map((c) => `excluded.${c}`).join(", ")})
+        returning comments.id, comments.sentiment, comments.sentiment_source, comments.sentiment_confidence, comments.theme, comments.purchase_intent, comments.translation, comments.topic_id
+      ), lb as (
+        -- the labels the dump brought, kept with their author (labels)
+        insert into labels (workspace_id, target, target_id, kind, value, confidence, labeller_id)
+        select $2, 'comment', w.id, v.kind, v.value, w.sentiment_confidence::real, $4::int
+          from w cross join lateral (values ('sentiment', w.sentiment), ('theme', w.theme), ('intent', case when w.purchase_intent then 'yes' when not w.purchase_intent then 'no' end),
+                                            ('translation', w.translation), ('topic', w.topic_id)) as v(kind, value)
+         where w.sentiment_source = 'listening' and v.value is not null
         returning 1
       )
-      select (select count(*) from w)::int as changed, (select count(*) from b)::int as rows, (select max(platform_comment_id) from b) as last`;
+      select (select count(*) from w)::int as changed, (select count(*) from b)::int as rows, (select count(*) from lb)::int as labels, (select max(platform_comment_id) from b) as last`;
   }
   // a profile load keeps what our model decided (a label, or that it could not label) when the file brings no label
   const keep = (c: string) => `case when comments.sentiment_source like 'model%' and excluded.sentiment is null then comments.${c} else excluded.${c} end`;
@@ -146,12 +181,16 @@ function commentSql(source: SourceKind): string {
         sentiment = ${keep("sentiment")}, sentiment_source = ${keep("sentiment_source")}
       where (comments.post_id, comments.platform, comments.author_handle, comments.author_hash, comments.text, comments.posted_at, comments.likes, comments.views, comments.sentiment, comments.sentiment_source)
             is distinct from (excluded.post_id, excluded.platform, excluded.author_handle, excluded.author_hash, excluded.text, excluded.posted_at, excluded.likes, excluded.views, ${keep("sentiment")}, ${keep("sentiment_source")})
+      returning comments.id, comments.sentiment, comments.sentiment_source
+    ), lb as (
+      insert into labels (workspace_id, target, target_id, kind, value, labeller_id)
+      select $2, 'comment', w.id, 'sentiment', w.sentiment, $4::int from w where w.sentiment_source = 'listening' and w.sentiment is not null
       returning 1
     )
-    select (select count(*) from w)::int as changed, (select count(*) from b)::int as rows, (select max(platform_comment_id) from b) as last`;
+    select (select count(*) from w)::int as changed, (select count(*) from b)::int as rows, (select count(*) from lb)::int as labels, (select max(platform_comment_id) from b) as last`;
 }
 
-type Step = { changed: number; rows: number; last: string[] | string | null };
+type Step = { changed: number; rows: number; labels?: number; last: string[] | string | null };
 
 /**
  * Promote a staged load, as far as `budgetMs` allows; call again with the progress it returns until done.
@@ -214,9 +253,19 @@ export async function promote(loadId: string, from: PromoteProgress = { phase: "
     }
     if (p.phase === "posts") {
       const [pl, u, br] = p.key ?? ["", "", ""];
-      const r = (await q<Step>(postSql(l.source), [loadId, ws, pl, u, br, toJson(p.ledgers ?? {})]))[0];
+      const rule = l.source === "listening" ? await labellerId("rule:terms", String((l.report.facts ?? {}).terms_version ?? "")) : null;
+      const r = (await q<Step>(postSql(l.source), [loadId, ws, pl, u, br, toJson(p.ledgers ?? {}), rule]))[0];
       add("posts", r.changed);
-      if (!r.rows) { next(l.source === "listening" ? "readings" : l.source === "profile" ? "comments" : "finish"); continue; }
+      if (r.labels) add("labels", r.labels);
+      if (!r.rows) { next(l.source === "listening" ? "readings" : "export_readings"); continue; }
+      p.key = r.last as string[];
+      continue;
+    }
+    if (p.phase === "export_readings") {
+      const [pl, u, br] = p.key ?? ["", "", ""];
+      const r = (await q<Step>(EXPORT_READING_SQL, [loadId, ws, pl, u, br]))[0];
+      add("readings", r.changed);
+      if (!r.rows) { next(l.source === "profile" ? "comments" : "finish"); continue; }
       p.key = r.last as string[];
       continue;
     }
@@ -229,8 +278,10 @@ export async function promote(loadId: string, from: PromoteProgress = { phase: "
       continue;
     }
     if (p.phase === "comments") {
-      const r = (await q<Step>(commentSql(l.source), [loadId, ws, p.key?.[0] ?? ""]))[0];
+      const vendor = await labellerId("vendor:fair-listening", "");
+      const r = (await q<Step>(commentSql(l.source), [loadId, ws, p.key?.[0] ?? "", vendor]))[0];
       add("comments", r.changed);
+      if (r.labels) add("labels", r.labels);
       if (!r.rows) { next(l.source === "profile" ? "captions" : "finish"); continue; }
       p.key = [r.last as string];
       continue;

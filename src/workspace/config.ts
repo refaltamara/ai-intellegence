@@ -31,7 +31,7 @@ export type WorkspaceSettings = {
   roles?: RoleId[];
   /** a profile that has moved onto the reputation dashboard ("reputation"); its crisis view moves to Pulse */
   dashboard?: "reputation" | "crisis";
-  /** what the PR dashboard and decks leave out for this case (Fair sets it): "status" (the norm and ladder), "reach", "csat", "intent" */
+  /** what the PR dashboard and decks leave out for this case (Fair sets it): "status" (the norm and ladder), "reach", "intent" (CSAT is no longer shown: DECISIONS, 10 Oct 2026) */
   pr?: { hide?: string[] };
 };
 

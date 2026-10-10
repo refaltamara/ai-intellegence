@@ -7,6 +7,7 @@
  *   pnpm load check <load id>                           run the checks again
  *   pnpm load promote <load id> [--anyway]              promote a staged load (--anyway lets a held load in, recorded as the CLI's)
  *   pnpm load discard <load id>                         throw a staged load away whole
+ *   pnpm load backfill-readings                         read times and export readings for what was loaded before 10 Oct 2026
  * source: listening | beauty | profile
  */
 import { sql } from "../src/db/client";
@@ -83,6 +84,7 @@ async function main() {
   const [, , cmd, a, b, ...rest] = process.argv;
   if (cmd === "stage") return stage(a, b as SourceKind, rest);
   if (cmd === "compare") return compare(a);
+  if (cmd === "backfill-readings") { const { backfillReadings } = await import("../src/loader/backfillReadings"); return backfillReadings((x) => console.log(x)); }
   if (cmd === "check") { const r = await runChecks(a); showChecks(r.checks); return console.log(r.held ? "held" : "passed"); }
   if (cmd === "promote") {
     if (process.argv.includes("--anyway")) await letIn(a, "cli").catch(() => undefined);

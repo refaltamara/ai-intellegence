@@ -9,6 +9,7 @@ import { contractFromDb, type StoredFile } from "../../onboard/contract";
 import { buildComments, buildPosts, buildSnapshots, creatorRows, parseCsv, primeTable, table, topicRows } from "../../onboard/listening";
 import { DUMP_TABLES, tableOf } from "../../onboard/storage";
 import { flagsOf } from "./beauty";
+import { ruleVersion } from "../../labels/record";
 import { emptyStaged, type AdapterInput, type FileReport, type Staged, type StagedPost } from "../types";
 
 export async function readListening(input: AdapterInput): Promise<Staged> {
@@ -45,12 +46,19 @@ export async function readListening(input: AdapterInput): Promise<Staged> {
     likes: r.likes, comments_count: r.comments_count, shares: r.shares, saves: r.saves, engagements: r.engagements, engagements_lc: r.engagements_lc,
     captured_days: r.captured_days, relevant: r.relevant, stub: false, flags: flagsOf(r.followers_at_post, r.views, r.content_type), source_file: r.source_file,
   }));
-  st.files.push({ file: files._content_.name, kind: "posts", platform: null, rows_in: content.length, staged: built.rows.length, merged: content.length - built.rows.length - postDrops, dropped: postDrops, drops: built.drops });
+  st.files.push({ file: files._content_.name, kind: "posts", platform: null, rows_in: content.length, staged: built.rows.length, merged: content.length - built.rows.length - postDrops, dropped: postDrops, drops: built.drops, notes: { naive_times: built.rows.length } });
 
   const kept = new Map(built.rows.map((r) => [r._cid, `${r.platform}\u0001${r.url}\u0001${r.brand_id}`]));
   const sn = await buildSnapshots(files, kept);
   const snapsIn = (await table(files, "content_metric_snapshot")).length;
   st.readings = sn.rows.map((r) => ({ ...r }));
+  // a post's numbers were read at its latest reading
+  const lastRead = new Map<string, string>();
+  for (const r of sn.rows) {
+    const k = `${r.platform}\u0001${r.url}\u0001${r.brand_id}`;
+    if (!lastRead.has(k) || r.captured_at > lastRead.get(k)!) lastRead.set(k, r.captured_at);
+  }
+  for (const p of st.posts) p.read_at = lastRead.get(`${p.platform}\u0001${p.url}\u0001${p.brand_id}`) ?? null;
   st.files.push({ file: files.content_metric_snapshot.name, kind: "snapshots", platform: null, rows_in: snapsIn, staged: sn.rows.length, merged: snapsIn - sn.rows.length - sn.drops, dropped: sn.drops, drops: sn.drops ? { "not on a kept capture, or a day outside 0 to 30": { count: sn.drops, examples: [] } } : {}, notes: { merged_means: "a later reading of the same post and day, or a reading without a time" } });
 
   const t = await topicRows(input.workspace, files);
@@ -62,7 +70,7 @@ export async function readListening(input: AdapterInput): Promise<Staged> {
   st.comments = cm.rows.map((r) => ({
     platform: r.platform, url: r.url, brand_id: r.brand_id, platform_comment_id: r.platform_comment_id, author_handle: r.author_handle, author_hash: r.author_hash,
     text: r.text, posted_at: r.posted_at, likes: r.likes, views: null, sentiment: r.sentiment, sentiment_source: r.sentiment_source, sentiment_confidence: r.confidence,
-    sentiment_detail: r.sentiment_detail, csat: r.csat, theme: r.theme, purchase_intent: r.purchase_intent, translation: r.translation, topic_id: r.topic_id, flags: null,
+    sentiment_detail: null, csat: null, theme: r.theme, purchase_intent: r.purchase_intent, translation: r.translation, topic_id: r.topic_id, flags: null,
     source_file: files._comment_.name,
   }));
   st.files.push({
@@ -72,7 +80,9 @@ export async function readListening(input: AdapterInput): Promise<Staged> {
 
   st.accounts = await creatorRows(files, built.rows);
   const brandCaptures = Object.fromEntries([...built.seen].map(([id, byP]) => [id, Object.fromEntries([...byP].map(([p, hs]) => [p, [...hs].sort()]))]));
-  st.facts = { client: k.client, unmapped_accounts: built.unmapped, unknown_labels: cm.unknownLabels, brand_captures: brandCaptures, raw_tables: rawOf };
+  // which terms judged relevance at this load: the rule's version on every relevance label it writes
+  const termsVersion = ruleVersion(Object.fromEntries(Object.entries(k.brands).map(([id, br]) => [id, { terms: br.terms, never: br.never ?? [], handles: br.handles }])));
+  st.facts = { client: k.client, unmapped_accounts: built.unmapped, unknown_labels: cm.unknownLabels, brand_captures: brandCaptures, raw_tables: rawOf, terms_version: termsVersion };
   for (const f of st.files as FileReport[]) f.platform = f.platform ?? null;
   return st;
 }

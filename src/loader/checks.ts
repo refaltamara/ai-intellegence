@@ -76,8 +76,10 @@ export async function runChecks(loadId: string): Promise<{ checks: Check[]; held
     });
   }
 
-  const hours = await q<{ side: string; platform: string; n: number; mid: number; sn: number; cs: number }>(
-    `with s as (select platform, posted_at from staging.posts where load_id = $1 and not stub),
+  // only times that came without a zone can be read in the wrong one: an X time from its status id, an ISO time with Z, never
+  const naiveFiles = files.filter((f) => f.kind === "posts" && Number(f.notes?.naive_times ?? f.staged) >= Math.max(1, f.staged) / 2).map((f) => f.file);
+  const hours = !naiveFiles.length ? [] : await q<{ side: string; platform: string; n: number; mid: number; sn: number; cs: number }>(
+    `with s as (select platform, posted_at from staging.posts where load_id = $1 and not stub and source_file = any($4::text[])),
           b as (select p.platform, p.posted_at from posts p where p.workspace_id = $2
                   and not exists (select 1 from staging.posts x where x.load_id = $1 and x.platform = p.platform and x.url = p.url)),
           x as (select 'load' as side, platform, posted_at at time zone $3 as lt from s
@@ -85,7 +87,7 @@ export async function runChecks(loadId: string): Promise<{ checks: Check[]; held
      select side, platform, count(*)::int as n, avg((lt::time = '00:00')::int)::float8 as mid,
             avg(sin(2 * pi() * extract(hour from lt) / 24))::float8 as sn, avg(cos(2 * pi() * extract(hour from lt) / 24))::float8 as cs
        from x group by 1, 2`,
-    [loadId, ws, tz],
+    [loadId, ws, tz, naiveFiles],
   );
   const meanHour = (r: { sn: number; cs: number }) => ((Math.atan2(r.sn, r.cs) * 24) / (2 * Math.PI) + 24) % 24;
   const shifted: string[] = [];
@@ -142,6 +144,7 @@ export async function runChecks(loadId: string): Promise<{ checks: Check[]; held
   if (cats.length) out.push({ key: "categories", label: "Categories mapped", outcome: "info", detail: `Kept as they are: ${cats.slice(0, 8).map(([c, n]) => `${c} (${fmt(n)})`).join(", ")}.` });
 
   const held = out.some((c) => c.outcome === "hold");
-  await q(`update staging.loads set checks = $2::jsonb, status = case when $3 then 'held' else status end where id = $1`, [loadId, toJson(out), held]);
+  // a held load that passes when checked again (after its setup was fixed) is ready to go in
+  await q(`update staging.loads set checks = $2::jsonb, status = case when $3 then 'held' when status = 'held' then 'staged' else status end where id = $1`, [loadId, toJson(out), held]);
   return { checks: out, held };
 }

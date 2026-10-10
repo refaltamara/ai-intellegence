@@ -7,7 +7,7 @@
  *   brand                     -> grouped into the workspace's brands by their handles (brand_handles)
  *   content_hashtag           -> posts.hashtags
  *   content_tagged_user       -> posts.tagged_handles (one of the relevance signals)
- *   content_metric_snapshot   -> post_snapshots (day 0-30)
+ *   content_metric_snapshot   -> post_readings (day 0-30; post_snapshots is a view of them)
  *   _comment_ + comment_sentiment (is_latest) -> comments, labelled (sentiment_source 'listening')
  *   topic                     -> topics (the workspace's own taxonomy)
  *
@@ -304,11 +304,11 @@ const POST_SQL = `
     ${POST_COLS.filter((c) => c !== "url" && c !== "brand_id").map((c) => `${c} = excluded.${c}`).join(", ")}
   returning 1`;
 const SNAP_SQL = `
-  insert into post_snapshots (post_id, day_n, captured_at, views, likes, comments_count, shares, saves)
-  select p.id, r.day_n, r.captured_at, r.views, r.likes, r.comments_count, r.shares, r.saves
+  insert into post_readings (post_id, read_at, age_hours, day_n, source, views, likes, comments_count, shares, saves)
+  select p.id, r.captured_at, round(extract(epoch from (r.captured_at - p.posted_at)) / 3600)::int, r.day_n, 'listening', r.views, r.likes, r.comments_count, r.shares, r.saves
   from jsonb_to_recordset($1::jsonb) as r(platform text, url text, brand_id text, day_n smallint, captured_at timestamptz, views bigint, likes int, comments_count int, shares int, saves int)
   join posts p on p.workspace_id = $2 and p.platform = r.platform and p.url = r.url and p.brand_id = r.brand_id
-  on conflict (post_id, day_n) do update set captured_at = excluded.captured_at, views = excluded.views, likes = excluded.likes,
+  on conflict (post_id, read_at, day_n) do update set views = excluded.views, likes = excluded.likes,
     comments_count = excluded.comments_count, shares = excluded.shares, saves = excluded.saves
   returning 1`;
 const COMMENT_SQL = `

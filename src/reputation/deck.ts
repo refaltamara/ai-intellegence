@@ -35,7 +35,7 @@ export type ReputationReport = PrDashboardData & {
   period: Period;
   previous: Period;
   slides: RepSlide[];
-  /** what this workspace leaves out (settings.pr.hide: status, reach, csat, intent) */
+  /** what this workspace leaves out (settings.pr.hide: status, reach, intent) */
   hide: string[];
   /** the crisis slides' facts (src/reputation/case.ts), when the deck carries any of them */
   case?: CaseFacts;
@@ -138,7 +138,6 @@ export function repSheet(r: ReputationReport): string {
   if (shown(r, "reach")) out.push(k.reach.now == null ? `- Reach: not reported (these platforms report no views)` : `- Reach (views of those posts): ${compact(k.reach.now)}; ${compact(k.reach.prev)}; ${change(k.reach.now ?? 0, k.reach.prev ?? 0)}`);
   out.push(`- ${r.voice_posts > 0 ? `Posts and comments (${int(r.voice_posts)} posts with a stance, and the comments under posts)` : "Comments"}: ${int(k.comments.now ?? 0)}; ${int(k.comments.prev ?? 0)}; ${change(k.comments.now ?? 0, k.comments.prev ?? 0)}`);
   out.push(`- Negative share of ${said}: ${pct(k.neg_pct.now)}; ${pct(k.neg_pct.prev)}; ${pts(k.neg_pct.now, k.neg_pct.prev)}`);
-  if (shown(r, "csat")) out.push(`- CSAT (1 to 5): ${k.csat.now?.toFixed(2) ?? "–"}; ${k.csat.prev?.toFixed(2) ?? "–"}`);
   if (shown(r, "intent")) out.push(`- Purchase intent share of comments: ${pct(k.intent_pct.now)}; ${pct(k.intent_pct.prev)}; ${pts(k.intent_pct.now, k.intent_pct.prev)}`);
   out.push(`\n## Issues (topics carrying ${who}'s negative ${said})`);
   if (!r.issues.length) out.push(`None: no topic carried enough negative ${said} to call an issue.`);
@@ -148,10 +147,10 @@ export function repSheet(r: ReputationReport): string {
     for (const q of i.quotes.slice(0, 2)) out.push(`  - quote: ${quoteLine(q)}`);
     for (const p of i.posts.slice(0, 2)) out.push(`  - post: @${p.handle ?? "unknown"} on ${PLATFORM[p.platform] ?? p.platform}${p.source === "owned" ? " (our own post)" : ""}, ${p.views != null ? `${compact(p.views)} views` : `${int(p.likes ?? 0)} likes`}${p.stance ? `, ${p.stance === "negative" ? "against" : p.stance === "positive" ? "defending" : "neutral"}` : ""}, ${int(p.negative)} negative of ${int(p.comments)} comments under it: ${p.caption.slice(0, 160)}`);
   }
-  out.push(`\n## Narratives (topics of the ${said} about ${who}; share; change in volume; negative share and its change; CSAT)`);
-  for (const x of r.narratives.filter((x) => x.comments > 0)) out.push(`- ${x.catch_all ? `${x.topic} (no topic fits)` : x.topic}: ${int(x.comments)} ${said}, ${pct(x.share)}, ${change(x.comments, x.comments_prev)}; negative ${pct(x.neg_pct)} (${pts(x.neg_pct, x.neg_pct_prev)}); CSAT ${x.csat?.toFixed(2) ?? "–"}${x.quote ? `; e.g. ${quoteLine(x.quote)}` : ""}`);
-  if (!solo(r)) out.push(`\n## Competitive reputation (posts; share of voice; reach; comments; negative share and change; CSAT; purchase intent)`);
-  if (!solo(r)) for (const b of r.competitive) out.push(`- ${b.name}${b.is_focus ? " (this report)" : ""}: ${int(b.posts)}; ${pct(b.sov)}; ${compact(b.views)}; ${int(b.comments)}; ${pct(b.neg_pct)} (${pts(b.neg_pct, b.neg_pct_prev)}); ${b.csat?.toFixed(2) ?? "–"}; ${pct(b.intent_pct)}${b.top_issue ? `; issue building: ${b.top_issue.topic}, ${int(b.top_issue.negative)} negative (${change(b.top_issue.negative, b.top_issue.negative_prev)})` : ""}`);
+  out.push(`\n## Narratives (topics of the ${said} about ${who}; share; change in volume; negative share and its change)`);
+  for (const x of r.narratives.filter((x) => x.comments > 0)) out.push(`- ${x.catch_all ? `${x.topic} (no topic fits)` : x.topic}: ${int(x.comments)} ${said}, ${pct(x.share)}, ${change(x.comments, x.comments_prev)}; negative ${pct(x.neg_pct)} (${pts(x.neg_pct, x.neg_pct_prev)})${x.quote ? `; e.g. ${quoteLine(x.quote)}` : ""}`);
+  if (!solo(r)) out.push(`\n## Competitive reputation (posts; share of voice; reach; comments; negative share and change; purchase intent)`);
+  if (!solo(r)) for (const b of r.competitive) out.push(`- ${b.name}${b.is_focus ? " (this report)" : ""}: ${int(b.posts)}; ${pct(b.sov)}; ${compact(b.views)}; ${int(b.comments)}; ${pct(b.neg_pct)} (${pts(b.neg_pct, b.neg_pct_prev)}); ${pct(b.intent_pct)}${b.top_issue ? `; issue building: ${b.top_issue.topic}, ${int(b.top_issue.negative)} negative (${change(b.top_issue.negative, b.top_issue.negative_prev)})` : ""}`);
   const ampViews = r.amplifiers.some((a) => a.views > 0);
   out.push(`\n## Amplifiers (accounts whose posts about ${who} reached most people; ${ampViews ? "reach" : "likes (no views reported)"}; comments; ${ampViews ? "negative share" : "their posts against us"})`);
   for (const a of r.amplifiers) out.push(`- @${a.handle} (${PLATFORM[a.platform] ?? a.platform}${a.followers ? `, ${compact(a.followers)} followers` : ""}): ${ampViews ? compact(a.views) : `${int(a.likes)} likes`}; ${int(a.comments)}; ${a.neg_pct != null ? pct(a.neg_pct) : a.stanced ? `${int(a.against)} of ${int(a.stanced)} posts against` : "–"}`);
@@ -449,10 +448,9 @@ function summarySlide(pres: PptxGenJS, r: ReputationReport, n: RepNarrative, pag
     ["Reach", k.reach.now == null ? "–" : compact(k.reach.now), k.reach.now == null ? "not reported;" : change(k.reach.now ?? 0, k.reach.prev ?? 0)],
     [r.voice_posts > 0 ? "Posts and comments" : "Comments", int(k.comments.now ?? 0), change(k.comments.now ?? 0, k.comments.prev ?? 0)],
     ["Negative", pct(k.neg_pct.now), pts(k.neg_pct.now, k.neg_pct.prev)],
-    ["CSAT", k.csat.now?.toFixed(2) ?? "–", k.csat.now != null && k.csat.prev != null ? `${k.csat.now - k.csat.prev >= 0 ? "+" : "−"}${Math.abs(k.csat.now - k.csat.prev).toFixed(2)}` : "–"],
     ["Purchase intent", pct(k.intent_pct.now), pts(k.intent_pct.now, k.intent_pct.prev)],
   ];
-  const KEY: Record<string, string> = { Reach: "reach", CSAT: "csat", "Purchase intent": "intent" };
+  const KEY: Record<string, string> = { Reach: "reach", "Purchase intent": "intent" };
   const extraTiles = allTiles.filter(([l]) => KEY[l]);
   const tiles = (r.voice_posts > 0 ? [...caseTiles, ...extraTiles] : allTiles).filter(([l]) => !KEY[l] || shown(r, KEY[l]));
   const tw = (CW - 0.15 * (tiles.length - 1)) / tiles.length;
@@ -588,9 +586,9 @@ function narrativesSlide(pres: PptxGenJS, r: ReputationReport, n: RepNarrative, 
     foot(s, `Posts by other accounts with a stance, and the comments under posts, about ${r.focus.name} in ${r.period.label}, by topic; off-topic left out. Voice is the side a post or comment is written from.`);
     return;
   }
-  table(s, ["Topic", r.voice_posts > 0 ? "Posts + comments" : "Comments", "Share", "Change", "Negative", "vs before", "CSAT", "In their words"],
-    rows.map((x) => [x.catch_all ? `${x.topic} (no topic fits)` : x.topic, int(x.comments), pct(x.share), change(x.comments, x.comments_prev), pct(x.neg_pct), pts(x.neg_pct, x.neg_pct_prev), x.csat?.toFixed(2) ?? "–", x.quote ? `“${plainText(x.quote.text).slice(0, 90)}${plainText(x.quote.text).length > 90 ? "…" : ""}”` : "–"]),
-    { x: M, y: 1.7, w: CW, colW: [2.1, 0.95, 0.8, 0.85, 0.95, 0.9, 0.7, 5.083], right: [1, 2, 3, 4, 5, 6], bold: [0], size: 9.5 });
+  table(s, ["Topic", r.voice_posts > 0 ? "Posts + comments" : "Comments", "Share", "Change", "Negative", "vs before", "In their words"],
+    rows.map((x) => [x.catch_all ? `${x.topic} (no topic fits)` : x.topic, int(x.comments), pct(x.share), change(x.comments, x.comments_prev), pct(x.neg_pct), pts(x.neg_pct, x.neg_pct_prev), x.quote ? `“${plainText(x.quote.text).slice(0, 90)}${plainText(x.quote.text).length > 90 ? "…" : ""}”` : "–"]),
+    { x: M, y: 1.7, w: CW, colW: [2.1, 0.95, 0.8, 0.85, 0.95, 0.9, 5.783], right: [1, 2, 3, 4, 5], bold: [0], size: 9.5 });
   foot(s, `${r.voice_posts > 0 ? "Posts and comments" : "Comments"} about ${r.focus.name} in ${r.period.label} by topic; change is against ${r.previous.label}.`);
 }
 
@@ -599,10 +597,10 @@ function competitiveSlide(pres: PptxGenJS, r: ReputationReport, n: RepNarrative,
   chrome(s, r, page);
   title(s, "Reputation against the competitors", n.competitive);
   const rows = r.competitive;
-  table(s, ["Brand", "Posts", "Share of voice", "Reach", "Comments", "Negative", "vs before", "CSAT", "Purchase intent", "Issue building"],
-    rows.map((b) => [b.name, int(b.posts), pct(b.sov), compact(b.views), int(b.comments), pct(b.neg_pct), pts(b.neg_pct, b.neg_pct_prev), b.csat?.toFixed(2) ?? "–", pct(b.intent_pct), b.top_issue ? `${b.top_issue.topic} (${change(b.top_issue.negative, b.top_issue.negative_prev)})` : "–"]),
-    { x: M, y: 1.7, w: CW, colW: [1.6, 0.8, 1.15, 0.9, 1.0, 1.0, 0.95, 0.75, 1.25, 2.933], right: [1, 2, 3, 4, 5, 6, 7, 8], bold: [0], mark: rows.findIndex((b) => b.is_focus) });
-  foot(s, `${r.period.label} against ${r.previous.label}. Posts that name the brand or are its own; share of voice is of those posts. Negative and CSAT over labelled comments; purchase intent over all comments.`);
+  table(s, ["Brand", "Posts", "Share of voice", "Reach", "Comments", "Negative", "vs before", "Purchase intent", "Issue building"],
+    rows.map((b) => [b.name, int(b.posts), pct(b.sov), compact(b.views), int(b.comments), pct(b.neg_pct), pts(b.neg_pct, b.neg_pct_prev), pct(b.intent_pct), b.top_issue ? `${b.top_issue.topic} (${change(b.top_issue.negative, b.top_issue.negative_prev)})` : "–"]),
+    { x: M, y: 1.7, w: CW, colW: [1.6, 0.8, 1.15, 0.9, 1.0, 1.0, 0.95, 1.25, 3.683], right: [1, 2, 3, 4, 5, 6, 7], bold: [0], mark: rows.findIndex((b) => b.is_focus) });
+  foot(s, `${r.period.label} against ${r.previous.label}. Posts that name the brand or are its own; share of voice is of those posts. Negative over labelled comments; purchase intent over all comments.`);
 }
 
 function voicesSlide(pres: PptxGenJS, r: ReputationReport, n: RepNarrative, page: number) {

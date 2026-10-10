@@ -15,6 +15,7 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import { anthropicClient, toolAnswer } from "../chat/client";
 import { modelId } from "../chat/loop";
+import { modelLabeller, promptVersion, recordLabels } from "../labels/record";
 import { sql } from "../db/client";
 import { toJson } from "../db/json";
 import { captionBatchPrompt, captionSystem, parseTags, READ_CAPTIONS_TOOL, type PostForReading } from "./prompt";
@@ -146,13 +147,18 @@ export async function readCaptions(workspaceId: string, opts: CaptionOptions = {
       const tags = results.flatMap((r) => r.tags);
       const missing = results.flatMap((r) => r.missing);
       if (tags.length) {
-        await sql.query(
+        const tagged = (await sql.query(
           `update posts p set cap_product = l.product, cap_event = l.event, cap_event_name = l.event_name, cap_offer = l.offer, cap_hook = l.hook, cap_angle = l.angle,
                   cap_source = 'model', cap_read_at = now()
            from jsonb_to_recordset($1::jsonb) as l(platform text, url text, product text, event text, event_name text, offer text, hook text, angle text)
-           where p.workspace_id = $2 and p.platform = l.platform and p.url = l.url`,
+           where p.workspace_id = $2 and p.platform = l.platform and p.url = l.url
+           returning p.id, l.product, l.event, l.event_name, l.offer, l.hook, l.angle`,
           [toJson(tags.map(({ ref: _r, ...t }) => t)), workspaceId],
-        );
+        )) as { id: string; product: string | null; event: string | null; event_name: string | null; offer: string | null; hook: string | null; angle: string | null }[];
+        // each tag kept with its author: this model, and the instructions it ran with (labels)
+        await recordLabels(workspaceId, modelLabeller(captionModel()), promptVersion(captionSystem()), tagged.flatMap((t) =>
+          (["product", "event", "event_name", "offer", "hook", "angle"] as const).map((k) => ({ target: "post" as const, target_id: t.id, kind: `caption_${k}`, value: t[k] })),
+        )).catch((e) => console.error("[labels]", (e as Error).message));
         out.read += tags.length;
       }
       if (missing.length) {
@@ -191,13 +197,17 @@ export async function readCaptions(workspaceId: string, opts: CaptionOptions = {
  */
 export async function tidyNames(workspaceId: string): Promise<void> {
   for (const col of ["cap_event_name", "cap_product"]) {
-    await sql.query(
+    const renamed = (await sql.query(
       `update posts p set ${col} = c.name
        from (select lower(regexp_replace(btrim(${col}), '\\s+', ' ', 'g')) as k, mode() within group (order by ${col}) as name
              from posts where workspace_id = $1 and ${col} is not null group by 1 having count(distinct ${col}) > 1) c
-       where p.workspace_id = $1 and lower(regexp_replace(btrim(p.${col}), '\\s+', ' ', 'g')) = c.k and p.${col} <> c.name`,
+       where p.workspace_id = $1 and lower(regexp_replace(btrim(p.${col}), '\\s+', ' ', 'g')) = c.k and p.${col} <> c.name
+       returning p.id, c.name`,
       [workspaceId],
-    );
+    )) as { id: string; name: string }[];
+    // a rename is a rule's judgment, kept like any other (labels)
+    await recordLabels(workspaceId, "rule:one-spelling", "", renamed.map((r) => ({ target: "post" as const, target_id: r.id, kind: col === "cap_product" ? "caption_product" : "caption_event_name", value: r.name })))
+      .catch((e) => console.error("[labels]", (e as Error).message));
   }
 }
 
