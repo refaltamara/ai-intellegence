@@ -8,7 +8,7 @@ import { DEFAULT_WORKSPACE_ID } from "../config/thresholds";
 import type { SkillDef } from "./registry";
 import type { SkillDb } from "./db";
 import type { Platform } from "./types";
-import { panelPostEdge } from "../db/panel";
+import { PANEL, panelPostEdge, type Scope } from "../db/panel";
 
 const ajv = new Ajv({ useDefaults: true, coerceTypes: "array", allErrors: true, strict: false });
 addFormats(ajv);
@@ -44,11 +44,24 @@ export type Context = {
   freshness: string;
   clientBrandId: string | null;
   brands: BrandRef[];
+  /** the panel's own posts, or a case's; absent means the panel */
+  scope?: Scope;
+  /** a case's subject, as the case names it (cases.settings) */
+  subject?: string;
 };
 
 export type BrandRef = { id: string; name: string; tiktok_handle: string | null; instagram_handle: string | null; is_client: boolean };
 
-export async function loadContext(db: SkillDb, workspaceId = DEFAULT_WORKSPACE_ID): Promise<Context> {
+/** what a case is about, in its own words: the subject its case context names, else its brand's name */
+async function caseSubject(db: SkillDb, caseId: string): Promise<string | undefined> {
+  const r = await db.one<{ subject: string | null }>(
+    "select coalesce(c.settings->'label'->>'subject', b.name, c.name) as subject from cases c left join brands b on b.id = c.settings->>'brand' where c.id = $1",
+    [caseId],
+  );
+  return r?.subject ?? undefined;
+}
+
+export async function loadContext(db: SkillDb, workspaceId = DEFAULT_WORKSPACE_ID, scope: Scope = PANEL): Promise<Context> {
   const ws = await db.one<{ tz: string; client_brand_id: string | null }>(
     "select tz, client_brand_id from workspaces where id = $1",
     [workspaceId],
@@ -59,7 +72,7 @@ export async function loadContext(db: SkillDb, workspaceId = DEFAULT_WORKSPACE_I
     `select to_char(e.newest at time zone $2, 'YYYY-MM-DD') as as_of,
             to_char(e.oldest at time zone $2, 'YYYY-MM-DD') as earliest,
             to_char(e.newest at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as freshness
-     from (select ${panelPostEdge("$1", "newest")} as newest, ${panelPostEdge("$1", "oldest")} as oldest) e`,
+     from (select ${panelPostEdge("$1", "newest", "", scope)} as newest, ${panelPostEdge("$1", "oldest", "", scope)} as oldest) e`,
     [workspaceId, ws.tz],
   );
   const brands = await db.q<BrandRef>(
@@ -74,6 +87,7 @@ export async function loadContext(db: SkillDb, workspaceId = DEFAULT_WORKSPACE_I
     freshness: range?.freshness ?? new Date(0).toISOString(),
     clientBrandId: ws.client_brand_id ?? brands.find((b) => b.is_client)?.id ?? null,
     brands,
+    ...(scope.caseId ? { scope, subject: await caseSubject(db, scope.caseId) } : {}),
   };
 }
 

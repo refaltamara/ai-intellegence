@@ -12,7 +12,7 @@ import { loadContext, ParamError, validateParams, type Context } from "./params"
 import type { SkillOutput, SkillRequest, SkillResult } from "./types";
 import { unavailable } from "./unavailable";
 import { toJson } from "../db/json";
-import { COMMENT_IN_PANEL, panelPlatformsSql } from "../db/panel";
+import { commentIn, PANEL, panelPlatformsSql, postIn, scopeKey, type Scope } from "../db/panel";
 
 export type SkillImpl = (db: SkillDb, ctx: Context, def: SkillDef, params: Record<string, unknown>) => Promise<SkillOutput>;
 
@@ -21,36 +21,37 @@ const LAYER_TABLES = ["posts", "creators", "comments", "topics", "post_snapshots
 const LAYER_TTL_MS = 5 * 60 * 1000;
 const layerCache = new Map<string, { counts: Record<string, number>; platforms: string[]; at: number }>();
 
-async function layerCounts(db: SkillDb, workspaceId: string): Promise<Record<string, number>> {
-  const hit = layerCache.get(workspaceId);
+async function layerCounts(db: SkillDb, workspaceId: string, scope: Scope = PANEL): Promise<Record<string, number>> {
+  const key = scopeKey(workspaceId, scope);
+  const hit = layerCache.get(key);
   if (hit && Date.now() - hit.at < LAYER_TTL_MS) return hit.counts;
-  const [counts, platforms] = await Promise.all([layerCountsUncached(db, workspaceId), platformsPresentUncached(db, workspaceId)]);
-  layerCache.set(workspaceId, { counts, platforms, at: Date.now() });
+  const [counts, platforms] = await Promise.all([layerCountsUncached(db, workspaceId, scope), platformsPresentUncached(db, workspaceId, scope)]);
+  layerCache.set(key, { counts, platforms, at: Date.now() });
   return counts;
 }
 
-async function platformsPresent(db: SkillDb, workspaceId: string): Promise<string[]> {
-  const hit = layerCache.get(workspaceId);
+async function platformsPresent(db: SkillDb, workspaceId: string, scope: Scope = PANEL): Promise<string[]> {
+  const hit = layerCache.get(scopeKey(workspaceId, scope));
   if (hit && Date.now() - hit.at < LAYER_TTL_MS) return hit.platforms;
-  await layerCounts(db, workspaceId);
-  return layerCache.get(workspaceId)?.platforms ?? [];
+  await layerCounts(db, workspaceId, scope);
+  return layerCache.get(scopeKey(workspaceId, scope))?.platforms ?? [];
 }
 
-async function layerCountsUncached(db: SkillDb, workspaceId: string): Promise<Record<string, number>> {
+async function layerCountsUncached(db: SkillDb, workspaceId: string, scope: Scope): Promise<Record<string, number>> {
   const r = await db.one<Record<string, number>>(
-    // posts and comments: whether the panel holds any (all that is asked of them), found at the first one
-    `select (select count(*) from (select 1 from posts where workspace_id = $1 and brought_in_by = 'panel' limit 1) x)::int as posts,
-            (select count(*) from creators where workspace_id = $1 and brought_in_by = 'panel')::int as creators,
-            (select count(*) from (select 1 from comments c where c.workspace_id = $1 and ${COMMENT_IN_PANEL("c")} limit 1) x)::int as comments,
-            (select count(*) from topics where workspace_id = $1 and case_id is null)::int as topics,
+    // posts and comments: whether the panel (or the case) holds any (all that is asked of them), found at the first one
+    `select (select count(*) from (select 1 from posts where workspace_id = $1 and ${postIn(scope, "posts")} limit 1) x)::int as posts,
+            ${scope.caseId ? `(select count(distinct p.creator_id) from posts p where p.workspace_id = $1 and ${postIn(scope, "p")})` : `(select count(*) from creators where workspace_id = $1 and brought_in_by = 'panel')`}::int as creators,
+            (select count(*) from (select 1 from comments c where c.workspace_id = $1 and ${commentIn(scope, "c")} limit 1) x)::int as comments,
+            (select count(*) from topics where workspace_id = $1 and case_id is not distinct from $2::text)::int as topics,
             (select count(*) from post_snapshots)::int as post_snapshots`,
-    [workspaceId],
+    [workspaceId, scope.caseId],
   );
   return r ?? {};
 }
 
-async function platformsPresentUncached(db: SkillDb, workspaceId: string): Promise<string[]> {
-  const rows = await db.q<{ platform: string }>(panelPlatformsSql("$1"), [workspaceId]);
+async function platformsPresentUncached(db: SkillDb, workspaceId: string, scope: Scope): Promise<string[]> {
+  const rows = await db.q<{ platform: string }>(panelPlatformsSql("$1", "", scope), [workspaceId]);
   return rows.map((r) => r.platform);
 }
 
@@ -59,13 +60,14 @@ async function platformsPresentUncached(db: SkillDb, workspaceId: string): Promi
  * loaded from the complete schema with daily tracking, has none of those gaps, so they are dropped there.
  */
 const listeningCache = new Map<string, { at: number; v: boolean }>();
-async function workspaceCaveats(db: SkillDb, workspaceId: string, caveats: string[]): Promise<string[]> {
+async function workspaceCaveats(db: SkillDb, workspaceId: string, caveats: string[], scope: Scope = PANEL): Promise<string[]> {
   if (!caveats.length) return caveats;
-  let hit = listeningCache.get(workspaceId);
+  const key = scopeKey(workspaceId, scope);
+  let hit = listeningCache.get(key);
   if (!hit || Date.now() - hit.at > 5 * 60_000) {
-    const r = await db.one<{ l: boolean }>("select exists (select 1 from posts where workspace_id = $1 and brought_in_by = 'panel' and relevant is not null) as l", [workspaceId]);
+    const r = await db.one<{ l: boolean }>(`select exists (select 1 from posts where workspace_id = $1 and ${postIn(scope, "posts")} and relevant is not null) as l`, [workspaceId]);
     hit = { at: Date.now(), v: !!r?.l };
-    listeningCache.set(workspaceId, hit);
+    listeningCache.set(key, hit);
   }
   return hit.v ? caveats.filter((c) => !EXPORT_CAVEAT_STARTS.some((s) => c.startsWith(s))) : caveats;
 }
@@ -74,6 +76,7 @@ export async function runSkill(req: SkillRequest): Promise<SkillResult> {
   const started = Date.now();
   const db = new SkillDb();
   const workspaceId = req.workspace_id || DEFAULT_WORKSPACE_ID;
+  const scope = req.scope ?? PANEL;
   const def = getSkill(req.skill);
   const base = (status: SkillResult["status"], message: string, params: Record<string, unknown>): SkillResult => ({
     skill: req.skill,
@@ -92,10 +95,10 @@ export async function runSkill(req: SkillRequest): Promise<SkillResult> {
   // Missing data layers win over parameter errors: an unavailable skill stays
   // unavailable however it is called, so callers do not retry with new params.
   const missingLayers = async (): Promise<string[]> => {
-    const counts = await layerCounts(db, workspaceId);
+    const counts = await layerCounts(db, workspaceId, scope);
     const missing = def.requires.filter((t) => LAYER_TABLES.includes(t as any) && !(counts[t] > 0));
     if (def.gate?.platforms_present) {
-      const present = await platformsPresent(db, workspaceId);
+      const present = await platformsPresent(db, workspaceId, scope);
       if (!def.gate.platforms_present.some((p) => present.includes(p))) missing.push(`${def.gate.platforms_present.join("/")} posts`);
     }
     return missing;
@@ -117,7 +120,7 @@ export async function runSkill(req: SkillRequest): Promise<SkillResult> {
 
   let result: SkillResult;
   try {
-    const [ctx, missing] = await Promise.all([loadContext(db, workspaceId), missingLayers()]);
+    const [ctx, missing] = await Promise.all([loadContext(db, workspaceId, scope), missingLayers()]);
     let out: SkillOutput;
     if (missing.length) {
       out = unavailable(def, missing, params);
@@ -131,7 +134,8 @@ export async function runSkill(req: SkillRequest): Promise<SkillResult> {
     }
     const dataWindow = out.data_window ?? { from: ctx.earliest, to: ctx.asOf };
     // a skill counting views at day 7 says so, with how many of the window's posts count so far (DECISIONS, 10 Oct 2026)
-    const views = status === "ok" && def.views === "views_d7" ? [await viewsCaveat(db, workspaceId, dataWindow)] : [];
+    // (the daily totals behind it count the panel; a case's screens leave it out)
+    const views = status === "ok" && def.views === "views_d7" && !scope.caseId ? [await viewsCaveat(db, workspaceId, dataWindow)] : [];
     result = {
       skill: def.name,
       status,
@@ -146,7 +150,7 @@ export async function runSkill(req: SkillRequest): Promise<SkillResult> {
         returned: out.rows.length,
         data_window: dataWindow,
         freshness: ctx.freshness,
-        caveats: await workspaceCaveats(db, workspaceId, [...(out.caveats ?? []), ...views]),
+        caveats: await workspaceCaveats(db, workspaceId, [...(out.caveats ?? []), ...views], scope),
         sql_hash: db.sqlHash(),
         duration_ms: Date.now() - started,
       },

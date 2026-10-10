@@ -1,3 +1,4 @@
+import type { Scope } from "../db/panel";
 /** Skill contract (PRD §4.1). A skill is a pure function over the database. */
 
 export type SkillStatus = "ok" | "unavailable" | "error";
@@ -9,6 +10,8 @@ export type SkillRequest = {
   actor: { user_id: string; via: "chat" | "agent" | "api" | "cli" };
   /** set by the runner; skip persistence (tests, dry runs) */
   persist?: boolean;
+  /** what the skill counts: the panel's own posts (default), or a case's (src/db/panel.ts; DECISIONS 10 Oct 2026, step 5) */
+  scope?: Scope;
 };
 
 export type Evidence = {

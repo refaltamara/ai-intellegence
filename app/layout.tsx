@@ -9,6 +9,7 @@ import { BRAND_KOL } from "@/roles/model";
 import { getWorkspace } from "@/workspace/store";
 import { teamsFor } from "@/workspace/teams";
 import { headers } from "next/headers";
+import { caseNamesFor } from "@/cases/store";
 import { sql } from "@/db/client";
 
 /** Pages that take the whole screen: sign-in, the team question, connector consent. */
@@ -38,7 +39,9 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
   // "Our Chorus": the team's own version of its role; a Builder sees how many creations wait for them
   const builder = !!actor && can(actor, "company.change", { workspace: ws, role: role.id });
   const waiting = builder ? await waitingCount(ws, role.id).catch(() => 0) : 0;
-  const user = session ? { email: session.email, role: who(actor, ws, role.id), team: !!actor && can(actor, "team.manage", { workspace: ws }), cms: !!actor && can(actor, "cms.open"), company: { label: `Our ${role.codename}`, waiting } } : null;
+  // a case shows only to the people on its list (DECISIONS, 10 Oct 2026, step 5)
+  const cases = actor ? (await caseNamesFor(actor, ws).catch(() => [])).length : 0;
+  const user = session ? { email: session.email, role: who(actor, ws, role.id), team: !!actor && can(actor, "team.manage", { workspace: ws }), cms: !!actor && can(actor, "cms.open"), company: { label: `Our ${role.codename}`, waiting }, cases } : null;
   return (
     <html lang="en">
       <head>

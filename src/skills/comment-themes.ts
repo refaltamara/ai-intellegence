@@ -16,7 +16,9 @@ export const commentThemes: SkillImpl = async (db, ctx, _def, params) => {
   const p: unknown[] = [];
   const where = commentWhere(ctx, w, platforms, p) + (sentiment === "all" ? "" : ` and c.sentiment = $${p.push(sentiment)}`);
   // the subject's own name is in most comments by construction; drop its parts with the stopwords
-  const subjectWords = ctx.brands.flatMap((b) => `${b.name} ${b.id}`.toLowerCase().split(/[^a-z0-9]+/)).filter((x) => x.length >= 3);
+  // (a case's are its own subject's, not every brand of its panel)
+  const named = ctx.scope?.caseId && ctx.subject ? [ctx.subject] : ctx.brands.map((b) => `${b.name} ${b.id}`);
+  const subjectWords = named.flatMap((n) => n.toLowerCase().split(/[^a-z0-9]+/)).filter((x) => x.length >= 3);
   const pStop = `$${p.push([...STOPWORDS, ...subjectWords])}`;
   const pMin = `$${p.push(minComments)}`;
   const pLimit = `$${p.push(limit)}`;

@@ -1076,3 +1076,20 @@ The agreed design is the doc "Core data architecture and model" (https://claude.
   - the caption reader. It read Kahf's 8 own posts once, before the fix went live.
 
   A case's new comments and posts are labelled with its own context when loading into a case begins.
+
+**Step 5, fourth part: a case's own screens (10 Oct).**
+- **Cases in the sidebar.** A "Cases" link shows to anyone on at least one case's list in the workspace. `/cases` lists those cases, and `/cases/<id>` shows a case's own numbers. To anyone else, neither page exists.
+- **What a case shows.** The crisis view (the Pulse) is counted over the case's own posts (`case_posts`) and the comments under them:
+  - with the case's subject and case words (`cases.settings`);
+  - with its skills (sentiment, drivers, themes, seeding) run over the same scope;
+  - the case's themes leave out its own subject's name, not every brand of the panel.
+
+  "Ask CeMO" is off on a case's page for now. It reads the figures back for the panel.
+- **One scope** (`src/db/panel.ts`: `postIn`, `commentIn`, and the edges and platform lists with a scope). A screen counts the panel's own posts or a case's. The skill runner takes it too: `runSkill({ scope })`, with layers, caveats and context worked out per scope.
+  - For the panel, the SQL is the same as before. The panel's screens give the same numbers, and `pnpm perf` is unchanged.
+  - A case's comments are matched against the case's posts through a hashed list. A join let the planner walk the case's posts once per comment, which took 6 s.
+- **Checked on Kahf.** Kahf's view inside Beauty gives the same numbers as `kahf-threads`'s own Pulse. Only ids, the brand's name and the order of tied rows differ. It takes 7.0 s of database time, against 5.9 s for Kahf's own, behind the same loading screen.
+- **Not yet.**
+  - Creating a case from the CMS, wired to the scraper team's API.
+  - A case's own dashboard, decks and Chats.
+  - Labelling a case's new comments with its own context.

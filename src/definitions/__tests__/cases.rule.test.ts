@@ -16,11 +16,11 @@ function files(dir: string): string[] {
 }
 
 describe("a case's own posts stay out of the panel's numbers", () => {
-  it("every relevance filter carries the case rule beside it", () => {
+  it("every relevance filter carries the case rule (or a scope's, postIn) beside it", () => {
     const missing: string[] = [];
     for (const f of [...files(path.join(process.cwd(), "src")), ...files(path.join(process.cwd(), "app"))]) {
       const text = readFileSync(f, "utf8");
-      for (const m of text.matchAll(/relevant is not false(?! and (?:\$\{[^}]+\}\.|\w+\.)?brought_in_by = 'panel')/g)) {
+      for (const m of text.matchAll(/relevant is not false(?! and (?:(?:\$\{[^}]+\}\.|\w+\.)?brought_in_by = 'panel'|\$\{postIn\())/g)) {
         const line = text.slice(0, m.index).split("\n").length;
         missing.push(`${path.relative(process.cwd(), f)}:${line}`);
       }
