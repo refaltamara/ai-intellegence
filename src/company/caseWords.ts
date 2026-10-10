@@ -34,8 +34,8 @@ export async function matches(ws: string, words: string[]): Promise<{ posts: num
   const like = words.map((w) => `%${clean(w)}%`).filter((w) => w.length > 3);
   if (!like.length) return { posts: 0, comments: 0 };
   const r = (await sql.query(
-    `select (select count(*) from posts p where p.workspace_id = $1 and p.relevant is not false and p.caption ilike any($2::text[]))::int as posts,
-            (select count(*) from comments c join posts p on p.id = c.post_id where c.workspace_id = $1 and p.relevant is not false and c.sentiment_source is distinct from 'subject' and c.text ilike any($2::text[]))::int as comments`,
+    `select (select count(*) from posts p where p.workspace_id = $1 and p.relevant is not false and p.brought_in_by = 'panel' and p.caption ilike any($2::text[]))::int as posts,
+            (select count(*) from comments c join posts p on p.id = c.post_id where c.workspace_id = $1 and p.relevant is not false and p.brought_in_by = 'panel' and c.sentiment_source is distinct from 'subject' and c.text ilike any($2::text[]))::int as comments`,
     [ws, like],
   )) as { posts: number; comments: number }[];
   return r[0] ?? { posts: 0, comments: 0 };

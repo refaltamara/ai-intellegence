@@ -215,7 +215,7 @@ async function queryComments(input: QueryMetricsInput, workspaceId: string, db: 
     params.push(v);
     return `$${params.length}`;
   };
-  const where = [`c.workspace_id = ${add(ctx.workspaceId)}`, "p.relevant is not false", "c.sentiment_source is distinct from 'subject'", "c.posted_at is not null"];
+  const where = [`c.workspace_id = ${add(ctx.workspaceId)}`, "p.relevant is not false and p.brought_in_by = 'panel'", "c.sentiment_source is distinct from 'subject'", "c.posted_at is not null"];
   const filters = { ...(input.filters ?? {}) } as Record<string, unknown>;
   if (!filters.date_from && !filters.date_to) {
     const d = new Date(ctx.asOf + "T00:00:00Z");
@@ -288,7 +288,7 @@ export async function queryMetrics(input: QueryMetricsInput, workspaceId: string
       return `$${params.length}`;
     };
     // posts judged not about their brand (listening workspaces, DECISIONS 3 Oct 2026) never count
-    const where: string[] = [`p.workspace_id = ${add(ctx.workspaceId)}`, "p.relevant is not false"];
+    const where: string[] = [`p.workspace_id = ${add(ctx.workspaceId)}`, "p.relevant is not false and p.brought_in_by = 'panel'"];
     const r: Reading = opts.views === "views_latest" ? "p" : "d7";
     const filters = { ...(input.filters ?? {}) } as Record<string, unknown>;
     // entity presets

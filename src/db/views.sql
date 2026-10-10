@@ -17,7 +17,7 @@ with base as (
          p.views, p.engagements, p.engagements_lc, p.comments_count, p.has_cart, p.url, p.posted_at
   from posts p
   join creators c on c.id = p.creator_id
-  where p.creator_id is not null and p.relevant is not false
+  where p.creator_id is not null and p.relevant is not false and p.brought_in_by = 'panel'
 ), agg as (
   select workspace_id, platform, month, brand_id, creator_id,
          max(creator_handle) as creator_handle,
@@ -58,7 +58,7 @@ select p.workspace_id, p.platform, p.creator_id, p.brand_id,
        case when p.platform = 'tiktok' then count(*) filter (where p.has_cart) end::int as cart_posts,
        sum(p.views)::bigint as views
 from posts p
-where p.creator_id is not null and p.relevant is not false
+where p.creator_id is not null and p.relevant is not false and p.brought_in_by = 'panel'
 group by p.workspace_id, p.platform, p.creator_id, p.brand_id;
 create unique index mv_creator_brand_history_uq on mv_creator_brand_history (workspace_id, creator_id, brand_id);
 create index mv_creator_brand_history_brand_idx on mv_creator_brand_history (workspace_id, brand_id, last_post);
@@ -75,7 +75,7 @@ with wk as (
          sum(comments_count)::bigint as comments_count,
          case when platform = 'tiktok' then count(*) filter (where has_cart) end::int as cart_posts
   from posts
-  where relevant is not false
+  where relevant is not false and brought_in_by = 'panel'
   group by workspace_id, platform, source, brand_id, week_start
 ), tot as (
   select workspace_id, platform, week_start,
@@ -100,6 +100,6 @@ select workspace_id, creator_id, month,
        round(count(*) filter (where has_cart)::numeric / count(*) * 100, 2) as cart_pct,
        count(distinct brand_id)::int as brands
 from posts
-where platform = 'tiktok' and creator_id is not null and relevant is not false
+where platform = 'tiktok' and creator_id is not null and relevant is not false and brought_in_by = 'panel'
 group by workspace_id, creator_id, month;
 create unique index mv_creator_cart_profile_uq on mv_creator_cart_profile (workspace_id, creator_id, month);

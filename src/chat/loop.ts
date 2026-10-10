@@ -49,6 +49,7 @@ import { listDecks } from "../decks/store";
 import { roleOfSpec } from "../decks/changes";
 import { signal, type SignalCtx } from "../learning/signals";
 import { queryIntent, skillIntent } from "../learning/vocab";
+import { COMMENT_IN_PANEL } from "../db/panel";
 
 export const MAX_TOOL_CALLS = 6;
 const MAX_ROWS_IN_CONTEXT = 60;
@@ -138,15 +139,15 @@ async function buildSystemUncached(workspaceId: string, role: RoleModel): Promis
   const ctx = await loadContext(db, workspaceId);
   const ws = await db.one<{ name: string }>("select name from workspaces where id = $1", [workspaceId]);
   const platforms = await db.q<{ platform: string; posts: number; from: string; to: string }>(
-    "select platform, count(*)::int as posts, to_char(min(posted_at at time zone $2), 'DD Mon YYYY') as from, to_char(max(posted_at at time zone $2), 'DD Mon YYYY') as to from posts where workspace_id = $1 group by 1 order by 1",
+    "select platform, count(*)::int as posts, to_char(min(posted_at at time zone $2), 'DD Mon YYYY') as from, to_char(max(posted_at at time zone $2), 'DD Mon YYYY') as to from posts where workspace_id = $1 and brought_in_by = 'panel' group by 1 order by 1",
     [workspaceId, ctx.tz],
   );
   const client = ctx.clientBrandId ? ctx.brands.find((b) => b.id === ctx.clientBrandId) : null;
   const [counts, cfg, comments, tracked] = await Promise.all([
     workspaceCounts(workspaceId, db),
     getWorkspace(workspaceId),
-    db.one<{ n: number; labelled: number }>("select count(*)::int as n, count(*) filter (where sentiment is not null)::int as labelled from comments where workspace_id = $1", [workspaceId]),
-    db.one<{ snapshots: boolean; off_topic: number }>("select exists (select 1 from post_snapshots s join posts p on p.id = s.post_id where p.workspace_id = $1) as snapshots, (select count(*) from posts where workspace_id = $1 and relevant = false)::int as off_topic", [workspaceId]),
+    db.one<{ n: number; labelled: number }>(`select count(*)::int as n, count(*) filter (where c.sentiment is not null)::int as labelled from comments c where c.workspace_id = $1 and ${COMMENT_IN_PANEL("c")}`, [workspaceId]),
+    db.one<{ snapshots: boolean; off_topic: number }>("select exists (select 1 from post_snapshots s join posts p on p.id = s.post_id where p.workspace_id = $1) as snapshots, (select count(*) from posts where workspace_id = $1 and brought_in_by = 'panel' and relevant = false)::int as off_topic", [workspaceId]),
   ]);
   const available = Object.keys(impls);
   const profile = cfg?.kind === "profile";

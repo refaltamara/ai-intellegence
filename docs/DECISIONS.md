@@ -996,3 +996,28 @@ The agreed design is the doc "Core data architecture and model" (https://claude.
   - Whoever saves a case stays on its list, so nobody shuts themselves out by accident. Changes go to the audit log.
 - **Where.** CMS → a workspace → Cases lists the cases you are on, with the posts each caught and how many only it brought in. You can set one up, edit it, close it or open it again. A case you are not on stays hidden from you.
 - **Not yet.** No case holds posts yet. Loading into a case, and keeping case-only posts out of the panel's numbers, are the next parts. Kahf stays its own workspace.
+
+**Step 5, second part: a case's own posts stay out of the panel's numbers (10 Oct).**
+- **The rule** (definition `case_post` v1):
+  - A post only a case brought in (`posts.brought_in_by` = the case's id) never counts in the panel's numbers, and neither do the comments under it.
+  - A post the panel caught as well stays the panel's (`'panel'`) and counts in both.
+- **Where it holds.** Everywhere a set-aside post is already left out:
+  - the daily totals and the materialised views;
+  - the dashboards, the Pulse, decks and the weekly report;
+  - skills, the query builder, brand pages, the Data page and the connector.
+
+  A query that leaves out set-aside posts (`relevant is not false`) now also carries `brought_in_by = 'panel'`, and a test fails on any that does not (`src/definitions/__tests__/cases.rule.test.ts`). Comments take `COMMENT_IN_PANEL` (`src/db/panel.ts`).
+- **Speed.**
+  - The extra filter stopped some reads from being answered by an index alone: the newest post, the platforms a panel holds, the newest comment. `src/db/panel.ts` looks these up so they stay index lookups: the newest post is now found per platform, in under a millisecond, where reading every post took 0.4 s on Beauty.
+  - A small index on case-only posts (`posts_case_only_idx`, migration 0040; empty until a case loads) keeps the comment rule cheap.
+  - Database time per page, old code → new:
+    - Beauty Brand & KOL: 1,437 → 1,299 ms.
+    - Fintech PR: 2,933 → 2,723 ms. Fintech Social: 335 → 459 ms; its "settled day" count now reads each comment's post.
+    - Kahf PR: 1,959 → 1,669 ms. Kahf Pulse: 7,769 → 5,737 ms.
+    - Maudy's crisis view: 8,306 → 8,036 ms.
+
+    Fintech PR, Kahf Pulse and Maudy's crisis view were over the 2 s budget before this change and still are.
+- **What changed.** Nothing on screen: no case holds posts yet.
+  - The daily totals check finds no difference in any of the four workspaces.
+  - 46 screens and skill results, built with the old code and the new, give the same numbers. Only the order of tied rows differs.
+- **Next.** Loading into a case (third part).

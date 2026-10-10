@@ -26,6 +26,7 @@ import { isBuilder, makeCreation } from "../company/creations";
 import type { FindingColumn } from "../competitor/types";
 import { findingColumns } from "./findings";
 import { teamLine, teamShape, type TeamShape } from "./teamSlide";
+import { panelPlatformsSql } from "../db/panel";
 
 export type SlidePreview = { status: "ok" | "empty" | "error"; message?: string; columns: FindingColumn[]; rows: Record<string, unknown>[]; rows_total: number; shape: TeamShape; line: string | null; window: { from: string; to: string } };
 export type SlideDraft = { recipe: RecipeSpec; preview: SlidePreview };
@@ -64,7 +65,7 @@ async function brief(ws: string): Promise<string> {
   const ctx = await loadContext(db, ws);
   const cfg = await getWorkspace(ws);
   const topics = await db.q<{ label: string }>("select label from topics where workspace_id = $1 order by sort_order, label limit 30", [ws]).catch(() => []);
-  const platforms = await db.q<{ platform: string }>("select distinct platform from posts where workspace_id = $1", [ws]);
+  const platforms = await db.q<{ platform: string }>(panelPlatformsSql("$1"), [ws]);
   const label = ((await db.q<{ label: { voices?: string[] } | null }>("select settings->'label' as label from workspaces where id = $1", [ws]))[0]?.label) ?? null;
   return [
     `Workspace: ${cfg?.name ?? ws}; brands: ${ctx.brands.slice(0, 20).map((b) => `${b.name} (${b.id})`).join(", ")}${ctx.clientBrandId ? `; the team's own brand is ${ctx.clientBrandId}` : ""}.`,

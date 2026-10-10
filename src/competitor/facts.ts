@@ -23,6 +23,7 @@ import { deckPeriod, nextStart, periodWords, stepFrom, type Grain } from "./peri
 import { CAPTION_SLIDES, cleanSlides, LANDSCAPE_SLIDES } from "./slides";
 import { shortDay } from "./weeks";
 import type { Cell, CreatorRow, EvidencePost, Finding, Flag, Group, GroupResult, Mover, Panel, PanelPoint, Platform, WeekPoint, WeeklyReport } from "./types";
+import { panelPlatformsSql } from "../db/panel";
 
 const PLATFORM_NAME: Record<Platform, string> = { tiktok: "TikTok", instagram: "Instagram", threads: "Threads", x: "X", youtube: "YouTube" };
 /** Owned-account posts are captured on TikTok in the beauty panel; listening workspaces capture them everywhere (a platform with any counts). */
@@ -59,7 +60,7 @@ export async function weeklyReport(contract: WeeklyContract, week: string, opts:
   const words = periodWords(grain);
   const rules = weeklyRules(contract.rules, grain);
   // by default every platform the workspace holds (TikTok and Instagram in the beauty panel)
-  const platforms: Platform[] = contract.platforms?.length ? contract.platforms : ((await db.q<{ platform: Platform }>("select distinct platform from posts where workspace_id = $1 order by 1", [contract.workspace])).map((r) => r.platform));
+  const platforms: Platform[] = contract.platforms?.length ? contract.platforms : ((await db.q<{ platform: Platform }>(panelPlatformsSql("$1"), [contract.workspace])).map((r) => r.platform));
   const slides = contract.slides ? cleanSlides(contract.slides) : undefined;
   const period = deckPeriod(grain, week);
   const W = period.from;
@@ -84,7 +85,7 @@ export async function weeklyReport(contract: WeeklyContract, week: string, opts:
               g.gkey, p.platform, p.url, p.source, p.creator_handle, d7.views, ${ENG_D7} as engagements, coalesce(d7.so_far, false) as so_far, p.has_cart,
               (date_trunc('${unit}', p.posted_at at time zone $4))::date as wk
        from posts p join g on g.brand_id = p.brand_id ${D7}
-       where p.workspace_id = $1 and p.relevant is not false and p.platform = any($5::text[])
+       where p.workspace_id = $1 and p.relevant is not false and p.brought_in_by = 'panel' and p.platform = any($5::text[])
          and p.posted_at >= ($6::date::timestamp at time zone $4) and p.posted_at < ($7::date::timestamp at time zone $4)
        order by g.gkey, p.platform, p.url, d7.views desc nulls last
      )
@@ -107,7 +108,7 @@ export async function weeklyReport(contract: WeeklyContract, week: string, opts:
     `with d as (
        select distinct on (p.platform, p.url) p.platform, p.url, d7.views, coalesce(d7.so_far, false) as so_far, (date_trunc('${unit}', p.posted_at at time zone $2))::date as wk
        from posts p ${D7}
-       where p.workspace_id = $1 and p.relevant is not false and p.platform = any($3::text[])
+       where p.workspace_id = $1 and p.relevant is not false and p.brought_in_by = 'panel' and p.platform = any($3::text[])
          and p.posted_at >= ($4::date::timestamp at time zone $2) and p.posted_at < ($5::date::timestamp at time zone $2)
        order by p.platform, p.url, d7.views desc nulls last
      )
@@ -194,7 +195,7 @@ export async function weeklyReport(contract: WeeklyContract, week: string, opts:
   const lastSeen = await db.q<{ gkey: string; platform: Platform; last: string | null; n: number }>(
     `with g as (select * from unnest($2::text[], $3::text[]) as t(gkey, brand_id))
      select g.gkey, p.platform, to_char(max(p.posted_at at time zone $4), 'YYYY-MM-DD') as last, count(*)::int as n
-     from posts p join g on g.brand_id = p.brand_id where p.workspace_id = $1 and p.relevant is not false group by 1, 2`,
+     from posts p join g on g.brand_id = p.brand_id where p.workspace_id = $1 and p.relevant is not false and p.brought_in_by = 'panel' group by 1, 2`,
     [ctx.workspaceId, pairs.map((p) => p[0]), pairs.map((p) => p[1]), tz],
   );
   for (const r of watch) {
@@ -218,7 +219,7 @@ export async function weeklyReport(contract: WeeklyContract, week: string, opts:
     });
     notes.push({ kind: "coverage", text: `${g.name} is outside current coverage: ${[untracked, ...parts].filter(Boolean).join("; ")}.` });
   }
-  const snapshots = await db.one<{ n: number }>("select count(*)::int as n from post_snapshots s join posts p on p.id = s.post_id where p.workspace_id = $1 and p.relevant is not false", [ctx.workspaceId]);
+  const snapshots = await db.one<{ n: number }>("select count(*)::int as n from post_snapshots s join posts p on p.id = s.post_id where p.workspace_id = $1 and p.relevant is not false and p.brought_in_by = 'panel'", [ctx.workspaceId]);
   if (!snapshots?.n) notes.push({ kind: "method", text: `Views and engagement are as captured once per post, not at a fixed age, so ${words.this}'s posts have had less time to collect views than ${words.last}'s. The live collector measures every post at day 7.` });
   else notes.push({ kind: "method", text: "Views and engagement are counted at day 7 after posting, from the reading nearest day 7, so every post is compared at the same age." });
   // the period's young posts count their latest reading so far, and the period says so (Refal, 10 Oct 2026)
@@ -298,7 +299,7 @@ async function drivers(
               p.content_format, p.has_cart, p.product_name, p.caption, p.hashtags, p.posted_at,
               to_char((date_trunc('${g8.unit}', p.posted_at at time zone $3))::date, 'YYYY-MM-DD') as wk
        from posts p ${D7}
-       where p.workspace_id = $1 and p.relevant is not false and p.platform = $2 and p.brand_id = any($4::text[])
+       where p.workspace_id = $1 and p.relevant is not false and p.brought_in_by = 'panel' and p.platform = $2 and p.brand_id = any($4::text[])
          and p.posted_at >= ($5::date::timestamp at time zone $3) and p.posted_at < ($6::date::timestamp at time zone $3)
        order by p.url, d7.views desc nulls last
      )`;
@@ -351,7 +352,7 @@ async function drivers(
      tot as (
        select h as tag, count(distinct p.url)::int as posts_all
        from posts p, unnest(p.hashtags) h
-       where p.workspace_id = $1 and p.relevant is not false and p.platform = $2
+       where p.workspace_id = $1 and p.relevant is not false and p.brought_in_by = 'panel' and p.platform = $2
          and p.posted_at >= ($7::date::timestamp at time zone $3) and p.posted_at < ($11::date::timestamp at time zone $3)
          and h in (select tag from agg where creators >= $10)
        group by 1
@@ -447,7 +448,7 @@ async function topCreators(db: SkillDb, o: Reach & { from: string }): Promise<Cr
      d as (
        select distinct on (p.platform, p.url, g.gkey) g.gkey, p.platform, p.url, p.creator_handle, p.tier, p.followers_at_post as followers, d7.views, ${ENG_D7} as engagements, p.posted_at
        from posts p join g on g.brand_id = p.brand_id ${D7}
-       where p.workspace_id = $1 and p.relevant is not false and p.platform = any($5::text[]) and p.source = 'earned' and p.creator_handle is not null
+       where p.workspace_id = $1 and p.relevant is not false and p.brought_in_by = 'panel' and p.platform = any($5::text[]) and p.source = 'earned' and p.creator_handle is not null
          and p.posted_at >= ($6::date::timestamp at time zone $4) and p.posted_at < ($8::date::timestamp at time zone $4)
        order by p.platform, p.url, g.gkey, d7.views desc nulls last
      ),
@@ -494,7 +495,7 @@ async function topContent(db: SkillDb, o: Reach, evidence: EvidencePost[]): Prom
               to_char(p.posted_at at time zone $4, 'YYYY-MM-DD') as posted_at, d7.views::float8 as views, (${ENG_D7})::float8 as engagements,
               p.content_format, p.has_cart, p.product_name, p.caption
        from posts p join g on g.brand_id = p.brand_id ${D7}
-       where p.workspace_id = $1 and p.relevant is not false and p.platform = any($5::text[])
+       where p.workspace_id = $1 and p.relevant is not false and p.brought_in_by = 'panel' and p.platform = any($5::text[])
          and p.posted_at >= ($6::date::timestamp at time zone $4) and p.posted_at < ($7::date::timestamp at time zone $4)
        order by p.platform, p.url, d7.views desc nulls last, g.gkey
      ),

@@ -34,7 +34,7 @@ const D7_SQL = `
      where p.workspace_id = $1
      order by p.item_id, r.read_at desc, r.day_n desc, r.views desc nulls last
   ), asof as (
-    select max(r.read_at) as t from posts p join post_readings r on r.post_id = p.id where p.workspace_id = $1
+    select max(r.read_at) as t from posts p join post_readings r on r.post_id = p.id where p.workspace_id = $1 and p.brought_in_by = 'panel'
   ), v as (
     select n.item_id, s.so_far,
            case when s.so_far then l.day_n else n.day_n end as day_n, case when s.so_far then l.read_at else n.read_at end as read_at,
@@ -84,7 +84,7 @@ const BRAND_SQL = `
   select $1, day, brand_id, platform, source, ${SUMS}, $3
     from (select (i.posted_at at time zone $2)::date as day, p.brand_id, p.platform, p.source, coalesce(p.has_cart, false) as cart, ${NUMBERS}
             from posts p join post_items i on i.id = p.item_id left join post_d7 d on d.item_id = i.id
-           where p.workspace_id = $1 and p.relevant is not false) x
+           where p.workspace_id = $1 and p.relevant is not false and p.brought_in_by = 'panel') x
    group by day, brand_id, platform, source`;
 
 /** the panel's rows ('*') count each post once: owned when a panel brand's own account posted it */
@@ -93,7 +93,7 @@ const PANEL_SQL = `
   select $1, day, '*', platform, source, ${SUMS}, $3
     from (select (i.posted_at at time zone $2)::date as day, i.platform, case when l.owned then 'owned' else 'earned' end as source, l.cart, ${NUMBERS}
             from (select p.item_id, bool_or(p.source = 'owned') as owned, bool_or(coalesce(p.has_cart, false)) as cart
-                    from posts p where p.workspace_id = $1 and p.relevant is not false group by p.item_id) l
+                    from posts p where p.workspace_id = $1 and p.relevant is not false and p.brought_in_by = 'panel' group by p.item_id) l
             join post_items i on i.id = l.item_id left join post_d7 d on d.item_id = i.id) x
    group by day, platform, source`;
 
@@ -103,7 +103,7 @@ const CREATORS_SQL = `
   select $1, (i.posted_at at time zone $2)::date, p.brand_id, p.platform, i.creator_id, count(*)::int, count(*) filter (where p.has_cart)::int,
          coalesce(sum(i.views), 0), coalesce(sum(d.views), 0), coalesce(sum(${sqlOf("engagement_lc", "i")}), 0), max(i.followers_at_post), $3
     from posts p join post_items i on i.id = p.item_id left join post_d7 d on d.item_id = i.id
-   where p.workspace_id = $1 and p.relevant is not false and p.source = 'earned' and i.creator_id is not null
+   where p.workspace_id = $1 and p.relevant is not false and p.brought_in_by = 'panel' and p.source = 'earned' and i.creator_id is not null
    group by 2, 3, 4, 5`;
 
 export type ServingReport = { workspace: string; posts: number; so_far: number; d7_changed: number; totals: number; creators: number; ms: number };

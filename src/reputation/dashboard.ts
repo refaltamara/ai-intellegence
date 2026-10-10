@@ -16,6 +16,7 @@ import { PLATFORM_LABEL } from "../skills/common";
 import { dayMonth } from "../competitor/view";
 import { SkillDb } from "../skills/db";
 import { PR, type RoleModel } from "../roles/model";
+import { COMMENT_IN_PANEL, panelCommentEdge, panelPlatformsSql, panelPostEdge } from "../db/panel";
 
 export type Level = "calm" | "watch" | "issue" | "crisis" | "recovering";
 export const WINDOWS = [7, 14, 30] as const;
@@ -121,7 +122,7 @@ export const VOICES = `(select c.id, c.post_id, c.workspace_id, c.platform, c.po
      from comments c
    union all
    select p.id, p.id, p.workspace_id, p.platform, p.posted_at, p.stance, 'post', p.topic_id, p.likes, p.caption, null::text, null::text, null::boolean, true, p.voice, false
-     from posts p where p.source = 'earned' and p.stance_source = 'model' and p.relevant is not false)`;
+     from posts p where p.source = 'earned' and p.stance_source = 'model' and p.relevant is not false and p.brought_in_by = 'panel')`;
 
 export function crisisOf(alert: NonNullable<RoleModel["alert"]>): { multiple: number; min_negative: number } {
   const m = alert.crisis_multiple != null && alert.crisis_multiple >= alert.negative_multiple * 1.25 ? alert.crisis_multiple : alert.negative_multiple * 1.5;
@@ -166,7 +167,7 @@ export function ladder(days: { d: string; comments: number; negative: number; ba
 export async function settledDay(db: SkillDb, ws: string, tz: string, asOf: string, alert: NonNullable<RoleModel["alert"]>): Promise<string> {
   const rows = await db.q<{ d: string; n: number }>(
     `with days as (select generate_series($3::date - 35, $3::date, interval '1 day')::date as d)
-     select to_char(days.d, 'YYYY-MM-DD') as d, (select count(*) from ${VOICES} c where c.workspace_id = $1 and c.posted_at >= (days.d::timestamp at time zone $2) and c.posted_at < ((days.d + 1)::timestamp at time zone $2))::int as n
+     select to_char(days.d, 'YYYY-MM-DD') as d, (select count(*) from ${VOICES} c where c.workspace_id = $1 and ${COMMENT_IN_PANEL("c")} and c.posted_at >= (days.d::timestamp at time zone $2) and c.posted_at < ((days.d + 1)::timestamp at time zone $2))::int as n
      from days order by 1`,
     [ws, tz, asOf],
   );
@@ -198,9 +199,9 @@ export async function workspaceBasics(db: SkillDb, ws: string): Promise<Basics |
   if (!w) return null;
   const brands = await db.q<{ id: string; name: string }>("select id, name from brands where workspace_id = $1 order by name", [ws]);
   if (!brands.length) return null;
-  const platforms = (await db.q<{ platform: string }>("select distinct platform from posts where workspace_id = $1 order by 1", [ws])).map((r) => r.platform);
+  const platforms = (await db.q<{ platform: string }>(panelPlatformsSql("$1"), [ws])).map((r) => r.platform);
   const asOfRow = await db.one<{ d: string }>(
-    `select to_char(greatest((select max(posted_at) from comments where workspace_id = $1), (select max(posted_at) from posts where workspace_id = $1)) at time zone $2, 'YYYY-MM-DD') as d`,
+    `select to_char(greatest(${panelCommentEdge("$1", "newest")}, ${panelPostEdge("$1", "newest")}) at time zone $2, 'YYYY-MM-DD') as d`,
     [ws, w.tz],
   );
   return { tz: w.tz, client: w.client, brands, platforms, asOf: asOfRow?.d ?? new Date().toISOString().slice(0, 10) };
@@ -242,7 +243,7 @@ export async function reputationFacts(ws: string, win: { focus: string; from: st
   const platC = plat ? "and c.platform = $3" : "and $3::text is null";
   const platP = plat ? "and p.platform = $3" : "and $3::text is null";
   const onBrandComments = `${VOICES} c join posts p on p.id = c.post_id
-     where c.workspace_id = $1 and p.relevant is not false and c.sentiment_source is distinct from 'subject' and not c.off_topic and c.posted_at is not null ${platC}`;
+     where c.workspace_id = $1 and p.relevant is not false and p.brought_in_by = 'panel' and c.sentiment_source is distinct from 'subject' and not c.off_topic and c.posted_at is not null ${platC}`;
   const base = [ws, tz, plat];
 
   // ---- status ladder: the focus brand's daily negative share against the 28 days before each day (all platforms)
@@ -281,8 +282,8 @@ export async function reputationFacts(ws: string, win: { focus: string; from: st
   // ---- headline numbers, now and before
   const kpiRow = async (a: string, b: string) =>
     db.one<{ mentions: number; reach: number | null; comments: number; negative: number; labelled: number; intent: number; intent_read: number; post_voices: number }>(
-      `select (select count(*) from posts p where p.workspace_id = $1 and p.brand_id = $4 and p.relevant is not false ${platP} and ${inDays("p.posted_at", "$5", "$6")})::int as mentions,
-              (select sum(p.views) from posts p where p.workspace_id = $1 and p.brand_id = $4 and p.relevant is not false ${platP} and ${inDays("p.posted_at", "$5", "$6")})::float8 as reach,
+      `select (select count(*) from posts p where p.workspace_id = $1 and p.brand_id = $4 and p.relevant is not false and p.brought_in_by = 'panel' ${platP} and ${inDays("p.posted_at", "$5", "$6")})::int as mentions,
+              (select sum(p.views) from posts p where p.workspace_id = $1 and p.brand_id = $4 and p.relevant is not false and p.brought_in_by = 'panel' ${platP} and ${inDays("p.posted_at", "$5", "$6")})::float8 as reach,
               count(c.id)::int as comments, count(c.id) filter (where c.sentiment = 'negative')::int as negative, count(c.sentiment)::int as labelled,
               count(c.id) filter (where c.purchase_intent)::int as intent, count(c.purchase_intent)::int as intent_read, count(c.id) filter (where c.is_post)::int as post_voices
        from ${onBrandComments} and p.brand_id = $4 and ${inDays("c.posted_at", "$5", "$6")}`,
@@ -328,7 +329,7 @@ export async function reputationFacts(ws: string, win: { focus: string; from: st
             count(*)::int as comments, count(*) filter (where c.sentiment = 'negative')::int as negative, count(*) filter (where c.sentiment = 'neutral')::int as neutral,
             count(*) filter (where c.sentiment = 'positive')::int as positive, count(c.sentiment)::int as labelled
      from ${VOICES} c join posts p on p.id = c.post_id left join topics t on t.id = c.topic_id
-     where c.workspace_id = $1 and p.relevant is not false and c.sentiment_source is distinct from 'subject' and not c.off_topic and c.posted_at is not null ${platC}
+     where c.workspace_id = $1 and p.relevant is not false and p.brought_in_by = 'panel' and c.sentiment_source is distinct from 'subject' and not c.off_topic and c.posted_at is not null ${platC}
        and ${inDays("c.posted_at", "$6", "$5")}
      group by 1, 2, 3, 4, 5, 6`,
     [...base, from, to, prevFrom],
@@ -436,7 +437,7 @@ export async function reputationFacts(ws: string, win: { focus: string; from: st
   const curve = await db.q<{ day_n: number; share: number }>(
     `select s.day_n, percentile_cont(0.5) within group (order by s.views::float8 / p.views)::float8 as share
      from post_snapshots s join posts p on p.id = s.post_id
-     where p.workspace_id = $1 and p.views >= 1000 and p.captured_days >= 7 and s.day_n between 0 and 7 and s.views is not null group by 1`,
+     where p.workspace_id = $1 and p.brought_in_by = 'panel' and p.views >= 1000 and p.captured_days >= 7 and s.day_n between 0 and 7 and s.views is not null group by 1`,
     [ws],
   );
   const shareAt = new Map(curve.map((r) => [n(r.day_n), Number(r.share)]));
@@ -447,7 +448,7 @@ export async function reputationFacts(ws: string, win: { focus: string; from: st
             (select count(*) from comments c where c.post_id = p.id and c.sentiment_source is distinct from 'subject')::int as comments,
             (select count(*) from comments c where c.post_id = p.id and c.sentiment = 'negative')::int as negative,
             (select count(c.sentiment) from comments c where c.post_id = p.id and c.sentiment_source is distinct from 'subject')::int as labelled
-     from posts p where p.workspace_id = $1 and p.brand_id = $5 and p.relevant is not false ${platP}
+     from posts p where p.workspace_id = $1 and p.brand_id = $5 and p.relevant is not false and p.brought_in_by = 'panel' ${platP}
        and p.posted_at >= (($4::date - 2)::timestamp at time zone $2) and (p.views is not null or p.likes is not null)
      order by p.views desc nulls last, p.likes desc nulls last limit 6`,
     [...base, asOf, focus.id],
@@ -467,7 +468,7 @@ export async function reputationFacts(ws: string, win: { focus: string; from: st
             sum((select count(c.sentiment) from comments c where c.post_id = p.id and c.sentiment_source is distinct from 'subject'))::int as labelled,
             (array_agg(p.url order by p.views desc nulls last, p.likes desc nulls last))[1] as top_url
      from posts p left join creators cr on cr.id = p.creator_id
-     where p.workspace_id = $1 and p.brand_id = $4 and p.source = 'earned' and p.relevant is not false and p.creator_handle is not null ${platP} and ${inDays("p.posted_at", "$5", "$6")}
+     where p.workspace_id = $1 and p.brand_id = $4 and p.source = 'earned' and p.relevant is not false and p.brought_in_by = 'panel' and p.creator_handle is not null ${platP} and ${inDays("p.posted_at", "$5", "$6")}
      group by 1, 2 order by views desc, likes desc limit 8`,
     [...base, focus.id, from, to],
   );
@@ -482,7 +483,7 @@ export async function reputationFacts(ws: string, win: { focus: string; from: st
        select count(*) filter (where c.sentiment_source is distinct from 'subject') as comments, count(*) filter (where c.sentiment = 'negative') as negative,
               count(c.sentiment) filter (where c.sentiment_source is distinct from 'subject') as labelled, count(*) filter (where c.sentiment_source = 'subject') as replies
        from comments c where c.post_id = p.id) k on true
-     where p.workspace_id = $1 and p.source = 'owned' ${platP} and ${inDays("p.posted_at", "$5", "$6")}
+     where p.workspace_id = $1 and p.brought_in_by = 'panel' and p.source = 'owned' ${platP} and ${inDays("p.posted_at", "$5", "$6")}
      group by 1, 2`,
     [...base, focus.id, from, to],
   );
@@ -498,14 +499,14 @@ export async function reputationFacts(ws: string, win: { focus: string; from: st
     `select p.url, p.platform, p.creator_handle as handle, p.source, left(regexp_replace(coalesce(p.caption, ''), '\\s+', ' ', 'g'), 200) as caption, to_char(p.posted_at at time zone $2, 'YYYY-MM-DD') as posted_at, p.views::float8 as views, p.likes,
             count(c.id)::int as comments, count(c.id) filter (where c.sentiment = 'negative')::int as negative
      from posts p join comments c on c.post_id = p.id and c.sentiment_source is distinct from 'subject' and not coalesce(c.off_topic, false)
-     where p.workspace_id = $1 and p.brand_id = $4 and p.source = 'owned' ${platP} and ${inDays("c.posted_at", "$5", "$6")}
+     where p.workspace_id = $1 and p.brought_in_by = 'panel' and p.brand_id = $4 and p.source = 'owned' ${platP} and ${inDays("c.posted_at", "$5", "$6")}
      group by p.id having count(c.id) filter (where c.sentiment = 'negative') > 0 order by negative desc limit 3`,
     [...base, focus.id, from, to],
   )).map((r) => ({ url: String(r.url), platform: String(r.platform), handle: (r.handle as string) ?? null, source: String(r.source), caption: String(r.caption ?? ""), posted_at: String(r.posted_at), views: nn(r.views), comments: n(r.comments), negative: n(r.negative), likes: nn(r.likes) }));
 
   // ---- for customer service: negative comments that are service problems, not reputation stories
   const serviceWhere = (a: string, b: string) => `and c.sentiment = 'negative' and c.theme ~* ${a} and c.theme !~* ${b}`;
-  const themed = await db.one<{ any: boolean }>(`select exists (select 1 from comments c where c.workspace_id = $1 and c.theme is not null and c.theme <> 'unknown') as any`, [ws]);
+  const themed = await db.one<{ any: boolean }>(`select exists (select 1 from comments c where c.workspace_id = $1 and c.theme is not null and c.theme <> 'unknown' and ${COMMENT_IN_PANEL("c")}) as any`, [ws]);
   const [serviceCount, serviceQuotes] = await Promise.all([
     db.one<{ n: number }>(`select count(*)::int as n from ${onBrandComments} and p.brand_id = $4 and ${inDays("c.posted_at", "$5", "$6")} ${serviceWhere("$7", "$8")}`, [...base, focus.id, from, to, SERVICE_THEME.source, NOT_SERVICE.source]),
     db.q(quoteSql(serviceWhere("$8", "$9")), [...base, focus.id, from, to, 6, SERVICE_THEME.source, NOT_SERVICE.source]),
@@ -516,7 +517,7 @@ export async function reputationFacts(ws: string, win: { focus: string; from: st
     `with posts_w as (
        select p.brand_id, count(*) filter (where ${inDays("p.posted_at", "$4", "$5")})::int as posts, count(*) filter (where ${inDays("p.posted_at", "$6", "$7")})::int as posts_prev,
               coalesce(sum(p.views) filter (where ${inDays("p.posted_at", "$4", "$5")}), 0)::float8 as views
-       from posts p where p.workspace_id = $1 and p.relevant is not false ${platP} group by 1),
+       from posts p where p.workspace_id = $1 and p.relevant is not false and p.brought_in_by = 'panel' ${platP} group by 1),
      comments_w as (
        select p.brand_id, count(*) filter (where ${inDays("c.posted_at", "$4", "$5")})::int as comments,
               count(*) filter (where c.sentiment = 'negative' and ${inDays("c.posted_at", "$4", "$5")})::int as negative,
@@ -551,8 +552,8 @@ export async function reputationFacts(ws: string, win: { focus: string; from: st
   const covRows = await db.q(
     `select p.platform, to_char(min(p.posted_at at time zone $2), 'YYYY-MM-DD') as first, to_char(max(p.posted_at at time zone $2), 'YYYY-MM-DD') as last, count(*)::int as posts,
             count(*) filter (where p.relevant = false)::int as off_topic, coalesce(sum(p.comments_count), 0)::float8 as reported,
-            (select count(*) from comments c where c.workspace_id = $1 and c.platform = p.platform)::int as comments
-     from posts p where p.workspace_id = $1 group by 1 order by posts desc`,
+            (select count(*) from comments c where c.workspace_id = $1 and c.platform = p.platform and ${COMMENT_IN_PANEL("c")})::int as comments
+     from posts p where p.workspace_id = $1 and p.brought_in_by = 'panel' group by 1 order by posts desc`,
     [ws, tz],
   );
   const coverage: Coverage[] = covRows.map((r) => ({ platform: String(r.platform), first: String(r.first), last: String(r.last), posts: n(r.posts), off_topic: n(r.off_topic), comments: n(r.comments), reported_comments: n(r.reported) }));
@@ -561,7 +562,7 @@ export async function reputationFacts(ws: string, win: { focus: string; from: st
   else if (to > settled) notes.push(`Comments for ${dayMonth(addDays(settled, 1))} to ${dayMonth(to)} are still arriving (half of a post's comments come in its first 15 hours); those days will grow.`);
   for (const c of coverage) if (c.first > prevFrom) notes.push(`${PLATFORM_LABEL[c.platform] ?? c.platform} has been tracked since ${dayMonth(c.first)}, so comparisons with the previous ${f.days} days include it on one side only.`);
   const weekly = await db.q<{ wk: string; posts: number }>(
-    `select to_char(date_trunc('week', p.posted_at at time zone $2), 'YYYY-MM-DD') as wk, count(*)::int as posts from posts p where p.workspace_id = $1 and p.posted_at >= (($3::date - 63)::timestamp at time zone $2) group by 1 order by 1`,
+    `select to_char(date_trunc('week', p.posted_at at time zone $2), 'YYYY-MM-DD') as wk, count(*)::int as posts from posts p where p.workspace_id = $1 and p.brought_in_by = 'panel' and p.posted_at >= (($3::date - 63)::timestamp at time zone $2) group by 1 order by 1`,
     [ws, tz, asOf],
   );
   const wk = weekly.map((r) => n(r.posts));

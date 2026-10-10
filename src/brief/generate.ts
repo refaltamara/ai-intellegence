@@ -23,6 +23,7 @@ import { loadContext } from "../skills/params";
 import { runSkill } from "../skills/runner";
 import type { Evidence, SkillResult } from "../skills/types";
 import { insertBrief, latestBrief, type BriefContent, type BriefItem, type BriefRow, type NoticedItem } from "./store";
+import { panelPostEdge } from "../db/panel";
 
 const BRIEF_SYSTEM = readFileSync(path.join(process.cwd(), "src/brief/system.md"), "utf8");
 const REFRESH_COOLDOWN_MS = 60 * 60 * 1000;
@@ -36,7 +37,7 @@ function addDays(iso: string, d: number): string {
 /** The data state: newest post plus the last finished load. A new key means new data. */
 export async function dataKey(workspaceId = DEFAULT_WORKSPACE_ID): Promise<string> {
   const [r] = (await sql.query(
-    `select (select to_char(max(posted_at), 'YYYY-MM-DD"T"HH24:MI:SS') from posts where workspace_id = $1) as freshness,
+    `select to_char(${panelPostEdge("$1", "newest")}, 'YYYY-MM-DD"T"HH24:MI:SS') as freshness,
             (select to_char(max(finished_at), 'YYYY-MM-DD"T"HH24:MI:SS') from data_loads where workspace_id = $1) as last_load`,
     [workspaceId],
   )) as { freshness: string | null; last_load: string | null }[];
@@ -98,7 +99,7 @@ export async function generateBrief(workspaceId: string, key: string): Promise<B
 
   // the brands that mattered this week, client first when there is one
   const top = await db.q<{ brand_id: string }>(
-    `select brand_id from posts where workspace_id = $1 and posted_at >= ($2::date::timestamp at time zone $4) and posted_at < (($3::date + 1)::timestamp at time zone $4)
+    `select brand_id from posts where workspace_id = $1 and brought_in_by = 'panel' and posted_at >= ($2::date::timestamp at time zone $4) and posted_at < (($3::date + 1)::timestamp at time zone $4)
      group by 1 order by count(*) desc limit 6`,
     [workspaceId, from, to, ctx.tz],
   );

@@ -37,8 +37,8 @@ export async function caseFacts(ws: string, o: { from: string; to: string; focus
   // $1 ws, $2 tz, $3 from, $4 to, $5 focus, $6 platform
   const base = [ws, o.tz, o.from, o.to, o.focus, plat];
   const inWin = (col: string) => `${col} >= ($3::date::timestamp at time zone $2) and ${col} < (($4::date + 1)::timestamp at time zone $2)`;
-  const postsWhere = `p.workspace_id = $1 and p.brand_id = $5 and p.relevant is not false and p.content_type is distinct from 'stub' and ($6::text is null or p.platform = $6)`;
-  const commentsWhere = `c.workspace_id = $1 and p.brand_id = $5 and p.relevant is not false and c.sentiment_source is distinct from 'subject' and not coalesce(c.off_topic, false) and ($6::text is null or c.platform = $6)`;
+  const postsWhere = `p.workspace_id = $1 and p.brand_id = $5 and p.relevant is not false and p.brought_in_by = 'panel' and p.content_type is distinct from 'stub' and ($6::text is null or p.platform = $6)`;
+  const commentsWhere = `c.workspace_id = $1 and p.brand_id = $5 and p.relevant is not false and p.brought_in_by = 'panel' and c.sentiment_source is distinct from 'subject' and not coalesce(c.off_topic, false) and ($6::text is null or c.platform = $6)`;
   const bucket = (col: string) => `to_char(date_trunc('${unit}', ${col} at time zone $2), '${unit === "hour" ? "YYYY-MM-DD HH24:00" : "YYYY-MM-DD"}')`;
 
   const endRow = await db.one<{ end: string | null }>(
@@ -145,7 +145,7 @@ export async function caseFacts(ws: string, o: { from: string; to: string; focus
     `select p.url, p.caption, to_char(p.posted_at at time zone $2, 'YYYY-MM-DD HH24:MI') as posted_at, count(c.id)::int as comments,
             count(c.id) filter (where c.sentiment = 'negative')::int as negative, count(c.sentiment)::int as labelled
      from posts p join comments c on c.post_id = p.id and c.sentiment_source is distinct from 'subject' and not coalesce(c.off_topic, false) and ${inWin("c.posted_at")}
-     where p.workspace_id = $1 and p.brand_id = $5 and p.source = 'owned' and ($6::text is null or p.platform = $6)
+     where p.workspace_id = $1 and p.brought_in_by = 'panel' and p.brand_id = $5 and p.source = 'owned' and ($6::text is null or p.platform = $6)
      group by p.id order by comments desc limit 4`,
     base,
   )).map((r) => ({ url: String(r.url), caption: clip(r.caption, 140), posted_at: String(r.posted_at), comments: n(r.comments), negative: n(r.negative), labelled: n(r.labelled) }));
@@ -163,7 +163,7 @@ export async function caseFacts(ws: string, o: { from: string; to: string; focus
   for (const p of exposure?.partners ?? []) if (p.first) events.push({ at: p.first, kind: "partner", what: `${p.name} first named`, detail: `${p.posts} posts and ${p.comments} comments name it in the period` });
   const own = await db.q(
     `select to_char(p.posted_at at time zone $2, 'YYYY-MM-DD HH24:MI') as at, p.creator_handle as handle, p.caption, p.url from posts p
-     where p.workspace_id = $1 and p.brand_id = $5 and p.source = 'owned' and ($6::text is null or p.platform = $6) and ${inWin("p.posted_at")} order by p.posted_at limit 4`,
+     where p.workspace_id = $1 and p.brought_in_by = 'panel' and p.brand_id = $5 and p.source = 'owned' and ($6::text is null or p.platform = $6) and ${inWin("p.posted_at")} order by p.posted_at limit 4`,
     base,
   );
   for (const r of own) events.push({ at: String(r.at), kind: "own", what: `@${r.handle} posts`, detail: clip(r.caption, 110), url: String(r.url) });

@@ -12,7 +12,7 @@ export default async function DiscoveryPage() {
   const db = new SkillDb();
   const [ctx, monthRows] = await Promise.all([
     loadContext(db, ws),
-    sql.query("select to_char(month, 'YYYY-MM') as m from posts where workspace_id = $1 group by month order by month", [ws]) as unknown as Promise<{ m: string }[]>,
+    sql.query("select to_char(month, 'YYYY-MM') as m from posts where workspace_id = $1 and brought_in_by = 'panel' group by month order by month", [ws]) as unknown as Promise<{ m: string }[]>,
   ]);
   const brands = ctx.brands.map((b) => ({ id: b.id, name: b.name, hint: b.is_client ? "your brand" : undefined }));
   return (

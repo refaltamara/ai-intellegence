@@ -281,6 +281,13 @@
       "when": 1791626918996,
       "tag": "0039_watery_barracuda",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1791628263890,
+      "tag": "0040_stiff_kid_colt",
+      "breakpoints": true
     }
   ]
 }

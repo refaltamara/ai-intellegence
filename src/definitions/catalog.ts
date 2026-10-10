@@ -32,6 +32,8 @@ const LIST: Definition[] = [
     means: "One post on one platform, whatever brands it is about (a post about two brands is one post, linked to each). A reply that arrives as a post counts as a comment." },
   { key: "link", version: 1, unit: "posts", name: "Brand post",
     means: "A post's link to one brand. A brand's numbers count its links, so a post about two brands counts for both; a panel total counts each post once." },
+  { key: "case_post", version: 1, unit: "posts", name: "Case post",
+    means: "A post a case brought in that the panel's own setup did not catch. It counts in that case's numbers and never in the panel's everyday numbers, creators or tiers; a post the panel also caught counts in both. Every panel query keeps relevant is not false and brought_in_by = 'panel' together." },
   { key: "views_d7", version: 2, unit: "views", name: "Views (day 7)",
     means: "Views in the reading nearest 7 days after posting. A post that went up less than 7 days before the data's latest reading counts its latest reading so far, and a period holding such posts is shown as \"so far\": its views will still grow.",
     sql: (x) => `${x}.views` },
@@ -82,6 +84,7 @@ export const fingerprint = (d: Definition) => createHash("sha1").update(`${d.mea
 export const RECORDED: Record<string, { version: number; fingerprint: string }> = {
   post: { version: 1, fingerprint: "322fbbacc6" },
   link: { version: 1, fingerprint: "f85cc110f4" },
+  case_post: { version: 1, fingerprint: "e20057a9b3" },
   views_d7: { version: 2, fingerprint: "e69a97442f" },
   views_latest: { version: 1, fingerprint: "7f706dce75" },
   engagement: { version: 1, fingerprint: "b585cd40db" },
