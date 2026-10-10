@@ -45,7 +45,7 @@ export function LoadsList({ ws, loads }: { ws: string; loads: LoadRow[] }) {
             return [
               <tr key={l.id} className={l.status === "held" ? "warnrow" : ""} onClick={() => setOpen(open === l.id ? null : l.id)} style={{ cursor: "pointer" }}>
                 <td>{when(l.created_at)}<br /><small className="muted">{l.started_by ?? ""}</small></td>
-                <td>{l.source}</td>
+                <td>{l.source}{l.case_id ? <><br /><small className="muted">case: {l.case_name ?? l.case_id}</small></> : null}</td>
                 <td>{l.files.length === 1 ? l.files[0].path.split("/").pop() : `${l.files.length} files`}</td>
                 <td><span className={`hst ${HST[l.status] ?? "info"}`}>{STATUS[l.status] ?? l.status}</span>{l.cleared_at && l.status !== "discarded" ? <small className="muted"> · cleared</small> : null}</td>
                 <td>{bad.length ? bad.map((c) => <span key={c.key} className={`hst ${OUT[c.outcome]}`} title={c.detail}>{c.label}</span>) : l.checks.length ? <span className="hst ok">all passed</span> : ""}</td>

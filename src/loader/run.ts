@@ -13,6 +13,7 @@ import { readProfile } from "./adapters/profile";
 import { runChecks, type Check } from "./checks";
 import { notifyLoad } from "./notify";
 import { promote, type PromoteProgress } from "./promote";
+import { assertOpenCase } from "../cases/store";
 import { failLoad, openLoad, writeStaged } from "./stage";
 import type { SourceKind, Staged } from "./types";
 
@@ -24,12 +25,13 @@ async function adapt(ws: string, source: SourceKind, tz: string, files: { raw: R
   return readProfile({ workspace: ws, tz, files });
 }
 
-/** read and stage a load, then check it: held, or ready to promote */
-export async function stageAndCheck(ws: string, source: SourceKind, raws: RawFile[], startedBy: string | null): Promise<{ loadId: string; held: boolean; checks: Check[] }> {
+/** read and stage a load, then check it: held, or ready to promote. `caseId` makes it a case's load. */
+export async function stageAndCheck(ws: string, source: SourceKind, raws: RawFile[], startedBy: string | null, caseId: string | null = null): Promise<{ loadId: string; held: boolean; checks: Check[] }> {
   const tz = ((await sql.query(`select tz from workspaces where id = $1`, [ws])) as { tz: string }[])[0]?.tz;
   if (!tz) throw new Error(`no workspace ${ws}`);
+  if (caseId) await assertOpenCase(ws, caseId);
   const ids = new Map(((await sql.query(`select id, blob_path from raw_files where blob_path = any($1::text[])`, [raws.map((f) => f.blob)])) as { id: string; blob_path: string }[]).map((r) => [r.blob_path, r.id]));
-  const loadId = await openLoad(ws, source, raws.map((f) => ({ raw_file_id: ids.get(f.blob) ?? null, path: f.path, sha256: f.sha256 })), startedBy);
+  const loadId = await openLoad(ws, source, raws.map((f) => ({ raw_file_id: ids.get(f.blob) ?? null, path: f.path, sha256: f.sha256 })), startedBy, caseId);
   try {
     const files = await Promise.all(raws.map(async (raw) => ({ raw, bytes: await readRaw(raw) })));
     const st = await adapt(ws, source, tz, files);
@@ -58,18 +60,18 @@ export async function letIn(loadId: string, by: string): Promise<void> {
 
 // --------------------------------------------------------------------- jobs
 /** onboarding: a draft or review workspace shows as loading while its first loads run, and goes to review after (src/onboard/) */
-type LoadParams = { source: SourceKind; files: string[]; started_by?: string | null; promote?: "auto" | "never"; load_id?: string; onboarding?: boolean };
+type LoadParams = { source: SourceKind; files: string[]; started_by?: string | null; promote?: "auto" | "never"; load_id?: string; onboarding?: boolean; case_id?: string | null };
 type LoadProgress = { phase?: "stage" | "promote" | "done"; load_id?: string; held?: boolean; promote?: PromoteProgress };
 
 /** one slice of a `load` job: stage and check first, then promote as far as the budget reaches */
 export async function loadJobSlice(ws: string, params: LoadParams, progress: LoadProgress, budgetMs = 40_000): Promise<{ done: boolean; progress: LoadProgress; note: string }> {
   const p: LoadProgress = { phase: progress.phase ?? (params.load_id ? "promote" : "stage"), load_id: progress.load_id ?? params.load_id, held: progress.held, promote: progress.promote };
   if (p.phase === "stage") {
-    if (params.onboarding) {
+    if (params.onboarding && !params.case_id) {
       const st = ((await sql.query(`select status from workspaces where id = $1`, [ws])) as { status: string }[])[0]?.status;
       if (st === "draft" || st === "review") await (await import("../onboard/load")).setStatus(ws, "loading");
     }
-    const r = await stageAndCheck(ws, params.source, await rawFilesFor(params.files), params.started_by ?? null);
+    const r = await stageAndCheck(ws, params.source, await rawFilesFor(params.files), params.started_by ?? null, params.case_id ?? null);
     p.load_id = r.loadId;
     p.held = r.held;
     if (r.held || params.promote === "never") return { done: true, progress: { ...p, phase: "done" }, note: r.held ? "Held: see the load's checks." : "Staged and checked; not promoted." };
@@ -84,7 +86,7 @@ export async function loadJobSlice(ws: string, params: LoadParams, progress: Loa
     p.promote = r.progress;
     if (!r.done) return { done: false, progress: p, note: `Promoting: ${r.progress.phase}.` };
     await afterPromote(p.load_id);
-    if (params.onboarding) {
+    if (params.onboarding && !params.case_id) {
       const st = ((await sql.query(`select status from workspaces where id = $1`, [ws])) as { status: string }[])[0]?.status;
       if (st === "loading") await (await import("../onboard/load")).setStatus(ws, "review");
       // the health checks, for data ops to read in review (src/onboard/health.ts)

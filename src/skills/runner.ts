@@ -42,7 +42,7 @@ async function layerCountsUncached(db: SkillDb, workspaceId: string): Promise<Re
     `select (select count(*) from (select 1 from posts where workspace_id = $1 and brought_in_by = 'panel' limit 1) x)::int as posts,
             (select count(*) from creators where workspace_id = $1)::int as creators,
             (select count(*) from (select 1 from comments c where c.workspace_id = $1 and ${COMMENT_IN_PANEL("c")} limit 1) x)::int as comments,
-            (select count(*) from topics where workspace_id = $1)::int as topics,
+            (select count(*) from topics where workspace_id = $1 and case_id is null)::int as topics,
             (select count(*) from post_snapshots)::int as post_snapshots`,
     [workspaceId],
   );

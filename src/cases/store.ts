@@ -75,6 +75,13 @@ export async function getCase(id: string): Promise<CaseRow | null> {
   return (await q<CaseRow>(`select ${COLS} from cases c where c.id = $1`, [id]))[0] ?? null;
 }
 
+/** a load goes into a case only while the case is open, and only into a case of the load's own workspace */
+export async function assertOpenCase(ws: string, caseId: string): Promise<void> {
+  const c = (await q<{ workspace_id: string; status: string }>(`select workspace_id, status from cases where id = $1`, [caseId]))[0];
+  if (!c || c.workspace_id !== ws) throw new Error(`no case ${caseId} in ${ws}`);
+  if (c.status !== "open") throw new Error(`case ${caseId} is closed: open it again to load into it`);
+}
+
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 const validDay = (d: string) => DAY.test(d) && !Number.isNaN(Date.parse(`${d}T00:00:00Z`)) && new Date(`${d}T00:00:00Z`).toISOString().slice(0, 10) === d;

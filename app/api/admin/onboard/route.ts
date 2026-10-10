@@ -146,7 +146,7 @@ export async function POST(req: Request) {
       const list = Array.isArray(b.topics) ? b.topics : [];
       for (const t of list as Record<string, unknown>[]) {
         const tags = (Array.isArray(t.tags) ? t.tags : []).map(String).filter((x) => ["service", "promo", "product", "reputation"].includes(x));
-        await sql.query("update topics set label = coalesce(nullif($3, ''), label), is_catch_all = $4, tags = $5::text[], definition = nullif($6, '') where id = $1 and workspace_id = $2", [
+        await sql.query("update topics set label = coalesce(nullif($3, ''), label), is_catch_all = $4, tags = $5::text[], definition = nullif($6, '') where id = $1 and workspace_id = $2 and case_id is null", [
           String(t.id ?? ""), ws, String(t.label ?? "").trim().slice(0, 60), !!t.is_catch_all, tags, String(t.definition ?? "").trim().slice(0, 200),
         ]);
       }

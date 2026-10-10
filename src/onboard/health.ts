@@ -55,7 +55,7 @@ export async function healthChecks(ws: string): Promise<Check[]> {
   // the catch-all topic and thin topics
   const tp = (await sql.query(
     `select t.label, t.is_catch_all, count(c.id)::int as n, count(c.id) filter (where c.posted_at > (select max(posted_at) from comments where workspace_id = $1) - interval '30 days')::int as month
-       from topics t left join comments c on c.topic_id = t.id and c.workspace_id = $1 where t.workspace_id = $1 group by 1, 2 order by 3 desc`,
+       from topics t left join comments c on c.topic_id = t.id and c.workspace_id = $1 where t.workspace_id = $1 and t.case_id is null group by 1, 2 order by 3 desc`,
     [ws],
   )) as { label: string; is_catch_all: boolean; n: number; month: number }[];
   if (tp.length) {

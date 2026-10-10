@@ -48,7 +48,7 @@ export default async function CompanyPage() {
     sql.query("select b.name from workspaces w join brands b on b.id = w.client_brand_id and b.workspace_id = w.id where w.id = $1", [ws]) as unknown as Promise<{ name: string }[]>,
   ]);
   const client = clientRow[0]?.name ?? "Your team";
-  const topics = role.id === "pr" ? ((await sql.query("select label from topics where workspace_id = $1 and not coalesce(is_catch_all, false) order by sort_order, label limit 20", [ws])) as { label: string }[]).map((t) => t.label) : [];
+  const topics = role.id === "pr" ? ((await sql.query("select label from topics where workspace_id = $1 and case_id is null and not coalesce(is_catch_all, false) order by sort_order, label limit 20", [ws])) as { label: string }[]).map((t) => t.label) : [];
   const badge = (c: Creation) => <i className="badge client" title={`Made by ${c.maker_name ?? c.maker_email}${c.approver && c.approver !== c.maker_email ? `, approved by ${c.approver}` : ""}`}>{client}</i>;
   const live = (k: Creation["kind"][]) => d.creations.filter((c) => k.includes(c.kind) && c.status === "approved");
   const mine = d.creations.filter((c) => c.maker_email === d.me && c.status !== "approved" && c.status !== "removed");

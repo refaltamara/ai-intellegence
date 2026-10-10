@@ -19,10 +19,10 @@ const pct = (a: number, b: number) => (b ? Math.round((a / b) * 1000) / 10 : 0);
 const fmt = (n: number) => n.toLocaleString("en-US");
 const PL: Record<string, string> = { tiktok: "TikTok", instagram: "Instagram", threads: "Threads", x: "X", youtube: "YouTube" };
 
-type LoadRow = { workspace_id: string; source: SourceKind; report: { files?: FileReport[]; staged?: Record<string, number>; facts?: Record<string, unknown> } };
+type LoadRow = { workspace_id: string; source: SourceKind; report: { files?: FileReport[]; staged?: Record<string, number>; facts?: Record<string, unknown> }; case_id: string | null };
 
 export async function runChecks(loadId: string): Promise<{ checks: Check[]; held: boolean }> {
-  const l = (await q<LoadRow>(`select workspace_id, source, report from staging.loads where id = $1`, [loadId]))[0];
+  const l = (await q<LoadRow>(`select workspace_id, source, report, case_id from staging.loads where id = $1`, [loadId]))[0];
   if (!l) throw new Error(`no staged load ${loadId}`);
   const ws = l.workspace_id;
   const tz = (await q<{ tz: string }>(`select tz from workspaces where id = $1`, [ws]))[0]?.tz ?? "Asia/Jakarta";
@@ -113,16 +113,19 @@ export async function runChecks(loadId: string): Promise<{ checks: Check[]; held
     detail: `${fmt(dup.groups)} posts appear under more than one url (${fmt(dup.rows)} rows), so they would count more than once.`,
   });
 
-  // 5. how much is set aside: posts not about their brand, contents a profile's rules drop
+  // 5. how much is set aside: posts not about their brand, contents a profile's rules drop. A case watches beyond the panel's
+  // terms (step 5), so much of what it brings may not name a brand: for a case's load the share is reported, never held.
+  const over = (bad: boolean): Check["outcome"] => (bad ? (l.case_id ? "info" : "hold") : "pass");
   if (l.source === "listening") {
     const s = (await q<{ n: number; off: number }>(`select count(*)::int as n, count(*) filter (where relevant = false)::int as off from staging.posts where load_id = $1`, [loadId]))[0];
-    out.push({ key: "set_aside", label: "Share set aside", count: s.off, outcome: s.n && s.off / s.n > C.setAsideShare ? "hold" : "pass", detail: `${fmt(s.off)} of ${fmt(s.n)} posts (${pct(s.off, s.n)}%) do not name their brand and are set aside${s.n && s.off / s.n > C.setAsideShare ? ": check the brands' terms before letting this in" : ""}.` });
+    const bad = !!s.n && s.off / s.n > C.setAsideShare;
+    out.push({ key: "set_aside", label: "Share set aside", count: s.off, outcome: over(bad), detail: `${fmt(s.off)} of ${fmt(s.n)} posts (${pct(s.off, s.n)}%) do not name their brand and are set aside${bad ? (l.case_id ? ": usual for a case, which watches beyond the brands' terms; the case keeps them and the panel never counts them" : ": check the brands' terms before letting this in") : ""}.` });
   }
   if (l.source === "profile") {
     const ruled = files.filter((f) => f.kind === "posts").map((f) => ({ f, n: Object.entries(f.drops).filter(([w]) => /^no subject keyword|^no caption to match|^link spam/.test(w)).reduce((a, [, d]) => a + d.count, 0) }));
     const bad = ruled.filter((r) => r.f.rows_in >= C.emptyFileMinRows && r.n / r.f.rows_in > C.droppedByRuleShare);
     const n = ruled.reduce((a, r) => a + r.n, 0), all = ruled.reduce((a, r) => a + r.f.rows_in, 0);
-    out.push({ key: "set_aside", label: "Share set aside", count: n, outcome: bad.length ? "hold" : "pass", detail: bad.length ? `${bad.map((r) => `${r.f.file}: ${pct(r.n, r.f.rows_in)}% dropped by the keyword and spam rules`).join("; ")}: check the contract's keywords.` : `${fmt(n)} of ${fmt(all)} posts (${pct(n, all)}%) dropped by the keyword and spam rules.` });
+    out.push({ key: "set_aside", label: "Share set aside", count: n, outcome: over(bad.length > 0), detail: bad.length ? `${bad.map((r) => `${r.f.file}: ${pct(r.n, r.f.rows_in)}% dropped by the keyword and spam rules`).join("; ")}${l.case_id ? ": a profile keeps only posts that name its subject, a case's too" : ": check the contract's keywords"}.` : `${fmt(n)} of ${fmt(all)} posts (${pct(n, all)}%) dropped by the keyword and spam rules.` });
   }
 
   // 6. a file that yields nothing

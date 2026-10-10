@@ -27,26 +27,28 @@ export async function rawFilesFor(keys: string[]): Promise<RawFile[]> {
 }
 
 /** a workspace's raw files, newest first */
-export async function workspaceRawFiles(ws: string): Promise<(RawFile & { stored: boolean })[]> {
+/** a workspace's raw files, each with the case it was delivered for (empty for the panel's) */
+export async function workspaceRawFiles(ws: string): Promise<(RawFile & { stored: boolean; case_id: string | null })[]> {
   const rows = (await sql.query(
-    `select workspace_id, path, blob_path, bytes::float8 as bytes, sha256, received::text, stored_at is not null as stored from raw_files where workspace_id = $1 order by received desc, path`,
+    `select workspace_id, path, blob_path, bytes::float8 as bytes, sha256, received::text, stored_at is not null as stored, case_id from raw_files where workspace_id = $1 order by received desc, path`,
     [ws],
-  )) as (Row & { stored: boolean })[];
-  return rows.map((r) => ({ ...asRaw(r), stored: r.stored }));
+  )) as (Row & { stored: boolean; case_id: string | null })[];
+  return rows.map((r) => ({ ...asRaw(r), stored: r.stored, case_id: r.case_id }));
 }
 
 /**
  * A file uploaded in the CMS becomes a raw file: it is kept where it was uploaded (private Blob, or the onboarding folder on
  * a laptop), read once to take its hash, and kept 12 months like any other.
  */
-export async function registerUpload(ws: string, name: string, url: string): Promise<RawFile> {
+export async function registerUpload(ws: string, name: string, url: string, caseId: string | null = null): Promise<RawFile> {
   const bytes = await readStoredBytes(url);
-  const f: RawFile = { path: `${ws}/${name}`, workspace: ws, blob: url, bytes: bytes.length, sha256: sha256(bytes), received: new Date().toISOString().slice(0, 10) };
+  // a case's delivery is filed under the case (step 5): only the people on its list see it
+  const f: RawFile = { path: caseId ? `${ws}/cases/${caseId}/${name}` : `${ws}/${name}`, workspace: ws, blob: url, bytes: bytes.length, sha256: sha256(bytes), received: new Date().toISOString().slice(0, 10) };
   await sql.query(
-    `insert into raw_files (workspace_id, path, blob_path, bytes, sha256, received, keep_until, stored_at)
-     values ($1, $2, $3, $4, $5, $6::date, $7::date, case when $3 like 'file://%' then null else now() end)
+    `insert into raw_files (workspace_id, path, blob_path, bytes, sha256, received, keep_until, stored_at, case_id)
+     values ($1, $2, $3, $4, $5, $6::date, $7::date, case when $3 like 'file://%' then null else now() end, $8)
      on conflict (blob_path) do update set bytes = excluded.bytes, sha256 = excluded.sha256`,
-    [ws, f.path, f.blob, f.bytes, f.sha256, f.received, keepUntil(f.received)],
+    [ws, f.path, f.blob, f.bytes, f.sha256, f.received, keepUntil(f.received), caseId],
   );
   return f;
 }

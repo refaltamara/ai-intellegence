@@ -12,18 +12,18 @@ import { labellerId } from "../labels/record";
 import type { FileReport, SourceKind } from "./types";
 
 export type PromoteProgress = {
-  phase: "prepare" | "creators" | "stubs" | "items" | "posts" | "export_readings" | "readings" | "comments" | "captions" | "finish" | "done";
+  phase: "prepare" | "creators" | "stubs" | "items" | "posts" | "case_posts" | "export_readings" | "readings" | "comments" | "captions" | "finish" | "done";
   key?: string[];
   ledgers?: Record<string, string>;
   changed?: Record<string, number>;
 };
-type Load = { id: string; workspace_id: string; source: SourceKind; report: { files?: FileReport[]; facts?: Record<string, unknown> }; files: { raw_file_id: string | null; path: string }[] };
+type Load = { id: string; workspace_id: string; source: SourceKind; report: { files?: FileReport[]; facts?: Record<string, unknown> }; files: { raw_file_id: string | null; path: string }[]; case_id: string | null };
 
 const BATCH = { creators: 5000, items: 2000, posts: 2000, readings: 5000, comments: 2000 } as const;
 const q = async <T>(text: string, params: unknown[]) => (await sql.query(text, params)) as T[];
 
 async function loadOf(id: string): Promise<Load> {
-  const l = (await q<Load>(`select id, workspace_id, source, report, files from staging.loads where id = $1`, [id]))[0];
+  const l = (await q<Load>(`select id, workspace_id, source, report, files, case_id from staging.loads where id = $1`, [id]))[0];
   if (!l) throw new Error(`no staged load ${id}`);
   return l;
 }
@@ -37,7 +37,8 @@ async function openLedgers(l: Load): Promise<Record<string, string>> {
     const r = await q<{ id: string }>(
       `insert into data_loads (workspace_id, file, platform, kind, rows_in, rows_loaded, rows_rejected, report, staging_load_id, raw_file_id)
        values ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10) returning id`,
-      [l.workspace_id, f.file, f.platform, f.kind, f.rows_in, f.staged, f.dropped, toJson({ ...f, staging_load: l.id }), l.id, raw],
+      // a case's load says so on its ledger: the panel's load lists leave it out (step 5)
+      [l.workspace_id, f.file, f.platform, f.kind, f.rows_in, f.staged, f.dropped, toJson({ ...f, staging_load: l.id, ...(l.case_id ? { case: l.case_id } : {}) }), l.id, raw],
     );
     out[f.file] = r[0].id;
   }
@@ -97,11 +98,18 @@ function itemSql(source: SourceKind): string {
 
 // -------------------------------------------------------------------- posts
 /**
+ * What brought a link in (step 5; definition case_post): a new link is the load's, the panel's or its case's. A case's load
+ * never takes a link from the panel or from another case; the panel's load takes every link it carries, so a post a case
+ * found first counts in the panel from the day the panel catches it too. `$8` is 'panel' or the case's id.
+ */
+export const BROUGHT_IN_BY = `case when $8::text = 'panel' then 'panel' else posts.brought_in_by end`;
+
+/**
  * The links: one per post and brand. A new link takes its post's fields (migration 0036's trigger), so what a link adds is
  * what is about the post and its brand; how we know (match) is kept once set, and a listening load's relevance is the
  * terms rule's (checked_by).
  */
-function postSql(source: SourceKind): string {
+export function postSql(source: SourceKind): string {
   const { cols, mode } = POST_WRITE[source];
   const val = (c: string) => (mode === "coalesce" ? `coalesce(excluded.${c}, posts.${c})` : `excluded.${c}`);
   const checked = cols.includes("relevant") ? `case when excluded.relevant is not null then 'rule:terms' else posts.checked_by end` : "posts.checked_by";
@@ -111,16 +119,16 @@ function postSql(source: SourceKind): string {
        where s.load_id = $1 and not s.stub and (s.platform, s.url, s.brand_id) > ($3, $4, $5)
        order by s.platform, s.url, s.brand_id limit ${BATCH.posts}
     ), w as (
-      insert into posts (workspace_id, platform, url, brand_id, load_id, creator_id, flags, match, checked_by, ${cols.join(", ")})
+      insert into posts (workspace_id, platform, url, brand_id, load_id, creator_id, flags, match, checked_by, brought_in_by, ${cols.join(", ")})
       select $2, b.platform, b.url, b.brand_id, ($6::jsonb ->> b.source_file)::uuid, c.id, b.flags, ${MATCH_SQL("b")},
-             ${cols.includes("relevant") ? "case when b.relevant is not null then 'rule:terms' end" : "null"}, ${cols.map((c) => `b.${c}`).join(", ")}
+             ${cols.includes("relevant") ? "case when b.relevant is not null then 'rule:terms' end" : "null"}, $8::text, ${cols.map((c) => `b.${c}`).join(", ")}
         from b left join creators c on c.workspace_id = $2 and c.platform = b.platform and c.handle = b.creator_key
       on conflict (workspace_id, platform, url, brand_id) do update set
         load_id = excluded.load_id, creator_id = excluded.creator_id, flags = excluded.flags,
-        match = coalesce(posts.match, excluded.match), checked_by = ${checked},
+        match = coalesce(posts.match, excluded.match), checked_by = ${checked}, brought_in_by = ${BROUGHT_IN_BY},
         ${cols.map((c) => `${c} = ${val(c)}`).join(", ")}
-      where (posts.creator_id, posts.flags, posts.match, posts.checked_by, ${cols.map((c) => `posts.${c}`).join(", ")})
-            is distinct from (excluded.creator_id, excluded.flags, coalesce(posts.match, excluded.match), ${checked}, ${cols.map(val).join(", ")})
+      where (posts.creator_id, posts.flags, posts.match, posts.checked_by, posts.brought_in_by, ${cols.map((c) => `posts.${c}`).join(", ")})
+            is distinct from (excluded.creator_id, excluded.flags, coalesce(posts.match, excluded.match), ${checked}, ${BROUGHT_IN_BY}, ${cols.map(val).join(", ")})
       returning posts.id, ${cols.includes("relevant") ? "posts.relevant" : "null::boolean as relevant"}
     ), lb as (
       -- a listening post's relevance is the terms rule's judgment, kept with its author (labels)
@@ -132,14 +140,34 @@ function postSql(source: SourceKind): string {
            (select array[platform, url, brand_id] from b order by platform desc, url desc, brand_id desc limit 1) as last`;
 }
 
-/** a post only known from its comments: written when the post is not there yet, never over one (profiles); the link makes the post */
-const STUB_SQL = (cols: string[]) => `
-  insert into posts (workspace_id, platform, url, brand_id, load_id, creator_id, match, ${cols.join(", ")})
-  select $2, s.platform, s.url, s.brand_id, ($3::jsonb ->> s.source_file)::uuid, c.id, ${MATCH_SQL("s")}, ${cols.map((c) => `s.${c}`).join(", ")}
+/**
+ * a post only known from its comments: written when the post is not there yet, never over one (profiles); the link makes the
+ * post. `$4` is what brought it in: 'panel', or the case's id.
+ */
+export const STUB_SQL = (cols: string[]) => `
+  insert into posts (workspace_id, platform, url, brand_id, load_id, creator_id, match, brought_in_by, ${cols.join(", ")})
+  select $2, s.platform, s.url, s.brand_id, ($3::jsonb ->> s.source_file)::uuid, c.id, ${MATCH_SQL("s")}, $4::text, ${cols.map((c) => `s.${c}`).join(", ")}
     from staging.posts s left join creators c on c.workspace_id = $2 and c.platform = s.platform and c.handle = s.creator_key
    where s.load_id = $1 and s.stub
   on conflict (workspace_id, platform, url, brand_id) do nothing
   returning 1`;
+
+// --------------------------------------------------------------- case posts
+/**
+ * Every post a case's load carries is the case's (case_posts), whether or not the panel has it too: the case counts these.
+ * `$3` is the case; posts known only from their comments are the case's as well.
+ */
+export const CASE_POSTS_SQL = `
+  with u as (
+    select distinct platform, url from staging.posts where load_id = $1 and (platform, url) > ($4, $5) order by platform, url limit ${BATCH.items}
+  ), w as (
+    insert into case_posts (case_id, item_id, workspace_id, load_id)
+    select $3, i.id, $2, $1::uuid from u join post_items i on i.workspace_id = $2 and i.platform = u.platform and i.url = u.url
+    on conflict (case_id, item_id) do nothing
+    returning 1
+  )
+  select (select count(*) from w)::int as changed, (select count(*) from u)::int as rows,
+         (select array[platform, url] from u order by platform desc, url desc limit 1) as last`;
 
 // ----------------------------------------------------------------- readings
 /** an export's one reading per post: its numbers, when the file was made (Beauty: the day the file reached us, at the latest) */
@@ -246,20 +274,27 @@ export async function promote(loadId: string, from: PromoteProgress = { phase: "
   const p: PromoteProgress = { ...from, changed: { ...(from.changed ?? {}) } };
   const add = (k: string, n: number) => { p.changed![k] = (p.changed![k] ?? 0) + n; };
   const next = (phase: PromoteProgress["phase"]) => { p.phase = phase; p.key = undefined; };
+  const afterPosts: PromoteProgress["phase"] = l.source === "listening" ? "readings" : "export_readings";
 
   while (left() > 0 && p.phase !== "done") {
     if (p.phase === "prepare") {
+      // a case closed since its load was staged takes nothing more (step 5)
+      if (l.case_id) await (await import("../cases/store")).assertOpenCase(ws, l.case_id);
       await q(`update staging.loads set status = 'promoting', decided_at = coalesce(decided_at, now()) where id = $1`, [loadId]);
       p.ledgers = await openLedgers(l);
       const facts = l.report.facts ?? {};
       if (l.source === "listening") {
-        const { writeTopics, writeBrandCaptures } = await import("../onboard/listening");
+        const { writeCaseTopics, writeTopics, writeBrandCaptures } = await import("../onboard/listening");
         const topics = await q<{ id: string; label: string; sort_order: number; is_catch_all: boolean }>(`select id, label, sort_order, is_catch_all from staging.topics where load_id = $1`, [loadId]);
-        await writeTopics(ws, topics);
-        const caps = (facts.brand_captures ?? {}) as Record<string, Record<string, string[]>>;
-        await writeBrandCaptures(ws, new Map(Object.entries(caps).map(([id, byP]) => [id, new Map(Object.entries(byP).map(([pl, hs]) => [pl, new Set(hs)]))])));
+        // a case's load leaves the panel's setup alone (step 5): its new topics are the case's, and the brands' captures stay
+        if (l.case_id) await writeCaseTopics(ws, l.case_id, topics);
+        else {
+          await writeTopics(ws, topics);
+          const caps = (facts.brand_captures ?? {}) as Record<string, Record<string, string[]>>;
+          await writeBrandCaptures(ws, new Map(Object.entries(caps).map(([id, byP]) => [id, new Map(Object.entries(byP).map(([pl, hs]) => [pl, new Set(hs)]))])));
+        }
       }
-      if (l.source === "profile" && facts.subject) {
+      if (l.source === "profile" && facts.subject && !l.case_id) {
         // the subject is the workspace's one brand, made or updated from the contract (etl/load_profile.py ensure_subject)
         const subj = facts.subject as { brand_id: string; name: string; owned_handles: Record<string, string[]>; keywords: string[] };
         const owned = Object.fromEntries(["youtube", "tiktok", "instagram", "threads", "x"].map((pl) => [pl, [...new Set((subj.owned_handles[pl] ?? []).map((h) => h.replace(/^@+/, "").trim().toLowerCase()).filter(Boolean))].sort()]));
@@ -289,7 +324,7 @@ export async function promote(loadId: string, from: PromoteProgress = { phase: "
     }
     if (p.phase === "stubs") {
       const cols = POST_WRITE.profile.cols;
-      add("stub_posts", (await q(STUB_SQL(cols), [loadId, ws, toJson(p.ledgers ?? {})])).length);
+      add("stub_posts", (await q(STUB_SQL(cols), [loadId, ws, toJson(p.ledgers ?? {}), l.case_id ?? "panel"])).length);
       next("items");
       continue;
     }
@@ -304,10 +339,18 @@ export async function promote(loadId: string, from: PromoteProgress = { phase: "
     if (p.phase === "posts") {
       const [pl, u, br] = p.key ?? ["", "", ""];
       const rule = l.source === "listening" ? await labellerId("rule:terms", String((l.report.facts ?? {}).terms_version ?? "")) : null;
-      const r = (await q<Step>(postSql(l.source), [loadId, ws, pl, u, br, toJson(p.ledgers ?? {}), rule]))[0];
+      const r = (await q<Step>(postSql(l.source), [loadId, ws, pl, u, br, toJson(p.ledgers ?? {}), rule, l.case_id ?? "panel"]))[0];
       add("posts", r.changed);
       if (r.labels) add("labels", r.labels);
-      if (!r.rows) { next(l.source === "listening" ? "readings" : "export_readings"); continue; }
+      if (!r.rows) { next(l.case_id ? "case_posts" : afterPosts); continue; }
+      p.key = r.last as string[];
+      continue;
+    }
+    if (p.phase === "case_posts") {
+      const [pl, u] = p.key ?? ["", ""];
+      const r = (await q<Step>(CASE_POSTS_SQL, [loadId, ws, l.case_id, pl, u]))[0];
+      add("case_posts", r.changed);
+      if (!r.rows) { next(afterPosts); continue; }
       p.key = r.last as string[];
       continue;
     }

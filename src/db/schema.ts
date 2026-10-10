@@ -764,6 +764,8 @@ export const rawFiles = pgTable(
     keepUntil: date("keep_until").notNull(),
     storedAt: ts("stored_at"),
     storeError: text("store_error"),
+    /** a case's delivery (step 5): seen only by the people on that case's list */
+    caseId: text("case_id").references(() => cases.id),
     createdAt: createdAt(),
   },
   (t) => [uniqueIndex("raw_files_blob_path_uq").on(t.blobPath), index("raw_files_workspace_idx").on(t.workspaceId, t.received)],
@@ -1642,6 +1644,8 @@ export const stagingLoads = staging.table(
     report: jsonb("report").notNull().default(sql`'{}'::jsonb`),
     error: text("error"),
     startedBy: text("started_by"),
+    /** the case this load is for (step 5): the posts it brings that the panel does not have count in that case only; empty for the panel's own */
+    caseId: text("case_id").references(() => cases.id),
     /** who let a held load in, or threw one away */
     decidedBy: text("decided_by"),
     createdAt: createdAt(),

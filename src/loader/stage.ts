@@ -41,10 +41,11 @@ async function insertRows(table: string, cols: [string, string][], loadId: strin
   return rows.length;
 }
 
-export async function openLoad(ws: string, source: SourceKind, files: unknown[], startedBy: string | null): Promise<string> {
+/** a new load; `caseId` makes it a case's (step 5): what it brings that the panel does not have counts in that case only */
+export async function openLoad(ws: string, source: SourceKind, files: unknown[], startedBy: string | null, caseId: string | null = null): Promise<string> {
   const r = (await sql.query(
-    `insert into staging.loads (workspace_id, source, files, status, started_by) values ($1, $2, $3::jsonb, 'reading', $4) returning id`,
-    [ws, source, toJson(files), startedBy],
+    `insert into staging.loads (workspace_id, source, files, status, started_by, case_id) values ($1, $2, $3::jsonb, 'reading', $4, $5) returning id`,
+    [ws, source, toJson(files), startedBy, caseId],
   )) as { id: string }[];
   return r[0].id;
 }

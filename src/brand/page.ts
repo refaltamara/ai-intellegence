@@ -84,7 +84,7 @@ export async function brandPage(brandId: string, period: Period, workspaceId = D
   const [meta, cov, months, capture, tiers, weeksRaw, wsWeeks, growthRaw, creators, tagsCur, tagsPrev, tagTotal] = await Promise.all([
     db.one<{ tracked_since: string | null; last_load: string | null }>(
       `select (select to_char(min(posted_at at time zone $3), 'DD Mon YYYY') from posts where workspace_id = $1 and relevant is not false and brought_in_by = 'panel' and brand_id = $2) as tracked_since,
-              (select to_char(max(finished_at) at time zone $3, 'DD Mon YYYY HH24:MI') from data_loads where workspace_id = $1) as last_load`,
+              (select to_char(max(finished_at) at time zone $3, 'DD Mon YYYY HH24:MI') from data_loads where workspace_id = $1 and report->>'case' is null) as last_load`,
       [workspaceId, brandId, tz],
     ),
     db.q<{ platform: string; posts: number; creators: number; owned: number; earned: number; first: string; last: string }>(

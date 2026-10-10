@@ -333,13 +333,25 @@ export async function writeChunk(kind: "posts" | "snapshots" | "comments", rows:
   return r.length;
 }
 
+/** the panel's topics, as its dump gives them; a topic a case brought first becomes the panel's once the panel's dump has it */
 export async function writeTopics(ws: string, rows: { id: string; label: string; sort_order: number; is_catch_all: boolean }[]): Promise<void> {
   if (!rows.length) return;
   await sql.query(
     `insert into topics (id, workspace_id, label, kind, sort_order, is_catch_all)
      select r.id, $2, r.label, 'general', r.sort_order, r.is_catch_all from jsonb_to_recordset($1::jsonb) as r(id text, label text, sort_order int, is_catch_all boolean)
-     on conflict (id) do update set label = excluded.label, sort_order = excluded.sort_order, is_catch_all = excluded.is_catch_all`,
+     on conflict (id) do update set label = excluded.label, sort_order = excluded.sort_order, is_catch_all = excluded.is_catch_all, case_id = null`,
     [toJson(rows), ws],
+  );
+}
+
+/** a case's dump brings topics (step 5): a new one is the case's own (topics.case_id); one already there is left as it is */
+export async function writeCaseTopics(ws: string, caseId: string, rows: { id: string; label: string; sort_order: number; is_catch_all: boolean }[]): Promise<void> {
+  if (!rows.length) return;
+  await sql.query(
+    `insert into topics (id, workspace_id, label, kind, sort_order, is_catch_all, case_id)
+     select r.id, $2, r.label, 'general', r.sort_order, r.is_catch_all, $3 from jsonb_to_recordset($1::jsonb) as r(id text, label text, sort_order int, is_catch_all boolean)
+     on conflict (id) do nothing`,
+    [toJson(rows), ws, caseId],
   );
 }
 
