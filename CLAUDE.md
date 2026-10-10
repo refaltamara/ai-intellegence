@@ -48,7 +48,7 @@ Rules:
 
   Raw files live in private Vercel Blob (`src/raw/store.ts`, `data/raw/MANIFEST.json`, `pnpm raw`), never in the repository: never commit a raw file.
 
-  A post is one `post_items` row; `posts` rows are its links to brands. Each link carries a copy of the post's fields (`ITEM_COLS` in `src/loader/fold.ts`), and triggers keep the copies in step (migration 0036). Write through either. The loader writes the post before its links. A total over a platform counts each post once (`item_id`); a brand's numbers count its links.
+  A post is one `post_items` row; `posts` rows are its links to brands. Each link carries a copy of the post's fields (`ITEM_COLS` in `src/loader/fold.ts`), and triggers keep the copies in step (migration 0036). Write through either. The loader writes the post before its links. A total over a platform counts each post once (`item_id`); a brand's numbers count its links. Every number has one definition in `src/definitions/catalog.ts` (a change is a new version, never an edit); screens move onto `daily_totals`, `daily_creators` and `post_d7`, rebuilt by `refreshServing` after loads and relevance changes and nightly (`pnpm totals check` reconciles them).
   Every load goes through the one loader (`src/loader/`, `pnpm load`):
   - a source's adapter maps its files;
   - the rows land in `staging`;

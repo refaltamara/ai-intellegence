@@ -422,6 +422,101 @@ export const postReadings = pgTable(
   (t) => [primaryKey({ columns: [t.postId, t.readAt, t.dayN] }), index("post_readings_post_day_idx").on(t.postId, t.dayN)],
 );
 
+/**
+ * Each post's reading at day 7 (DECISIONS, 10 Oct 2026; definition views_d7 in src/definitions/catalog.ts): the reading
+ * nearest day 7 after posting, from any of its links' readings. A post that went up less than 7 days before the
+ * workspace's latest reading is too new: its row is kept with day_n and the numbers empty. Rebuilt from post_readings by
+ * src/definitions/totals.ts.
+ */
+export const postD7 = pgTable(
+  "post_d7",
+  {
+    itemId: uuid("item_id").primaryKey().references(() => postItems.id, { onDelete: "cascade" }),
+    workspaceId: text("workspace_id").notNull().references(() => workspaces.id),
+    /** the day index of the reading used; null when the post is too new */
+    dayN: smallint("day_n"),
+    readAt: ts("read_at"),
+    views: bigint("views", { mode: "number" }),
+    likes: integer("likes"),
+    commentsCount: integer("comments_count"),
+    shares: integer("shares"),
+    saves: integer("saves"),
+  },
+  (t) => [index("post_d7_workspace_idx").on(t.workspaceId)],
+);
+
+/**
+ * Daily totals (DECISIONS, 10 Oct 2026, "Every number has one definition"): per workspace, local day of posting, brand,
+ * platform and owned or earned, the sums every screen's numbers are made of, by the definitions in
+ * src/definitions/catalog.ts. A brand's row counts its links (a post about two brands counts for both); brand '*' counts
+ * each post once, for the whole panel. Posts set aside as not about their brand never count; flagged posts count, but
+ * stay out of the rated sums that rates are made of. Rebuilt per workspace by src/definitions/totals.ts.
+ *   views, engagement, ...       the latest reading
+ *   d7_*                         the reading at day 7 (d7_posts: posts read at day 7 or later; the rest are too new)
+ *   rated_* / rated_lc_*         posts that can carry a rate: not flagged, views over 0, engagement no more than views
+ */
+export const dailyTotals = pgTable(
+  "daily_totals",
+  {
+    workspaceId: text("workspace_id").notNull().references(() => workspaces.id),
+    day: date("day").notNull(),
+    brandId: text("brand_id").notNull(),
+    platform: text("platform").notNull(),
+    source: text("source").notNull(),
+    posts: integer("posts").notNull(),
+    flagged: integer("flagged").notNull(),
+    cartPosts: integer("cart_posts").notNull(),
+    views: bigint("views", { mode: "number" }).notNull(),
+    engagement: bigint("engagement", { mode: "number" }).notNull(),
+    engagementLc: bigint("engagement_lc", { mode: "number" }).notNull(),
+    comments: bigint("comments", { mode: "number" }).notNull(),
+    ratedPosts: integer("rated_posts").notNull(),
+    ratedViews: bigint("rated_views", { mode: "number" }).notNull(),
+    ratedEngagement: bigint("rated_engagement", { mode: "number" }).notNull(),
+    ratedLcPosts: integer("rated_lc_posts").notNull(),
+    ratedLcViews: bigint("rated_lc_views", { mode: "number" }).notNull(),
+    ratedLcEngagement: bigint("rated_lc_engagement", { mode: "number" }).notNull(),
+    d7Posts: integer("d7_posts").notNull(),
+    d7Views: bigint("d7_views", { mode: "number" }).notNull(),
+    d7Engagement: bigint("d7_engagement", { mode: "number" }).notNull(),
+    d7EngagementLc: bigint("d7_engagement_lc", { mode: "number" }).notNull(),
+    d7RatedPosts: integer("d7_rated_posts").notNull(),
+    d7RatedViews: bigint("d7_rated_views", { mode: "number" }).notNull(),
+    d7RatedEngagement: bigint("d7_rated_engagement", { mode: "number" }).notNull(),
+    d7RatedLcPosts: integer("d7_rated_lc_posts").notNull(),
+    d7RatedLcViews: bigint("d7_rated_lc_views", { mode: "number" }).notNull(),
+    d7RatedLcEngagement: bigint("d7_rated_lc_engagement", { mode: "number" }).notNull(),
+    /** the definitions' version the row was counted with */
+    definitions: text("definitions").notNull(),
+    computedAt: ts("computed_at").notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.workspaceId, t.day, t.brandId, t.platform, t.source] }), index("daily_totals_brand_idx").on(t.workspaceId, t.brandId, t.day)],
+);
+
+/**
+ * Daily totals per creator (definitions creators, affiliator, viewership_mix): a creator's earned posts per local day,
+ * brand and platform. Distinct creators, affiliators (a cart post in the period) and the viewership mix are worked out per
+ * period from these, never stored. Rebuilt with daily_totals.
+ */
+export const dailyCreators = pgTable(
+  "daily_creators",
+  {
+    workspaceId: text("workspace_id").notNull().references(() => workspaces.id),
+    day: date("day").notNull(),
+    brandId: text("brand_id").notNull(),
+    platform: text("platform").notNull(),
+    creatorId: uuid("creator_id").notNull(),
+    posts: integer("posts").notNull(),
+    cartPosts: integer("cart_posts").notNull(),
+    views: bigint("views", { mode: "number" }).notNull(),
+    d7Views: bigint("d7_views", { mode: "number" }).notNull(),
+    engagementLc: bigint("engagement_lc", { mode: "number" }).notNull(),
+    followers: integer("followers"),
+    definitions: text("definitions").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.workspaceId, t.day, t.brandId, t.platform, t.creatorId] }), index("daily_creators_creator_idx").on(t.workspaceId, t.creatorId, t.day)],
+);
+
 /** Aggregated imports for months without post-level data. Skills flag reduced confidence. */
 export const creatorBrandMonthImport = pgTable(
   "creator_brand_month_import",

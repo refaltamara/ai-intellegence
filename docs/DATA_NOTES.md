@@ -273,3 +273,17 @@ A post is one `post_items` row; `posts` rows are its links to brands, each with 
 
 Summed over links, Beauty's views went from 8,360,865,832 to 8,370,110,691 and Fintech's from 338,433,509 to 338,434,264. Counted once per post, they are 8,273,330,457 and 335,968,707.
 
+## Definitions and daily totals (DECISIONS, 10 Oct 2026, step 4)
+
+Every number is counted by a definition in `src/definitions/catalog.ts`, from rows `refreshServing` rebuilds per workspace (`src/definitions/totals.ts`):
+
+| Table | One row per | Rows today |
+|---|---|---|
+| `post_d7` | post: its reading nearest day 7, or too new | 284,774 |
+| `daily_totals` | workspace, local day, brand (`*` = each post once), platform, owned or earned | Beauty 20,201 · Fintech 1,314 · Kahf 16 · Maudy 44 |
+| `daily_creators` | workspace, local day, brand, platform, creator | Beauty 249,329 · Fintech 8,302 · Kahf 2,082 · Maudy 3,038 |
+
+**Which reading "day 7" is, per workspace.** Fintech is read every day from day 0 to 30, so its day-7 number is the reading at day 7. Beauty's exports give one reading per post, at a median of day 103, so its day-7 number is that reading; the scraper team's day-7 stop and the Fintech shape will change that. Kahf and Maudy were read within days of their posts, so most of their posts are too new.
+
+**Profile read times.** A profile contract carries one `export_time`, written for its first batch; later batches were added without one, and until 10 Oct read as exported at that first time. A file is now read no earlier than its latest post. Maudy's readings moved from 14 Sep 12:15 WIB to each file's latest post (15 to 18 Sep, 3,146 readings), Kahf's from 7 Oct 10:00 WIB (2,128 readings).
+

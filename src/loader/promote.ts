@@ -351,6 +351,8 @@ export async function promote(loadId: string, from: PromoteProgress = { phase: "
       for (const id of Object.values(p.ledgers ?? {})) await q(`update data_loads set finished_at = now(), report = report || $2::jsonb where id = $1`, [id, toJson({ changed: p.changed })]);
       const { refreshViews } = await import("../onboard/load");
       await refreshViews();
+      // the numbers every screen reads, counted again by the definitions (src/definitions/totals.ts)
+      await (await import("../definitions/totals")).refreshServing(ws);
       await q(`update staging.loads set status = 'live', live_at = now(), report = report || $2::jsonb where id = $1`, [loadId, toJson({ promoted: p.changed })]);
       p.phase = "done";
     }

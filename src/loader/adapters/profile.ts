@@ -196,6 +196,18 @@ type ProfileContract = {
 /** an ISO time from the contract: naive ones are Jakarta time */
 const contractTime = (v: string) => parseWhen(v, new Date(0), LOCAL_TZ).when ?? new Date(v);
 
+/**
+ * When a contents file's numbers were read: its own export time in the contract. A file the contract gives no time of
+ * its own (later batches added to a contract written for the first) was read no earlier than its latest post, nor than
+ * the contract's export time: on 10 Oct every Maudy and Kahf file read as exported at the first batch's time, so later
+ * batches' readings came before their own posts.
+ */
+export function readTimeOf(f: { export_time?: string }, anchor: Date, postedAt: string[]): Date {
+  if (f.export_time) return anchor;
+  const latest = postedAt.reduce((m, t) => Math.max(m, Date.parse(t)), Number.NEGATIVE_INFINITY);
+  return new Date(Math.max(anchor.getTime(), latest));
+}
+
 export class Profile {
   raw: ProfileContract; workspace: string; brandId: string; anchor: Date;
   owned: Record<string, Set<string>>; followers: Record<string, number>; naiveTz: Record<string, string>;
@@ -364,9 +376,11 @@ export async function readProfile(input: AdapterInput): Promise<Staged> {
         }));
         const added = fileRows[fileRows.length - 1];
         if (naive) naiveTimes++;
-        added.read_at = anchor.toISOString(); // the export's time: when these numbers were read
         added.flags = flagsOf(fol == null ? reported : null, added.views, added.content_type);
       }
+      // when these numbers were read: the file's export time (DECISIONS, 10 Oct 2026, step 4)
+      const readAt = readTimeOf(f, anchor, fileRows.map((r) => r.posted_at)).toISOString();
+      for (const r of fileRows) r.read_at = readAt;
       // creators from this file: the first row's followers, then a later post's when it has some
       const best = new Map<string, { followers: number | null; last: string; first: string }>();
       for (const r of fileRows) {

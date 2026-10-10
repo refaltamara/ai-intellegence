@@ -852,3 +852,31 @@ The agreed design is the doc "Core data architecture and model" (https://claude.
 - **Two loader fixes found on the way.**
   - Staging is analysed after each load is written. A load staged after the last analyze read as one row, and comparing the Fintech load ran past the driver's five minutes.
   - Beauty's files are read in the order they reached us (`received`), whatever order they are given in. The adapter keeps the first row of a creator's last day, so order decides ties. Staged in the manifest's order, 7 creators differed from the core. That load (c779ad18) is marked failed rather than promoted, and its rows go with the 30-day clearing.
+
+**Step 4, first part: definitions and daily totals (10 Oct).** Nothing on screen changes yet; the screens move onto these in the next parts.
+- **One versioned list of definitions** (`src/definitions/catalog.ts`). Each has its plain meaning (the design doc's words) and, where it is one expression, the SQL it is counted with:
+  - posts: post, brand post (a link), flagged;
+  - views: Views (day 7), Views (latest);
+  - engagement: Engagement, Engagement (comparable), Engagement rate and its comparable form;
+  - shares: of voice, of views, of engagement; negative share;
+  - accounts and bands: tier, creators, commenters, affiliator;
+  - viewership mix.
+
+  A definition never changes in place: a new meaning or new SQL is a new version, and a test holds each version to its fingerprint. The daily totals record the catalog version that counted them.
+- **Each post's reading at day 7** (`post_d7`). It is the reading nearest day 7 after posting, from any of the post's links (on a tie, the later one). A post that went up less than 7 days before its workspace's latest reading is too new. Today:
+  - Fintech: 3,158 of 13,167 posts too new. Its dump was last read on 25 Sep, after a surge of posts in mid-September.
+  - Beauty: one reading per post, at a median of day 103, so its day-7 number is that reading; 201 posts too new.
+  - Kahf (2,680 of 2,683) and Maudy (3,551 of 3,559): cases whose data ends within days of their posts.
+- **Daily totals** (`daily_totals`, `daily_creators`):
+  - **Grain:** per workspace, local day of posting, brand, platform, and owned or earned. A brand's rows count its links; brand `*` counts each post once.
+  - **Counts:** posts, flagged posts, cart posts, views, engagement (and comparable), comments, at the latest reading and at day 7, plus the rated sums rates are made of (flagged posts left out).
+  - **Creator days:** each creator's earned posts, carts and views per brand and day, so creators, affiliators and the viewership mix are worked out per period.
+  - **Rebuilt** per workspace (`refreshServing`) after every load, after every change of relevance (CMS terms, the labeller setting posts aside), and each night (the health cron). Beauty takes 16 s.
+- **Reconciled** (`pnpm totals check`), with 0 difference in all four workspaces:
+  - against the posts they are counted from: links, views, engagement, flags, carts, each post once, day-7 readings and creator posts;
+  - against the Brand & KOL dashboard's own brand × platform × month posts and views, for the nine months it looks back.
+- **Profile read times corrected.** Until now, a profile file without its own export time read as exported at its contract's first export time. Later batches' readings therefore came before their own posts (Maudy's 15–18 Sep files, Kahf's 7–8 Oct files).
+  - A file is now read no earlier than its latest post (`readTimeOf`).
+  - The existing readings were moved to their right time in place (`pnpm load move-readings`): 3,146 in Maudy, 2,128 in Kahf.
+  - Fresh loads of both then changed only those posts' read times, and both compare clean.
+- **Engagement by its definition.** The totals count engagement from its parts (likes + comments + shares + saves), not the stored column. The two are equal on Beauty and Fintech. On Kahf and Maudy the stored column differs on 541 and 55 posts; screens keep the stored column until they move onto the totals (4c).

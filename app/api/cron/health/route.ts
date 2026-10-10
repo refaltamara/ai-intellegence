@@ -1,10 +1,13 @@
 /**
- * Nightly health checks (CMS plan, "Health") for every workspace that is live or in review; then staged rows of loads
- * that went in or were held more than 30 days ago are cleared (DECISIONS, 10 Oct 2026). Protected by CRON_SECRET.
+ * Nightly health checks (CMS plan, "Health") for every workspace that is live or in review, and their numbers counted
+ * again by the definitions (src/definitions/totals.ts; loads and relevance changes count them as they happen, this
+ * catches anything else); then staged rows of loads that went in or were held more than 30 days ago are cleared
+ * (DECISIONS, 10 Oct 2026). Protected by CRON_SECRET.
  */
 import { sql } from "@/db/client";
 import { recordHealth } from "@/onboard/health";
 import { clearOld } from "@/loader/stage";
+import { refreshServing } from "@/definitions/totals";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -18,6 +21,7 @@ export async function GET(req: Request) {
   const out: Record<string, unknown>[] = [];
   for (const w of ws) {
     const h = await recordHealth(w.id).catch((e) => ({ error: (e as Error).message }) as never);
+    await refreshServing(w.id).catch((e) => console.error("[serving]", w.id, (e as Error).message));
     out.push({ ws: w.id, ...("checks" in (h as object) ? { warn: (h as { checks: { status: string }[] }).checks.filter((c) => c.status !== "ok" && c.status !== "info").length } : h) });
   }
   const cleared = await clearOld(30).catch((e) => ({ error: (e as Error).message }));
