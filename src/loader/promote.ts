@@ -7,18 +7,19 @@
 import { sql } from "../db/client";
 import { toJson } from "../db/json";
 import { POST_WRITE } from "./columns";
+import { MATCH_SQL, foldSql, itemColsOf } from "./fold";
 import { labellerId } from "../labels/record";
 import type { FileReport, SourceKind } from "./types";
 
 export type PromoteProgress = {
-  phase: "prepare" | "creators" | "stubs" | "posts" | "export_readings" | "readings" | "comments" | "captions" | "finish" | "done";
+  phase: "prepare" | "creators" | "stubs" | "items" | "posts" | "export_readings" | "readings" | "comments" | "captions" | "finish" | "done";
   key?: string[];
   ledgers?: Record<string, string>;
   changed?: Record<string, number>;
 };
 type Load = { id: string; workspace_id: string; source: SourceKind; report: { files?: FileReport[]; facts?: Record<string, unknown> }; files: { raw_file_id: string | null; path: string }[] };
 
-const BATCH = { creators: 5000, posts: 2000, readings: 5000, comments: 2000 } as const;
+const BATCH = { creators: 5000, items: 2000, posts: 2000, readings: 5000, comments: 2000 } as const;
 const q = async <T>(text: string, params: unknown[]) => (await sql.query(text, params)) as T[];
 
 async function loadOf(id: string): Promise<Load> {
@@ -61,24 +62,65 @@ function creatorSql(source: SourceKind): string {
     returning 1`;
 }
 
+// -------------------------------------------------------------------- items
+/**
+ * One row per real post (DECISIONS, 10 Oct 2026): the load's brand rows of a post folded by the rule in fold.ts, written to
+ * post_items before the links, by the source's rule (creator and flags as the old loaders wrote them: the load's, always).
+ * A changed post reaches every link it has, of any load, through migration 0036's trigger.
+ */
+function itemSql(source: SourceKind): string {
+  const { mode } = POST_WRITE[source];
+  const cols = itemColsOf(source);
+  const val = (c: string) => (mode === "coalesce" && c !== "creator_id" && c !== "flags" ? `coalesce(excluded.${c}, post_items.${c})` : `excluded.${c}`);
+  const fold = foldSql({
+    table: "staging.posts",
+    where: (x) => `${x}.load_id = $1 and not ${x}.stub`,
+    batch: (x) => `(${x}.platform, ${x}.url) in (select platform, url from u)`,
+    cols,
+    creator: (x) => `(select c.id from creators c where c.workspace_id = $2 and c.platform = ${x}.platform and c.handle = ${x}.creator_key)`,
+    carry: ["source_file"],
+  });
+  return `
+    with u as (
+      select distinct platform, url from staging.posts where load_id = $1 and not stub and (platform, url) > ($3, $4) order by platform, url limit ${BATCH.items}
+    ), f as (${fold}), w as (
+      insert into post_items (workspace_id, platform, url, ${cols.join(", ")}, source_file, load_id)
+      select $2, f.platform, f.url, ${cols.map((c) => `f.${c}`).join(", ")}, f.source_file, ($5::jsonb ->> f.source_file)::uuid from f
+      on conflict (workspace_id, platform, url) do update set
+        ${cols.map((c) => `${c} = ${val(c)}`).join(", ")}, source_file = excluded.source_file, load_id = excluded.load_id
+      where (${cols.map((c) => `post_items.${c}`).join(", ")}) is distinct from (${cols.map(val).join(", ")})
+      returning 1
+    )
+    select (select count(*) from w)::int as changed, (select count(*) from u)::int as rows,
+           (select array[platform, url] from u order by platform desc, url desc limit 1) as last`;
+}
+
 // -------------------------------------------------------------------- posts
+/**
+ * The links: one per post and brand. A new link takes its post's fields (migration 0036's trigger), so what a link adds is
+ * what is about the post and its brand; how we know (match) is kept once set, and a listening load's relevance is the
+ * terms rule's (checked_by).
+ */
 function postSql(source: SourceKind): string {
   const { cols, mode } = POST_WRITE[source];
   const val = (c: string) => (mode === "coalesce" ? `coalesce(excluded.${c}, posts.${c})` : `excluded.${c}`);
+  const checked = cols.includes("relevant") ? `case when excluded.relevant is not null then 'rule:terms' else posts.checked_by end` : "posts.checked_by";
   return `
     with b as (
       select s.* from staging.posts s
        where s.load_id = $1 and not s.stub and (s.platform, s.url, s.brand_id) > ($3, $4, $5)
        order by s.platform, s.url, s.brand_id limit ${BATCH.posts}
     ), w as (
-      insert into posts (workspace_id, platform, url, brand_id, load_id, creator_id, flags, ${cols.join(", ")})
-      select $2, b.platform, b.url, b.brand_id, ($6::jsonb ->> b.source_file)::uuid, c.id, b.flags, ${cols.map((c) => `b.${c}`).join(", ")}
+      insert into posts (workspace_id, platform, url, brand_id, load_id, creator_id, flags, match, checked_by, ${cols.join(", ")})
+      select $2, b.platform, b.url, b.brand_id, ($6::jsonb ->> b.source_file)::uuid, c.id, b.flags, ${MATCH_SQL("b")},
+             ${cols.includes("relevant") ? "case when b.relevant is not null then 'rule:terms' end" : "null"}, ${cols.map((c) => `b.${c}`).join(", ")}
         from b left join creators c on c.workspace_id = $2 and c.platform = b.platform and c.handle = b.creator_key
       on conflict (workspace_id, platform, url, brand_id) do update set
         load_id = excluded.load_id, creator_id = excluded.creator_id, flags = excluded.flags,
+        match = coalesce(posts.match, excluded.match), checked_by = ${checked},
         ${cols.map((c) => `${c} = ${val(c)}`).join(", ")}
-      where (posts.creator_id, posts.flags, ${cols.map((c) => `posts.${c}`).join(", ")})
-            is distinct from (excluded.creator_id, excluded.flags, ${cols.map(val).join(", ")})
+      where (posts.creator_id, posts.flags, posts.match, posts.checked_by, ${cols.map((c) => `posts.${c}`).join(", ")})
+            is distinct from (excluded.creator_id, excluded.flags, coalesce(posts.match, excluded.match), ${checked}, ${cols.map(val).join(", ")})
       returning posts.id, ${cols.includes("relevant") ? "posts.relevant" : "null::boolean as relevant"}
     ), lb as (
       -- a listening post's relevance is the terms rule's judgment, kept with its author (labels)
@@ -90,10 +132,10 @@ function postSql(source: SourceKind): string {
            (select array[platform, url, brand_id] from b order by platform desc, url desc, brand_id desc limit 1) as last`;
 }
 
-/** a post only known from its comments: written when the post is not there yet, never over one (profiles) */
+/** a post only known from its comments: written when the post is not there yet, never over one (profiles); the link makes the post */
 const STUB_SQL = (cols: string[]) => `
-  insert into posts (workspace_id, platform, url, brand_id, load_id, creator_id, ${cols.join(", ")})
-  select $2, s.platform, s.url, s.brand_id, ($3::jsonb ->> s.source_file)::uuid, c.id, ${cols.map((c) => `s.${c}`).join(", ")}
+  insert into posts (workspace_id, platform, url, brand_id, load_id, creator_id, match, ${cols.join(", ")})
+  select $2, s.platform, s.url, s.brand_id, ($3::jsonb ->> s.source_file)::uuid, c.id, ${MATCH_SQL("s")}, ${cols.map((c) => `s.${c}`).join(", ")}
     from staging.posts s left join creators c on c.workspace_id = $2 and c.platform = s.platform and c.handle = s.creator_key
    where s.load_id = $1 and s.stub
   on conflict (workspace_id, platform, url, brand_id) do nothing
@@ -240,7 +282,7 @@ export async function promote(loadId: string, from: PromoteProgress = { phase: "
       const lastRow = (await q<{ platform: string; handle: string }>(
         `select platform, handle from (select platform, handle from staging.accounts where load_id = $1 and (platform, handle) > ($2, $3) order by platform, handle limit ${BATCH.creators}) b order by platform desc, handle desc limit 1`,
         [loadId, pl, h]))[0];
-      if (!lastRow) { next(l.source === "profile" ? "stubs" : "posts"); continue; }
+      if (!lastRow) { next(l.source === "profile" ? "stubs" : "items"); continue; }
       add("creators", (await q(sqlText, [loadId, ws, pl, h])).length);
       p.key = [lastRow.platform, lastRow.handle];
       continue;
@@ -248,7 +290,15 @@ export async function promote(loadId: string, from: PromoteProgress = { phase: "
     if (p.phase === "stubs") {
       const cols = POST_WRITE.profile.cols;
       add("stub_posts", (await q(STUB_SQL(cols), [loadId, ws, toJson(p.ledgers ?? {})])).length);
-      next("posts");
+      next("items");
+      continue;
+    }
+    if (p.phase === "items") {
+      const [pl, u] = p.key ?? ["", ""];
+      const r = (await q<Step>(itemSql(l.source), [loadId, ws, pl, u, toJson(p.ledgers ?? {})]))[0];
+      add("items", r.changed);
+      if (!r.rows) { next("posts"); continue; }
+      p.key = r.last as string[];
       continue;
     }
     if (p.phase === "posts") {

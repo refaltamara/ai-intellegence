@@ -240,5 +240,36 @@ Every source goes through the same steps:
 Promoting the four loads changed nothing else: 0 rows in Kahf, Fintech and Beauty, and 261 posts in Maudy.
 
 **Warnings.**
-- A reported 0 followers (about 6,700 Beauty rows; the Q3 converter had already turned those zeros blank) and a video or reel with 0 views are flagged on the post (`posts.flags`).
+- A reported 0 followers (about 6,700 Beauty rows; the Q3 converter had already turned those zeros blank) and a video or reel with 0 views are flagged on the post (`posts.flags`). The four loads promoted on 10 Oct were staged before the adapters flagged, so the flags reached the core only with the Fintech and Beauty loads of step 3 (below); Kahf and Maudy have none to give.
 - Images and text posts often report no views, so they are never flagged for it.
+
+## One row per real post (DECISIONS, 10 Oct 2026, step 3)
+
+A post is one `post_items` row; `posts` rows are its links to brands, each with a copy of the post's fields, kept in step by triggers (migration 0036). `pnpm load check-items` shows each workspace's links, posts, and anything out of step.
+
+| Workspace | Links (`posts`) | Posts (`post_items`) | Links whose numbers moved |
+|---|---|---|---|
+| Beauty | 278,322 | 265,365 | 6,624 (views on 4,533) |
+| Fintech | 13,275 | 13,167 | 21 views, a few followers |
+| Kahf | 2,683 | 2,683 | none |
+| Maudy | 3,563 | 3,563 | none |
+
+**Why Beauty's brand rows disagreed.** The Instagram exports list a collab post once per brand it tags. The scraper read each brand's list at a different time, so one post shows different views, likes and follower counts under each brand: 6,593 posts sit under more than one brand, on 19,550 rows. When it folded them, the post took the numbers of the reading with the most views, the creator and followers of the row with the most followers, the earliest time and the longest caption (`src/loader/fold.ts`). Fields that differ because the brand differs stay on the link: universe (399 posts), category (1,620), product category (58).
+
+**Views by brand, summed over links, before and after.** 43 brands moved; these ten by 0.1% or more, every other by less:
+
+| Brand | Before | After | Change |
+|---|---|---|---|
+| somethincofficial | 34,471,946 | 36,624,785 | +6.25% |
+| mopbeauty | 60,786,975 | 61,420,502 | +1.04% |
+| whitelabid | 6,240,072 | 6,304,567 | +1.03% |
+| itsomgbeauty | 208,449,096 | 210,372,980 | +0.92% |
+| gouteid | 4,806,788 | 4,842,324 | +0.74% |
+| makeoverid | 195,583,166 | 196,675,923 | +0.56% |
+| luxcrime_id | 33,643,282 | 33,798,771 | +0.46% |
+| judydollindonesia | 56,972,278 | 57,149,675 | +0.31% |
+| wardahofficial | 468,536,540 | 469,526,012 | +0.21% |
+| blpbeauty | 17,787,083 | 17,818,901 | +0.18% |
+
+Summed over links, Beauty's views went from 8,360,865,832 to 8,370,110,691 and Fintech's from 338,433,509 to 338,434,264. Counted once per post, they are 8,273,330,457 and 335,968,707.
+

@@ -63,6 +63,9 @@ export async function writeStaged(loadId: string, st: Staged): Promise<Record<st
     `update staging.loads set status = 'staged', staged_at = now(), report = report || $2::jsonb where id = $1`,
     [loadId, toJson({ files: st.files, staged: counts, facts: st.facts })],
   );
+  // the planner learns the new load's size (DECISIONS, 8 Oct 2026: every load ends with analyze); without it a load staged
+  // after the last analyze reads as one row, and the checks, the comparison and the promotion pick plans that never finish
+  for (const t of ["posts", "readings", "accounts", "comments", "captions", "topics"]) await sql.query(`analyze staging.${t}`);
   return counts;
 }
 

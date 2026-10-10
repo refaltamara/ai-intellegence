@@ -814,3 +814,41 @@ The agreed design is the doc "Core data architecture and model" (https://claude.
   - `post_snapshots` is now a view (the latest reading per post and day index) that returns exactly the old table's 114,633 rows. The old table is kept as `post_snapshots_before_10_oct`.
   - The loader writes readings to `post_readings`. Loading the same file again changes nothing: proven on Maudy's 18 Sep X file, with 0 posts and 0 readings changed.
 - **One check made narrower.** The time-of-day check now judges only files whose times came without a zone, since a time from an X status id or an ISO time with Z cannot be read in the wrong zone. It had held Maudy's 18 Sep X file, whose posts peak 4.4 hours from earlier ones because a news cycle moved, not a zone. A held load that passes when checked again is ready to go in.
+
+**Step 3, second part: one row per real post (10 Oct).**
+- **A post and its links.** A post is now one `post_items` row, keyed by workspace, platform and url, whatever brands it is about (migration 0035). `posts` stays, as the post's links: one row per post and brand.
+  - What is about the post: its numbers, time, caption and hashtags, creator, followers and tier, format and type, read time, flags, and the model's labels and caption tags. It sits on `post_items`, and each link carries a copy, so every screen still reads `posts` unchanged.
+  - What is about the post and one brand stays on the link: owned or earned, the collection, relevance, and Beauty's universe, category, product, price, cart and reseller. These differ by brand: on Beauty's collab posts the category differs between brand rows on 1,620 posts.
+  - New on the link: how we know (`match`: owned, tagged, keyword, mention), the term that matched (`term`), who last judged its relevance (`checked_by`: `rule:terms`, the model or a person; `labels` keep the history), and what brought it in (`brought_in_by`: `panel`, later a case). Every existing link got its `match` from its collection; Fintech's 13,275 links and Kahf's 219 set-aside posts got their `checked_by` from their relevance labels.
+  - A comment is on its link's post (`comments.item_id`), so later counts can give it to every brand the post links to.
+- **Kept in step by the database** (migration 0036, five triggers):
+  - a new link takes its post's fields, and a link to a post not seen before makes the post;
+  - a change made through a link (the labeller, caption reading) reaches the post and its other links;
+  - a change to the post reaches every link;
+  - a post goes when its last link is deleted;
+  - a new comment gets its link's post.
+
+  Old and new code alike cannot leave a post and its links disagreeing. `pnpm load check-items` counts links without their post, links out of step with it, and posts without links: all 0.
+- **When a post's brand rows disagreed.** Beauty's Instagram exports list a collab post once per brand, read at different times. The post now takes (`src/loader/fold.ts`):
+  - the numbers of the reading with the most views (views only grow), then the latest;
+  - the creator, followers and tier of the row with the most followers;
+  - the earliest time posted, and the longest caption with its hashtags;
+  - on ties, the brand id, so a reload picks the same row.
+
+  The loader and the backfill use this one rule.
+- **What moved** (`pnpm load backfill-items`, run once between migrations 0035 and 0036):
+  - **Posts:** Beauty's 278,322 links are 265,365 posts and Fintech's 13,275 are 13,167. Kahf (2,683) and Maudy (3,563) have one brand each and nothing moved.
+  - **Beauty links:** only links whose brand rows had disagreed changed. Views moved on 4,533 links, likes 3,126, comments 1,324, engagements 3,456, followers 6,624 (tier 594), content type 213, caption 83, hashtags 13, time 10, creator 5. Views summed over links went from 8,360,865,832 to 8,370,110,691 (+0.11%). 43 brands moved, ten of them by 0.1% or more: Somethinc +6.25% (34,471,946 to 36,624,785), MOP Beauty +1.04%, Whitelab +1.03%, OMG +0.92%, Goute +0.74%, Make Over +0.56%, Luxcrime +0.46%, Judydoll +0.31%, Wardah +0.21%, BLP +0.18% (DATA_NOTES has the figures).
+  - **Fintech links:** views moved on 21 links (338,433,509 to 338,434,264), with a few follower counts, read times and day counts.
+- **Counted once per post,** Beauty holds 8,273,330,457 views and Fintech 335,968,707. Step 4's definitions say which a number uses: a brand's share counts its links, and a platform's total counts each post once.
+- **The loader writes the post first.** A promotion folds a load's brand rows of each post by the same rule and writes `post_items` before the links (its `items` phase). The comparison folds the same way. Each step is proven on a fresh load of the same files:
+  - Fintech compares with no difference at all;
+  - Beauty differs only in flags (below).
+- **Flags reach the core.** The four loads promoted on 10 Oct were staged before the adapters flagged warnings, so the core held no flags, though the notes on the one loader describe them as flagged. Fintech and Beauty were loaded again, and nothing changed but flags:
+  - Fintech: 5,629 posts (5,696 links). Of these, 5,383 are from accounts reporting 0 followers, 235 are videos reporting 0 views, and 11 are both.
+  - Beauty: 6,859 posts (6,901 links). Of these, 2,612 are from accounts reporting 0 followers, 801 are videos reporting 0 views, and 3,446 are both.
+
+  No screen reads flags yet; step 4's definitions keep flagged rows out of rates and medians.
+- **Two loader fixes found on the way.**
+  - Staging is analysed after each load is written. A load staged after the last analyze read as one row, and comparing the Fintech load ran past the driver's five minutes.
+  - Beauty's files are read in the order they reached us (`received`), whatever order they are given in. The adapter keeps the first row of a creator's last day, so order decides ties. Staged in the manifest's order, 7 creators differed from the core. That load (c779ad18) is marked failed rather than promoted, and its rows go with the 30-day clearing.

@@ -5,25 +5,35 @@
  */
 import { sql } from "../db/client";
 import { COMMENT_WRITE, POST_WRITE } from "./columns";
+import { foldSql, isItemCol, itemColsOf } from "./fold";
 import type { SourceKind } from "./types";
 
 export type Diff = { rows: number; matched: number; missing: number; extra?: number; differs: Record<string, number>; examples: Record<string, unknown[]> };
 
 const q = async <T>(text: string, params: unknown[]) => (await sql.query(text, params)) as T[];
 
-/** staged posts against the core: overwrite → the staged value; coalesce → the staged value where it has one */
+/**
+ * staged posts against the core: overwrite → the staged value; coalesce → the staged value where it has one. A post's own
+ * fields are compared after folding its staged brand rows (fold.ts), as the promotion writes them; the rest per link.
+ */
 export async function comparePosts(loadId: string, ws: string, source: SourceKind): Promise<Diff> {
   const { cols, mode } = POST_WRITE[source];
-  const want = (c: string) => (mode === "coalesce" ? `coalesce(s.${c}, p.${c})` : `s.${c}`);
-  const all = [...cols, "creator_id"];
-  const expr = (c: string) => (c === "creator_id" ? `(p.creator_id is distinct from c.id)` : `(${want(c)} is distinct from p.${c})`);
+  const fold = foldSql({
+    table: "staging.posts", where: (x) => `${x}.load_id = $1 and not ${x}.stub`, cols: itemColsOf(source),
+    creator: (x) => `(select c.id from creators c where c.workspace_id = $2 and c.platform = ${x}.platform and c.handle = ${x}.creator_key)`,
+  });
+  const src = (c: string) => (isItemCol(c) ? `f.${c}` : `s.${c}`);
+  const want = (c: string) => (mode === "coalesce" ? `coalesce(${src(c)}, p.${c})` : src(c));
+  // creator and flags are the load's, always (as the promotion writes them)
+  const all = [...cols, "creator_id", "flags"];
+  const expr = (c: string) => (c === "creator_id" || c === "flags" ? `(p.${c} is distinct from f.${c})` : `(${want(c)} is distinct from p.${c})`);
+  const from = (select: string, join: "join" | "left join") => `with f as (${fold})
+    select ${select} from staging.posts s join f on f.platform = s.platform and f.url = s.url
+      ${join} posts p on p.workspace_id = $2 and p.platform = s.platform and p.url = s.url and p.brand_id = s.brand_id
+     where s.load_id = $1 and not s.stub`;
   const head = (await q<Record<string, number>>(
-    `select count(*)::int as rows, count(p.id)::int as matched, count(*) filter (where p.id is null)::int as missing,
-            ${all.map((c) => `count(*) filter (where p.id is not null and ${expr(c)})::int as "d_${c}"`).join(", ")}
-       from staging.posts s
-       left join posts p on p.workspace_id = $2 and p.platform = s.platform and p.url = s.url and p.brand_id = s.brand_id
-       left join creators c on c.workspace_id = $2 and c.platform = s.platform and c.handle = s.creator_key
-      where s.load_id = $1 and not s.stub`,
+    from(`count(*)::int as rows, count(p.id)::int as matched, count(*) filter (where p.id is null)::int as missing,
+            ${all.map((c) => `count(*) filter (where p.id is not null and ${expr(c)})::int as "d_${c}"`).join(", ")}`, "left join"),
     [loadId, ws],
   ))[0];
   const differs: Record<string, number> = {};
@@ -33,11 +43,8 @@ export async function comparePosts(loadId: string, ws: string, source: SourceKin
     if (!n) continue;
     differs[c] = n;
     examples[c] = await q(
-      `select s.platform, s.url, s.brand_id, ${c === "creator_id" ? "c.id::text as staged, p.creator_id::text as core" : `${want(c)}::text as staged, p.${c}::text as core`}
-         from staging.posts s
-         join posts p on p.workspace_id = $2 and p.platform = s.platform and p.url = s.url and p.brand_id = s.brand_id
-         left join creators c on c.workspace_id = $2 and c.platform = s.platform and c.handle = s.creator_key
-        where s.load_id = $1 and not s.stub and ${expr(c)} limit 4`,
+      `${from(`s.platform, s.url, s.brand_id, ${c === "creator_id" || c === "flags" ? `f.${c}::text as staged, p.${c}::text as core` : `${want(c)}::text as staged, p.${c}::text as core`}`, "join")}
+         and ${expr(c)} limit 4`,
       [loadId, ws],
     );
   }

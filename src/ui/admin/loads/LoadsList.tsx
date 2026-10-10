@@ -13,6 +13,8 @@ const when = (d: string | null) => (d ? new Date(d).toLocaleString("en-GB", { da
 const STATUS: Record<string, string> = { reading: "reading", staged: "staged", held: "held", promoting: "going in", live: "in", discarded: "thrown away", failed: "failed" };
 const HST: Record<string, string> = { live: "ok", held: "fail", failed: "fail", discarded: "info", staged: "warn", promoting: "warn", reading: "warn" };
 const OUT: Record<string, string> = { pass: "ok", hold: "fail", warn: "warn", info: "info" };
+/** what a promotion counts, in words: a post is one post_items row, and a posts row is its link to a brand (DECISIONS, 10 Oct 2026) */
+const WORD: Record<string, string> = { items: "posts", posts: "brand links", stub_posts: "posts known only from their comments" };
 
 export function LoadsList({ ws, loads }: { ws: string; loads: LoadRow[] }) {
   const router = useRouter();
@@ -59,7 +61,7 @@ export function LoadsList({ ws, loads }: { ws: string; loads: LoadRow[] }) {
                   {l.error && <p className="err">{l.error}</p>}
                   <ul className="checks">{l.checks.map((c) => <li key={c.key}><span className={`hst ${OUT[c.outcome]}`}>{c.outcome}</span> <b>{c.label}</b>: {c.detail}</li>)}</ul>
                   {l.file_reports.length > 0 && <p className="muted">{l.file_reports.map((f) => `${f.file}: ${n(f.rows_in)} rows, ${n(f.staged)} staged, ${n(f.merged)} merged, ${n(f.dropped)} dropped`).join(" · ")}</p>}
-                  {l.staged && <p className="muted">Staged: {Object.entries(l.staged).filter(([, v]) => Number(v)).map(([k, v]) => `${n(v)} ${k}`).join(", ")}.{l.promoted ? ` Changed when it went in: ${Object.entries(l.promoted).map(([k, v]) => `${n(v)} ${k}`).join(", ")}.` : ""}</p>}
+                  {l.staged && <p className="muted">Staged: {Object.entries(l.staged).filter(([, v]) => Number(v)).map(([k, v]) => `${n(v)} ${k}`).join(", ")}.{l.promoted ? ` Changed when it went in: ${Object.entries(l.promoted).map(([k, v]) => `${n(v)} ${WORD[k] ?? k}`).join(", ")}.` : ""}</p>}
                   {l.notice && <p className="muted">Told {l.notice.to.join(", ") || "no one"} {when(l.notice.at)}: {l.notice.sent ? "sent" : `not sent (${l.notice.error ?? "email not set up"})`}.</p>}
                   {l.decided_by && <p className="muted">Decided by {l.decided_by}.</p>}
                 </td></tr>

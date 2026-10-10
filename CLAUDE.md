@@ -47,6 +47,8 @@ Rules:
   - every number on every screen comes from one versioned definition.
 
   Raw files live in private Vercel Blob (`src/raw/store.ts`, `data/raw/MANIFEST.json`, `pnpm raw`), never in the repository: never commit a raw file.
+
+  A post is one `post_items` row; `posts` rows are its links to brands. Each link carries a copy of the post's fields (`ITEM_COLS` in `src/loader/fold.ts`), and triggers keep the copies in step (migration 0036). Write through either. The loader writes the post before its links. A total over a platform counts each post once (`item_id`); a brand's numbers count its links.
   Every load goes through the one loader (`src/loader/`, `pnpm load`):
   - a source's adapter maps its files;
   - the rows land in `staging`;

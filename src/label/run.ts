@@ -196,10 +196,11 @@ export async function labelWorkspace(workspaceId: string, opts: LabelOptions = {
           // a post that is not about the subject or the case is set aside (relevant = false), as listening workspaces do
           `update posts p set stance = case when l.sentiment = 'off_topic' then null else l.sentiment end, stance_source = 'model',
                   relevant = case when l.sentiment = 'off_topic' then false else p.relevant end,
+                  checked_by = case when l.sentiment = 'off_topic' then $3 else p.checked_by end,
                   topic_id = coalesce(l.topic, p.topic_id), topic_confidence = case when l.topic is not null then l.confidence else p.topic_confidence end,
                   voice = coalesce(l.voice, p.voice)
            from jsonb_to_recordset($1::jsonb) as l(id uuid, sentiment text, confidence numeric, topic text, voice text) where p.id = l.id and p.workspace_id = $2`,
-          [toJson(labels), workspaceId],
+          [toJson(labels), workspaceId, modelLabeller(modelId())],
         );
         await recordLabels(workspaceId, modelLabeller(modelId()), promptVersion(stanceSystem(ctx)), labels.flatMap(postLabelRows)).catch((e) => console.error("[labels]", (e as Error).message));
         out.posts_labelled += labels.length;
