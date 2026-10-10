@@ -55,7 +55,7 @@ function WeeklyBars({ points }: { points: WeekPoint[] }) {
         const hE = y(0) - y(p.earned), hO = y(0) - y(p.owned);
         return (
           <g key={p.week}>
-            <title>{`Week of ${weekLabel(p.week)}: ${p.earned} creator posts, ${p.owned} owned, ${fmtNum(p.views)} views`}</title>
+            <title>{`Week of ${weekLabel(p.week)}: ${p.earned} creator posts, ${p.owned} owned, ${fmtNum(p.views)} views at day 7`}</title>
             <rect x={cx - barW / 2} y={y(p.earned)} width={barW} height={hE} fill="var(--blue)" rx="3" />
             {p.owned > 0 && <rect x={cx - barW / 2} y={y(p.earned + p.owned)} width={barW} height={hO} fill="var(--violet)" rx="3" />}
           </g>
@@ -131,7 +131,7 @@ export function BrandPage({ d, q, productName = "CeMO" }: { d: BrandPageData; q:
           <header><h2>Creator tiers <span>{period}, creator posts only</span></h2><AskLink prompt={`Which tier is doing the work for ${b.name}: creators, views and carts by tier over the ${period}?`} /></header>
           <div className="tablewrap still">
             <table>
-              <thead><tr><th>Tier</th><th className="num">Creators</th><th className="num">Share of creators</th><th className="num">Posts</th><th className="num">Views</th><th className="num">Share of views</th><th className="num">Median views / post</th><th className="num">ER</th><th className="num">Cart share (TikTok)</th></tr></thead>
+              <thead><tr><th>Tier</th><th className="num">Creators</th><th className="num">Share of creators</th><th className="num">Posts</th><th className="num">Views (day 7)</th><th className="num">Share of views</th><th className="num">Median views / post</th><th className="num">ER</th><th className="num">Cart share (TikTok)</th></tr></thead>
               <tbody>
                 {d.tiers.map((t) => (
                   <tr key={t.tier}>
@@ -174,7 +174,7 @@ export function BrandPage({ d, q, productName = "CeMO" }: { d: BrandPageData; q:
               <div key={g.platform}>
                 <b>{PF[g.platform] ?? g.platform}</b>
                 <span>{fmtNum(g.posts)} posts · <GrowthCell g={g} what="posts" /></span>
-                <span>{fmtNum(g.views)} views · <GrowthCell g={g} what="views" /></span>
+                <span>{fmtNum(g.views)} views at day 7 · <GrowthCell g={g} what="views" /></span>
                 <small>{d.prior ? `vs ${d.prior.from} to ${d.prior.to}` : "no prior period for all data"}</small>
               </div>
             ))}
@@ -183,10 +183,10 @@ export function BrandPage({ d, q, productName = "CeMO" }: { d: BrandPageData; q:
 
         {/* 4. Top creators */}
         <div className="bsec">
-          <header><h2>Top creators <span>{period}, by views</span></h2><AskLink prompt={b.is_client ? `Who's new for ${b.name} this period, and which competitors have they also posted for?` : `Who's new for ${b.name} this period, and have any of them posted for ${clientName ?? "us"}?`} /></header>
+          <header><h2>Top creators <span>{period}, by views at day 7</span></h2><AskLink prompt={b.is_client ? `Who's new for ${b.name} this period, and which competitors have they also posted for?` : `Who's new for ${b.name} this period, and have any of them posted for ${clientName ?? "us"}?`} /></header>
           <div className="tablewrap still">
             <table>
-              <thead><tr><th>#</th><th>Creator</th><th>Tier</th><th className="num">Followers</th><th className="num">Posts</th><th className="num">Views</th><th className="num">ER</th><th className="num">Cart share</th><th>Worked for</th>{clientName && <th>For {clientName}</th>}</tr></thead>
+              <thead><tr><th>#</th><th>Creator</th><th>Tier</th><th className="num">Followers</th><th className="num">Posts</th><th className="num">Views (day 7)</th><th className="num">ER</th><th className="num">Cart share</th><th>Worked for</th>{clientName && <th>For {clientName}</th>}</tr></thead>
               <tbody>
                 {creatorRows.map((c, i) => (
                   <tr key={c.creator_id}>
@@ -212,7 +212,7 @@ export function BrandPage({ d, q, productName = "CeMO" }: { d: BrandPageData; q:
         {/* 5. Hashtags */}
         <div className="bsec">
           <header>
-            <h2>Hashtags <span>{period}, by views</span></h2>
+            <h2>Hashtags <span>{period}, by views at day 7</span></h2>
             <div className="right">
               {tagsHidden > 0 && <Link className="linkish" href={href(base, q, { tags: showTags ? "" : "all" })}>{showTags ? "Hide brand hashtags" : `Include ${tagsHidden} brand hashtag${tagsHidden === 1 ? "" : "s"}`}</Link>}
               <AskLink prompt={b.is_client ? `Which hashtags are competitors riding that ${b.name} isn't?` : `Which hashtags is ${b.name} riding that ${clientName ?? "we"} ${clientName ? "isn't" : "aren't"}?`} />
@@ -220,7 +220,7 @@ export function BrandPage({ d, q, productName = "CeMO" }: { d: BrandPageData; q:
           </header>
           <div className="tablewrap still">
             <table>
-              <thead><tr><th>Hashtag</th><th className="num">Posts</th><th className="num">Creators</th><th className="num">Views</th><th className="num">Share of {b.name}&apos;s views</th><th className="num">vs prior period</th></tr></thead>
+              <thead><tr><th>Hashtag</th><th className="num">Posts</th><th className="num">Creators</th><th className="num">Views (day 7)</th><th className="num">Share of {b.name}&apos;s views</th><th className="num">vs prior period</th></tr></thead>
               <tbody>
                 {tagRows.map((h) => {
                   const g = h.posts <= 1 ? null : growthOf(h.posts, h.prev_posts, prior);
