@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "NODE_USE_ENV_PROXY=1 next dev",
-    "build": "next build",
+    "build": "tsx scripts/raw.ts sync --build && next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "db:generate": "drizzle-kit generate",
@@ -23,7 +23,8 @@
     "weekly": "NODE_USE_ENV_PROXY=1 tsx scripts/weekly.ts",
     "weekly:publish": "NODE_USE_ENV_PROXY=1 tsx scripts/weekly-publish.ts",
     "onboard": "NODE_USE_ENV_PROXY=1 tsx scripts/onboard.ts",
-    "perf": "NODE_USE_ENV_PROXY=1 tsx scripts/perf.ts"
+    "perf": "NODE_USE_ENV_PROXY=1 tsx scripts/perf.ts",
+    "raw": "NODE_USE_ENV_PROXY=1 tsx scripts/raw.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "0.122.0",

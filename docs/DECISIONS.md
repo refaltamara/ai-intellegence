@@ -658,3 +658,76 @@ The app's mark is the one Refal supplied for the pitch, now Fair Intelligence's 
 It is drawn as a vector (`src/ui/LogoMark.tsx`), traced from the supplied PNG; the two match to within one pixel along the edge. The browser tab icon is the same drawing (`app/icon.svg`), and the home-screen icon is a 180 px PNG (`app/apple-icon.png`). Both are public paths, so the sign-in page shows them.
 
 The product's name stays "Fair Intelligence", and the rest of the app keeps its blue and violet.
+
+## Data architecture V1 (Refal, 10 Oct 2026)
+
+The agreed design is the doc "Core data architecture and model" (https://claude.ai/artifact/XCpZz9SB1HqZboBykahT4e). Refal set all 13 of its decisions to Agree on 10 Oct 2026. Where it conflicts with an older entry, it wins: for example, listening comments no longer keep the five-point scale or CSAT (3 Oct), and a post is read for 7 days, not 30.
+
+**Architecture: one road for every source.** Sources → landing → staging → checks → core → enrichment → serving → screens.
+- **Raw files** are kept exactly as received in private Vercel Blob, never in the repository. They are kept 12 months and deleted on request.
+- **Staging** is its own area in the same database. Each load lands there first, mapped to our tables. It can be thrown away whole and is cleared 30 days after go-live. Nothing in staging is ever shown.
+- **One loader, in TypeScript.** Each source has a small adapter that turns a file into rows; every source then takes the same steps. Python stays for one-off analysis.
+- **Who starts a load.** A new workspace's setup and first load happen in the CMS. After that, loads start automatically whenever the scraper delivers.
+- **Checks have two outcomes.**
+  - A broken load is held with a report: rows missing against the file, duplicates, time zone, unknown handles, or too large a share set aside.
+  - A warning, such as an account with 0 followers or a video with 0 views, does not stop the load. The row goes in flagged and stays out of rates and medians, and data ops and the scraper team are told.
+  - Nobody reviews a daily load by hand. A person looks only when a load is held, and at a new workspace's first load.
+- **Freshness.** Clients are told "updated daily" (weekly for some panels), never an hour. Every number shows its as-of date.
+- **Scale.** Posts and readings are split by month from the start, since readings multiply rows.
+- **Enrichment** comes from two places.
+  - Ours, set up with the panel: sentiment, and topics from the client's list.
+  - The client's, after onboarding: extras and cleanup rules. A cleanup never deletes and never changes the core. A standing cleanup shows what it would set aside and needs a Builder's approval.
+
+**Model principles.**
+- **One row per real thing**, keyed by platform plus the platform's own id. A post about three brands is one post with three links, each saying how we know: owned, tagged, keyword or mention, with its term, relevance, who checked it, and what brought it in (the panel or a case).
+- **Readings keep their time.** Views, likes and followers are readings at a moment. The latest is copied onto the post for speed.
+- **Judgments keep their author.** Every label says who made it (vendor, our model and its version, or a person) and when. A new labeller adds rows and never silently overwrites.
+- **The core holds only what every source has.** Anything else is an extra (`ext_defs`/`ext_values`). An extra moves into the core once three or more sources have it.
+- **Every number has one definition**, versioned, used the same way by every role, screen, chat and the connector. Roles choose definitions and defaults; they never redefine them.
+- **Raw stays**, so any number can be rebuilt from its file.
+
+**Decided.**
+- **Views.** Default views are at day 7, with the latest beside them. A post is read for 7 days from posting; the scraper should stop there.
+- **Copies.** Each panel keeps its own copies for now, keyed by platform id so sharing stays possible.
+- **Sentiment** is three classes only: positive, neutral, negative. The vendor's "average" stays negative. CSAT and the five-point detail are dropped and remain only in the kept file.
+- **Commenter handles** are kept inside Fair Intelligence only; no legal check needed.
+- **Beauty** gets comments, sentiment and topics from Q4 2026 onwards. It is posts-only until then.
+- **Share of views leads on brand panels**, with share of voice (posts) always beside it. Share of engagement uses likes + comments.
+- **Commenters are never creators.** Only an account with a linked post is a creator.
+- **Affiliator** is worked out per period (day, week or month), never stored. One cart post makes a creator an affiliator for that whole period.
+- **Cases** are blended in storage and divided in counting. Posts only a case brought in count in that case, never in the panel's everyday totals, creators or tiers. Each case needs its own access list before any case moves out of its own workspace; until then Kahf stays its own workspace.
+- **Client creations** are reviewed by Fair. Adopting one takes the definition, never the client's rows. Adopting a model-made field moves its running cost from the client's credits to Fair, so Fair estimates it per panel first.
+
+**Refal's answers on 10 Oct.**
+- Git history keeps the old raw files for now; Refal will change the repository's visibility later.
+- Build now and integrate with the scraper later: the day-7 stop and the Fintech shape for Beauty and cases are the scraper team's side.
+- Clients are not told about moving numbers at this point.
+- Share of views leads.
+- Access per case as above.
+
+**Build order**, each step its own PR, checked with `pnpm test`, `pnpm smoke`, `pnpm perf` and a count before and after:
+
+| Step | What changes |
+|---|---|
+| 0 | this entry |
+| 1 | raw files to private Blob |
+| 2 | one TypeScript loader with staging and checks |
+| 3 | the core: links instead of a row per brand, readings, labels with their author, three-class sentiment, CSAT out |
+| 4 | definitions and daily totals, which every screen reads |
+| 5 | cases with an access list |
+
+**Step 1: raw files to the store (10 Oct).**
+- **The manifest.** `data/raw/MANIFEST.json` lists the 53 raw files, 64 MB in all: 3 Beauty exports, 15 Kahf files and 35 Maudy files. Each entry gives:
+  - its workspace;
+  - its place in the store (`raw/<workspace>/<file>`);
+  - its size and SHA-256;
+  - the day it arrived, from git.
+- **The upload.** The files go to private Vercel Blob from Vercel's own production build, which already holds the store's token, so no token passes through a laptop or a chat.
+  - `pnpm raw sync --build` is the first step of `pnpm build`, and `vercel.json` pins the build command.
+  - That build fails unless every file is confirmed in the store.
+- **Out of the repository.** Then the repository stops tracking the files: `data/raw/*` is gitignored except this README and the manifest. Old commits still hold them; Refal decides later about the history and the repository's visibility.
+- **Reading them back.** Loaders read a raw file through `readRaw` (`src/raw/store.ts`): the local copy if its hash matches, else the store.
+- **Commands.**
+  - `pnpm raw pull <workspace>` fetches files into `data/raw/`, checked against their hash, for the Python loaders or for analysis.
+  - `pnpm raw check` shows where each file is.
+  - `pnpm raw expired` lists files past their 12 months.

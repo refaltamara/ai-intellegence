@@ -1,5 +1,7 @@
 # Raw data files
 
+**These files no longer live in the repository** (DECISIONS, 10 Oct 2026, "Data architecture V1"). Every raw file is kept exactly as received in private Vercel Blob under `raw/<workspace>/<file>`, for 12 months. `MANIFEST.json` in this folder lists each one with its workspace, size, SHA-256 and the day it arrived. `pnpm raw pull <workspace>` fetches them into this folder (gitignored), checked against their hash; it needs the store's token (`BLOB_READ_WRITE_TOKEN`, from `vercel env pull`). Never commit a raw file: comments carry people's handles and words.
+
 Source: Paragon Q1/Q2 2026 exports from Fair Listening, cleaned by Refal. Converted from the original xlsx data sheets to gzipped CSV with no row or column changes. The README and Exclusions sheets from each workbook are reproduced below.
 
 | file | posts | brands | window |
