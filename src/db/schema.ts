@@ -18,6 +18,7 @@ import {
   integer,
   jsonb,
   numeric,
+  pgSchema,
   pgTable,
   primaryKey,
   smallint,
@@ -282,6 +283,11 @@ export const posts = pgTable(
      * stored and are left out of every reputation number; null means not judged (counted).
      */
     relevant: boolean("relevant"),
+    /**
+     * Warnings from the load's checks (DECISIONS, 10 Oct 2026): 'zero_followers' (the account reported 0 followers),
+     * 'zero_views' (a video reported 0 views). The row counts as a post; it stays out of rates and medians.
+     */
+    flags: text("flags").array(),
     sourceFile: text("source_file"),
     loadId: uuid("load_id"),
     createdAt: createdAt(),
@@ -426,6 +432,9 @@ export const dataLoads = pgTable(
     rowsLoaded: integer("rows_loaded").notNull().default(0),
     rowsRejected: integer("rows_rejected").notNull().default(0),
     report: jsonb("report").notNull().default(sql`'{}'::jsonb`),
+    /** the staged load this write came from (src/loader/), and the raw file it read */
+    stagingLoadId: uuid("staging_load_id"),
+    rawFileId: uuid("raw_file_id"),
     startedAt: ts("started_at").notNull().defaultNow(),
     finishedAt: ts("finished_at"),
   },
@@ -1302,4 +1311,186 @@ export const slideComments = pgTable(
     index("slide_comments_report_idx").on(t.reportId, t.slide),
     check("slide_comments_author_chk", sql`${t.author} in ('person','cemo')`),
   ],
+);
+
+// ------------------------------------------------------------------ staging
+/**
+ * Staging (DECISIONS, 10 Oct 2026, "Data architecture V1"): every load lands here first, in its own area of the same
+ * database, mapped to our columns: one row per row the file gives (after the source's rules), never shown on a
+ * screen. The checks read it (src/loader/checks.ts); a broken load is held here with its report, a clean one is
+ * promoted to the core (src/loader/promote.ts). A load can be thrown away whole; rows are cleared 30 days after.
+ */
+export const staging = pgSchema("staging");
+
+export const stagingLoads = staging.table(
+  "loads",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workspaceId: text("workspace_id").notNull().references(() => workspaces.id),
+    /** the adapter: 'listening' (a Fair Listening dump) | 'beauty' (a quarterly export) | 'profile' (a case's exports) */
+    source: text("source").notNull(),
+    /** [{ raw_file_id, path, sha256, rows }]: the raw files this load read */
+    files: jsonb("files").notNull().default(sql`'[]'::jsonb`),
+    /** reading → staged → held | promoting → live; discarded (thrown away whole) | failed (an error, see error) */
+    status: text("status").notNull().default("reading"),
+    /** [{ key, label, outcome: 'pass' | 'hold' | 'warn' | 'info', detail, count }] */
+    checks: jsonb("checks").notNull().default(sql`'[]'::jsonb`),
+    /** what was read, mapped, merged and dropped per file, and what the promotion wrote */
+    report: jsonb("report").notNull().default(sql`'{}'::jsonb`),
+    error: text("error"),
+    startedBy: text("started_by"),
+    /** who let a held load in, or threw one away */
+    decidedBy: text("decided_by"),
+    createdAt: createdAt(),
+    stagedAt: ts("staged_at"),
+    decidedAt: ts("decided_at"),
+    liveAt: ts("live_at"),
+    clearedAt: ts("cleared_at"),
+  },
+  (t) => [
+    index("staging_loads_ws_idx").on(t.workspaceId, t.createdAt),
+    check("staging_loads_status_chk", sql`${t.status} in ('reading','staged','held','promoting','live','discarded','failed')`),
+  ],
+);
+
+/** posts as the file gives them: one row per (platform, url, brand), today's post columns */
+export const stagingPosts = staging.table(
+  "posts",
+  {
+    loadId: uuid("load_id").notNull().references(() => stagingLoads.id, { onDelete: "cascade" }),
+    platform: text("platform").notNull(),
+    url: text("url").notNull(),
+    brandId: text("brand_id").notNull(),
+    platformPostId: text("platform_post_id"),
+    creatorHandle: text("creator_handle"),
+    /** the handle that becomes a creator (null for the brand's own accounts) */
+    creatorKey: text("creator_key"),
+    source: text("source").notNull(),
+    collection: text("collection").notNull(),
+    accountType: text("account_type"),
+    postedAt: ts("posted_at").notNull(),
+    month: date("month").notNull(),
+    caption: text("caption"),
+    hashtags: text("hashtags").array(),
+    taggedHandles: text("tagged_handles").array(),
+    isPaid: boolean("is_paid"),
+    hasCart: boolean("has_cart"),
+    isReseller: boolean("is_reseller"),
+    followersAtPost: integer("followers_at_post"),
+    tier: text("tier"),
+    universe: text("universe"),
+    categoryBroad: text("category_broad"),
+    productCategory: text("product_category"),
+    contentFormat: text("content_format"),
+    contentType: text("content_type"),
+    productName: text("product_name"),
+    productUrl: text("product_url"),
+    price: numeric("price"),
+    priceOriginal: numeric("price_original"),
+    discountPercent: numeric("discount_percent"),
+    views: bigint("views", { mode: "number" }),
+    likes: integer("likes"),
+    commentsCount: integer("comments_count"),
+    shares: integer("shares"),
+    saves: integer("saves"),
+    engagements: integer("engagements"),
+    engagementsLc: integer("engagements_lc"),
+    capturedDays: integer("captured_days"),
+    relevant: boolean("relevant"),
+    /** a post only known from its comments (profiles): written only when the post is not there yet */
+    stub: boolean("stub").notNull().default(false),
+    flags: text("flags").array(),
+    sourceFile: text("source_file"),
+  },
+  (t) => [uniqueIndex("staging_posts_uq").on(t.loadId, t.platform, t.url, t.brandId)],
+);
+
+/** a post's readings over time (listening dumps: day 0 to 30) */
+export const stagingReadings = staging.table(
+  "readings",
+  {
+    loadId: uuid("load_id").notNull().references(() => stagingLoads.id, { onDelete: "cascade" }),
+    platform: text("platform").notNull(),
+    url: text("url").notNull(),
+    brandId: text("brand_id").notNull(),
+    dayN: smallint("day_n").notNull(),
+    capturedAt: ts("captured_at").notNull(),
+    views: bigint("views", { mode: "number" }),
+    likes: integer("likes"),
+    commentsCount: integer("comments_count"),
+    shares: integer("shares"),
+    saves: integer("saves"),
+  },
+  (t) => [primaryKey({ columns: [t.loadId, t.platform, t.url, t.brandId, t.dayN] })],
+);
+
+export const stagingAccounts = staging.table(
+  "accounts",
+  {
+    loadId: uuid("load_id").notNull().references(() => stagingLoads.id, { onDelete: "cascade" }),
+    platform: text("platform").notNull(),
+    handle: text("handle").notNull(),
+    displayName: text("display_name"),
+    followersLatest: integer("followers_latest"),
+    tierLatest: text("tier_latest"),
+    firstSeen: date("first_seen"),
+    lastSeen: date("last_seen"),
+  },
+  (t) => [primaryKey({ columns: [t.loadId, t.platform, t.handle] })],
+);
+
+/** comments as the file gives them, with the labels a source sends (listening dumps arrive labelled) */
+export const stagingComments = staging.table(
+  "comments",
+  {
+    loadId: uuid("load_id").notNull().references(() => stagingLoads.id, { onDelete: "cascade" }),
+    platform: text("platform").notNull(),
+    url: text("url").notNull(),
+    brandId: text("brand_id").notNull(),
+    platformCommentId: text("platform_comment_id").notNull(),
+    authorHandle: text("author_handle"),
+    authorHash: text("author_hash"),
+    text: text("text"),
+    postedAt: ts("posted_at"),
+    likes: integer("likes"),
+    views: bigint("views", { mode: "number" }),
+    sentiment: text("sentiment"),
+    sentimentSource: text("sentiment_source"),
+    sentimentConfidence: numeric("sentiment_confidence"),
+    sentimentDetail: text("sentiment_detail"),
+    csat: smallint("csat"),
+    theme: text("theme"),
+    purchaseIntent: boolean("purchase_intent"),
+    translation: text("translation"),
+    topicId: text("topic_id"),
+    flags: text("flags").array(),
+    sourceFile: text("source_file"),
+  },
+  (t) => [uniqueIndex("staging_comments_uq").on(t.loadId, t.platformCommentId)],
+);
+
+/** captions that arrive apart from their posts (a url → text export): they fill only empty captions */
+export const stagingCaptions = staging.table(
+  "captions",
+  {
+    loadId: uuid("load_id").notNull().references(() => stagingLoads.id, { onDelete: "cascade" }),
+    platform: text("platform").notNull(),
+    url: text("url").notNull(),
+    caption: text("caption").notNull(),
+    hashtags: text("hashtags").array(),
+  },
+  (t) => [primaryKey({ columns: [t.loadId, t.platform, t.url] })],
+);
+
+/** a listening dump's own topics */
+export const stagingTopics = staging.table(
+  "topics",
+  {
+    loadId: uuid("load_id").notNull().references(() => stagingLoads.id, { onDelete: "cascade" }),
+    id: text("id").notNull(),
+    label: text("label").notNull(),
+    sortOrder: integer("sort_order").notNull().default(0),
+    isCatchAll: boolean("is_catch_all").notNull().default(false),
+  },
+  (t) => [primaryKey({ columns: [t.loadId, t.id] })],
 );

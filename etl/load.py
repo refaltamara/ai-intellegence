@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Fair Intel loader: Refal's cleaned exports -> Neon Postgres.
+"""Superseded on 10 Oct 2026 by the one loader (src/loader/adapters/beauty.ts, `pnpm load run beauty-id beauty <files>`), which
+writes the same rows through staging and its checks (DECISIONS, "Data architecture V1"). Kept for reference and one-off
+analysis; it reads data/raw/, which `pnpm raw pull beauty-id` fills.
+
+Fair Intel loader: Refal's cleaned exports -> Neon Postgres.
 
   python3 etl/load.py --all                       # brands + the three raw files + refresh views
   python3 etl/load.py --brands                    # brand mapping only

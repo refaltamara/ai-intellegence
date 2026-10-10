@@ -10,3 +10,7 @@ __pycache__/
 *.tsbuildinfo
 next-env.d.ts
 .claude/settings.local.json
+# raw files never go in the repository (DECISIONS, 10 Oct 2026): they live in private Vercel Blob (`pnpm raw`)
+/data/raw/*
+!/data/raw/README.md
+!/data/raw/MANIFEST.json

@@ -11,6 +11,7 @@ import { fillRules, scopeCounts, tagRows, type Tagger } from "./fill";
 import { getDef, invalidateExt } from "./store";
 import type { ExtDef } from "./spec";
 import { ONBOARD_KINDS, onboardSlice } from "../onboard/jobs";
+import { LOAD_KINDS, loadJobSlice } from "../loader/run";
 
 export type Job = { id: string; workspace_id: string | null; kind: string; params: Record<string, unknown>; status: string; progress: Record<string, unknown>; error: string | null; created_by: string | null };
 
@@ -46,6 +47,18 @@ export async function runSlice(job: Job, tagger?: Tagger, budgetMs?: number): Pr
     // onboarding a workspace (src/onboard/): inspect, load in slices, relevance
     try {
       const r = await onboardSlice(job.kind, job.workspace_id, job.params, job.progress, budgetMs);
+      await finish(job, r.done ? "done" : "queued", { ...r.progress, note: r.note }, null);
+      return { status: r.done ? "done" : "running", detail: { note: r.note } };
+    } catch (e) {
+      const msg = (e as Error).message.slice(0, 500);
+      await finish(job, "failed", {}, msg);
+      return { status: "failed", detail: { error: msg } };
+    }
+  }
+  if (job.workspace_id && (LOAD_KINDS as readonly string[]).includes(job.kind)) {
+    // a load through the one loader (src/loader/): stage and check, then promote in slices
+    try {
+      const r = await loadJobSlice(job.workspace_id, job.params as Parameters<typeof loadJobSlice>[1], job.progress, budgetMs);
       await finish(job, r.done ? "done" : "queued", { ...r.progress, note: r.note }, null);
       return { status: r.done ? "done" : "running", detail: { note: r.note } };
     } catch (e) {

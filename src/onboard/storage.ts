@@ -36,6 +36,19 @@ export async function saveLocal(ws: string, name: string, data: Uint8Array | str
   return { url: `file://${p}`, size: (await stat(p)).size };
 }
 
+/** The whole file as bytes (a raw file is hashed as it was received). Local files must sit under ONBOARD_DIR. */
+export async function readStoredBytes(url: string): Promise<Buffer> {
+  if (url.startsWith("file://")) {
+    const p = path.resolve(/*turbopackIgnore: true*/ url.slice("file://".length));
+    if (!p.startsWith(localDir() + path.sep)) throw new Error("That file is outside the onboarding folder.");
+    return readFile(p);
+  }
+  const { get } = await import("@vercel/blob");
+  const r = await get(url, { access: "private", useCache: false });
+  if (!r || !r.stream) throw new Error("The stored file is gone; upload it again.");
+  return Buffer.from(await new Response(r.stream).arrayBuffer());
+}
+
 /** The whole file as text. Local files must sit under ONBOARD_DIR; blobs are read with the store's token. */
 export async function readStored(url: string): Promise<string> {
   if (url.startsWith("file://")) {

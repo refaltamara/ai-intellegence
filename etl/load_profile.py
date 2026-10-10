@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Profile loader: one subject's contents and comments, five platforms -> Neon.
+"""Superseded on 10 Oct 2026 by the one loader (src/loader/adapters/profile.ts, `pnpm load run <workspace> profile`), which
+writes the same rows through staging and its checks (DECISIONS, "Data architecture V1"). Kept for reference and one-off
+analysis; it reads data/raw/, which `pnpm raw pull <workspace>` fills.
+
+Profile loader: one subject's contents and comments, five platforms -> Neon.
 
   python3 etl/load_profile.py etl/profiles/maudy-ayunda.json            # load everything the contract lists
   python3 etl/load_profile.py etl/profiles/maudy-ayunda.json --dry-run  # validate and print the report only

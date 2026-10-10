@@ -2,6 +2,14 @@
   "note": "Raw files as received, kept in private Vercel Blob (DECISIONS, 10 Oct 2026). Not in the repository: `pnpm raw pull <workspace>` fetches them into data/raw/. A raw file never changes; a corrected file is a new file.",
   "files": [
     {
+      "path": "beauty-id/instagram_q3_2026.csv",
+      "workspace": "beauty-id",
+      "blob": "raw/beauty-id/instagram_q3_2026.csv",
+      "bytes": 28839412,
+      "sha256": "4f9c9f6bb8a95a5a63d6044a84ae6d2d4c393d2189f72e1caaba6c7dba6283f3",
+      "received": "2026-10-06"
+    },
+    {
       "path": "instagram_q1_2026.csv.gz",
       "workspace": "beauty-id",
       "blob": "raw/beauty-id/instagram_q1_2026.csv.gz",
@@ -24,6 +32,110 @@
       "bytes": 10703876,
       "sha256": "23dca9e3b7c6bb41b771fd15cbb8cf578b105df9326a9b8b0ec4606b51ca1686",
       "received": "2026-09-02"
+    },
+    {
+      "path": "fintech-id/_comment__202610011730.csv",
+      "workspace": "fintech-id",
+      "blob": "raw/fintech-id/_comment__202610011730.csv",
+      "bytes": 24640408,
+      "sha256": "58a8160a43fb284cbee7972c2072e21910714fadcb24f8b28cdc152da85c394c",
+      "received": "2026-10-03"
+    },
+    {
+      "path": "fintech-id/_content__202610011730.csv",
+      "workspace": "fintech-id",
+      "blob": "raw/fintech-id/_content__202610011730.csv",
+      "bytes": 11617815,
+      "sha256": "c8bd78b50b2a2fbe7760a9e7b13248526f29ce6e05cac8c7a4bbf9ce61209f01",
+      "received": "2026-10-03"
+    },
+    {
+      "path": "fintech-id/brand_202610011730.csv",
+      "workspace": "fintech-id",
+      "blob": "raw/fintech-id/brand_202610011730.csv",
+      "bytes": 1075,
+      "sha256": "4773448d2882e87493dba1a46eb5b5c81b393ad1a958430d6c093a21c47f9132",
+      "received": "2026-10-03"
+    },
+    {
+      "path": "fintech-id/comment_sentiment_202610011730.csv",
+      "workspace": "fintech-id",
+      "blob": "raw/fintech-id/comment_sentiment_202610011730.csv",
+      "bytes": 22253660,
+      "sha256": "396c1d3a92530053a0265af0107e5b7e86e658dd52efc54b6b29c1c3e545a0af",
+      "received": "2026-10-03"
+    },
+    {
+      "path": "fintech-id/content_audio_202610011730.csv",
+      "workspace": "fintech-id",
+      "blob": "raw/fintech-id/content_audio_202610011730.csv",
+      "bytes": 244822,
+      "sha256": "476e7ebe0e4a5ee941579f329975d6ebba6aa27ea2c98879a00399ad7a21273f",
+      "received": "2026-10-03"
+    },
+    {
+      "path": "fintech-id/content_hashtag_202610011730.csv",
+      "workspace": "fintech-id",
+      "blob": "raw/fintech-id/content_hashtag_202610011730.csv",
+      "bytes": 394460,
+      "sha256": "86f1e2b0a16a9d84638ac7c92add3b65a55abb55f304ac415355e0f87521a92b",
+      "received": "2026-10-03"
+    },
+    {
+      "path": "fintech-id/content_media_202610011730.csv",
+      "workspace": "fintech-id",
+      "blob": "raw/fintech-id/content_media_202610011730.csv",
+      "bytes": 1668891,
+      "sha256": "acd10390faa4ec2c02acc45b9355278271b12d72fcb7014880f22fac41ae6e3c",
+      "received": "2026-10-03"
+    },
+    {
+      "path": "fintech-id/content_metric_snapshot_202610011730.csv",
+      "workspace": "fintech-id",
+      "blob": "raw/fintech-id/content_metric_snapshot_202610011730.csv",
+      "bytes": 18316937,
+      "sha256": "9ecf95501ccf4876f0674e19f489ce6881e80a8b25e5c4f24a6edcf36f62a8fd",
+      "received": "2026-10-03"
+    },
+    {
+      "path": "fintech-id/content_sentiment_daily_202610011730.csv",
+      "workspace": "fintech-id",
+      "blob": "raw/fintech-id/content_sentiment_daily_202610011730.csv",
+      "bytes": 28562316,
+      "sha256": "c192451cd135b9dc27a1f98db087b386083e1817eb77162e8d691eb5653aef1e",
+      "received": "2026-10-03"
+    },
+    {
+      "path": "fintech-id/content_tagged_user_202610011730.csv",
+      "workspace": "fintech-id",
+      "blob": "raw/fintech-id/content_tagged_user_202610011730.csv",
+      "bytes": 160340,
+      "sha256": "cf6582c9ab1ced512627313f6e5f0447a2d6fbf0b47ed17f343616cae8483831",
+      "received": "2026-10-03"
+    },
+    {
+      "path": "fintech-id/creator_202610011730.csv",
+      "workspace": "fintech-id",
+      "blob": "raw/fintech-id/creator_202610011730.csv",
+      "bytes": 1778473,
+      "sha256": "d4fc509044058d74146cdaa12688dbf384a49d846198218e03e5f343fdfdf49f",
+      "received": "2026-10-03"
+    },
+    {
+      "path": "fintech-id/topic_202610011730.csv",
+      "workspace": "fintech-id",
+      "blob": "raw/fintech-id/topic_202610011730.csv",
+      "bytes": 1748,
+      "sha256": "4de666cedca808a8d821eab1a2ce233e4d6c3827d6d43c2a9297796321b40fc8",
+      "received": "2026-10-03"
+    },
+    {
+      "path": "fintech-id/topic_theme_map_202610011730.csv",
+      "workspace": "fintech-id",
+      "blob": "raw/fintech-id/topic_theme_map_202610011730.csv",
+      "bytes": 248984,
+      "sha256": "1874ad1f4745f79b28681b2f3504ec0d37d8aec1cdcb8171d6782b3049bc3e9c",
+      "received": "2026-10-03"
     },
     {
       "path": "kahf/comments_threads_1007a.csv",

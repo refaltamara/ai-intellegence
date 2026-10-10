@@ -24,7 +24,7 @@ export function LoadPanel({ ws, blockers, running, canReset }: { ws: string; blo
         {msg && <span className="muted">{msg}</span>}
         {error && <span className="err">{error}</span>}
       </div>
-      <p className="muted">Posts are one row per platform, link and brand (the capture tracked last wins); a post found for two brands is two rows. Loading again updates in place. Slices run here while this page is open; otherwise every five minutes.</p>
+      <p className="muted">The dump's files are kept as raw files, staged and checked before anything reaches the core: a broken load is held in Loads. Posts are one row per platform, link and brand (the capture tracked last wins). Loading again changes only what changed. Slices run here while this page is open; otherwise every five minutes.</p>
     </div>
   );
 }

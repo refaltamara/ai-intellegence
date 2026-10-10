@@ -1,6 +1,6 @@
 # Data notes (from profiling the three raw files, 2 Sep 2026)
 
-Companion to `docs/PRD.md` §3. These findings override the PRD where they conflict. Raw files live in `data/raw/`, brand mapping in `data/seed/brand_mapping_master.csv`.
+Companion to `docs/PRD.md` §3. These findings override the PRD where they conflict. Raw files are listed in `data/raw/MANIFEST.json` and kept in private Vercel Blob (`pnpm raw pull <workspace>` fetches them; DECISIONS, 10 Oct 2026); brand mapping in `data/seed/brand_mapping_master.csv`. Since 10 Oct every source loads through the one loader (`src/loader/`, `pnpm load`); the per-source rules below are what its adapters do.
 
 ## What the data is
 
@@ -211,3 +211,34 @@ One contents file, `data/raw/kahf/contents_threads.csv` (posts only; comments to
   - **336 replies loaded as posts** by the recent-posts exports (`1007h` 107, `1008a` 88, `1008c` 84, `1007i` 55, the first posts file 2). They were removed as posts and listed in `drop_urls` with their parent, so they count once, as comments. None had comments of their own in the database. The 467 rows in this file under one of them moved to its parent post (9 of the replies sit under another reply; the loader follows the chain). 2,683 posts in all.
 - **All comments labelled by 12:30 WIB on 7 Oct**: 8,965 on posts about the case (off-topic left out). Labelling moved to every 5 minutes the same day.
 
+
+## The one loader (DECISIONS, 10 Oct 2026)
+
+Every source goes through the same steps:
+
+1. Its raw files are read: the local copy when its hash matches the manifest, else the private store.
+2. The source's adapter turns them into rows, mapped to our columns:
+   - Beauty exports (`src/loader/adapters/beauty.ts`, from `etl/load.py`);
+   - Fair Listening dumps (`listening.ts`, from the CMS's listening loader);
+   - profile and case exports with their contract in `etl/profiles/` (`profile.ts`, from `etl/load_profile.py`).
+3. The rows land in staging.
+4. The checks run (`src/loader/checks.ts`, thresholds in `src/config/loads.ts`).
+5. The load is held with a report, or promoted to the core, writing only what changed.
+
+**Proving the ports.** Each port was run on every raw file the core was built from and compared column by column with the core (`pnpm load stage`, `src/loader/compare.ts`):
+
+| Workspace | What matched | Differences |
+|---|---|---|
+| Beauty | 278,322 posts and 86,521 creators | none |
+| Fintech | 13,275 posts, 114,633 readings, 116,366 comments and 9,087 creators | none |
+| Kahf | 2,683 posts, 46,643 comments and 2,217 creators | none |
+| Maudy | 3,559 posts, 53,846 comments and 2,867 creators | 261 posts |
+
+- **Maudy's 261 posts.** On 7 Oct the profile rules changed: `reshare` and `repost` count as shares, and a later export no longer blanks a value an earlier one gave. Maudy was last loaded on 18 Sep, before that change. Re-loading through the one loader filled 258 follower counts (and tiers), 260 share counts and 3 like counts. For example, the 15 Sep evening file gives a post 82 followers and the 16 Sep file leaves the field empty.
+- **Kahf's three comments.** Three comments our labeller tried and gave up on (`model_failed_final`) keep that mark when a file brings no label. The old rule reset them, so a reload paid to try them again.
+
+Promoting the four loads changed nothing else: 0 rows in Kahf, Fintech and Beauty, and 261 posts in Maudy.
+
+**Warnings.**
+- A reported 0 followers (about 6,700 Beauty rows; the Q3 converter had already turned those zeros blank) and a video or reel with 0 views are flagged on the post (`posts.flags`).
+- Images and text posts often report no views, so they are never flagged for it.
