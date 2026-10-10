@@ -22,7 +22,7 @@ function summarySlide(pres: PptxGenJS, r: WeeklyReport, n: Narrative, page: numb
   const s = pres.addSlide();
   chrome(s, r, page, sampleLabel);
   add(s, r.title, { x: M, y: 0.7, w: 9, h: 0.4, fontSize: 16, bold: true, color: C.blue });
-  add(s, r.week.label, { x: M, y: 1.08, w: 9, h: 0.8, fontSize: 40, bold: true, color: C.ink, valign: "middle" });
+  add(s, r.week.label, { x: M, y: 1.08, w: 9, h: 0.8, fontSize: 40, bold: true, color: C.ink, valign: "middle", fit: "shrink" });
   add(s, [r.client ? `Prepared for ${r.client}` : null, listAnd(r.platforms.map((p) => PLATFORM_NAME[p])), r.grain === "month" ? `against ${r.previous_week.label}` : `week ${Number(r.week.iso.slice(-2))}`].filter(Boolean).join(" · "), { x: M, y: 1.9, w: 9, h: 0.3, fontSize: 13, color: C.ink6 });
 
   const gap = 0.3;

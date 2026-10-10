@@ -211,7 +211,10 @@ export function displayedNumbers(r: WeeklyReport): { percent: number[]; points: 
     if (p.posts_change_pct != null) percent.push(Math.abs(p.posts_change_pct));
     if (p.views_change_pct != null) percent.push(Math.abs(p.views_change_pct));
     if (p.prev.posts > 0) ratios.push(p.now.posts / p.prev.posts);
+    counts.push(p.now.so_far ?? 0, p.prev.so_far ?? 0);
   }
+  // views at day 7: the age, and the posts counted so far, as the data notes give them
+  counts.push(7, r.platforms.reduce((a, pl) => a + (r.panel[pl]?.now.so_far ?? 0), 0), r.platforms.reduce((a, pl) => a + (r.panel[pl]?.now.posts ?? 0), 0));
   for (const m of r.movers) {
     counts.push(m.who.creators, m.who.creators_prev, m.who.new_creators);
     for (const v of [m.who.new_creator_share, m.who.new_creator_share_prev, m.what.top_post_view_share]) if (v != null) percent.push(v);

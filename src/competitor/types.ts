@@ -24,6 +24,8 @@ export type Group = {
 export type WeekPoint = {
   week: string;
   posts: number;
+  /** posts under 7 days old at the latest reading, whose views count so far (DECISIONS, 10 Oct 2026); absent on older reports */
+  so_far?: number;
   creators: number;
   owned_posts: number;
   views: number;
@@ -69,7 +71,8 @@ export type Cell = {
 
 export type GroupResult = { group: Group; cells: Partial<Record<Platform, Cell>> };
 
-export type PanelPoint = { week: string; posts: number; views: number };
+/** views are Views (day 7); so_far: posts under 7 days old counted at their latest reading so far (absent on older reports) */
+export type PanelPoint = { week: string; posts: number; views: number; so_far?: number };
 export type Panel = { now: PanelPoint; prev: PanelPoint; history: PanelPoint[]; posts_change_pct: number | null; views_change_pct: number | null };
 
 export type EvidencePost = {

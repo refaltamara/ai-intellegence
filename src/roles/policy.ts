@@ -40,10 +40,15 @@ const hiddenSections: Check = (v, fair) => {
   const list = [...new Set(v)];
   return list.every((x) => typeof x === "string" && keys.includes(x)) ? list : undefined;
 };
-/** a whole order of the role's Dashboard sections, each once */
+/**
+ * an order of the role's Dashboard sections, each once. A saved order outlives releases: a section a release adds later
+ * takes its default place (arrange, src/dashboard/sections.ts), and one it removes leaves the order.
+ */
 const sectionOrder: Check = (v, fair) => {
   const keys = sectionKeys(fair.id);
-  return Array.isArray(v) && v.length === keys.length && new Set(v).size === v.length && v.every((x) => keys.includes(x as string)) ? v : undefined;
+  if (!Array.isArray(v) || new Set(v).size !== v.length || !v.every((x) => typeof x === "string")) return undefined;
+  const known = (v as string[]).filter((x) => keys.includes(x));
+  return known.length ? known : undefined;
 };
 /** new titles for some sections, each up to 40 characters */
 const sectionNames: Check = (v, fair) => {
@@ -171,7 +176,7 @@ export const POLICY_HELP: Record<string, { label: string; range: string; roles?:
   skill_order: { label: "Which kinds of analysis come first in the composer's menu", range: "audience, brands, comments, conversation, creators, posts" },
   "tiles.hidden": { label: "Dashboard sections hidden for everyone", range: "section ids; at least two stay; [] shows all" },
   "tiles.names": { label: "Dashboard sections renamed for everyone", range: "{ section id: new title up to 40 characters }" },
-  "tiles.order": { label: "Dashboard sections in order (each person may also set their own)", range: "every section id, once each" },
+  "tiles.order": { label: "Dashboard sections in order (each person may also set their own)", range: "section ids, once each; a section left out keeps its default place" },
   "prefs.days": { label: "Default window on the Dashboard", range: "7, 14, 30 or 90 days" },
   "prefs.answer": { label: "How long CeMO's answers are", range: "short or full" },
 };

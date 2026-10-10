@@ -49,14 +49,18 @@ export type Tiles = { hidden?: string[]; order?: string[]; names?: Record<string
 export type Arranged = { shown: (SectionDef & { title: string })[]; hidden: (SectionDef & { title: string })[]; all: (SectionDef & { title: string; hidden: boolean })[] };
 
 /**
- * The sections in the order the role asks for: its `order` first (unknown ids dropped),
- * then any section it does not name in the default order, so a section added by a
- * release still shows. `show` brings back what a Builder hid, for this view only.
+ * The sections in the order the role asks for (unknown ids dropped). A section the order
+ * does not name, such as one a release added after the order was saved, goes right after
+ * the section it follows by default, so it still shows where Fair put it. `show` brings
+ * back what a Builder hid, for this view only.
  */
 export function arrange(role: RoleId, tiles: Tiles | undefined, show = false): Arranged {
   const defs = SECTIONS[role];
   const byKey = new Map(defs.map((d) => [d.key, d]));
-  const order = [...new Set([...(tiles?.order ?? []).filter((k) => byKey.has(k)), ...defs.map((d) => d.key)])];
+  const order = [...new Set((tiles?.order ?? []).filter((k) => byKey.has(k)))];
+  defs.forEach((d, i) => {
+    if (!order.includes(d.key)) order.splice(i ? order.indexOf(defs[i - 1].key) + 1 : 0, 0, d.key);
+  });
   const hidden = new Set((tiles?.hidden ?? []).filter((k) => byKey.has(k)));
   const all = order.map((k) => ({ ...byKey.get(k)!, title: tiles?.names?.[k]?.trim() || byKey.get(k)!.label }));
   return { shown: all.filter((s) => show || !hidden.has(s.key)), hidden: all.filter((s) => hidden.has(s.key)), all: all.map((s) => ({ ...s, hidden: hidden.has(s.key) })) };
