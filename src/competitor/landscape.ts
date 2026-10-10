@@ -11,6 +11,7 @@ import { CATEGORIES, CLIPPER_HANDLE_RE, CLIPPER_TAG_RE, DOUBLE_DATE_RE, PAYDAY_R
 import { GENERIC_HASHTAGS } from "../config/hashtags";
 import { THEMES, themeQuery } from "../config/themes";
 import type { SkillDb } from "../skills/db";
+import { d7Join } from "../definitions/catalog";
 import { addDays } from "./weeks";
 import type { Group, Platform } from "./types";
 
@@ -141,15 +142,16 @@ export async function landscape(
   const base = `with g as (select * from unnest($2::text[], $3::text[]) as t(gkey, brand_id)),
      d as (
        select distinct on (g.gkey, p.platform, p.url)
-              g.gkey, p.platform, p.url, p.source, p.creator_handle, p.tier, coalesce(p.views, 0)::float8 as views,
-              coalesce(p.likes, 0)::float8 as likes, coalesce(p.comments_count, 0)::float8 as comments,
+              -- views, likes and comments from one reading: day 7, or the latest so far (src/definitions/catalog.ts)
+              g.gkey, p.platform, p.url, p.source, p.creator_handle, p.tier, coalesce(d7.views, 0)::float8 as views,
+              coalesce(d7.likes, 0)::float8 as likes, coalesce(d7.comments_count, 0)::float8 as comments,
               p.has_cart, p.product_name, p.caption, p.caption_tsv as tsv, p.hashtags,
               (p.posted_at at time zone $4) as local_at,
               (p.posted_at >= ($8::date::timestamp at time zone $4)) as cur
-       from posts p join g on g.brand_id = p.brand_id
+       from posts p join g on g.brand_id = p.brand_id ${d7Join("p", "d7")}
        where p.workspace_id = $1 and p.relevant is not false and p.platform = any($5::text[])
          and p.posted_at >= ($6::date::timestamp at time zone $4) and p.posted_at < ($7::date::timestamp at time zone $4)
-       order by g.gkey, p.platform, p.url, p.views desc nulls last
+       order by g.gkey, p.platform, p.url, d7.views desc nulls last
      ),
      a as (select distinct on (platform, url) * from d order by platform, url, views desc)`;
   const args: unknown[] = [o.workspaceId, pairs.map((p) => p[0]), pairs.map((p) => p[1]), o.tz, o.platforms, P, toExcl, W];

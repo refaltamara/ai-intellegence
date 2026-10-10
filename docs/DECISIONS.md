@@ -925,3 +925,22 @@ The agreed design is the doc "Core data architecture and model" (https://claude.
 - **Numbers, September 2026.**
   - **Fintech:** views 75.6M (it was 57.6M with young posts at 0; 121.5M at the latest reading). Share of views: ShopeePay 25.1%, BCA 24.8%, GoPay 24.6%, OVO 17.1%, SeaBank 6.4%. Engagement rate 5.53%.
   - **Beauty:** its figures equal its latest readings (one reading per post).
+
+**Step 4, fifth part: decks and the weekly report read the definitions (10 Oct).**
+- **What moved.** These now count views and engagement from each post's day-7 reading (`post_d7`, joined with `d7Join` from `src/definitions/catalog.ts`):
+  - the weekly report and decks (scoreboard, trend, drivers, top creators, top content);
+  - the landscape slides, and so Pulse's landscape cards;
+  - the caption slides (campaigns, angles).
+
+  Picking which brand row speaks for a post, and ranking posts, follow views at day 7 too. A deck made from Chats with no brand named picks the panel's biggest brands by views at day 7 from the daily totals. Before, it read every post, set-aside ones included.
+- **"So far" on a deck.**
+  - A period holding posts under 7 days old is labelled "(so far)", e.g. "14–20 Sep 2026 (so far)". The label shows on the title slide, the scoreboard, Weekly Reports and the deck's versions, as the newest day already does when picking a day.
+  - The previous period gets the label too when it holds such posts.
+  - A data note says how many, e.g. "Views so far: 987 of the 2,893 posts this week went up less than 7 days before the latest reading, so their views are their latest reading and will still grow."
+  - The writer may quote those counts.
+  - A recurring deck is not remade when its posts reach day 7. "New version" remakes it, as for days.
+- **Data notes.** Where posts are read more than once (Fintech), a note says views and engagement are counted at day 7, so every post is compared at the same age. Where each post was captured once (Beauty), the note that says so stays.
+- **What changed.**
+  - **Beauty:** the Paragon weekly report for the weeks of 15 and 22 Sep is identical to the old code's, field by field.
+  - **Fintech:** a deck on September moves most on Instagram. ShopeePay's own posts kept growing long after day 7: one went from 1.35M views at day 8 to 21.8M at day 23. ShopeePay's Instagram views were 39.3M at the latest reading and are 3.7M at day 7. Its share of the panel's Instagram views goes from 88.0% to 45.4%, and its engagement rate from 0.71% to 5.31%.
+- **A saved section order outlives a release.** The viewership mix (second part) made Beauty's saved Dashboard order invalid. The order was saved on 8 Oct and names the five sections there were then, so the whole order was dropped. Now an order names known sections once each, and a section it leaves out goes right after the section it follows by default: Beauty's mix shows after its rankings. A section a release removes leaves the order.

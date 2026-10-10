@@ -9,6 +9,7 @@
  * those slides; findings pinned from Chats come in ready-made.
  */
 import { GENERIC_HASHTAGS } from "../config/hashtags";
+import { d7Join, sqlOf } from "../definitions/catalog";
 import { weeklyRules } from "../config/weekly";
 import { brandNameKeys } from "../skills/campaigns";
 import { SkillDb } from "../skills/db";
@@ -28,8 +29,15 @@ const PLATFORM_NAME: Record<Platform, string> = { tiktok: "TikTok", instagram: "
 const OWNED_PLATFORMS: Platform[] = ["tiktok"];
 const CART_PLATFORMS: Platform[] = ["tiktok"];
 const MIN_TAG_CREATORS = 3;
-/** The engagement-rate base: posts with views, and without the impossible rows where engagement exceeds views. */
+/** The engagement-rate base: posts with views, and without the impossible rows where engagement exceeds views (definition engagement_rate, over the columns below). */
 const RATED = "views > 0 and engagements is not null and engagements <= views";
+/**
+ * Views are Views (day 7) and engagement comes from the same reading (src/definitions/catalog.ts; DECISIONS, 10 Oct 2026):
+ * a post under 7 days old counts its latest reading so far, and a period holding such posts is labelled "(so far)", as
+ * the newest day is in a deck's periods, with a note saying how many.
+ */
+const D7 = d7Join("p", "d7");
+const ENG_D7 = sqlOf("engagement", "d7");
 
 const pct = (n: number, d: number) => (d > 0 ? (n / d) * 100 : null);
 const round = (v: number | null, dp = 1) => (v == null || !Number.isFinite(v) ? null : Math.round(v * 10 ** dp) / 10 ** dp);
@@ -73,12 +81,12 @@ export async function weeklyReport(contract: WeeklyContract, week: string, opts:
     `with g as (select * from unnest($2::text[], $3::text[]) as t(gkey, brand_id)),
      d as (
        select distinct on (g.gkey, p.platform, p.url)
-              g.gkey, p.platform, p.url, p.source, p.creator_handle, p.views, p.engagements, p.has_cart,
+              g.gkey, p.platform, p.url, p.source, p.creator_handle, d7.views, ${ENG_D7} as engagements, coalesce(d7.so_far, false) as so_far, p.has_cart,
               (date_trunc('${unit}', p.posted_at at time zone $4))::date as wk
-       from posts p join g on g.brand_id = p.brand_id
+       from posts p join g on g.brand_id = p.brand_id ${D7}
        where p.workspace_id = $1 and p.relevant is not false and p.platform = any($5::text[])
          and p.posted_at >= ($6::date::timestamp at time zone $4) and p.posted_at < ($7::date::timestamp at time zone $4)
-       order by g.gkey, p.platform, p.url, p.views desc nulls last
+       order by g.gkey, p.platform, p.url, d7.views desc nulls last
      )
      select gkey, platform, to_char(wk, 'YYYY-MM-DD') as week,
             count(*)::int as posts,
@@ -90,19 +98,20 @@ export async function weeklyReport(contract: WeeklyContract, week: string, opts:
             coalesce(sum(views) filter (where ${RATED}), 0)::float8 as views_rated,
             coalesce(sum(engagements) filter (where ${RATED}), 0)::float8 as engagements,
             count(*) filter (where has_cart)::int as cart_posts,
-            count(has_cart)::int as cart_known
+            count(has_cart)::int as cart_known,
+            count(*) filter (where so_far)::int as so_far
      from d group by 1, 2, 3`,
     [ctx.workspaceId, pairs.map((p) => p[0]), pairs.map((p) => p[1]), tz, platforms, from, toExcl],
   );
   const panelRows = await db.q<PanelPoint & { platform: Platform }>(
     `with d as (
-       select distinct on (p.platform, p.url) p.platform, p.url, p.views, (date_trunc('${unit}', p.posted_at at time zone $2))::date as wk
-       from posts p
+       select distinct on (p.platform, p.url) p.platform, p.url, d7.views, coalesce(d7.so_far, false) as so_far, (date_trunc('${unit}', p.posted_at at time zone $2))::date as wk
+       from posts p ${D7}
        where p.workspace_id = $1 and p.relevant is not false and p.platform = any($3::text[])
          and p.posted_at >= ($4::date::timestamp at time zone $2) and p.posted_at < ($5::date::timestamp at time zone $2)
-       order by p.platform, p.url, p.views desc nulls last
+       order by p.platform, p.url, d7.views desc nulls last
      )
-     select platform, to_char(wk, 'YYYY-MM-DD') as week, count(*)::int as posts, coalesce(sum(views), 0)::float8 as views
+     select platform, to_char(wk, 'YYYY-MM-DD') as week, count(*)::int as posts, coalesce(sum(views), 0)::float8 as views, count(*) filter (where so_far)::int as so_far
      from d group by 1, 2`,
     [ctx.workspaceId, tz, platforms, from, toExcl],
   );
@@ -211,6 +220,13 @@ export async function weeklyReport(contract: WeeklyContract, week: string, opts:
   }
   const snapshots = await db.one<{ n: number }>("select count(*)::int as n from post_snapshots s join posts p on p.id = s.post_id where p.workspace_id = $1 and p.relevant is not false", [ctx.workspaceId]);
   if (!snapshots?.n) notes.push({ kind: "method", text: `Views and engagement are as captured once per post, not at a fixed age, so ${words.this}'s posts have had less time to collect views than ${words.last}'s. The live collector measures every post at day 7.` });
+  else notes.push({ kind: "method", text: "Views and engagement are counted at day 7 after posting, from the reading nearest day 7, so every post is compared at the same age." });
+  // the period's young posts count their latest reading so far, and the period says so (Refal, 10 Oct 2026)
+  const youngIn = (at: "now" | "prev") => platforms.reduce((a, pl) => a + (panel[pl]?.[at].so_far ?? 0), 0);
+  const young = youngIn("now");
+  const total = platforms.reduce((a, pl) => a + (panel[pl]?.now.posts ?? 0), 0);
+  if (young) notes.push({ kind: "method", text: `Views so far: ${young.toLocaleString("en-US")} of the ${total.toLocaleString("en-US")} posts ${words.this} went up less than 7 days before the latest reading, so their views are their latest reading and will still grow.` });
+  const soFar = (label: string, n: number) => (n ? `${label} (so far)` : label);
 
   const coveredWatch = watch.filter((r) => platforms.some((pl) => r.cells[pl]?.covered)).map((r) => r.group);
   const scene = !slides || slides.some((k) => LANDSCAPE_SLIDES.has(k))
@@ -235,8 +251,8 @@ export async function weeklyReport(contract: WeeklyContract, week: string, opts:
     workspace_id: ctx.workspaceId,
     grain,
     ...(slides ? { slides } : {}),
-    week: { from: W, to: period.to, label: period.label, iso: period.key },
-    previous_week: { from: prev.from, to: prev.to, label: prev.label },
+    week: { from: W, to: period.to, label: soFar(period.label, young), iso: period.key },
+    previous_week: { from: prev.from, to: prev.to, label: soFar(prev.label, youngIn("prev")) },
     history_weeks: weeks.slice(0, L),
     rules,
     platforms,
@@ -278,13 +294,13 @@ async function drivers(
   const L = weeks.length - 1;
   // one CTE shape for every lens: the group's distinct posts on this platform across the lookback and the week
   const base = `with d as (
-       select distinct on (p.url) p.url, p.creator_handle, p.source, p.tier, p.followers_at_post as followers, p.views, p.engagements,
+       select distinct on (p.url) p.url, p.creator_handle, p.source, p.tier, p.followers_at_post as followers, d7.views, ${ENG_D7} as engagements,
               p.content_format, p.has_cart, p.product_name, p.caption, p.hashtags, p.posted_at,
               to_char((date_trunc('${g8.unit}', p.posted_at at time zone $3))::date, 'YYYY-MM-DD') as wk
-       from posts p
+       from posts p ${D7}
        where p.workspace_id = $1 and p.relevant is not false and p.platform = $2 and p.brand_id = any($4::text[])
          and p.posted_at >= ($5::date::timestamp at time zone $3) and p.posted_at < ($6::date::timestamp at time zone $3)
-       order by p.url, p.views desc nulls last
+       order by p.url, d7.views desc nulls last
      )`;
   const args = [workspaceId, platform, tz, g.brand_ids, from, toExcl];
 
@@ -429,11 +445,11 @@ async function topCreators(db: SkillDb, o: Reach & { from: string }): Promise<Cr
   const rows = await db.q<{ handle: string; platform: Platform; tier: string | null; followers: number | null; posts: number; views: number; eng: number | null; vr: number | null; gkeys: string[]; seen: boolean; top_url: string | null; top_views: number | null }>(
     `with g as (select * from unnest($2::text[], $3::text[]) as t(gkey, brand_id)),
      d as (
-       select distinct on (p.platform, p.url, g.gkey) g.gkey, p.platform, p.url, p.creator_handle, p.tier, p.followers_at_post as followers, p.views, p.engagements, p.posted_at
-       from posts p join g on g.brand_id = p.brand_id
+       select distinct on (p.platform, p.url, g.gkey) g.gkey, p.platform, p.url, p.creator_handle, p.tier, p.followers_at_post as followers, d7.views, ${ENG_D7} as engagements, p.posted_at
+       from posts p join g on g.brand_id = p.brand_id ${D7}
        where p.workspace_id = $1 and p.relevant is not false and p.platform = any($5::text[]) and p.source = 'earned' and p.creator_handle is not null
          and p.posted_at >= ($6::date::timestamp at time zone $4) and p.posted_at < ($8::date::timestamp at time zone $4)
-       order by p.platform, p.url, g.gkey, p.views desc nulls last
+       order by p.platform, p.url, g.gkey, d7.views desc nulls last
      ),
      cur as (select * from d where posted_at >= ($7::date::timestamp at time zone $4)),
      one as (select distinct on (platform, url) * from cur order by platform, url, views desc nulls last),
@@ -475,12 +491,12 @@ async function topContent(db: SkillDb, o: Reach, evidence: EvidencePost[]): Prom
     `with g as (select * from unnest($2::text[], $3::text[]) as t(gkey, brand_id)),
      d as (
        select distinct on (p.platform, p.url) g.gkey, p.platform, p.url, p.creator_handle, p.source, p.tier, p.followers_at_post as followers,
-              to_char(p.posted_at at time zone $4, 'YYYY-MM-DD') as posted_at, p.views::float8 as views, p.engagements::float8 as engagements,
+              to_char(p.posted_at at time zone $4, 'YYYY-MM-DD') as posted_at, d7.views::float8 as views, (${ENG_D7})::float8 as engagements,
               p.content_format, p.has_cart, p.product_name, p.caption
-       from posts p join g on g.brand_id = p.brand_id
+       from posts p join g on g.brand_id = p.brand_id ${D7}
        where p.workspace_id = $1 and p.relevant is not false and p.platform = any($5::text[])
          and p.posted_at >= ($6::date::timestamp at time zone $4) and p.posted_at < ($7::date::timestamp at time zone $4)
-       order by p.platform, p.url, p.views desc nulls last, g.gkey
+       order by p.platform, p.url, d7.views desc nulls last, g.gkey
      ),
      top as (select d.*, row_number() over (partition by platform order by views desc nulls last, url) as rn from d)
      select * from top where rn <= $8 order by array_position($5::text[], platform), rn`,

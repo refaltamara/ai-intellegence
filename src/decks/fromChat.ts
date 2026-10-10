@@ -75,8 +75,9 @@ export async function findingBrands(findings: FindingSpec[], workspaceId: string
   let ids = named.filter((id) => id !== ctx.clientBrandId).slice(0, 8);
   if (!ids.length) {
     const top = (await sql.query(
-      `select brand_id, sum(views) as v from posts where workspace_id = $1 and posted_at >= ($2::date - 29) and brand_id is not null and brand_id <> coalesce($3, '')
-       group by 1 order by 2 desc nulls last limit 6`,
+      // views at day 7 from the daily totals (src/definitions/totals.ts), which count only posts about their brand
+      `select brand_id, sum(d7_views) as v from daily_totals where workspace_id = $1 and day >= ($2::date - 29) and brand_id <> '*' and brand_id <> coalesce($3, '')
+       group by 1 order by 2 desc nulls last, 1 limit 6`,
       [workspaceId, ctx.asOf, ctx.clientBrandId],
     )) as { brand_id: string }[];
     ids = top.map((t) => t.brand_id).filter((id) => name.has(id));

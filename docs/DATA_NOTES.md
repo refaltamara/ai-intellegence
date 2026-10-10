@@ -279,11 +279,13 @@ Every number is counted by a definition in `src/definitions/catalog.ts`, from ro
 
 | Table | One row per | Rows today |
 |---|---|---|
-| `post_d7` | post: its reading nearest day 7, or too new | 284,774 |
+| `post_d7` | post: its reading nearest day 7, or its latest reading so far while it is under 7 days old | 284,774 |
 | `daily_totals` | workspace, local day, brand (`*` = each post once), platform, owned or earned | Beauty 20,201 · Fintech 1,314 · Kahf 16 · Maudy 44 |
 | `daily_creators` | workspace, local day, brand, platform, creator | Beauty 249,329 · Fintech 8,302 · Kahf 2,082 · Maudy 3,038 |
 
-**Which reading "day 7" is, per workspace.** Fintech is read every day from day 0 to 30, so its day-7 number is the reading at day 7. Beauty's exports give one reading per post, at a median of day 103, so its day-7 number is that reading; the scraper team's day-7 stop and the Fintech shape will change that. Kahf and Maudy were read within days of their posts, so most of their posts are too new.
+**Which reading "day 7" is, per workspace.** Fintech is read every day from day 0 to 30, so its day-7 number is the reading at day 7. Beauty's exports give one reading per post, at a median of day 103, so its day-7 number is that reading; the scraper team's day-7 stop and the Fintech shape will change that. Kahf and Maudy were read within days of their posts, so most of their posts count their latest reading so far.
+
+**Decks and the weekly report** count the same way: views and engagement from the post's day-7 reading (`d7Join`), and a period holding posts under 7 days old is labelled "(so far)", with a data note saying how many. Fintech's September on Instagram shows why it matters: ShopeePay's own posts kept growing long after day 7 (one went from 1.35M views at day 8 to 21.8M at day 23), so at the latest reading ShopeePay held 88.0% of the panel's Instagram views, and 45.4% at day 7.
 
 **Profile read times.** A profile contract carries one `export_time`, written for its first batch; later batches were added without one, and until 10 Oct read as exported at that first time. A file is now read no earlier than its latest post. Maudy's readings moved from 14 Sep 12:15 WIB to each file's latest post (15 to 18 Sep, 3,146 readings), Kahf's from 7 Oct 10:00 WIB (2,128 readings).
 

@@ -20,10 +20,16 @@ describe("dashboard sections", () => {
     expect(rows(a.shown).find((r) => r[0].key === "rising")).toHaveLength(1);
   });
   it("show everything again on request, and ignore ids the code does not know", () => {
-    const a = arrange("pr", { hidden: ["amplifiers"], order: ["nope", "health"] }, true);
+    const a = arrange("pr", { hidden: ["amplifiers"], order: ["nope", "health", "issues"] }, true);
     expect(a.hidden.map((s) => s.key)).toEqual(["amplifiers"]);
     expect(a.shown).toHaveLength(sectionKeys("pr").length);
     expect(a.shown[0].key).toBe("health");
+  });
+  it("put a section added after an order was saved where it goes by default", () => {
+    // Beauty's order from 8 Oct, saved before the viewership mix came after the rankings
+    expect(arrange("brand_kol", { order: ["rankings", "tiers", "trend", "creators", "content"] }).shown.map((s) => s.key)).toEqual(["rankings", "mix", "tiers", "trend", "creators", "content"]);
+    expect(arrange("brand_kol", { order: ["content", "creators", "trend", "tiers", "rankings"] }).shown.map((s) => s.key)).toEqual(["content", "creators", "trend", "tiers", "rankings", "mix"]);
+    expect(arrange("brand_kol", { order: ["tiers", "rankings"] }).shown.map((s) => s.key)).toEqual(["tiers", "trend", "creators", "content", "rankings", "mix"]);
   });
 });
 
@@ -38,7 +44,10 @@ describe("company policies", () => {
   it("let a person order sections only for themselves, and nothing else of the company's", () => {
     const order = [...sectionKeys("social")].reverse();
     expect(sanitize({ "tiles.order": order, "tiles.hidden": ["best"] }, "member", SOCIAL)).toEqual({ "tiles.order": order });
-    expect(sanitize({ "tiles.order": order.slice(1) }, "member", SOCIAL)).toEqual({});
+    // an order saved before a release added a section stays; ids the code does not know leave it; a section twice is refused
+    expect(sanitize({ "tiles.order": order.slice(1) }, "member", SOCIAL)).toEqual({ "tiles.order": order.slice(1) });
+    expect(sanitize({ "tiles.order": ["nope", ...order] }, "member", SOCIAL)).toEqual({ "tiles.order": order });
+    expect(sanitize({ "tiles.order": [...order, order[0]] }, "member", SOCIAL)).toEqual({});
   });
   it("resolve tiles even though Fair's role has no tiles block", () => {
     const r = resolve(PR, { "tiles.hidden": ["amplifiers"] }, { "tiles.order": sectionKeys("pr") });

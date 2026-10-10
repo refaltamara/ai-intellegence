@@ -7,6 +7,7 @@
  * creators and views in SQL over those tags, for the period and the one before.
  */
 import type { SkillDb } from "../skills/db";
+import { d7Join } from "../definitions/catalog";
 import type { Group, Platform } from "./types";
 
 export type CaptionBrand = { key: string; name: string; client: boolean };
@@ -69,15 +70,15 @@ export async function captionFacts(
      d as (
        -- the client's own brands stay apart (bsub), so Wardah's and Makeover's payday sales are two rows
        select distinct on (g.gkey, case when g.gkey = $9 then p.brand_id else '' end, p.platform, p.url) g.gkey, p.platform, p.url, p.creator_handle,
-              case when g.gkey = $9 then p.brand_id else '' end as bsub, p.source, coalesce(p.views, 0)::float8 as views,
+              case when g.gkey = $9 then p.brand_id else '' end as bsub, p.source, coalesce(d7.views, 0)::float8 as views,
               p.posted_at >= ($7::date::timestamp at time zone $4) as cur, b.name as bname,
               p.cap_source, p.cap_product, p.cap_event, p.cap_event_name, p.cap_offer, p.cap_hook, p.cap_angle,
               -- the event's key: its name without the brand's own name, so "Glad2Glow Loose Powder launch" and "Loose Powder launch" are one
               nullif(btrim(regexp_replace(regexp_replace(lower(p.cap_event_name), '\\m' || regexp_replace(lower(b.name), '[^a-z0-9]+', '', 'g') || '\\M', '', 'g'), '\\s+', ' ', 'g')), '') as ekey
-       from posts p join g on g.brand_id = p.brand_id left join brands b on b.id = p.brand_id and b.workspace_id = p.workspace_id
+       from posts p join g on g.brand_id = p.brand_id left join brands b on b.id = p.brand_id and b.workspace_id = p.workspace_id ${d7Join("p", "d7")}
        where p.workspace_id = $1 and p.relevant is not false and p.platform = any($5::text[])
          and p.posted_at >= ($6::date::timestamp at time zone $4) and p.posted_at < ($8::date::timestamp at time zone $4)
-       order by g.gkey, case when g.gkey = $9 then p.brand_id else '' end, p.platform, p.url, p.views desc nulls last
+       order by g.gkey, case when g.gkey = $9 then p.brand_id else '' end, p.platform, p.url, d7.views desc nulls last
      )`;
   const args = [o.workspaceId, pairs.map((p) => p[0]), pairs.map((p) => p[1]), o.tz, o.platforms, o.prevFrom, o.from, o.to, o.clientKey ?? ""];
 

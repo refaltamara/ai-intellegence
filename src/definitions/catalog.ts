@@ -109,6 +109,12 @@ export function def(key: string): Definition {
   return d;
 }
 
+/**
+ * Each post's reading at day 7 (definition views_d7: the latest so far for a post under 7 days old), joined to a link
+ * `p` as `d`: views, likes, comments_count, shares and saves from one reading, and `d.so_far`.
+ */
+export const d7Join = (p = "p", d = "d7") => `left join post_d7 ${d} on ${d}.item_id = ${p}.item_id`;
+
 /** a definition's SQL over row `x` */
 export function sqlOf(key: string, x: string): string {
   const d = def(key);
