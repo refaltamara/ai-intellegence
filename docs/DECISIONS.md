@@ -969,3 +969,14 @@ The agreed design is the doc "Core data architecture and model" (https://claude.
     - September share of views in Chats matches the dashboard to the decimal: ShopeePay 25.11%, BCA 24.79%, GoPay 24.62%, SeaBank 6.38%.
     - GoPay's earned views against the 24 days before were −64% at the latest reading and are +136% at day 7: the earlier posts had longer to grow.
   - **Kahf (PR, latest):** engagement in Chats now follows the definition: 888,878, against 829,893 in the stored column. The stored column added a share count where the export has one. The definition adds the shares column, which holds reposts on Threads and X.
+
+**Step 4, seventh part: brand pages read the definitions (10 Oct).**
+- **Brand pages** (`/data/[brand]`) count views and engagement at day 7:
+  - creator tiers: views, median views over posts with views, and the engagement rate over the posts that can carry one;
+  - top creators, hashtags, and each hashtag's share of the brand's views.
+- **Posts over time and growth** read the daily totals: the brand's rows, and the panel's rows for the weeks that were captured. They no longer read `mv_brand_week`.
+  - Nothing reads that view now, but it is still refreshed after every load. Dropping it is Refal's call.
+- **What changed.**
+  - **Beauty:** weeks, growth, hashtags, coverage and the creator list are identical. Tier medians and rates follow the definitions. Wardah, September, mid-tier creators: median views 1,861 → 3,848, engagement rate 11.06% → 3.74%.
+  - **Fintech** moves to day 7. ShopeePay's Instagram views over the last 30 days: 39.3M at the latest reading, 3.7M at day 7.
+- **Speed.** Skintific's 90-day page takes 1.2 s, as before (1.0 s). Both were measured warm.
