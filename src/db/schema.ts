@@ -432,6 +432,31 @@ export const dataLoads = pgTable(
   (t) => [index("data_loads_workspace_started_idx").on(t.workspaceId, t.startedAt)],
 );
 
+/**
+ * Raw files as received (DECISIONS, 10 Oct 2026, "Data architecture V1"): kept in private Vercel Blob at
+ * blob_path, never in the repository, until keep_until (12 months). data/raw/MANIFEST.json is the list in the
+ * repository; this table is where each file is known to be stored (stored_at), or why it is not (store_error).
+ * Loads point here, so a number traces to its rows, each row to a load, and each load to its file.
+ */
+export const rawFiles = pgTable(
+  "raw_files",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workspaceId: text("workspace_id").notNull().references(() => workspaces.id),
+    /** where the file sat under data/raw when it was listed */
+    path: text("path").notNull(),
+    blobPath: text("blob_path").notNull(),
+    bytes: bigint("bytes", { mode: "number" }).notNull(),
+    sha256: text("sha256").notNull(),
+    received: date("received").notNull(),
+    keepUntil: date("keep_until").notNull(),
+    storedAt: ts("stored_at"),
+    storeError: text("store_error"),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("raw_files_blob_path_uq").on(t.blobPath), index("raw_files_workspace_idx").on(t.workspaceId, t.received)],
+);
+
 // --------------------------------------------------------------- app tables
 export const skillRuns = pgTable(
   "skill_runs",
