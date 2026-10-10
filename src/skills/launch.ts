@@ -31,7 +31,7 @@ export const launch: SkillImpl = async (db, ctx, _def, params) => {
        from posts p ${D7} where ${wh.sql}
      ), first_seen as (
        select creator_id, min(posted_at) as first_post from posts
-       where workspace_id = $1 and relevant is not false and brand_id = any($6::text[]) and source = 'earned' and creator_id is not null group by 1
+       where workspace_id = $1 and relevant is not false and brought_in_by = 'panel' and brand_id = any($6::text[]) and source = 'earned' and creator_id is not null group by 1
      )
      select b.week, count(*)::int as posts, count(distinct b.creator_id)::int as creators,
             sum(b.d7_views)::float8 as views, sum(b.d7_engagements)::float8 as engagements, sum(b.d7_comments)::float8 as comments_count,

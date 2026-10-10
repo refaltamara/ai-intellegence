@@ -6,6 +6,7 @@
 import type { SkillDb } from "./db";
 import { ParamError, type Context, type Window } from "./params";
 import type { Platform } from "./types";
+import { panelCommentEdge } from "../db/panel";
 
 export type CommentWindow = Window & { anchor: string; from_ts: string; to_ts: string };
 
@@ -17,11 +18,11 @@ function addDays(iso: string, days: number): string {
 
 /** Resolve a window over comments; `to_ts` is exclusive (end of the local day). */
 export async function commentWindow(db: SkillDb, ctx: Context, raw: unknown, defaultDays = 30, platforms: Platform[] | null = null): Promise<CommentWindow> {
-  // max and min of the stored time, then the local day: the (workspace, posted_at) index answers it in a lookup,
+  // the newest and oldest stored time, then the local day: the (workspace, posted_at) index answers it in a lookup,
   // where taking the max of a converted time read every comment (the same day in any zone without a midnight clock change)
+  const only = platforms ? "and c.platform = any($3::text[])" : "";
   const r = await db.one<{ latest: string | null; earliest: string | null }>(
-    `select to_char(max(posted_at) at time zone $2, 'YYYY-MM-DD') as latest, to_char(min(posted_at) at time zone $2, 'YYYY-MM-DD') as earliest
-     from comments where workspace_id = $1 and posted_at is not null ${platforms ? "and platform = any($3::text[])" : ""}`,
+    `select to_char(${panelCommentEdge("$1", "newest", only)} at time zone $2, 'YYYY-MM-DD') as latest, to_char(${panelCommentEdge("$1", "oldest", only)} at time zone $2, 'YYYY-MM-DD') as earliest`,
     platforms ? [ctx.workspaceId, ctx.tz, platforms] : [ctx.workspaceId, ctx.tz],
   );
   const anchor = r?.latest ?? ctx.asOf;
@@ -52,8 +53,9 @@ export function commentWhere(ctx: Context, w: CommentWindow, platforms: Platform
     `c.posted_at >= (${p(w.from_ts)}::date::timestamp at time zone ${p(ctx.tz)})`,
     `c.posted_at < (${p(w.to_ts)}::date::timestamp at time zone ${p(ctx.tz)})`,
     `c.sentiment_source is distinct from 'subject'`,
-    // comments under a post that is not about its brand are not about the brand either (DECISIONS 3 Oct 2026)
-    `not exists (select 1 from posts rp where rp.id = c.post_id and rp.relevant = false)`,
+    // comments under a post that is not about its brand are not about the brand either (DECISIONS 3 Oct 2026), and those
+    // under a post only a case brought in count in that case, not here (DECISIONS 10 Oct 2026, step 5)
+    `not exists (select 1 from posts rp where rp.id = c.post_id and (rp.relevant = false or rp.brought_in_by <> 'panel'))`,
   ];
   if (platforms) parts.push(`c.platform = any(${p(platforms)}::text[])`);
   return parts.join(" and ");

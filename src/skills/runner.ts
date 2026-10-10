@@ -12,6 +12,7 @@ import { loadContext, ParamError, validateParams, type Context } from "./params"
 import type { SkillOutput, SkillRequest, SkillResult } from "./types";
 import { unavailable } from "./unavailable";
 import { toJson } from "../db/json";
+import { COMMENT_IN_PANEL, panelPlatformsSql } from "../db/panel";
 
 export type SkillImpl = (db: SkillDb, ctx: Context, def: SkillDef, params: Record<string, unknown>) => Promise<SkillOutput>;
 
@@ -37,9 +38,10 @@ async function platformsPresent(db: SkillDb, workspaceId: string): Promise<strin
 
 async function layerCountsUncached(db: SkillDb, workspaceId: string): Promise<Record<string, number>> {
   const r = await db.one<Record<string, number>>(
-    `select (select count(*) from posts where workspace_id = $1)::int as posts,
+    // posts and comments: whether the panel holds any (all that is asked of them), found at the first one
+    `select (select count(*) from (select 1 from posts where workspace_id = $1 and brought_in_by = 'panel' limit 1) x)::int as posts,
             (select count(*) from creators where workspace_id = $1)::int as creators,
-            (select count(*) from comments where workspace_id = $1)::int as comments,
+            (select count(*) from (select 1 from comments c where c.workspace_id = $1 and ${COMMENT_IN_PANEL("c")} limit 1) x)::int as comments,
             (select count(*) from topics where workspace_id = $1)::int as topics,
             (select count(*) from post_snapshots)::int as post_snapshots`,
     [workspaceId],
@@ -48,7 +50,7 @@ async function layerCountsUncached(db: SkillDb, workspaceId: string): Promise<Re
 }
 
 async function platformsPresentUncached(db: SkillDb, workspaceId: string): Promise<string[]> {
-  const rows = await db.q<{ platform: string }>("select distinct platform from posts where workspace_id = $1", [workspaceId]);
+  const rows = await db.q<{ platform: string }>(panelPlatformsSql("$1"), [workspaceId]);
   return rows.map((r) => r.platform);
 }
 

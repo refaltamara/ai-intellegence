@@ -13,6 +13,7 @@ import { teamSkills } from "../skills/team";
 import type { Evidence } from "../skills/types";
 import { getWorkspace } from "../workspace/store";
 import { ROLES } from "../roles/model";
+import { COMMENT_IN_PANEL } from "../db/panel";
 
 export type McpTool = { name: string; title?: string; description: string; inputSchema: Record<string, unknown>; annotations?: Record<string, unknown> };
 export type ToolOutcome = { status: "ok" | "unavailable" | "error"; payload: Record<string, unknown>; error?: string };
@@ -106,11 +107,11 @@ async function overview(workspaceId: string): Promise<Record<string, unknown>> {
   const [platforms, brands, comments] = await Promise.all([
     sql.query(
       `select platform, count(*)::int as posts, to_char(min(posted_at at time zone 'Asia/Jakarta'), 'YYYY-MM-DD') as first_post, to_char(max(posted_at at time zone 'Asia/Jakarta'), 'YYYY-MM-DD') as last_post
-       from posts where workspace_id = $1 group by 1 order by 2 desc`,
+       from posts where workspace_id = $1 and brought_in_by = 'panel' group by 1 order by 2 desc`,
       [workspaceId],
     ),
     sql.query("select id, name from brands where workspace_id = $1 order by name", [workspaceId]),
-    sql.query("select count(*)::int as n, to_char(max(posted_at at time zone 'Asia/Jakarta'), 'YYYY-MM-DD HH24:MI') as last from comments where workspace_id = $1", [workspaceId]).catch(() => [{ n: 0, last: null }]),
+    sql.query(`select count(*)::int as n, to_char(max(posted_at at time zone 'Asia/Jakarta'), 'YYYY-MM-DD HH24:MI') as last from comments where workspace_id = $1 and ${COMMENT_IN_PANEL("comments")}`, [workspaceId]).catch(() => [{ n: 0, last: null }]),
   ]);
   const c = (comments as { n: number; last: string | null }[])[0];
   return {

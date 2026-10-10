@@ -12,7 +12,7 @@ export async function paneContext(messages: MessageRow[], workspaceId = DEFAULT_
   const runIds = messages.flatMap((m) => m.skill_run_ids ?? []);
   const [ctx, monthRows, states] = await Promise.all([
     loadContext(new SkillDb(), workspaceId),
-    sql.query("select to_char(month, 'YYYY-MM') as m from posts where workspace_id = $1 group by month order by month", [workspaceId]) as unknown as Promise<{ m: string }[]>,
+    sql.query("select to_char(month, 'YYYY-MM') as m from posts where workspace_id = $1 and brought_in_by = 'panel' group by month order by month", [workspaceId]) as unknown as Promise<{ m: string }[]>,
     paneStates(runIds, workspaceId).catch(() => ({} as Record<string, PaneState>)),
   ]);
   return { brands: ctx.brands.map((b) => ({ id: b.id, name: b.name, hint: b.is_client ? "your brand" : undefined })), months: monthRows.map((r) => r.m), paneStates: states };

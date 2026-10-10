@@ -53,7 +53,7 @@ export async function ladderReplay(ws: string, role: RoleModel, focusId: string 
      from days left join (
        select c.id, c.sentiment, (c.posted_at at time zone $2)::date as day
        from comments c join posts p on p.id = c.post_id
-       where c.workspace_id = $1 and p.relevant is not false and c.sentiment_source is distinct from 'subject' and c.posted_at is not null and p.brand_id = $5
+       where c.workspace_id = $1 and p.relevant is not false and p.brought_in_by = 'panel' and c.sentiment_source is distinct from 'subject' and c.posted_at is not null and p.brand_id = $5
      ) c on c.day = days.d
      group by days.d order by days.d`,
     [ws, basics.tz, to, lookback, focus.id],

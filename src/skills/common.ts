@@ -33,7 +33,7 @@ export class Where {
 
   /** the workspace, and only posts about their brand: a listening post that does not name it never counts (DECISIONS 3 Oct 2026) */
   workspace(ctx: Context): this {
-    return this.add(`${this.alias}.workspace_id = ? and ${this.alias}.relevant is not false`, ctx.workspaceId);
+    return this.add(`${this.alias}.workspace_id = ? and ${this.alias}.relevant is not false and ${this.alias}.brought_in_by = 'panel'`, ctx.workspaceId);
   }
 
   window(w: Window, ctx: Context): this {

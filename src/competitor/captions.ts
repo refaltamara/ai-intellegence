@@ -76,7 +76,7 @@ export async function captionFacts(
               -- the event's key: its name without the brand's own name, so "Glad2Glow Loose Powder launch" and "Loose Powder launch" are one
               nullif(btrim(regexp_replace(regexp_replace(lower(p.cap_event_name), '\\m' || regexp_replace(lower(b.name), '[^a-z0-9]+', '', 'g') || '\\M', '', 'g'), '\\s+', ' ', 'g')), '') as ekey
        from posts p join g on g.brand_id = p.brand_id left join brands b on b.id = p.brand_id and b.workspace_id = p.workspace_id ${d7Join("p", "d7")}
-       where p.workspace_id = $1 and p.relevant is not false and p.platform = any($5::text[])
+       where p.workspace_id = $1 and p.relevant is not false and p.brought_in_by = 'panel' and p.platform = any($5::text[])
          and p.posted_at >= ($6::date::timestamp at time zone $4) and p.posted_at < ($8::date::timestamp at time zone $4)
        order by g.gkey, case when g.gkey = $9 then p.brand_id else '' end, p.platform, p.url, d7.views desc nulls last
      )`;
@@ -114,7 +114,7 @@ export async function captionFacts(
      select e.*, (select to_char(min(x.posted_at at time zone $4), 'YYYY-MM-DD') from (
                     select p.posted_at, nullif(btrim(regexp_replace(regexp_replace(lower(p.cap_event_name), '\\m' || regexp_replace(lower(b.name), '[^a-z0-9]+', '', 'g') || '\\M', '', 'g'), '\\s+', ' ', 'g')), '') as k
                     from posts p join g on g.brand_id = p.brand_id left join brands b on b.id = p.brand_id and b.workspace_id = p.workspace_id
-                    where g.gkey = e.gkey and (e.bsub = '' or p.brand_id = e.bsub) and p.workspace_id = $1 and p.relevant is not false and p.cap_event_name is not null and p.posted_at < ($8::date::timestamp at time zone $4)) x where x.k = e.k) as first_seen
+                    where g.gkey = e.gkey and (e.bsub = '' or p.brand_id = e.bsub) and p.workspace_id = $1 and p.relevant is not false and p.brought_in_by = 'panel' and p.cap_event_name is not null and p.posted_at < ($8::date::timestamp at time zone $4)) x where x.k = e.k) as first_seen
      from e order by (e.posts >= 2) desc, e.views desc`,
     args,
   );

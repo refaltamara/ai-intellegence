@@ -27,7 +27,7 @@ export function scopeSql(def: Pick<ExtDef, "target" | "workspace_id"> & { spec: 
   const s = def.spec.scope ?? {};
   const ws = add(def.workspace_id);
   const postScope = (alias: string) => [
-    `${alias}.relevant is not false`,
+    `${alias}.relevant is not false and ${alias}.brought_in_by = 'panel'`,
     ...(s.brands?.length ? [`${alias}.brand_id = any(${add(s.brands)}::text[])`] : []),
     ...(s.platforms?.length ? [`${alias}.platform = any(${add(s.platforms)}::text[])`] : []),
   ];
@@ -37,7 +37,7 @@ export function scopeSql(def: Pick<ExtDef, "target" | "workspace_id"> & { spec: 
       from: `creators x where x.workspace_id = ${ws} and exists (select 1 from posts p where ${inner})${s.min_followers ? ` and x.followers_latest >= ${add(s.min_followers)}` : ""}`,
       ref: "x.id::text",
       label: "'@' || x.handle",
-      text: "coalesce(x.display_name, '') || ' · ' || (select string_agg(left(coalesce(p.caption, ''), 300), ' | ') from (select caption from posts p where p.creator_id = x.id and p.relevant is not false order by p.posted_at desc nulls last limit 3) p)",
+      text: "coalesce(x.display_name, '') || ' · ' || (select string_agg(left(coalesce(p.caption, ''), 300), ' | ') from (select caption from posts p where p.creator_id = x.id and p.relevant is not false and p.brought_in_by = 'panel' order by p.posted_at desc nulls last limit 3) p)",
       created: "x.created_at",
     };
   }
@@ -70,7 +70,7 @@ function ruleCase(def: ExtDef, add: (v: unknown) => string, text: string): strin
 /** for a creator, the words may sit in the handle, the name or any of their captions */
 function ruleText(def: ExtDef): string {
   return def.target === "creator"
-    ? "(x.handle || ' ' || coalesce(x.display_name, '') || ' ' || coalesce((select string_agg(coalesce(p.caption, ''), ' ') from (select caption from posts p where p.creator_id = x.id and p.relevant is not false order by p.posted_at desc nulls last limit 20) p), ''))"
+    ? "(x.handle || ' ' || coalesce(x.display_name, '') || ' ' || coalesce((select string_agg(coalesce(p.caption, ''), ' ') from (select caption from posts p where p.creator_id = x.id and p.relevant is not false and p.brought_in_by = 'panel' order by p.posted_at desc nulls last limit 20) p), ''))"
     : def.target === "post" ? "coalesce(x.caption, '')" : "coalesce(x.text, '')";
 }
 

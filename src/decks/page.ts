@@ -12,6 +12,7 @@ import { recipesFor } from "../recipes/store";
 import { BRAND_KOL, type RoleModel } from "../roles/model";
 import { REP_SLIDES } from "../reputation/slides";
 import { SOCIAL_SLIDES } from "../social/slides";
+import { panelPlatformsSql } from "../db/panel";
 
 export type DeckOptions = {
   brands: { id: string; name: string }[];
@@ -71,7 +72,7 @@ export async function deckOptions(workspaceId: string, role: RoleModel = BRAND_K
     data_from: ctx.earliest.slice(0, 10),
     rep_slides: REP_SLIDES,
     social_slides: SOCIAL_SLIDES,
-    platforms: (await new SkillDb().q<{ platform: string }>("select distinct platform from posts where workspace_id = $1 order by 1", [workspaceId])).map((r) => r.platform),
+    platforms: (await new SkillDb().q<{ platform: string }>(panelPlatformsSql("$1"), [workspaceId])).map((r) => r.platform),
     focus: ctx.clientBrandId ?? brands[0]?.id ?? null,
     team_skills: [
       ...(await recipesFor(role.recipes).catch(() => [])).map((r) => ({ key: r.key, title: r.title, description: r.description, badge: "Fair" })),

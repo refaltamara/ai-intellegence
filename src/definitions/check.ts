@@ -39,10 +39,10 @@ export async function checkTotals(which: string[] | null = null): Promise<Totals
             l as (select count(*)::bigint as posts, coalesce(sum(i.views), 0)::bigint as views, coalesce(sum(${sqlOf("engagement", "i")}), 0)::bigint as eng,
                          count(*) filter (where ${sqlOf("flagged", "i")})::bigint as flagged, count(*) filter (where p.has_cart)::bigint as carts,
                          count(*) filter (where p.source = 'earned' and i.creator_id is not null)::bigint as creator_posts
-                    from posts p join post_items i on i.id = p.item_id where p.workspace_id = $1 and p.relevant is not false),
+                    from posts p join post_items i on i.id = p.item_id where p.workspace_id = $1 and p.relevant is not false and p.brought_in_by = 'panel'),
             it as (select count(*)::bigint as posts, coalesce(sum(i.views), 0)::bigint as views, count(d.day_n)::bigint as d7_posts, coalesce(sum(d.views), 0)::bigint as d7_views
                      from post_items i left join post_d7 d on d.item_id = i.id
-                    where i.workspace_id = $1 and exists (select 1 from posts p where p.item_id = i.id and p.relevant is not false)),
+                    where i.workspace_id = $1 and exists (select 1 from posts p where p.item_id = i.id and p.relevant is not false and p.brought_in_by = 'panel')),
             c as (select coalesce(sum(posts), 0)::bigint as posts from daily_creators where workspace_id = $1)
        select b.rows + pn.rows as rows, b.posts - l.posts as links, b.views - l.views as views, b.eng - l.eng as engagement, b.flagged - l.flagged as flagged,
               b.carts - l.carts as carts, pn.posts - it.posts as panel_posts, pn.views - it.views as panel_views, pn.d7_posts - it.d7_posts as d7_posts,
@@ -56,7 +56,7 @@ export async function checkTotals(which: string[] | null = null): Promise<Totals
     const rows = await q<{ brand_id: string; platform: string; bucket: string; posts: number; views: number }>(
       `select p.brand_id, p.platform, to_char(date_trunc('month', p.posted_at at time zone $2), 'YYYY-MM-DD') as bucket, count(*)::int as posts, coalesce(sum(p.views), 0)::float8 as views
          from posts p
-        where p.workspace_id = $1 and p.relevant is not false
+        where p.workspace_id = $1 and p.relevant is not false and p.brought_in_by = 'panel'
           and p.posted_at >= ($3::date::timestamp at time zone $2) and p.posted_at < (($4::date + 1)::timestamp at time zone $2)
         group by 1, 2, 3`,
       [id, ctx.tz, from, last.to]);

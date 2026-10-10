@@ -1,0 +1,1 @@
+CREATE INDEX "posts_case_only_idx" ON "posts" USING btree ("id") WHERE "posts"."brought_in_by" <> 'panel';

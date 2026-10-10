@@ -14,6 +14,7 @@ import type { SkillDb } from "../skills/db";
 import { d7Join } from "../definitions/catalog";
 import { addDays } from "./weeks";
 import type { Group, Platform } from "./types";
+import { panelPlatformsSql } from "../db/panel";
 
 export type LandscapeBrand = { key: string; name: string; client: boolean };
 export type TierName = "nano" | "micro" | "mid" | "macro" | "mega" | "unknown";
@@ -149,7 +150,7 @@ export async function landscape(
               (p.posted_at at time zone $4) as local_at,
               (p.posted_at >= ($8::date::timestamp at time zone $4)) as cur
        from posts p join g on g.brand_id = p.brand_id ${d7Join("p", "d7")}
-       where p.workspace_id = $1 and p.relevant is not false and p.platform = any($5::text[])
+       where p.workspace_id = $1 and p.relevant is not false and p.brought_in_by = 'panel' and p.platform = any($5::text[])
          and p.posted_at >= ($6::date::timestamp at time zone $4) and p.posted_at < ($7::date::timestamp at time zone $4)
        order by g.gkey, p.platform, p.url, d7.views desc nulls last
      ),
@@ -316,7 +317,7 @@ export async function landscape(
   // ------------------------------------------------------------- close-ups
   // owned accounts are captured on TikTok in the beauty panel and on every platform in listening workspaces:
   // a brand's own share is of the views on the platforms where own accounts are captured at all
-  const ownedPlatforms = (await db.q<{ platform: Platform }>("select distinct platform from posts where workspace_id = $1 and source = 'owned'", [o.workspaceId])).map((r) => r.platform);
+  const ownedPlatforms = (await db.q<{ platform: Platform }>(panelPlatformsSql("$1", "and p.source = 'owned'"), [o.workspaceId])).map((r) => r.platform);
   const stats = await db.q<{ gkey: string; posts: number; views: number; likes: number; comments: number; creators: number; rated_views: number; rated_eng: number; tiktok_posts: number; instagram_posts: number; owned_posts: number; owned_views: number; owned_median: number | null; owned_base_views: number; owned_base_posts: number; promo_posts: number }>(
     `${base}
      select gkey, count(*)::int as posts, sum(views)::float8 as views, sum(likes)::float8 as likes, sum(comments)::float8 as comments,
@@ -445,7 +446,7 @@ export async function landscape(
      ),
      tot as (
        select h as tag, count(distinct p.url)::int as posts_all from posts p, unnest(p.hashtags) h
-       where p.workspace_id = $1 and p.relevant is not false and p.platform = any($5::text[])
+       where p.workspace_id = $1 and p.relevant is not false and p.brought_in_by = 'panel' and p.platform = any($5::text[])
          and p.posted_at >= ($8::date::timestamp at time zone $4) and p.posted_at < ($7::date::timestamp at time zone $4)
          and h in (select tag from agg) group by 1
      )

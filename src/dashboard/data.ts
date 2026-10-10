@@ -27,6 +27,7 @@ import { SkillDb } from "../skills/db";
 import { loadContext, type Context } from "../skills/params";
 import { PLATFORMS, PLATFORM_NAME, type PlatformFilter } from "./askref";
 import { daysCovered, monthOf, parsePeriod, periodOptions, shiftPeriod, type Grain, type Period } from "./period";
+import { panelPlatformsSql } from "../db/panel";
 
 export type ContentSort = "views" | "engagement" | "er";
 export type Filters = { platform: PlatformFilter; brands: string[]; period: Period };
@@ -125,7 +126,7 @@ export class Params {
 /** The workspace, the platform (all = every platform the workspace holds), and only posts about their brand (DECISIONS 3 Oct 2026). */
 export function scope(ws: string, f: { platform: PlatformFilter }, P: Params, alias = "p"): string {
   const platform = f.platform === "all" ? "" : ` and ${alias}.platform = ${P.add(f.platform)}`;
-  return `${alias}.workspace_id = ${P.add(ws)}${platform} and ${alias}.relevant is not false`;
+  return `${alias}.workspace_id = ${P.add(ws)}${platform} and ${alias}.relevant is not false and ${alias}.brought_in_by = 'panel'`;
 }
 export function inWindow(from: string, to: string, tz: string, P: Params, alias = "p"): string {
   const t = P.add(tz);
@@ -607,7 +608,7 @@ export async function dashboardData(workspaceId: string, sp: Record<string, stri
     tiers(db, ctx, f),
     capture(db, ctx, f, prev),
     brandHandles(db, workspaceId),
-    db.q<{ platform: string }>("select distinct platform from posts where workspace_id = $1 order by 1", [workspaceId]),
+    db.q<{ platform: string }>(panelPlatformsSql("$1"), [workspaceId]),
   ]);
   const ranked = rankings(rows, periods, f, names);
   const [tr, creators, viewers] = await Promise.all([trend(db, ctx, f, ranked, names), topCreators(db, ctx, f, handles), mix(db, ctx, f, names)]);

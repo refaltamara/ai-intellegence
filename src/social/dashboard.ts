@@ -109,7 +109,7 @@ export async function socialFacts(ws: string, win: { focus: string; from: string
   // $1 workspace, $2 tz, $3 platform (null = all), then per query
   const inDays = (col: string, a: string, b: string) => `${col} >= (${a}::date::timestamp at time zone $2) and ${col} < ((${b}::date + 1)::timestamp at time zone $2)`;
   const platP = plat ? "and p.platform = $3" : "and $3::text is null";
-  const own = `posts p where p.workspace_id = $1 and p.source = 'owned' and p.relevant is not false ${platP}`;
+  const own = `posts p where p.workspace_id = $1 and p.source = 'owned' and p.relevant is not false and p.brought_in_by = 'panel' ${platP}`;
   const base = [ws, tz, plat];
   const commentsOf = `(select count(*) from comments c where c.post_id = p.id and c.sentiment_source is distinct from 'subject')`;
 
@@ -204,7 +204,7 @@ export async function socialFacts(ws: string, win: { focus: string; from: string
     `select s.day_n, (percentile_cont(0.5) within group (order by s.likes::float8 / l.likes))::float8 as share
      from post_snapshots s join posts p on p.id = s.post_id
      join lateral (select likes from post_snapshots x where x.post_id = p.id and x.day_n = 7) l on true
-     where p.workspace_id = $1 and p.source = 'owned' and l.likes >= 20 and s.day_n between 0 and 7 and s.likes is not null group by 1 order by 1`,
+     where p.workspace_id = $1 and p.brought_in_by = 'panel' and p.source = 'owned' and l.likes >= 20 and s.day_n between 0 and 7 and s.likes is not null group by 1 order by 1`,
     [ws],
   );
   const curve: Curve = curveRows.map((r) => ({ day: n(r.day_n), share: Math.round(Number(r.share) * 1000) / 1000 }));
@@ -243,7 +243,7 @@ export async function socialFacts(ws: string, win: { focus: string; from: string
             coalesce(sum((select count(*) from comments c where c.post_id = p.id and c.sentiment = 'negative')), 0)::int as negative,
             coalesce(sum((select count(c.sentiment) from comments c where c.post_id = p.id and c.sentiment_source is distinct from 'subject')), 0)::int as labelled,
             (array_agg(jsonb_build_object('url', p.url, 'platform', p.platform, 'engagements', coalesce(p.engagements, 0), 'caption', left(regexp_replace(coalesce(p.caption, ''), '\\s+', ' ', 'g'), 140)) order by coalesce(p.engagements, 0) desc))[1] as top
-     from brands b left join posts p on p.brand_id = b.id and p.workspace_id = $1 and p.source = 'owned' and p.relevant is not false ${platP} and ${inDays("p.posted_at", "$4", "$5")}
+     from brands b left join posts p on p.brand_id = b.id and p.workspace_id = $1 and p.source = 'owned' and p.relevant is not false and p.brought_in_by = 'panel' ${platP} and ${inDays("p.posted_at", "$4", "$5")}
      where b.workspace_id = $1 group by b.id, b.name`,
     [...base, from, to],
   );
@@ -259,7 +259,7 @@ export async function socialFacts(ws: string, win: { focus: string; from: string
     `select coalesce(t.label, 'No topic') as topic, coalesce(t.is_catch_all, false) as catch_all, count(*)::int as comments,
             count(*) filter (where c.sentiment = 'negative')::int as negative, count(c.sentiment)::int as labelled, count(*) filter (where c.purchase_intent)::int as intent
      from comments c join posts p on p.id = c.post_id left join topics t on t.id = c.topic_id
-     where p.workspace_id = $1 and p.source = 'owned' and p.relevant is not false ${platP} and p.brand_id = $4 and ${inDays("p.posted_at", "$5", "$6")}
+     where p.workspace_id = $1 and p.source = 'owned' and p.relevant is not false and p.brought_in_by = 'panel' ${platP} and p.brand_id = $4 and ${inDays("p.posted_at", "$5", "$6")}
        and c.sentiment_source is distinct from 'subject'
      group by 1, 2 order by 3 desc`,
     [...base, focus.id, from, to],
@@ -269,7 +269,7 @@ export async function socialFacts(ws: string, win: { focus: string; from: string
   const quoteRows = (sentiment: string) => db.q(
     `select c.text, c.translation, coalesce(c.likes, 0)::int as likes, c.platform, p.url, c.sentiment
      from comments c join posts p on p.id = c.post_id
-     where p.workspace_id = $1 and p.source = 'owned' and p.relevant is not false ${platP} and p.brand_id = $4 and ${inDays("p.posted_at", "$5", "$6")}
+     where p.workspace_id = $1 and p.source = 'owned' and p.relevant is not false and p.brought_in_by = 'panel' ${platP} and p.brand_id = $4 and ${inDays("p.posted_at", "$5", "$6")}
        and c.sentiment = $7 and c.sentiment_source is distinct from 'subject' and c.text is not null and length(c.text) between 25 and 400
      order by coalesce(c.likes, 0) desc, length(c.text) desc limit 3`,
     [...base, focus.id, from, to, sentiment],
@@ -279,12 +279,12 @@ export async function socialFacts(ws: string, win: { focus: string; from: string
 
   // ---- data health: own-account capture per brand and platform, and days no account would post
   const capRows = await db.q(
-    `with d as (select p.brand_id, p.platform, (p.posted_at at time zone $2)::date as day, count(*)::int as k from posts p where p.workspace_id = $1 and p.source = 'owned' group by 1, 2, 3)
+    `with d as (select p.brand_id, p.platform, (p.posted_at at time zone $2)::date as day, count(*)::int as k from posts p where p.workspace_id = $1 and p.brought_in_by = 'panel' and p.source = 'owned' group by 1, 2, 3)
      select p.brand_id, p.platform, array_agg(distinct p.creator_handle) filter (where p.creator_handle is not null) as handles, count(*)::int as posts,
             to_char(min(p.posted_at at time zone $2), 'YYYY-MM-DD') as first, to_char(max(p.posted_at at time zone $2), 'YYYY-MM-DD') as last,
             (select to_char(day, 'YYYY-MM-DD') from d where d.brand_id = p.brand_id and d.platform = p.platform order by k desc limit 1) as busiest_day,
             (select max(k) from d where d.brand_id = p.brand_id and d.platform = p.platform)::int as busiest
-     from posts p where p.workspace_id = $1 and p.source = 'owned' group by 1, 2 order by 1, 2`,
+     from posts p where p.workspace_id = $1 and p.brought_in_by = 'panel' and p.source = 'owned' group by 1, 2 order by 1, 2`,
     [ws, tz],
   );
   const names = new Map(brands.map((b) => [b.id, b.name]));

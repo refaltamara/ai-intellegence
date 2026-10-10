@@ -19,6 +19,7 @@ import { getSkill } from "../skills/registry";
 import type { Context } from "../skills/params";
 import type { ChartSpec, SkillResult } from "../skills/types";
 import type { Platform } from "../competitor/types";
+import { panelPlatformsSql } from "../db/panel";
 
 export { CARD_KINDS, KIND_INFO, LANDSCAPE_KINDS, METRIC_LABEL };
 export type { CardConfig, CardKind, CardRow, CardSize, Metric };
@@ -91,12 +92,12 @@ const LANDSCAPE_TOP = 8;
  */
 export async function landscapeFor(db: SkillDb, ctx: Context, f: Filters, prev: Period, single = false): Promise<Landscape> {
   const platforms: Platform[] = f.platform === "all"
-    ? (await db.q<{ platform: Platform }>("select distinct platform from posts where workspace_id = $1", [ctx.workspaceId])).map((r) => r.platform)
+    ? (await db.q<{ platform: Platform }>(panelPlatformsSql("$1"), [ctx.workspaceId])).map((r) => r.platform)
     : [f.platform];
   let ids = f.brands.slice(0, single ? 1 : LANDSCAPE_TOP);
   if (!ids.length) {
     const top = await db.q<{ brand_id: string }>(
-      `select brand_id from posts where workspace_id = $1 and relevant is not false and platform = any($2::text[])
+      `select brand_id from posts where workspace_id = $1 and relevant is not false and brought_in_by = 'panel' and platform = any($2::text[])
          and posted_at >= ($3::date::timestamp at time zone $5) and posted_at < (($4::date + 1)::timestamp at time zone $5)
        group by 1 order by count(*) desc limit $6`,
       [ctx.workspaceId, [...platforms], f.period.from, f.period.to, ctx.tz, single ? 1 : LANDSCAPE_TOP],

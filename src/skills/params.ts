@@ -8,6 +8,7 @@ import { DEFAULT_WORKSPACE_ID } from "../config/thresholds";
 import type { SkillDef } from "./registry";
 import type { SkillDb } from "./db";
 import type { Platform } from "./types";
+import { panelPostEdge } from "../db/panel";
 
 const ajv = new Ajv({ useDefaults: true, coerceTypes: "array", allErrors: true, strict: false });
 addFormats(ajv);
@@ -54,11 +55,11 @@ export async function loadContext(db: SkillDb, workspaceId = DEFAULT_WORKSPACE_I
   );
   if (!ws) throw new ParamError(`Unknown workspace ${workspaceId}`);
   const range = await db.one<{ as_of: string | null; earliest: string | null; freshness: string | null }>(
-    // max and min of the stored time, then the local day: an index lookup, not a read of every post
-    `select to_char(max(posted_at) at time zone $2, 'YYYY-MM-DD') as as_of,
-            to_char(min(posted_at) at time zone $2, 'YYYY-MM-DD') as earliest,
-            to_char(max(posted_at) at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as freshness
-     from posts where workspace_id = $1`,
+    // the newest and oldest stored time, then the local day: an index lookup, not a read of every post
+    `select to_char(e.newest at time zone $2, 'YYYY-MM-DD') as as_of,
+            to_char(e.oldest at time zone $2, 'YYYY-MM-DD') as earliest,
+            to_char(e.newest at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as freshness
+     from (select ${panelPostEdge("$1", "newest")} as newest, ${panelPostEdge("$1", "oldest")} as oldest) e`,
     [workspaceId, ws.tz],
   );
   const brands = await db.q<BrandRef>(
