@@ -98,8 +98,9 @@ export async function applyRelevance(ws: string, brandId: string, by: string): P
     const next = isRelevant({ owned: x.source === "owned", tagged: x.tagged_handles ?? [], caption: x.caption }, handles, m);
     if (next !== x.relevant) (next ? on : off).push(x.id);
   }
-  if (on.length) await sql.query("update posts set relevant = true where id = any($1::uuid[])", [on]);
-  if (off.length) await sql.query("update posts set relevant = false where id = any($1::uuid[])", [off]);
+  // checked_by: who last judged each link's relevance (DECISIONS, 10 Oct 2026); the labels below keep the history
+  if (on.length) await sql.query("update posts set relevant = true, checked_by = 'rule:terms' where id = any($1::uuid[])", [on]);
+  if (off.length) await sql.query("update posts set relevant = false, checked_by = 'rule:terms' where id = any($1::uuid[])", [off]);
   // the rule's judgment, kept with which terms made it (labels; who applied them is in the audit log)
   const { recordLabels, ruleVersion } = await import("../labels/record");
   await recordLabels(ws, "rule:terms", ruleVersion({ brand: brandId, terms: base!.terms, never: base!.never, handles: base!.handles }), [

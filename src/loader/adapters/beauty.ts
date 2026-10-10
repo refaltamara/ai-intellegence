@@ -133,7 +133,10 @@ export function readBeauty(input: AdapterInput): Staged {
   const st = emptyStaged();
   const maps = brandMaps(readFileSync(SEED, "utf8"));
   const accounts: StagedAccount[] = [];
-  for (const { raw, bytes } of input.files) {
+  // a later row wins (the old loader's upsert), so files are read in the order they reached us, whatever order they are
+  // given in; files of one day keep the order given
+  const files = [...input.files].sort((a, b) => (a.raw.received < b.raw.received ? -1 : a.raw.received > b.raw.received ? 1 : 0));
+  for (const { raw, bytes } of files) {
     const name = path.basename(raw.path);
     const platform = platformOfFile(name);
     if (!platform) throw new Error(`${name}: say which platform it is (the name holds neither "tiktok" nor "instagram").`);

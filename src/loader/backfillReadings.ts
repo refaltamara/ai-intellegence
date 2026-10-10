@@ -4,7 +4,8 @@
  *   listening  posts.read_at = the post's latest dump reading
  *   profile    posts.read_at = the time of the export that last wrote the post (the contract's per file), stubs none
  *   beauty     posts.read_at = the day the file reached us (raw_files), at the latest
- * Then one 'export' reading per non-listening post with a read_at. Safe to run again.
+ * Then one 'export' reading per non-listening post with a read_at. Safe to run again: it fills only a read time that is
+ * missing, since a link now shares its post's read time (migration 0036) and the loader keeps it.
  */
 import { sql } from "../db/client";
 import { toJson } from "../db/json";
@@ -20,7 +21,7 @@ export async function backfillReadings(log: (s: string) => void = () => {}): Pro
     if (listening) {
       const r = await q(
         `update posts p set read_at = r.at from (select r.post_id, max(r.read_at) as at from post_readings r join posts p2 on p2.id = r.post_id
-           where p2.workspace_id = $1 and r.source = 'listening' group by 1) r where p.id = r.post_id and p.read_at is distinct from r.at returning 1`, [w.id]);
+           where p2.workspace_id = $1 and r.source = 'listening' group by 1) r where p.id = r.post_id and p.read_at is null returning 1`, [w.id]);
       log(`${w.id}: read_at from the latest dump reading on ${r.length} posts`);
       continue;
     }
@@ -37,7 +38,7 @@ export async function backfillReadings(log: (s: string) => void = () => {}): Pro
     }
     const r = await q(
       `update posts p set read_at = m.at::timestamptz from jsonb_each_text($2::jsonb) as m(file, at)
-        where p.workspace_id = $1 and p.source_file = m.file and coalesce(p.content_type, '') <> 'stub' and p.read_at is distinct from m.at::timestamptz returning 1`,
+        where p.workspace_id = $1 and p.source_file = m.file and coalesce(p.content_type, '') <> 'stub' and p.read_at is null returning 1`,
       [w.id, toJson(byFile)]);
     const e = await q(
       `insert into post_readings (post_id, read_at, age_hours, day_n, source, views, likes, comments_count, shares, saves)

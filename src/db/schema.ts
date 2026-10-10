@@ -287,6 +287,22 @@ export const posts = pgTable(
      */
     relevant: boolean("relevant"),
     /**
+     * The link (DECISIONS, 10 Oct 2026, "One row per real thing"): this row is the post's link to one brand. The post
+     * itself is post_items (item_id); the fields that are about the post (ITEM_COLS in src/loader/fold.ts) are a copy of
+     * the item's, kept in step by triggers (migration 0035): a change made through any link reaches the item and its other
+     * links, and a new link takes its post's fields. The rest is about the post and this brand.
+     *   match         how we know: owned (the brand's handle posted it) | tagged (its handle was tagged) | keyword (a brand term
+     *                 in the caption) | mention (named in the text, found by the model)
+     *   term          the term that matched, for keyword matches
+     *   checked_by    who last judged relevance: a rule, a model or a person (labels hold the history)
+     *   brought_in_by what brought the post in: the panel's own setup ('panel') or a case
+     */
+    itemId: uuid("item_id").notNull().references((): AnyPgColumn => postItems.id),
+    match: text("match"),
+    term: text("term"),
+    checkedBy: text("checked_by"),
+    broughtInBy: text("brought_in_by").notNull().default("panel"),
+    /**
      * Warnings from the load's checks (DECISIONS, 10 Oct 2026): 'zero_followers' (the account reported 0 followers),
      * 'zero_views' (a video reported 0 views). The row counts as a post; it stays out of rates and medians.
      */
@@ -312,6 +328,68 @@ export const posts = pgTable(
     check("posts_tier_chk", sql`${t.tier} is null or ${t.tier} in ('nano','micro','mid','macro','mega')`),
     check("posts_stance_chk", sql`${t.stance} is null or ${t.stance} in ('positive','neutral','negative')`),
     index("posts_cap_pick_idx").on(t.workspaceId, t.capSource, t.postedAt),
+    index("posts_item_idx").on(t.itemId),
+  ],
+);
+
+/**
+ * One row per real post (DECISIONS, 10 Oct 2026, "One row per real thing"): keyed by platform and url, whatever brands it
+ * is about. Its links to brands are the posts rows (item_id), which carry a copy of these fields for speed, kept in step
+ * by triggers (migration 0035). What is about the post sits here; what is about the post and one brand (owned or earned,
+ * relevance, the brand's universe and category, its product and price, a cart or a reseller) stays on the link.
+ * When a post's brand rows disagree, src/loader/fold.ts decides: the numbers of the reading with the most views, the
+ * earliest time, the longest caption, the creator with the highest follower count.
+ */
+export const postItems = pgTable(
+  "post_items",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workspaceId: text("workspace_id").notNull().references(() => workspaces.id),
+    platform: text("platform").notNull(),
+    url: text("url").notNull(),
+    platformPostId: text("platform_post_id"),
+    creatorId: uuid("creator_id").references(() => creators.id),
+    creatorHandle: text("creator_handle"),
+    postedAt: ts("posted_at").notNull(),
+    month: date("month").notNull(),
+    caption: text("caption"),
+    hashtags: text("hashtags").array(),
+    taggedHandles: text("tagged_handles").array(),
+    isPaid: boolean("is_paid"),
+    followersAtPost: integer("followers_at_post"),
+    tier: text("tier"),
+    contentFormat: text("content_format"),
+    contentType: text("content_type"),
+    views: bigint("views", { mode: "number" }),
+    likes: integer("likes"),
+    commentsCount: integer("comments_count"),
+    shares: integer("shares"),
+    saves: integer("saves"),
+    engagements: integer("engagements"),
+    engagementsLc: integer("engagements_lc"),
+    capturedDays: integer("captured_days"),
+    stance: text("stance"),
+    stanceSource: text("stance_source"),
+    topicId: text("topic_id"),
+    topicConfidence: numeric("topic_confidence"),
+    voice: text("voice"),
+    capProduct: text("cap_product"),
+    capEvent: text("cap_event"),
+    capEventName: text("cap_event_name"),
+    capOffer: text("cap_offer"),
+    capHook: text("cap_hook"),
+    capAngle: text("cap_angle"),
+    capSource: text("cap_source"),
+    capReadAt: ts("cap_read_at"),
+    flags: text("flags").array(),
+    readAt: ts("read_at"),
+    sourceFile: text("source_file"),
+    loadId: uuid("load_id"),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    uniqueIndex("post_items_workspace_platform_url_uq").on(t.workspaceId, t.platform, t.url),
+    index("post_items_workspace_posted_idx").on(t.workspaceId, t.postedAt),
   ],
 );
 
@@ -391,6 +469,11 @@ export const comments = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     workspaceId: text("workspace_id").notNull().references(() => workspaces.id),
     postId: uuid("post_id").notNull().references(() => posts.id, { onDelete: "cascade" }),
+    /**
+     * the real post (post_items), set from the comment's link by a trigger (migration 0036): a comment is on the post, so it
+     * counts for every brand the post links to (DECISIONS, 10 Oct 2026)
+     */
+    itemId: uuid("item_id").notNull().references((): AnyPgColumn => postItems.id),
     /** denormalised from the post so sentiment queries never join for it */
     platform: text("platform"),
     platformCommentId: text("platform_comment_id").notNull(),
@@ -430,6 +513,7 @@ export const comments = pgTable(
   (t) => [
     uniqueIndex("comments_workspace_platform_comment_uq").on(t.workspaceId, t.platformCommentId),
     index("comments_post_idx").on(t.postId),
+    index("comments_item_idx").on(t.itemId),
     index("comments_workspace_posted_idx").on(t.workspaceId, t.postedAt),
     check("comments_sentiment_chk", sql`${t.sentiment} is null or ${t.sentiment} in ('positive','neutral','negative')`),
   ],

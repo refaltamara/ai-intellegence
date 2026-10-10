@@ -246,6 +246,20 @@
       "when": 1791617177979,
       "tag": "0034_romantic_catseye",
       "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1791617941011,
+      "tag": "0035_foamy_surge",
+      "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1791619139975,
+      "tag": "0036_classy_impossible_man",
+      "breakpoints": true
     }
   ]
 }
