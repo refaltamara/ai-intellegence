@@ -7,7 +7,7 @@ Start with `CLAUDE.md`, then `docs/DECISIONS.md`, `docs/DATA_NOTES.md`, `docs/PR
 Layout:
 - `docs/` — PRD, decisions log, data notes, UI prototype
 - `skills.registry.json` — the 29-skill catalogue (revised per DECISIONS)
-- `data/raw/` — Q1/Q2 2026 post-level exports as gzipped CSV, with the original README notes
+- `data/raw/` — the manifest of raw files and their notes; the files themselves live in private Vercel Blob (`pnpm raw pull <workspace>`)
 - `data/seed/` — canonical brand mapping across TikTok and Instagram
 
 ## Running (M0)
