@@ -728,8 +728,8 @@ The agreed design is the doc "Core data architecture and model" (https://claude.
   - The first production build failed on the earlier version of the sync, which stopped the build when the store could not be reached. Its logs are only on Vercel, and this session cannot reach Vercel, which is why the outcome now goes to the database instead.
 - **Out of the repository.** Then the repository stops tracking the files: `data/raw/*` is gitignored except this README and the manifest. Old commits still hold them; Refal decides later about the history and the repository's visibility.
 - **Reading them back.** Loaders read a raw file through `readRaw` (`src/raw/store.ts`): the local copy if its hash matches, else the store.
-- **Not stored yet.** The production build on 10 Oct recorded "No Blob store in this environment": the Vercel project has no Blob store connected. The CMS's dump upload needs the same store. Connecting a private Blob store to the project, in all environments, lets the next production build store the files.
-- **Files never in the repository.** Fourteen raw files were never in the repository, and the only copies we know of sit in a Claude session's sandbox:
+- **Stored (11 Oct).** Refal connected a private Blob store to the project, in all environments, and redeployed production. The build stored the 53 files that were in the repository (63.6 MB: 3 Beauty, 15 Kahf, 35 Maudy) at 05:49 to 05:50 UTC, each confirmed in `raw_files`. The repository then stopped tracking them (the files stay in old commits).
+- **Files never in the repository.** Fourteen raw files were never in the repository and are not in the store yet. Refal keeps the originals, and a copy sits in a Claude session's sandbox:
   - the Fintech dump: 13 tables, 110 MB, first loaded 3 Oct;
   - the converted Q3 Instagram file for Beauty: 29 MB, first loaded 6 Oct.
 
