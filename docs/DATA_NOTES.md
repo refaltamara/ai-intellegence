@@ -195,8 +195,16 @@ Templates for the dump: `Indonesian_Beauty_Q3_2026_{TikTok,Instagram}_template.x
 **Instagram, last file (loaded 12 Oct).** The full Q3 export, 1 July to 30 September (`instagram_posts_formatted.csv` in a zip; `beauty-id/instagram_q3_2026_full_v2.csv`, load `b8e42909`). Refal: "I think it's all good now".
 - 93,696 links: every link of the second file, and 15,782 new ones (6,841 in July, 5,187 in August, 3,754 in September). The same 693 TikTok links are left out. No new brand.
 - **Counts only grow, across files too.** This file reads 1,309 posts lower than the file loaded that morning (one at 2.28M views against the 6.94M we held), and 323 with no views at all. Both files arrived the same day, so the new reading would have replaced the higher one. `convert_instagram.py --after <the earlier file>` keeps, for a post both files carry, the highest views, likes, comments and followers of either and the earliest date. With it, no post reads lower than before; 3,907 read higher.
-  - The plain conversion is kept as a raw file (`instagram_q3_2026_full.csv`) and staged as load `8e4729fb`, which was not promoted.
-- Instagram Q3 now holds 93,696 links (86,993 posts): July 32,976, August 31,026, September 29,694. 3,846 links have no followers.
+  - The plain conversion is kept as a raw file (`instagram_q3_2026_full.csv`); its staged load `8e4729fb` was never promoted and was discarded (Refal).
+- Instagram Q3 now holds 93,696 links (86,993 posts): July 32,976, August 31,026, September 29,694.
+- **Followers from history** (Refal: "check in our history whether we have it; if we have it, use the same"). 3,846 links had no followers, from 3,036 accounts; the handles are clean (none blank, none with @ or capitals).
+  - 2,227 of those accounts have an Instagram count elsewhere: on their other Q3 posts (2,053; the scraper caught followers on one post and missed them on another), on older posts (1,472) or in the accounts list (1,564).
+  - `convert_instagram.py --followers` gives each such link the count from the same account's post nearest in time (median 3 days away, 90% within a month); a TikTok account of the same name is not used (168 would match).
+  - Loaded as `beauty-id/instagram_q3_2026_full_v3.csv` (load `d9a521ed`): only followers and tier changed, on 2,876 links, and 662 accounts got a count. 970 links (809 accounts) have no Instagram count anywhere and stay without.
+- **Posts with 0 views, all of Q3** (12 Oct):
+  - TikTok: 13 of 46,830 videos report 0 views (8 of them with likes or comments). Each is flagged and kept out of rates and medians.
+  - Instagram reels: 2 of 74,380 report 0 views, flagged the same way.
+  - Instagram carousels and photos show no views by nature: 12,600 posts, 2,380 reported as 0 and 10,220 blank. Both read the same: rates and medians count views over 0 only.
 - Not cleaned, as before.
 
 ## Kahf on Threads (profile workspace `kahf-threads`, Fair's scraper, 7 Oct 2026 ~10:00 WIB)
