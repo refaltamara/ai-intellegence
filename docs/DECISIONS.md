@@ -1127,3 +1127,8 @@ The agreed design is the doc "Core data architecture and model" (https://claude.
   - First run, 12 Oct: 1,942 posts with 5,660 labels and 1,437 new accounts. Both sides now hold 4,625 posts, 654 set aside, the same stances and 46,643 comments; the panel's totals did not move.
 - **Counts only grow, across files.** When a later Instagram export reads a post lower than an earlier file of the same day, the post keeps the higher count (`convert_instagram.py --after`). Views, likes, comments and followers on Instagram never go down, so a lower number is an older capture. The last Q3 file read 1,309 posts lower; with the rule, none.
 - **Instagram Q3 is complete**: 93,696 links, 1 July to 30 September, not cleaned.
+- **Followers from the account's history.** An Instagram link the export gives no followers takes the same account's count from its post nearest in time, from the file or from what Beauty already holds (`convert_instagram.py --followers`). Never from another platform. Q3: 2,876 of 3,846 links filled; 970 have no count anywhere.
+- **The gap in September TikTok is never mentioned in the product**: not in CeMO's notes, on screens or in decks (Refal: "never mention September TikTok is incomplete").
+  - The nightly health check would have said it, through own accounts that stop posting ("not captured after 28 Aug").
+  - A check named in `settings.health_quiet` still runs and shows in the CMS but never becomes a note for CeMO. Beauty keeps `own_accounts` quiet.
+  - Beauty's 6 Oct own-account note ("not captured after 30 Jun") predated Q3 and no longer held; it was removed, with its text kept in the audit row.

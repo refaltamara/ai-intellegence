@@ -10,6 +10,14 @@
       "received": "2026-10-12"
     },
     {
+      "path": "beauty-id/instagram_q3_2026_full_v3.csv",
+      "workspace": "beauty-id",
+      "blob": "raw/beauty-id/instagram_q3_2026_full_v3.csv",
+      "bytes": 36792717,
+      "sha256": "2915e0727c0d6a646c909776f26d1e685289954c213d4d46d9d5463df016aefd",
+      "received": "2026-10-12"
+    },
+    {
       "path": "beauty-id/instagram_q3_2026_full.csv",
       "workspace": "beauty-id",
       "blob": "raw/beauty-id/instagram_q3_2026_full.csv",

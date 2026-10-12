@@ -109,14 +109,26 @@ export async function healthChecks(ws: string): Promise<Check[]> {
 
 export type HealthState = { at: string; checks: Check[]; streak: Record<string, number> };
 
+type Note = { text: string; source: string; at: string };
+
+/**
+ * The notes a run adds for CeMO: a check that warned or failed two runs in a row, once per text. A check the workspace keeps
+ * quiet (`settings.health_quiet`, set by Fair) still runs and shows in the CMS, but never becomes a note (Refal, 12 Oct: the
+ * gap in Beauty's September TikTok is never mentioned, and the own-account check would say it).
+ */
+export function notesFrom(checks: Check[], streak: Record<string, number>, notes: Note[], quiet: string[] = [], at = new Date().toISOString()): Note[] {
+  const out = [...notes];
+  for (const c of checks) if (c.note && streak[c.key] >= 2 && !quiet.includes(c.key) && !out.some((x) => x.text === c.note)) out.push({ text: c.note, source: "health", at });
+  return out;
+}
+
 /** Run the checks and keep them; a check that fails or warns two runs in a row adds its note for CeMO (once). */
 export async function recordHealth(ws: string): Promise<HealthState> {
   const checks = await healthChecks(ws);
-  const s = ((await sql.query("select settings from workspaces where id = $1", [ws])) as { settings: { health?: HealthState; notes?: { text: string; source: string; at: string }[] } }[])[0]?.settings ?? {};
+  const s = ((await sql.query("select settings from workspaces where id = $1", [ws])) as { settings: { health?: HealthState; notes?: Note[]; health_quiet?: string[] } }[])[0]?.settings ?? {};
   const streak: Record<string, number> = {};
   for (const c of checks) streak[c.key] = c.status === "warn" || c.status === "fail" ? (s.health?.streak?.[c.key] ?? 0) + 1 : 0;
-  const notes = [...(s.notes ?? [])];
-  for (const c of checks) if (c.note && streak[c.key] >= 2 && !notes.some((x) => x.text === c.note)) notes.push({ text: c.note, source: "health", at: new Date().toISOString() });
+  const notes = notesFrom(checks, streak, s.notes ?? [], s.health_quiet ?? []);
   const state: HealthState = { at: new Date().toISOString(), checks, streak };
   await sql.query("update workspaces set settings = settings || $2::jsonb where id = $1", [ws, toJson({ health: state, notes })]);
   invalidateWorkspace(ws);

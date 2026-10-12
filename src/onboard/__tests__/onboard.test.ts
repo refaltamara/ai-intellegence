@@ -71,3 +71,19 @@ describe("brand suggestions", () => {
     expect(s[0].name).toBe("BCA");
   });
 });
+
+describe("health notes for CeMO", async () => {
+  const { notesFrom } = await import("../health");
+  const own = { key: "own_accounts", label: "Own accounts", status: "warn" as const, detail: "", note: "X's own TikTok posts are not captured after 28 Aug." };
+  const fol = { key: "followers", label: "Follower history", status: "warn" as const, detail: "", note: "Follower counts are one capture per account." };
+  it("adds a note after two runs, once", () => {
+    const once = notesFrom([own], { own_accounts: 2 }, [], [], "t");
+    expect(once.map((n) => n.text)).toEqual([own.note]);
+    expect(notesFrom([own], { own_accounts: 3 }, once, [], "t")).toHaveLength(1);
+    expect(notesFrom([own], { own_accounts: 1 }, [], [], "t")).toHaveLength(0);
+  });
+  it("never adds a note for a check the workspace keeps quiet", () => {
+    const n = notesFrom([own, fol], { own_accounts: 5, followers: 5 }, [], ["own_accounts"], "t");
+    expect(n.map((x) => x.text)).toEqual([fol.note]);
+  });
+});
