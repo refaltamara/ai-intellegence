@@ -1101,7 +1101,12 @@ The agreed design is the doc "Core data architecture and model" (https://claude.
   - own accounts and resellers are as Q2 knew them;
   - the posts of 1 Sep wait for the September file.
 - **Q2's cleaning rule applies to Q3.** A link whose caption names another beauty brand and never its own, or a marketplace's own ad, is set aside, not deleted (`relevant = false`, `rule:collision`).
-  - 1,886 of 42,264 links, 17.4% of July–August TikTok views.
+  - 1,979 of 42,264 links, 17.5% of July–August TikTok views.
   - Q2 stays as it was. The September file goes the same way.
+- **Posts not about beauty are set aside too** (Refal: "anything not attached to the beauty brands, the Fruta Gummy kind").
+  - A link goes only on evidence: no own brand and no beauty word, with another topic or another language (`etl/quarterly/not_beauty_rule.py`, `rule:not_beauty`).
+  - Vague captions stay.
+  - 2,336 links, 5.4% of the remaining views.
+- **Instagram is not cleaned this way.** Its posts reach the panel by tagging the brand, so they are attached to it. The second Q3 Instagram file (12 Oct) is loaded as it came.
 - **Until the product file comes**, July–August TikTok engagement counts likes and comments only, and carts are unknown.
 - Details in `docs/DATA_NOTES.md`, "Indonesian Beauty Q3 2026".

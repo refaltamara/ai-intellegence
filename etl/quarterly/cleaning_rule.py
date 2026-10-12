@@ -25,6 +25,19 @@ OWN = {
     "somethincmakeup": ["somethinc"], "somethincofficial": ["somethinc"], "studiotropik": ["studiotropik"], "timephoriaid": ["timephoria"],
     "vaselineid": ["vaseline"], "velixirparfums": ["velixir"], "vivacosmetics": [r"\bviva"], "wardahofficial": ["wardah"],
     "whitelabid": ["whitelab"], "worldoftavi": ["worldoftavi", r"\btavi"], "youbeauty_id": ["youbeauty", r"\byou\s+beauty", r"\by\.o\.u\b"],
+    # Instagram-only brands
+    "animateofficial.id": ["animateofficial", r"\banimate\b"], "barberdaily.co": ["barberdaily"], "biodef.id": ["biodef"],
+    "cbdprofessional": ["cbdprofessional", r"\bcbd\b"], "clearindonesia": ["clearindonesia", r"\bclear\s+men", "clearmen"],
+    "deoxide.official": ["deoxide"], "dermascalpexpert": ["dermascalp"], "enchen.indonesia": ["enchen"], "facerinnaid": ["facerinna"],
+    "facetologyofficial": ["facetology"], "finallyfoundyou.id": ["finallyfoundyou"], "gloowandbe": ["gloowandbe", "gloow"],
+    "glowfxbeauty": ["glowfx"], "headandshouldersid": ["headandshoulders", r"head\s*&\s*shoulders"], "hmns.id": ["hmns"],
+    "kimeskincare": ["kimeskincare", r"\bkime\b"], "larocheposay.indonesia": ["larocheposay"], "lightplus": ["lightplus"],
+    "lorealindonesia": ["loreal"], "lorealpro_education_indonesia": ["loreal"], "makarizo.hairenergy": ["makarizo"],
+    "miraelsugarwax": ["mirael"], "msglowformen": ["msglow"], "nextprime.official": ["nextprime"], "niveamen_id": ["nivea"],
+    "octarine.official": ["octarine"], "olayindonesia": ["olay"], "putri.hairchoice": ["hairchoice", r"\bputri\s+hair"],
+    "raeccaid": ["raecca"], "royalebysoklin": ["royalebysoklin", "soklin"], "saffnco": ["saffn"], "scoraofficial": ["scora"],
+    "skin1004_indonesia": ["skin1004", r"\bcentella\s+1004"], "somebymi.official_id": ["somebymi"], "sombong.id": ["sombongid", r"\bsombong\b"],
+    "theoriginote": ["originote"], "zinc_id": ["zincshampoo", r"\bzinc\b"],
 }
 # names that mark another beauty brand: every tracked brand's specific names (no common words), the Instagram-only tracked
 # brands, and the untracked beauty and personal care brands that show up in this panel's captions
@@ -32,7 +45,8 @@ OTHER_EXTRA = ["loreal", "larocheposay", "olay", "headandshoulders", "skin1004",
                "facetology", "raecca", "theoriginote", "originote", "kimeskincare", "glowfx", "msglowformen", "niveamen",
                "pantene", "sunsilk", "garnier", "neutrogena", "scarlett", "rexona", "lifebuoy", "biore", "cetaphil", "hadalabo",
                "bioaqua", "emeron", "jiera", "elformula", "dazzleme", "eiembeauty", "barenbliss", "esqa", "madamgie"]
-COMMON = {r"\bomg", r"\bmop\b", r"\bviva", r"\bcitra", "makeover", r"\byou\s+beauty", r"\by\.o\.u\b", r"\btavi", r"\berha", r"\bblp"}
+COMMON = {r"\banimate\b", r"\bcbd\b", r"\bclear\s+men", "clearmen", r"\bkime\b", r"\bputri\s+hair", r"\bsombong\b", r"\bzinc\b", "gloow", "soklin",
+          r"\bomg", r"\bmop\b", r"\bviva", r"\bcitra", "makeover", r"\byou\s+beauty", r"\by\.o\.u\b", r"\btavi", r"\berha", r"\bblp"}
 MARKETPLACES = {"shopee indonesia", "shopee_id", "shopeeid", "tokopedia", "lazada id", "lazadaid", "blibli", "tiktok shop", "tiktokshop_id"}
 
 def rx(terms):
@@ -63,9 +77,13 @@ if __name__ == "__main__":
     path, label = sys.argv[1], sys.argv[2]
     df = pd.read_csv(path, dtype=str, keep_default_na=False)
     seed = pd.read_csv("data/seed/brand_mapping_master.csv", dtype=str, keep_default_na=False)
-    canon = {**{b: b for b in seed.brand}, **{h: b for h, b in zip(seed.tiktok_handle, seed.brand) if h}}
+    canon = {**{h: b for h, b in zip(seed.instagram_handle, seed.brand) if h}, **{h: b for h, b in zip(seed.tiktok_handle, seed.brand) if h},
+             **{b: b for b in seed.brand}}  # a file names a brand by its id or by its handle on either platform
     df["b"] = df.brand.str.strip().map(canon)
-    owned = df.get("is_owned_account", pd.Series(["0"] * len(df))).astype(str).isin(["1", "1.0", "True", "true"])
+    flagged_own = df.get("is_owned_account", pd.Series(["0"] * len(df))).astype(str).isin(["1", "1.0", "True", "true"])
+    # a post from the brand's own account (Instagram has no owned flag: the account is the brand's handle)
+    handles = {(b, h.lower()) for b, h in zip(seed.brand, seed.instagram_handle) if h} | {(b, h.lower()) for b, h in zip(seed.brand, seed.tiktok_handle) if h}
+    owned = flagged_own.values | pd.Series([(b, u.strip().lower()) in handles for b, u in zip(df.b, df.creator_username)]).values
     df["why"] = [judge(b, c, u, o) for b, c, u, o in zip(df.b, df.description, df.creator_username, owned)]
     df["v"] = pd.to_numeric(df.views, errors="coerce").fillna(0)
     f = df[df.why.notna()]

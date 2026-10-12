@@ -2,6 +2,14 @@
   "note": "Raw files as received, kept in private Vercel Blob (DECISIONS, 10 Oct 2026). Not in the repository: `pnpm raw pull <workspace>` fetches them into data/raw/. A raw file never changes; a corrected file is a new file.",
   "files": [
     {
+      "path": "beauty-id/instagram_q3_2026_oct12.csv",
+      "workspace": "beauty-id",
+      "blob": "raw/beauty-id/instagram_q3_2026_oct12.csv",
+      "bytes": 30721170,
+      "sha256": "70fc78f9842c0fc7d38b44d6857a87c139c7b5ffb87bd4c0e10a82ebc56aa07c",
+      "received": "2026-10-12"
+    },
+    {
       "path": "beauty-id/instagram_q3_2026.csv",
       "workspace": "beauty-id",
       "blob": "raw/beauty-id/instagram_q3_2026.csv",
