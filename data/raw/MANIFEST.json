@@ -266,6 +266,22 @@
       "received": "2026-10-08"
     },
     {
+      "path": "kahf/comments_threads_1012a.csv",
+      "workspace": "kahf-threads",
+      "blob": "raw/kahf-threads/comments_threads_1012a.csv",
+      "bytes": 889769,
+      "sha256": "8b7c042962b6e00ff1b853e32583d7394677879686384fa4977bf2fe94f7d3c2",
+      "received": "2026-10-12"
+    },
+    {
+      "path": "kahf/comments_threads_1012b.csv",
+      "workspace": "kahf-threads",
+      "blob": "raw/kahf-threads/comments_threads_1012b.csv",
+      "bytes": 35606,
+      "sha256": "9197ac2ae8a4b94c2f46ed34ad745246c14ec87dc30ccb20482c0d6203762c84",
+      "received": "2026-10-12"
+    },
+    {
       "path": "kahf/contents_threads_1007e.csv",
       "workspace": "kahf-threads",
       "blob": "raw/kahf-threads/contents_threads_1007e.csv",
