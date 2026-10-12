@@ -1115,3 +1115,15 @@ The agreed design is the doc "Core data architecture and model" (https://claude.
   - 556 July–August links (4.8% of views) and 1,496 Q2 links (2.6%). Instagram is left as it is (0.5%).
 - **September TikTok is incomplete** (the scraper broke around 28 August). It is loaded as it came, through the same rules.
 - Details in `docs/DATA_NOTES.md`, "Indonesian Beauty Q3 2026".
+
+## The Kahf case kept in step with kahf-threads; the last Q3 Instagram file (Refal, 12 Oct 2026)
+
+- **New Kahf posts go into both** (Refal: "consume the last Threads and update it on both cases").
+  - They load into `kahf-threads` as before, through its contract, and its labeller (every 5 minutes) gives each one a stance, a voice and a topic, or sets it aside as off the case.
+  - `pnpm case sync kahf-threads beauty-id --case kahf-threads-boycott --brand kahf=kahfeveryday` then brings into the Beauty case what `kahf-threads` gained since the copy: accounts, posts and their links, readings, comments and labels (`syncCase` in `src/cases/copy.ts`, one transaction).
+  - The case's own rows take the source's current fields: a later reading, a label given after the last sync, a comment moved under its parent post.
+  - It writes only rows the case brought in, never the panel's. It deletes nothing: what the case holds and the source no longer does is counted (`--dry`), not removed. Run again, it writes nothing.
+  - Until a case labels its own posts, `kahf-threads` is where Kahf is labelled, so the sync runs after its labeller finishes. A post that the panel itself holds stops the sync; a case load (`pnpm load run ... --case`) handles those.
+  - First run, 12 Oct: 1,942 posts with 5,660 labels and 1,437 new accounts. Both sides now hold 4,625 posts, 654 set aside, the same stances and 46,643 comments; the panel's totals did not move.
+- **Counts only grow, across files.** When a later Instagram export reads a post lower than an earlier file of the same day, the post keeps the higher count (`convert_instagram.py --after`). Views, likes, comments and followers on Instagram never go down, so a lower number is an older capture. The last Q3 file read 1,309 posts lower; with the rule, none.
+- **Instagram Q3 is complete**: 93,696 links, 1 July to 30 September, not cleaned.

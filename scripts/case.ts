@@ -5,9 +5,12 @@
  *     copies a case workspace into its panel as a case: who may see it comes from the source's restricted_to, and the
  *     case keeps the source's case context (label), hidden fields (pr), case words (commercial) and data notes. --dry shows
  *     the plan and what the copy would meet, and writes nothing.
+ *   pnpm case sync <from workspace> <to panel> --case <id> --brand <from brand>=<panel brand> [--brand ...] [--dry]
+ *     brings what the source gained since the copy into the case (posts, readings, comments, labels, accounts, topics) and
+ *     gives the case's rows the source's current fields; nothing is deleted. --dry shows what is new and writes nothing.
  */
 import { sql } from "../src/db/client";
-import { copyCheck, copyIntoCase, type CopyPlan } from "../src/cases/copy";
+import { copyCheck, copyIntoCase, syncCase, syncPending, type CopyPlan } from "../src/cases/copy";
 import { refreshServing } from "../src/definitions/totals";
 
 function flags(args: string[]): Map<string, string[]> {
@@ -58,10 +61,27 @@ async function copy(from: string, to: string, f: Map<string, string[]>) {
   console.log("serving tables rebuilt and statistics refreshed");
 }
 
+async function sync(from: string, to: string, f: Map<string, string[]>) {
+  const caseId = f.get("case")?.[0];
+  if (!caseId) throw new Error("--case <id>");
+  const plan = { from, to, caseId, brands: Object.fromEntries((f.get("brand") ?? []).map((b) => b.split("="))) };
+  const { problems, pending } = await syncPending(plan);
+  console.log(`${from} → ${to}, case ${caseId}:`, pending);
+  if (problems.length) throw new Error(`not synced: ${problems.join("; ")}`);
+  if (f.has("dry")) return console.log("dry run: nothing written");
+  const t = Date.now();
+  const wrote = await syncCase(plan);
+  console.log(`synced in ${((Date.now() - t) / 1000).toFixed(1)} s; rows written:`, wrote);
+  await refreshServing(to);
+  for (const tb of ["post_items", "posts", "comments", "creators", "labels", "case_posts"]) await sql.query(`analyze ${tb}`);
+  console.log("serving tables rebuilt and statistics refreshed");
+}
+
 async function main() {
   const [, , cmd, a, b, ...rest] = process.argv;
   if (cmd === "copy") return copy(a, b, flags(rest));
-  console.log("pnpm case copy <from workspace> <to panel> --case <id> --brand <from>=<to> [--dry]");
+  if (cmd === "sync") return sync(a, b, flags(rest));
+  console.log("pnpm case copy|sync <from workspace> <to panel> --case <id> --brand <from>=<to> [--dry]");
 }
 
 main().then(() => process.exit(0)).catch((e) => {
