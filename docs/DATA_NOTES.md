@@ -298,6 +298,15 @@ One contents file, `data/raw/kahf/contents_threads.csv` (posts only; comments to
   - 1,942 loaded (load `3556e049`), 4,625 posts in all. The file carries no follower counts.
   - Labelled within about 20 minutes: 435 off the case and set aside. Of the 1,492 with a stance, 784 are against Kahf (53%), 223 neutral and 485 defend it. Malaysian voices 849 (674 against), Indonesian 519 (49 against), unclear 124.
   - Brought into the Beauty case `kahf-threads-boycott` the same hour (`pnpm case sync`); both now hold 4,625 posts, 654 set aside, the same stances and 46,643 comments.
+- **Comments, 12 Oct** (two exports, both Threads, ISO times with Z):
+  - `scrapper-results-20261012-1816.csv` (Fair's scraper; `kahf/comments_threads_1012a.csv`): 4,911 comments on 21 posts already loaded, 7 Oct 10:27 to 12 Oct 18:08 WIB. Threads' numeric ids, written as their short codes (checked: 1,996 of 1,996 on the 12 Oct posts export). No duplicates; 333 already loaded and left out; 4,578 written. The busiest: @bellngasriofficial 532, @birskruth 502, @incik_random 460, Kahf Malaysia's apology DeLYd4QCUYg 429.
+  - `dataset_threads-replies-scraper_2026-10-12_11-24-30-313.csv` (a replies scraper; `kahf/comments_threads_1012b.csv`): 196 rows on 4 posts already loaded; 4 are the posts themselves and 31 replies were already loaded, all left out; 161 written.
+  - No overlap between the two. Loaded (load `faf5b0f3`): 4,375 new comments; dropped 225 empty and 139 emoji or symbols only. 51,018 comments in all. 14 are Meta AI replies, loaded as comments as the contract says.
+  - **24 replies had been loaded as posts** by the 12 Oct posts pull (the keyword search returns replies that name Kahf). They are kept as posts but set aside (`relevant = false`, `rule:reply`; one was already set aside as off the case), and listed in `drop_urls` with their parent, so each counts once, as a comment. None had comments of their own. Not removed, as on 8 Oct, because nothing is deleted without asking (Refal).
+  - Labelled by 12:29 WIB (about 15 minutes). **3,115 of the 4,375 are off the case** (71%): most of these threads are about the Indonesia–Malaysia quarrel in general (the haze, the rupiah, football, "indon", a cleanser question), not Kahf. 1,903 sit under 8 posts the labeller had already set aside; @birskruth (a facial wash question) 501, @bellngasriofficial (haze) 458, @izztasy 237.
+  - On posts about the case, 998 comments are about it: Malaysian 420 (222 negative), Indonesian 381 (281 positive, defending), unclear 196.
+  - One set-aside post holds comments that are on the case: @syatirah_husna DeW-MFaGWMn (flags outside a supermarket), 142 of its 200 comments about the case, 111 negative. Comments under a set-aside post do not count.
+  - Brought into the Beauty case the same hour (`pnpm case sync`: 4,375 comments, 14,404 labels, the 23 set-aside replies). Both hold 4,625 posts (677 set aside) and 51,018 comments; totals reconcile on both.
 
 
 ## The one loader (DECISIONS, 10 Oct 2026)
