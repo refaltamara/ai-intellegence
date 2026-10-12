@@ -2017,6 +2017,18 @@
       "url": "https://threads.com/@zxcvgraph/post/DeMeQrDGtEi",
       "reason": "a reply, loaded as a comment under @__xdrv__ DeLJNrnGAHO",
       "parent": "https://threads.com/@__xdrv__/post/DeLJNrnGAHO"
+    },
+    {
+      "url": "https://threads.com/@fahmiifaizal/post/DZl5uoVk0g_",
+      "reason": "June 2026, a call for KOLs for upcoming campaigns: before the case"
+    },
+    {
+      "url": "https://threads.com/@vinicia789/post/DasY9DOEpYS",
+      "reason": "July 2026, a cosmetics shop looking for suppliers: before the case"
+    },
+    {
+      "url": "https://threads.com/@paragoncorp.my/post/DawySxWEnCC",
+      "reason": "July 2026, Paragon Malaysia on a football match: before the case"
     }
   ],
   "reply_handles": {
@@ -2116,6 +2128,12 @@
       "file": "kahf/comments_threads_1008d.csv",
       "naive_tz": "Asia/Jakarta",
       "note": "comments_batch5_structured.xlsx, 8 Oct: 29,385 comments on 120 posts, to 8 Oct 10:36 WIB (326 under the April @kahfcommunities post, dropped as before the case). Comment ids came as Threads' numeric ids and are written here as their short codes (the same base-64 code the posts carry), so they match comments already loaded. Jakarta time: no post's first comment comes before it, median 9 minutes after. 336 of these comments had been loaded as posts from the recent-posts exports: removed as posts, listed in drop_urls with their parent"
+    },
+    {
+      "kind": "contents",
+      "platform": "threads",
+      "file": "kahf/contents_threads_1012a.csv",
+      "note": "kahf_posts_20261012_clean_raw.csv, 12 Oct (the epoch export, search_keyword = kahf): 1,996 posts, no post id, code or link twice; the 20 already loaded (7 to 8 Oct) left out of this file, their numbers stay as loaded; 1,976 written, 15 Jun to 12 Oct 12:27 WIB (followers blank: the export carries none). The contract drops the 30 Meta AI answers (reply_handles), one reply already loaded as a comment and three posts from June and July, before the case (drop_urls)"
     }
   ]
 }

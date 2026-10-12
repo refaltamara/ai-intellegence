@@ -192,6 +192,13 @@ Templates for the dump: `Indonesian_Beauty_Q3_2026_{TikTok,Instagram}_template.x
   - a skincare rating tags every brand it rates.
   On Q2 Instagram, which Refal had cleaned, the rules would catch 0.2% and 0.7%.
 
+**Instagram, last file (loaded 12 Oct).** The full Q3 export, 1 July to 30 September (`instagram_posts_formatted.csv` in a zip; `beauty-id/instagram_q3_2026_full_v2.csv`, load `b8e42909`). Refal: "I think it's all good now".
+- 93,696 links: every link of the second file, and 15,782 new ones (6,841 in July, 5,187 in August, 3,754 in September). The same 693 TikTok links are left out. No new brand.
+- **Counts only grow, across files too.** This file reads 1,309 posts lower than the file loaded that morning (one at 2.28M views against the 6.94M we held), and 323 with no views at all. Both files arrived the same day, so the new reading would have replaced the higher one. `convert_instagram.py --after <the earlier file>` keeps, for a post both files carry, the highest views, likes, comments and followers of either and the earliest date. With it, no post reads lower than before; 3,907 read higher.
+  - The plain conversion is kept as a raw file (`instagram_q3_2026_full.csv`) and staged as load `8e4729fb`, which was not promoted.
+- Instagram Q3 now holds 93,696 links (86,993 posts): July 32,976, August 31,026, September 29,694. 3,846 links have no followers.
+- Not cleaned, as before.
+
 ## Kahf on Threads (profile workspace `kahf-threads`, Fair's scraper, 7 Oct 2026 ~10:00 WIB)
 
 One contents file, `data/raw/kahf/contents_threads.csv` (posts only; comments to follow). Contract: `etl/profiles/kahf-threads.json`; loader: `etl/load_profile.py`.
@@ -271,6 +278,13 @@ One contents file, `data/raw/kahf/contents_threads.csv` (posts only; comments to
   - Jakarta time: no post's first comment comes before it, and the median first comment lands 9 minutes after (read as UTC, every first comment would come 7 hours late).
   - **336 replies loaded as posts** by the recent-posts exports (`1007h` 107, `1008a` 88, `1008c` 84, `1007i` 55, the first posts file 2). They were removed as posts and listed in `drop_urls` with their parent, so they count once, as comments. None had comments of their own in the database. The 467 rows in this file under one of them moved to its parent post (9 of the replies sit under another reply; the loader follows the chain). 2,683 posts in all.
 - **All comments labelled by 12:30 WIB on 7 Oct**: 8,965 on posts about the case (off-topic left out). Labelling moved to every 5 minutes the same day.
+- **Posts, 12 Oct pull** (`kahf_posts_20261012_clean_raw.csv`; `kahf/contents_threads_1012a.csv`): the same epoch export (search_keyword "kahf"), 1,996 posts, 15 Jun to 12 Oct 12:27 WIB.
+  - No duplicates: every post id, code and link appears once, including with threads.net, threads.com and www treated as one.
+  - The 20 already loaded (7 to 8 Oct) were left out of the file, as with every pull before; their numbers stay as loaded.
+  - 1,976 written; the contract dropped 34: 30 Meta AI answers (`reply_handles`), one reply already loaded as a comment, and three posts from June and July that predate the case (a call for KOLs, a cosmetics shop, Paragon Malaysia on football; now in `drop_urls`). The 2 and 4 Oct posts stay, for the labeller to judge.
+  - 1,942 loaded (load `3556e049`), 4,625 posts in all. The file carries no follower counts.
+  - Labelled within about 20 minutes: 435 off the case and set aside. Of the 1,492 with a stance, 784 are against Kahf (53%), 223 neutral and 485 defend it. Malaysian voices 849 (674 against), Indonesian 519 (49 against), unclear 124.
+  - Brought into the Beauty case `kahf-threads-boycott` the same hour (`pnpm case sync`); both now hold 4,625 posts, 654 set aside, the same stances and 46,643 comments.
 
 
 ## The one loader (DECISIONS, 10 Oct 2026)

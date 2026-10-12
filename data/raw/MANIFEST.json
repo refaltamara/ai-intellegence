@@ -2,6 +2,22 @@
   "note": "Raw files as received, kept in private Vercel Blob (DECISIONS, 10 Oct 2026). Not in the repository: `pnpm raw pull <workspace>` fetches them into data/raw/. A raw file never changes; a corrected file is a new file.",
   "files": [
     {
+      "path": "beauty-id/instagram_q3_2026_full_v2.csv",
+      "workspace": "beauty-id",
+      "blob": "raw/beauty-id/instagram_q3_2026_full_v2.csv",
+      "bytes": 36781181,
+      "sha256": "cc0391efd1820c68f2071da0efb5dcbcd41769f03add1cba9fe3fe3ed37c6da7",
+      "received": "2026-10-12"
+    },
+    {
+      "path": "beauty-id/instagram_q3_2026_full.csv",
+      "workspace": "beauty-id",
+      "blob": "raw/beauty-id/instagram_q3_2026_full.csv",
+      "bytes": 36778800,
+      "sha256": "5e5c8b719979918dc4bc1e15e9d5e3a7931dfd8e95e8238e473c7a4ec7dcba94",
+      "received": "2026-10-12"
+    },
+    {
       "path": "beauty-id/instagram_q3_2026_oct12.csv",
       "workspace": "beauty-id",
       "blob": "raw/beauty-id/instagram_q3_2026_oct12.csv",
@@ -272,6 +288,14 @@
       "bytes": 206971,
       "sha256": "648405a048ac59643f60946e4cd85dd88a1a3b4a3c608d5e41f737df20eb0163",
       "received": "2026-10-08"
+    },
+    {
+      "path": "kahf/contents_threads_1012a.csv",
+      "workspace": "kahf-threads",
+      "blob": "raw/kahf-threads/contents_threads_1012a.csv",
+      "bytes": 578279,
+      "sha256": "0d5cd888be14a69a12721261a97499c0bc7601b848672428fdc10e174a3ba8f9",
+      "received": "2026-10-12"
     },
     {
       "path": "kahf/contents_threads.csv",

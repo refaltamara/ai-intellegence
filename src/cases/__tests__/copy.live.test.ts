@@ -5,7 +5,7 @@
 import { describe, expect, it } from "vitest";
 import { sql } from "../../db/client";
 import { toJson } from "../../db/json";
-import { bind, copyStatements } from "../copy";
+import { bind, copyStatements, syncStatements } from "../copy";
 
 const live = !!process.env.DATABASE_URL;
 const d = live ? describe : describe.skip;
@@ -22,6 +22,21 @@ d("copying a case workspace into its panel (live database, nothing written)", ()
       expect(plan.length).toBeGreaterThan(0);
     }
   }, 60_000);
+
+  it("plans every statement of the sync, each writing only the case's rows", async () => {
+    const args = { src: "kahf-threads", dst: "beauty-id", case: "a-case", brands: toJson({ kahf: "kahfeveryday" }) };
+    const statements = await syncStatements();
+    expect(statements.map((s) => s.key)).toEqual(["topics", "accounts", "accounts_updated", "posts", "links", "links_updated", "readings", "comments", "comments_updated", "labels", "labels", "case_posts"]);
+    for (const { key, text } of statements) {
+      // an update touches only what the case brought in, never the panel's rows
+      if (key.endsWith("_updated")) expect(text).toMatch(/brought_in_by = :case/);
+      expect(text).not.toMatch(/\bdelete\b/i);
+      const [bound, params] = bind(text, args);
+      expect(bound).not.toMatch(/:(src|dst|case|brands)\b/);
+      const plan = (await sql.query(`explain ${bound}`, params)) as { "QUERY PLAN": string }[];
+      expect(plan.length).toBeGreaterThan(0);
+    }
+  }, 120_000);
 
   it("moves a topic id under the case", async () => {
     const T = "case when $2::text like $1 || ':%' then $3 || ':' || substr($2::text, length($1) + 2) else $3 || ':' || $2::text end";
