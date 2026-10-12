@@ -137,9 +137,9 @@ Templates for the dump: `Indonesian_Beauty_Q3_2026_{TikTok,Instagram}_template.x
   - **4,909 copies taken out.** 3,165 short links (vt.tiktok.com) copied a video already in the file under its full link, and 1,861 copied another short link: same creator, day, caption start, views, likes and comments. Among the 38,339 videos with a full link, that match picks out two different videos only once. Q2 had no such copies.
   - The 134 posts dated 1 Sep wait for the September file.
   - **Own accounts and resellers as Q2 knew them:** 4,152 links from brands' own accounts (2,690 main, 1,462 sub) and 286 from resellers. An own account Q2 never saw counts as earned.
-- **Not in the file yet: shares, saves and the cart.**
+- **Not in the file yet: shares, saves and the cart.** The cart came on 12 Oct (below); shares and saves have not.
   - Until the product file comes, July and August TikTok engagement is likes + comments; Q2's also counted shares and saves.
-  - No July or August post has a cart, so their affiliate and cart numbers are empty.
+  - Until the cart came, no July or August post had one, so their affiliate and cart numbers were empty.
 - **Q2's cleaning rule, applied (Refal, 12 Oct).** The export had not been cleaned the way Q2 was. Captions naming their own brand: 62% (Q2 80%). Captions naming only another brand: 5.1% (Q2 1.4%).
   - `etl/quarterly/cleaning_rule.py` sets aside a link whose caption names another beauty brand and never its own. "Another beauty brand" is a tracked one, or one of the untracked brands it lists, such as Pantene, Biore or Garnier.
   - It also sets aside a marketplace's own ad (Shopee's, under several brands).
@@ -152,7 +152,33 @@ Templates for the dump: `Indonesian_Beauty_Q3_2026_{TikTok,Instagram}_template.x
   - A vague caption ("bentar lagi naik kelas", "#fyp") stays, because a brand's skit often says nothing in its caption.
   - 2,312 links by the rule, plus 24 that an earlier pass caught and that read as plainly not beauty (flower seeds, a bookshop, gossip): 2,336 links, 5.4% of the views left after the brand rule. They are labelled `rule:not_beauty`, or `review:claude` where they were read by hand; ten vague ones that pass had caught came back.
   - On Q2 TikTok the rule catches 1.4% (Q2 is left as it was).
-- **July–August TikTok now counts 37,949 links, 2.82B views.** 4,315 links are set aside.
+- **July–August TikTok counted 37,949 links, 2.82B views** after these two rules, with 4,315 links set aside. The rest of this section changes those figures.
+- **The cart (12 Oct).** The export again with `is_tiktok_shop` (`beauty-id/tiktok_q3_2026_jul_aug_shop.csv`) changed only the cart. 18,814 links have one, 46% of July–August, in line with Q2's 41–52%. So affiliate and cart numbers work for July–August.
+- **Posts from outside the Indonesian market, set aside (Refal, 12 Oct; TikTok Q3 and Q2).** `etl/quarterly/market_rule.py` sets aside a link only on a clear sign. That is one of:
+  - another script (Vietnamese, Thai, Arabic, Japanese…);
+  - another language (Spanish, Portuguese, Tagalog, Malaysian Malay);
+  - a country account or tag (@vaselinevietnam, @wardahbeauty_my, #VaselineProDermaPH, #ShopeeMY).
+  It does not set a link aside when:
+  - the caption uses words only Indonesians use (gak, banget, aja, sih, dong…);
+  - the post carries an Indonesian tag (#vaselineid);
+  - it comes from a brand's own Indonesian account.
+  English-only captions are never set aside on this, because Indonesian brands and creators post in English too.
+  - 556 July–August links (134M views, 4.8%) and 1,496 Q2 links (84M views, 2.6%).
+  - The biggest moves: Nivea −22% of its views (NIVEA Middle East, Spanish and Brazilian creators), Vaseline −15% (Vaseline Vietnam, Sri Lanka, Thailand, Philippines), Whitelab −34% (a Thai account), Wardah −2% (Wardah Malaysia).
+  - Ranking on July–August share of views: Wardah 12.5%, Vaseline 10.1%, Make Over 8.2%, Nivea 7.8%. Nivea moved from third to fourth.
+  - On Instagram the same signals reach 0.5% of views, so Instagram is left as it is.
+
+**TikTok, all of Q3 (loaded 12 Oct).** The September export (`beauty-id/tiktok_q3_2026_full.csv`, load `61724a30`) covers 1 July to 30 September. It holds every row of the July–August file unchanged, plus 6,430 more: 765 in July, 1,090 in August and 4,575 in September.
+- **September is incomplete.** Fair's scraper broke around 28 August: those last days of August hold a few hundred posts a day instead of about 1,000, and September about a fifth of a normal month. Refal is looking for a way to capture it.
+- The converter folded 7 short links already loaded into the full links that arrived for them. The old short links are set aside as copies (`rule:copy`).
+- The three rules ran over the new links: 435 for another brand, 146 not beauty, 108 outside Indonesia.
+- **TikTok, as it counts now:**
+
+  | Month | Links counting | Set aside | Views | With a cart |
+  |---|---|---|---|---|
+  | Jul 2026 | 18,942 | 2,457 | 1.64B | 46.7% |
+  | Aug 2026 | 19,846 | 2,675 | 1.17B | 47.4% |
+  | Sep 2026 | 4,043 | 435 | 0.50B | 33.8% |
 - The converted file is the raw file (`beauty-id/tiktok_q3_2026_jul_aug.csv` in the manifest), not yet in the store.
 
 **Instagram, second file (loaded 12 Oct).** The full Q3 export so far, with another batch to come. It goes through `etl/quarterly/convert_instagram.py`, then the one loader (`beauty-id/instagram_q3_2026_oct12.csv`, load `ea186f1a`).

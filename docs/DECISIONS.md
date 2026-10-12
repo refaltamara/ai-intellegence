@@ -1108,5 +1108,10 @@ The agreed design is the doc "Core data architecture and model" (https://claude.
   - Vague captions stay.
   - 2,336 links, 5.4% of the remaining views.
 - **Instagram is not cleaned this way.** Its posts reach the panel by tagging the brand, so they are attached to it. The second Q3 Instagram file (12 Oct) is loaded as it came.
-- **Until the product file comes**, July–August TikTok engagement counts likes and comments only, and carts are unknown.
+- **The cart is `is_tiktok_shop`**, read as Q2's `yc_flag` was. July–August TikTok engagement still counts likes and comments only, because the exports carry no shares or saves.
+- **Posts from outside the Indonesian market are set aside on TikTok, in Q3 and Q2** (Refal: "take out the non Indonesian, e.g. Vaseline VN").
+  - A link goes only on a clear sign (another script, another language, a country account or tag), and never when the caption is plainly Indonesian.
+  - English-only captions stay.
+  - 556 July–August links (4.8% of views) and 1,496 Q2 links (2.6%). Instagram is left as it is (0.5%).
+- **September TikTok is incomplete** (the scraper broke around 28 August). It is loaded as it came, through the same rules.
 - Details in `docs/DATA_NOTES.md`, "Indonesian Beauty Q3 2026".

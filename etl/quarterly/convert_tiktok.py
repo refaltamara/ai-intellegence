@@ -18,7 +18,8 @@ Rules (Refal, 12 Oct):
   then a (link, brand) seen twice is kept once. A copy filed under another brand stays as that brand's link to the video.
 - own accounts and resellers as Q2 knew them: a (brand, account) that was the brand's own in Q2 (owned_main/owned_sub)
   is own again, an account that was a reseller in Q2 is a reseller; every other account is an influencer (earned)
-- the file has no shares, saves or cart: left blank (unknown), so engagement = likes + comments
+- the file has no shares or saves: left blank (unknown), so engagement = likes + comments
+- the cart is is_tiktok_shop when the export carries it (sent 12 Oct), the way Q2's yc_flag was; without it the cart is unknown
 - content_id = the video id from a full link; tier is worked out by the loader; everything else as received
 """
 import sys, json
@@ -68,8 +69,17 @@ df["account_type"] = acct
 df["is_owned_account"] = [1 if a.startswith("owned") else 0 for a in acct]
 
 df["content_id"] = df.url.str.extract(r"/video/(\d+)")[0].fillna("")
-for c in ("shares", "saves", "yc_flag", "yc_status_raw", "tier"):
+for c in ("shares", "saves", "tier"):
     df[c] = ""
+# the cart: is_tiktok_shop when the export has it (12 Oct), true when any copy of the video says so; else unknown
+if "is_tiktok_shop" in df.columns:
+    shop = df.is_tiktok_shop.str.strip().str.lower().isin(["true", "1", "yes"])
+    shop = shop.groupby(df.url).transform("max")
+    df["yc_status_raw"] = "1"
+    df["yc_flag"] = shop.astype(int).astype(str)
+else:
+    df["yc_status_raw"] = ""
+    df["yc_flag"] = ""
 lc = pd.to_numeric(df.likes, errors="coerce").fillna(0) + pd.to_numeric(df.comments, errors="coerce").fillna(0)
 df["engagement_platform_native"] = lc.astype("int64")
 df["engagement_likes_comments_only"] = df.engagement_platform_native
