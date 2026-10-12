@@ -42,6 +42,22 @@
       "received": "2026-10-06"
     },
     {
+      "path": "beauty-id/tiktok_q3_2026_clean_categorized.csv",
+      "workspace": "beauty-id",
+      "blob": "raw/beauty-id/tiktok_q3_2026_clean_categorized.csv",
+      "bytes": 13216717,
+      "sha256": "88889c692ac08e5e1f27dff50a493a062d2a58c6dee2fae1dafadc83930cfc19",
+      "received": "2026-10-12"
+    },
+    {
+      "path": "beauty-id/tiktok_q3_2026_full_categorized.csv",
+      "workspace": "beauty-id",
+      "blob": "raw/beauty-id/tiktok_q3_2026_full_categorized.csv",
+      "bytes": 17441134,
+      "sha256": "de455eac65689c0d24082c07ef691d3bdfd8a02e520b1c4a5c4070a4944f49c9",
+      "received": "2026-10-12"
+    },
+    {
       "path": "beauty-id/tiktok_q3_2026_full.csv",
       "workspace": "beauty-id",
       "blob": "raw/beauty-id/tiktok_q3_2026_full.csv",

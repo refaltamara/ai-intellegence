@@ -180,6 +180,11 @@ Templates for the dump: `Indonesian_Beauty_Q3_2026_{TikTok,Instagram}_template.x
   | Aug 2026 | 19,846 | 2,675 | 1.17B | 47.4% |
   | Sep 2026 | 4,043 | 435 | 0.50B | 33.8% |
 - The converted file is the raw file (`beauty-id/tiktok_q3_2026_jul_aug.csv` in the manifest), not yet in the store.
+- **Product category and content format (12 Oct).** Refal categorised the clean TikTok Q3 file by hand (`beauty-id/tiktok_q3_2026_clean_categorized.csv`, 42,831 links: those that count) in Q2's own words: the same 20 product categories and the same 10 formats.
+  - `etl/quarterly/add_categories.py` puts them on the loaded file as `category_new` and `content_format` (`beauty-id/tiktok_q3_2026_full_categorized.csv`, load `fd371922`): only those two fields changed.
+  - Product category on 25,293 links (perfume 4,620, lip 3,668, sunscreen 2,388, cushion 1,963…); blank where the post names no product.
+  - Content format on every counting link: other 72%, product showcase 17%, review 7%. A post filed under two brands holds one format, so a few dozen links take the other brand's.
+  - Links set aside keep both blank. Instagram Q3 keeps the export's own content format and has no product category.
 
 **Instagram, second file (loaded 12 Oct).** The full Q3 export so far, with another batch to come. It goes through `etl/quarterly/convert_instagram.py`, then the one loader (`beauty-id/instagram_q3_2026_oct12.csv`, load `ea186f1a`).
 - 77,914 links: every link of the first file, and 4,587 new ones.

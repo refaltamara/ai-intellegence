@@ -1128,6 +1128,12 @@ The agreed design is the doc "Core data architecture and model" (https://claude.
 - **Counts only grow, across files.** When a later Instagram export reads a post lower than an earlier file of the same day, the post keeps the higher count (`convert_instagram.py --after`). Views, likes, comments and followers on Instagram never go down, so a lower number is an older capture. The last Q3 file read 1,309 posts lower; with the rule, none.
 - **Instagram Q3 is complete**: 93,696 links, 1 July to 30 September, not cleaned.
 - **Followers from the account's history.** An Instagram link the export gives no followers takes the same account's count from its post nearest in time, from the file or from what Beauty already holds (`convert_instagram.py --followers`). Never from another platform. Q3: 2,876 of 3,846 links filled; 970 have no count anywhere.
+- **TikTok Q3 product category and content format are Refal's**, categorised by hand in Q2's words and loaded onto the counting links (`etl/quarterly/add_categories.py`).
+- **Raw files from chat stay with Refal** (Refal: "if raw files into Blob is not really important, can we just remove this?").
+  - Files that reach the store directly (scraper deliveries, CMS uploads) are still kept there.
+  - Files sent in a chat session cannot reach the store from that session (no token, host blocked). Refal keeps two zips instead: the Fintech dump, the only copy of the CSAT and five-point labels, and the current Beauty and Kahf files (Instagram Q3 v3, TikTok Q3 with categories, Kahf 12 Oct). Each was checked against its hash in the manifest.
+  - The other ten listed files are earlier versions whose content is in later files and in the database.
+  - They stay "not stored" in `raw_files`. To store them later, unzip into `data/raw/` in a session with the store's token and run `pnpm raw sync`.
 - **The gap in September TikTok is never mentioned in the product**: not in CeMO's notes, on screens or in decks (Refal: "never mention September TikTok is incomplete").
   - The nightly health check would have said it, through own accounts that stop posting ("not captured after 28 Aug").
   - A check named in `settings.health_quiet` still runs and shows in the CMS but never becomes a note for CeMO. Beauty keeps `own_accounts` quiet.
