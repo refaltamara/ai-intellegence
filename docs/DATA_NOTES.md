@@ -125,11 +125,28 @@ Templates for the dump: `Indonesian_Beauty_Q3_2026_{TikTok,Instagram}_template.x
   - the 20 Q2 brands with no Q3 posts yet;
   - followers for 4,896 rows (3,596 creators);
   - the product category column (Q2 had it on only 26% of posts);
-  - TikTok, in batches.
+  - TikTok for September, and the product details for July and August (below).
 - Loading again upserts on (platform, url, brand), so a corrected file replaces the rows.
 - Caveats:
   - Dates have no time of day (daily and monthly views are fine).
   - Q3 has far fewer zero-like posts than Q2 (4% against 34%; median likes 25 against 5). That points to a change in collection, so Q2 against Q3 comparisons on likes need that said.
+
+**TikTok, July and August (loaded 12 Oct).** The export has the same 14 columns as Instagram's. It goes through `etl/quarterly/convert_tiktok.py`, then the one loader (`pnpm load run beauty-id beauty beauty-id/tiktok_q3_2026_jul_aug.csv`, load `7e0b5874`).
+- Received 47,307 rows, 53 brands, all known. Loaded 42,264 links to 40,885 videos: July 20,714 links, August 21,550.
+- Corrections the converter makes:
+  - **4,909 copies taken out.** 3,165 short links (vt.tiktok.com) copied a video already in the file under its full link, and 1,861 copied another short link: same creator, day, caption start, views, likes and comments. Among the 38,339 videos with a full link, that match picks out two different videos only once. Q2 had no such copies.
+  - The 134 posts dated 1 Sep wait for the September file.
+  - **Own accounts and resellers as Q2 knew them:** 4,152 links from brands' own accounts (2,690 main, 1,462 sub) and 286 from resellers. An own account Q2 never saw counts as earned.
+- **Not in the file yet: shares, saves and the cart.**
+  - Until the product file comes, July and August TikTok engagement is likes + comments; Q2's also counted shares and saves.
+  - No July or August post has a cart, so their affiliate and cart numbers are empty.
+- **Q2's cleaning rule, applied (Refal, 12 Oct).** The export had not been cleaned the way Q2 was. Captions naming their own brand: 62% (Q2 80%). Captions naming only another brand: 5.1% (Q2 1.4%).
+  - `etl/quarterly/cleaning_rule.py` sets aside a link whose caption names another beauty brand and never its own. "Another beauty brand" is a tracked one, or one of the untracked brands it lists, such as Pantene, Biore or Garnier.
+  - It also sets aside a marketplace's own ad (Shopee's, under several brands).
+  - 1,886 links, 17.4% of July–August TikTok views (3.61B → 2.98B). They stay stored: `relevant = false`, `checked_by = 'rule:collision'`, a label per link and an audit row. A reload keeps them aside.
+  - On Q2, which Refal had cleaned, the same rule catches 0.6%; Q2 is left as it was.
+  - It does not catch a post naming a brand outside beauty, such as a Fruta Gummy unboxing filed under Goute.
+- The converted file is the raw file (`beauty-id/tiktok_q3_2026_jul_aug.csv` in the manifest), not yet in the store.
 
 ## Kahf on Threads (profile workspace `kahf-threads`, Fair's scraper, 7 Oct 2026 ~10:00 WIB)
 

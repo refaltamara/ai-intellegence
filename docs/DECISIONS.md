@@ -1093,3 +1093,15 @@ The agreed design is the doc "Core data architecture and model" (https://claude.
   - Creating a case from the CMS, wired to the scraper team's API.
   - A case's own dashboard, decks and Chats.
   - Labelling a case's new comments with its own context.
+
+## Beauty Q3 TikTok, July and August (Refal, 12 Oct 2026)
+
+- **Loaded through the one loader**, after `etl/quarterly/convert_tiktok.py`:
+  - copies under short links are folded into their video;
+  - own accounts and resellers are as Q2 knew them;
+  - the posts of 1 Sep wait for the September file.
+- **Q2's cleaning rule applies to Q3.** A link whose caption names another beauty brand and never its own, or a marketplace's own ad, is set aside, not deleted (`relevant = false`, `rule:collision`).
+  - 1,886 of 42,264 links, 17.4% of July–August TikTok views.
+  - Q2 stays as it was. The September file goes the same way.
+- **Until the product file comes**, July–August TikTok engagement counts likes and comments only, and carts are unknown.
+- Details in `docs/DATA_NOTES.md`, "Indonesian Beauty Q3 2026".
