@@ -13,6 +13,7 @@ import { commercialOf, type CommercialSettings, type WorkspaceConfig } from "../
 import { getCase } from "../cases/store";
 import { sql } from "../db/client";
 import { commentIn, PANEL, panelCommentEdge, panelPostEdge, postIn, scopeKey, type Scope } from "../db/panel";
+import { PULSE_MAX_HOURS, PULSE_MIN_READ } from "../config/pulse";
 
 export const PLATFORMS = ["youtube", "threads", "instagram", "tiktok", "x"] as const;
 export type Platform = (typeof PLATFORMS)[number];
@@ -20,7 +21,13 @@ export type Platform = (typeof PLATFORMS)[number];
 export type PulseEvent = { at: string; platform: string; what: string; detail: string; url?: string; kind: "root" | "first" | "reply" | "takeoff" | "peak" | "top" };
 /** One hour of the arc: how much arrived, and which way it leaned. Counts are comments about the subject unless named otherwise. */
 export type TrendPoint = { h: string; comments: number; off_topic: number; on_topic: number; labelled: number; negative: number; neutral: number; positive: number; posts: number; against: number; for_: number; neutral_posts: number };
-export type Trend = { points: TrendPoint[]; peak: TrendPoint | null; peak_posts: TrendPoint | null };
+export type Trend = {
+  points: TrendPoint[]; peak: TrendPoint | null; peak_posts: TrendPoint | null;
+  /** the same counts by day, from the day the wave started to the newest data (`h` is the day) */
+  days: TrendPoint[];
+  /** the wave is longer than the hourly window, which then starts after the wave did */
+  cut: boolean;
+};
 /** A window of the trend, summed. Shares are of on-topic comments, so they answer "how do they feel", not "how much noise". */
 export type Span = { comments: number; posts: number; on_topic: number; labelled: number; negative: number; neutral: number; positive: number; negative_pct: number | null; neutral_pct: number | null; positive_pct: number | null; against: number; posts_against_pct: number | null };
 export type Status = { now6: Span; prev6: Span; day: Span; prev_day: Span; hours_since_peak: number | null; partial_hour: boolean };
@@ -202,7 +209,11 @@ async function build(ws: string, scope: Scope): Promise<PulseData | null> {
       [ws, tz],
     );
     const lastH = (shape.at(-1)?.h as string) ?? "";
-    const firstH = (shape[Math.max(shape.length - 120, ignition(shape.map((r) => r.n as number)))]?.h as string) ?? (shape[0]?.h as string) ?? "";
+    const ig = ignition(shape.map((r) => r.n as number));
+    const firstH = (shape[Math.max(shape.length - PULSE_MAX_HOURS, ig)]?.h as string) ?? (shape[0]?.h as string) ?? "";
+    // where the wave itself started: the hourly window slides off it once the wave runs past five days
+    const waveH = (shape[ig]?.h as string) ?? firstH;
+    const cut = shape.length - PULSE_MAX_HOURS > ig;
 
     // The root: the post of the subject's that the crowd arrived at first. Ranking her posts
     // by total comments picks whichever one the pile-on later spilled onto, which is a
@@ -214,7 +225,7 @@ async function build(ws: string, scope: Scope): Promise<PulseData | null> {
               (select count(*) from comments c where c.post_id = p.id and c.sentiment_source is distinct from 'subject'
                 and c.posted_at at time zone $2 >= $3::timestamp and c.posted_at at time zone $2 < $3::timestamp + interval '24 hours')::int as first_day
        from posts p where p.workspace_id = $1 and ${postIn(scope, "p")} and p.source = 'owned' order by first_day desc, comments desc limit 1`,
-      [ws, tz, firstH],
+      [ws, tz, waveH],
     );
     // A root needs comments to be one: with none loaded (or a deleted original that never
     // reached the export) any owned post would win the ranking, so there is no root.
@@ -222,13 +233,13 @@ async function build(ws: string, scope: Scope): Promise<PulseData | null> {
     // The daily charts start where the wave did, not where the root post was published:
     // a post can sit quiet for weeks before the crowd finds it, and those weeks are a
     // flat line that squashes the days that matter.
-    const sinceIso = firstH ? firstH.slice(0, 10) : root ? root.posted_at.slice(0, 10) : null;
-    const [trendPart, dailyPart, spread, commercial] = await Promise.all([trendOf(firstH, lastH), dailyOf(sinceIso), spreadOf(sinceIso), exposureOf(sinceIso)]);
+    const sinceIso = waveH ? waveH.slice(0, 10) : root ? root.posted_at.slice(0, 10) : null;
+    const [trendPart, dailyPart, spread, commercial] = await Promise.all([trendOf(firstH, lastH, sinceIso, cut), dailyOf(sinceIso), spreadOf(sinceIso), exposureOf(sinceIso)]);
     return { root, ...trendPart, ...dailyPart, spread, commercial };
   };
-  const trendOf = async (firstH: string, lastH: string) => {
+  const trendOf = async (firstH: string, lastH: string, waveDay: string | null, cut: boolean) => {
     const hourSeries = `with hrs as (select generate_series($3::timestamp, $4::timestamp, interval '1 hour') as h)`;
-    const [trendComments, trendPosts] = await Promise.all([
+    const [trendComments, trendPosts, dayRows] = await Promise.all([
       db.q<Row>(
         `${hourSeries}
          select to_char(hrs.h, 'YYYY-MM-DD HH24:00') as h, count(c.id)::int as comments,
@@ -254,7 +265,35 @@ async function build(ws: string, scope: Scope): Promise<PulseData | null> {
          group by 1 order by 1`,
         [ws, tz, firstH, lastH],
       ),
+      // by day since the wave started: each table grouped once, then joined to the days
+      waveDay && lastH ? db.q<Row>(
+        `with ds as (select generate_series($3::date, $4::date, interval '1 day')::date as d),
+         cc as (select (c.posted_at at time zone $2)::date as d, count(*)::int as comments,
+                       count(*) filter (where c.off_topic)::int as off_topic,
+                       count(*) filter (where not coalesce(c.off_topic, false))::int as on_topic,
+                       count(*) filter (where not coalesce(c.off_topic, false) and c.sentiment is not null)::int as labelled,
+                       count(*) filter (where not coalesce(c.off_topic, false) and c.sentiment = 'negative')::int as negative,
+                       count(*) filter (where not coalesce(c.off_topic, false) and c.sentiment = 'neutral')::int as neutral,
+                       count(*) filter (where not coalesce(c.off_topic, false) and c.sentiment = 'positive')::int as positive
+                  from comments c where c.workspace_id = $1 and c.sentiment_source is distinct from 'subject' and ${commentIn(scope, "c")}
+                   and c.posted_at >= ($3::date::timestamp at time zone $2) group by 1),
+         pc as (select (p.posted_at at time zone $2)::date as d, count(*)::int as posts,
+                       count(*) filter (where p.stance = 'negative')::int as against, count(*) filter (where p.stance = 'positive')::int as for_,
+                       count(*) filter (where p.stance = 'neutral')::int as neutral_posts
+                  from posts p where p.workspace_id = $1 and p.source = 'earned' and p.content_type is distinct from 'stub' and p.relevant is not false and ${postIn(scope, "p")}
+                   and p.posted_at >= ($3::date::timestamp at time zone $2) group by 1)
+         select to_char(ds.d, 'YYYY-MM-DD') as h, coalesce(cc.comments, 0)::int as comments, coalesce(cc.off_topic, 0)::int as off_topic, coalesce(cc.on_topic, 0)::int as on_topic,
+                coalesce(cc.labelled, 0)::int as labelled, coalesce(cc.negative, 0)::int as negative, coalesce(cc.neutral, 0)::int as neutral, coalesce(cc.positive, 0)::int as positive,
+                coalesce(pc.posts, 0)::int as posts, coalesce(pc.against, 0)::int as against, coalesce(pc.for_, 0)::int as for_, coalesce(pc.neutral_posts, 0)::int as neutral_posts
+           from ds left join cc on cc.d = ds.d left join pc on pc.d = ds.d order by 1`,
+        [ws, tz, waveDay, lastH.slice(0, 10)],
+      ) : Promise.resolve([] as Row[]),
     ]);
+    const days: TrendPoint[] = dayRows.map((r) => ({
+      h: r.h as string, comments: r.comments as number, off_topic: r.off_topic as number, on_topic: r.on_topic as number,
+      labelled: r.labelled as number, negative: r.negative as number, neutral: r.neutral as number, positive: r.positive as number,
+      posts: r.posts as number, against: r.against as number, for_: r.for_ as number, neutral_posts: r.neutral_posts as number,
+    }));
     const postsByHour = new Map(trendPosts.map((r) => [r.h as string, r]));
     const points: TrendPoint[] = trendComments.map((r) => {
       const p = postsByHour.get(r.h as string);
@@ -266,7 +305,7 @@ async function build(ws: string, scope: Scope): Promise<PulseData | null> {
     });
     const peak = points.reduce<TrendPoint | null>((a, p) => (a == null || p.comments > a.comments ? p : a), null);
     const peakPosts = points.reduce<TrendPoint | null>((a, p) => (a == null || p.posts > a.posts ? p : a), null);
-    const trend: Trend = { points, peak, peak_posts: peakPosts };
+    const trend: Trend = { points, peak, peak_posts: peakPosts, days, cut };
     const status: Status = {
       now6: span(points.slice(-6)), prev6: span(points.slice(-12, -6)),
       day: span(points.slice(-24)), prev_day: span(points.slice(-48, -24)),
@@ -415,7 +454,7 @@ async function build(ws: string, scope: Scope): Promise<PulseData | null> {
     return { hourly, posts_hourly, posts_hourly_stance };
   };
 
-  // negative share per hour on labelled comments; hours with fewer than 10 labelled stay blank
+  // negative share per hour on labelled comments; hours with fewer than PULSE_MIN_READ labelled stay blank
   const negativePart = async () => {
     const negHours = await db.q<Row>(
       `with bounds as (select date_trunc('hour', greatest(${panelCommentEdge("$1", "newest", "", scope)}, ${panelPostEdge("$1", "newest", "and p.source = 'earned'", scope)}) at time zone $2) as last),
@@ -425,7 +464,7 @@ async function build(ws: string, scope: Scope): Promise<PulseData | null> {
        group by 1 order by 1`,
       [ws, tz],
     );
-    const negative_trend = { x: negHours.map((r) => r.h as string), series: [{ name: "Negative share of labelled comments (%)", data: negHours.map((r) => ((r.labelled as number) >= 10 ? Math.round(((r.negative as number) / (r.labelled as number)) * 1000) / 10 : null)) }] };
+    const negative_trend = { x: negHours.map((r) => r.h as string), series: [{ name: "Negative share of labelled comments (%)", data: negHours.map((r) => ((r.labelled as number) >= PULSE_MIN_READ ? Math.round(((r.negative as number) / (r.labelled as number)) * 1000) / 10 : null)) }] };
     return negative_trend;
   };
 

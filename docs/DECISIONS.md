@@ -1138,3 +1138,19 @@ The agreed design is the doc "Core data architecture and model" (https://claude.
   - The nightly health check would have said it, through own accounts that stop posting ("not captured after 28 Aug").
   - A check named in `settings.health_quiet` still runs and shows in the CMS but never becomes a note for CeMO. Beauty keeps `own_accounts` quiet.
   - Beauty's 6 Oct own-account note ("not captured after 30 Jun") predated Q3 and no longer held; it was removed, with its text kept in the audit row.
+
+## Kahf's screens: each comment by its own label, the Pulse by day (Refal, 13 Oct 2026)
+
+Refal: "the Pulse says 31K, the dashboard 29K, we loaded 51K; and the hourly lines jump, somehow there is sentiment, there isn't."
+
+- **Each comment counts by its own label, where the labeller reads comments against the case** (`settings.label.about`, today Kahf). That applies to the dashboard, PR decks, the case slides and the ladder replay (`commentsUnder` in `src/reputation/dashboard.ts`).
+  - They count a comment about the case whatever its post, as the Pulse always has. Kahf's 7 days: 29,616 → 30,949, in line with the Pulse's 30,954.
+  - Elsewhere nothing moves, because those comments carry no topic label. GoPay's Fintech PR dashboard and Maudy give the same numbers before and after; Fintech has 43,597 comments under posts that do not name its brands, and they stay out.
+- **The rest is shown, not hidden.** The dashboard now says how many comments in the same threads are about something else (Kahf: 20,003 in the 7 days), as the Pulse does.
+- **The Pulse trend by day.**
+  - The hourly chart covers at most 120 hours (`PULSE_MAX_HOURS`). Once a wave runs longer, it slid past the wave's start and lost the peak.
+  - Both trend cards (comments, and posts by stance) can now be read per day, from the day the wave started. They open by day when the wave is longer than the hourly window or when most of its hours are too thin to read; per hour is one click away.
+  - A share line needs at least 20 comments read, or 20 posts with a stance, in the hour or day (`PULSE_MIN_READ` in `src/config/pulse.ts`; it was 10). The posts line is now a share of the posts with a stance.
+- **The wave's first day is the wave's.** The root post and the daily charts start where the wave did, not where the sliding hourly window starts. Kahf's root went back to @kahfeveryday DeKWiFpE_9K; the slide had moved it to Kahf Malaysia's apology. Maudy's is unchanged.
+- **Why comments look quiet after 8 Oct:** comments come from the threads scraped. There are 90 threads about Kahf from 9 Oct on with 50 or more replies (about 57,000), and 35 of their comments are loaded. Posts, found by search, show the talk continuing: 585 posts on 11 Oct (claims that Indonesians insulted Malaysia's king and Tun Mahathir, and boycott calls spreading to other Indonesian brands), 213 on 12 Oct to midday.
+- Speed: about 0.6 s more database time on Kahf's Pulse and 0.15 s on its dashboard (`pnpm perf`), inside the 10 s Refal allows for a slower page.

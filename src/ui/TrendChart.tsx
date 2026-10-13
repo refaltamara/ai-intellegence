@@ -1,6 +1,6 @@
 "use client";
 /**
- * The Pulse trend: how much arrived each hour, and which way it leaned. Volume is
+ * The Pulse trend: how much arrived each hour (or day), and which way it leaned. Volume is
  * stacked bars on the left axis; the share lines are percentages on the right, so a
  * falling line next to rising bars is readable at a glance — the question everyone
  * actually asks in a crisis. Built for the page width rather than the 640px card
@@ -19,7 +19,7 @@ function parse(h: string) {
   return m ? { day: `${Number(m[3])} ${MONTHS[Number(m[2]) - 1]}`, hour: m[4] } : { day: h, hour: "" };
 }
 
-export function TrendChart({ x, bars, lines, barLabel, lineLabel, peakNote, height = 300 }: {
+export function TrendChart({ x, bars, lines, barLabel, lineLabel, peakNote, height = 300, grain = "hour" }: {
   x: string[];
   bars: TrendBar[];
   lines: TrendLine[];
@@ -27,6 +27,8 @@ export function TrendChart({ x, bars, lines, barLabel, lineLabel, peakNote, heig
   lineLabel: string;
   peakNote?: string;
   height?: number;
+  /** one bar per hour (x is "YYYY-MM-DD HH:00") or per day (x is "YYYY-MM-DD") */
+  grain?: "hour" | "day";
 }) {
   const [at, setAt] = useState<number | null>(null);
   const W = 1240, H = height, padL = 54, padR = lines.length ? 46 : 16, padT = 20, padB = 46;
@@ -51,17 +53,17 @@ export function TrendChart({ x, bars, lines, barLabel, lineLabel, peakNote, heig
         const shift = f > 0.72 ? "translateX(-100%)" : f < 0.16 ? "translateX(0)" : "translateX(-50%)";
         return (
         <div className="tip" style={{ left: `${f * 100}%`, top: 8, transform: shift }}>
-          <b>{hovered.day} {hovered.hour}:00</b>
+          <b>{grain === "day" ? hovered.day : `${hovered.day} ${hovered.hour}:00`}</b>
           {bars.map((s) => <div key={s.name}><i style={{ background: s.color }} />{s.name}: {fmt(s.data[at])}</div>)}
           {lines.map((s) => <div key={s.name}><i style={{ background: s.color }} />{s.name}: {s.data[at] == null ? "–" : `${fmt(s.data[at])}%`}</div>)}
         </div>
         );
       })()}
       <svg viewBox={`0 0 ${W} ${H}`} role="img" style={{ width: "100%", height: "auto", display: "block" }}
-        aria-label={`${barLabel} per hour with ${lines.map((l) => l.name).join(" and ")}`}>
+        aria-label={`${barLabel} per ${grain} with ${lines.map((l) => l.name).join(" and ")}`}>
         <g stroke="var(--line)" strokeWidth="1">{ticks.map((t) => <line key={t} x1={padL} x2={W - padR} y1={yOf(t)} y2={yOf(t)} />)}</g>
         {/* midnight dividers and the day they open */}
-        {x.map((h, i) => parse(h).hour === "00" && (
+        {grain === "hour" && x.map((h, i) => parse(h).hour === "00" && (
           <g key={`d${i}`}>
             <line x1={cx(i) - band / 2} x2={cx(i) - band / 2} y1={padT} y2={H - padB} stroke="var(--line-2)" strokeWidth="1" strokeDasharray="3 3" />
             <text x={cx(i) - band / 2 + 6} y={padT + 2} fontSize="12" fontWeight="600" fill="var(--text-3)" stroke="var(--bg)" strokeWidth="3" paintOrder="stroke">{parse(h).day}</text>
@@ -71,11 +73,15 @@ export function TrendChart({ x, bars, lines, barLabel, lineLabel, peakNote, heig
           {ticks.map((t) => <text key={t} x={padL - 8} y={yOf(t) + 4} textAnchor="end">{fmt(t)}</text>)}
           {lines.length > 0 && [0, 25, 50, 75, 100].map((p) => <text key={p} x={W - padR + 8} y={yPct(p) + 4} fill="var(--text-3)">{p}%</text>)}
           {x.map((h, i) => {
-            const { hour } = parse(h);
+            const { day, hour } = parse(h);
+            if (grain === "day") {
+              const every = Math.max(1, Math.ceil(n / 16));
+              return i % every === 0 ? <text key={`x${i}`} x={cx(i)} y={H - 26} textAnchor="middle">{day}</text> : null;
+            }
             const every = n > 96 ? 12 : n > 48 ? 6 : 3;
             return Number(hour) % every === 0 ? <text key={`x${i}`} x={cx(i)} y={H - 26} textAnchor="middle">{hour}</text> : null;
           })}
-          <text x={padL} y={H - 8} fill="var(--text-3)" fontSize="11">{barLabel} per hour, by hour of the day (WIB){lines.length ? ` · right axis: ${lineLabel}` : ""}</text>
+          <text x={padL} y={H - 8} fill="var(--text-3)" fontSize="11">{barLabel} per {grain === "day" ? "day (WIB)" : "hour, by hour of the day (WIB)"}{lines.length ? ` · right axis: ${lineLabel}` : ""}</text>
         </g>
         {/* volume */}
         {x.map((_, i) => {

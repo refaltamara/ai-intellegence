@@ -10,7 +10,7 @@ const post = { url: "https://www.threads.com/@a/post/x", platform: "threads", ha
 function report(): ReputationReport {
   const days = Array.from({ length: 30 }, (_, i) => ({ d: `2026-08-${String(22 + i).padStart(2, "0")}`.replace(/-08-(3[2-9]|[4-9]\d)/, (_, x) => `-09-${String(Number(x) - 31).padStart(2, "0")}`), comments: 500, negative: 40, neg_pct: 8, level: "calm" as const, norm: true }));
   return {
-    as_of: "2026-09-25", settled: "2026-09-22", tz: "Asia/Jakarta", voice_posts: 0, hide: [], conversation: { now: { posts: { n: 0, negative: 0, neutral: 0, positive: 0, labelled: 0 }, comments: { n: 0, negative: 0, neutral: 0, positive: 0, labelled: 0 } }, prev: { posts: { n: 0, negative: 0, neutral: 0, positive: 0, labelled: 0 }, comments: { n: 0, negative: 0, neutral: 0, positive: 0, labelled: 0 } }, by_voice: [] },
+    as_of: "2026-09-25", settled: "2026-09-22", tz: "Asia/Jakarta", voice_posts: 0, per_comment: false, other_comments: { now: 0, prev: 0 }, hide: [], conversation: { now: { posts: { n: 0, negative: 0, neutral: 0, positive: 0, labelled: 0 }, comments: { n: 0, negative: 0, neutral: 0, positive: 0, labelled: 0 } }, prev: { posts: { n: 0, negative: 0, neutral: 0, positive: 0, labelled: 0 }, comments: { n: 0, negative: 0, neutral: 0, positive: 0, labelled: 0 } }, by_voice: [] },
     focus: { id: "gopay", name: "GoPay", is_client: true },
     brands: [{ id: "gopay", name: "GoPay" }, { id: "dana", name: "DANA" }],
     platforms: ["instagram", "threads"],
