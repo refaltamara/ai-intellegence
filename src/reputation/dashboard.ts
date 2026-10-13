@@ -82,6 +82,10 @@ export type PrDashboardData = {
   voice_posts: number;
   /** the window's posts with a stance and its comments, apart; and by voice where the labeller gives one */
   conversation: { now: PostsComments; prev: PostsComments; by_voice: ({ voice: string } & PostsComments)[] };
+  /** each comment counts by its own label, whatever its post (the labeller reads comments against the case; see commentsUnder) */
+  per_comment: boolean;
+  /** comments in the same threads the labeller found to be about something else: left out, shown beside the count */
+  other_comments: { now: number; prev: number };
   status: Status;
   kpis: { mentions: Kpi; reach: Kpi; comments: Kpi; neg_pct: Kpi; intent_pct: Kpi };
   issues: Issue[];
@@ -123,6 +127,16 @@ export const VOICES = `(select c.id, c.post_id, c.workspace_id, c.platform, c.po
    union all
    select p.id, p.id, p.workspace_id, p.platform, p.posted_at, p.stance, 'post', p.topic_id, p.likes, p.caption, null::text, null::text, null::boolean, true, p.voice, false
      from posts p where p.source = 'earned' and p.stance_source = 'model' and p.relevant is not false and p.brought_in_by = 'panel')`;
+
+/**
+ * Which comments count, by their post (Refal, 13 Oct 2026: the dashboard and the Pulse gave Kahf two numbers). Where the
+ * labeller reads every comment against the case (`settings.label.about`, a case workspace such as Kahf), a comment counts
+ * by its own label, whatever its post, as the Pulse counts it. Elsewhere (a listening panel, whose comments carry no topic
+ * label) only the comments under posts about the brand count, as before. Either way only the panel's own posts (never a
+ * post only a case brought in), so the case rule travels with it.
+ */
+export const commentsUnder = (perComment: boolean, p = "p") =>
+  perComment ? `${p}.brought_in_by = 'panel'` : `${p}.relevant is not false and ${p}.brought_in_by = 'panel'`;
 
 export function crisisOf(alert: NonNullable<RoleModel["alert"]>): { multiple: number; min_negative: number } {
   const m = alert.crisis_multiple != null && alert.crisis_multiple >= alert.negative_multiple * 1.25 ? alert.crisis_multiple : alert.negative_multiple * 1.5;
@@ -192,10 +206,10 @@ export function readPrFilters(sp: Record<string, string | string[] | undefined>,
   };
 }
 
-export type Basics = { tz: string; client: string | null; brands: { id: string; name: string }[]; platforms: string[]; asOf: string };
+export type Basics = { tz: string; client: string | null; brands: { id: string; name: string }[]; platforms: string[]; asOf: string; per_comment: boolean };
 
 export async function workspaceBasics(db: SkillDb, ws: string): Promise<Basics | null> {
-  const w = await db.one<{ tz: string; client: string | null }>("select tz, client_brand_id as client from workspaces where id = $1", [ws]);
+  const w = await db.one<{ tz: string; client: string | null; per_comment: boolean }>("select tz, client_brand_id as client, (settings->'label'->>'about') is not null as per_comment from workspaces where id = $1", [ws]);
   if (!w) return null;
   const brands = await db.q<{ id: string; name: string }>("select id, name from brands where workspace_id = $1 order by name", [ws]);
   if (!brands.length) return null;
@@ -204,7 +218,7 @@ export async function workspaceBasics(db: SkillDb, ws: string): Promise<Basics |
     `select to_char(greatest(${panelCommentEdge("$1", "newest")}, ${panelPostEdge("$1", "newest")}) at time zone $2, 'YYYY-MM-DD') as d`,
     [ws, w.tz],
   );
-  return { tz: w.tz, client: w.client, brands, platforms, asOf: asOfRow?.d ?? new Date().toISOString().slice(0, 10) };
+  return { tz: w.tz, client: w.client, brands, platforms, asOf: asOfRow?.d ?? new Date().toISOString().slice(0, 10), per_comment: !!w.per_comment };
 }
 
 /** The dashboard: the window chosen in the URL, ending on the last settled day. */
@@ -226,7 +240,8 @@ export async function reputationFacts(ws: string, win: { focus: string; from: st
   const alert = role.alert ?? PR.alert!;
   const b0 = basics ?? (await workspaceBasics(db, ws));
   if (!b0) return null;
-  const { tz, brands, platforms, asOf, client } = b0;
+  const { tz, brands, platforms, asOf, client, per_comment } = b0;
+  const under = commentsUnder(per_comment);
   const settled = await settledDay(db, ws, tz, asOf, alert);
   const from = win.from;
   const to = win.to;
@@ -243,7 +258,7 @@ export async function reputationFacts(ws: string, win: { focus: string; from: st
   const platC = plat ? "and c.platform = $3" : "and $3::text is null";
   const platP = plat ? "and p.platform = $3" : "and $3::text is null";
   const onBrandComments = `${VOICES} c join posts p on p.id = c.post_id
-     where c.workspace_id = $1 and p.relevant is not false and p.brought_in_by = 'panel' and c.sentiment_source is distinct from 'subject' and not c.off_topic and c.posted_at is not null ${platC}`;
+     where c.workspace_id = $1 and ${under} and c.sentiment_source is distinct from 'subject' and not c.off_topic and c.posted_at is not null ${platC}`;
   const base = [ws, tz, plat];
 
   // ---- status ladder: the focus brand's daily negative share against the 28 days before each day (all platforms)
@@ -289,7 +304,14 @@ export async function reputationFacts(ws: string, win: { focus: string; from: st
        from ${onBrandComments} and p.brand_id = $4 and ${inDays("c.posted_at", "$5", "$6")}`,
       [...base, focus.id, a, b],
     );
-  const [kn, kp] = await Promise.all([kpiRow(from, to), kpiRow(prevFrom, prevTo)]);
+  const otherRow = db.one<{ now: number; prev: number }>(
+    `select count(*) filter (where ${inDays("c.posted_at", "$5", "$6")})::int as now, count(*) filter (where ${inDays("c.posted_at", "$7", "$8")})::int as prev
+       from comments c join posts p on p.id = c.post_id
+      where c.workspace_id = $1 and ${under} and p.brand_id = $4 and c.sentiment_source is distinct from 'subject' and c.off_topic ${platC}
+        and ${inDays("c.posted_at", "$7", "$6")}`,
+    [...base, focus.id, from, to, prevFrom, prevTo],
+  );
+  const [kn, kp, other] = await Promise.all([kpiRow(from, to), kpiRow(prevFrom, prevTo), otherRow]);
   // the conversation, posts and comments apart, now and before, and by the labeller's voice
   const convRows = await db.q<{ win: string; is_post: boolean; voice: string | null; n: number; negative: number; neutral: number; positive: number; labelled: number }>(
     `select case when ${inDays("c.posted_at", "$5", "$6")} then 'now' else 'prev' end as win, c.is_post, c.voice,
@@ -329,7 +351,7 @@ export async function reputationFacts(ws: string, win: { focus: string; from: st
             count(*)::int as comments, count(*) filter (where c.sentiment = 'negative')::int as negative, count(*) filter (where c.sentiment = 'neutral')::int as neutral,
             count(*) filter (where c.sentiment = 'positive')::int as positive, count(c.sentiment)::int as labelled
      from ${VOICES} c join posts p on p.id = c.post_id left join topics t on t.id = c.topic_id
-     where c.workspace_id = $1 and p.relevant is not false and p.brought_in_by = 'panel' and c.sentiment_source is distinct from 'subject' and not c.off_topic and c.posted_at is not null ${platC}
+     where c.workspace_id = $1 and ${under} and c.sentiment_source is distinct from 'subject' and not c.off_topic and c.posted_at is not null ${platC}
        and ${inDays("c.posted_at", "$6", "$5")}
      group by 1, 2, 3, 4, 5, 6`,
     [...base, from, to, prevFrom],
@@ -586,7 +608,7 @@ export async function reputationFacts(ws: string, win: { focus: string; from: st
   return {
     as_of: asOf, settled, tz, focus: { id: focus.id, name: focus.name, is_client: focus.id === client }, brands: brands.map((b) => ({ id: b.id, name: b.name })), platforms,
     filters: { ...f, from, to, prev_from: prevFrom, prev_to: prevTo },
-    voice_posts: n(kn?.post_voices), conversation, status, kpis, issues, rising, narratives, amplifiers, own, own_worst: ownWorst,
+    voice_posts: n(kn?.post_voices), conversation, per_comment, other_comments: { now: n(other?.now), prev: n(other?.prev) }, status, kpis, issues, rising, narratives, amplifiers, own, own_worst: ownWorst,
     service: { measured: !!themed?.any, total: n(serviceCount?.n), quotes: serviceQuotes.map(toQuote) },
     competitive, coverage, off_topic_posts: coverage.reduce((a, c) => a + c.off_topic, 0), notes,
   };

@@ -11,6 +11,7 @@
  * - chronology: how it spread, as dated events
  */
 import { SkillDb } from "../skills/db";
+import { commentsUnder } from "./dashboard";
 import type { Commercial } from "../workspace/config";
 
 export type Bin = { t: string; posts: number; against: number; comments: number; negative: number; labelled: number };
@@ -38,7 +39,9 @@ export async function caseFacts(ws: string, o: { from: string; to: string; focus
   const base = [ws, o.tz, o.from, o.to, o.focus, plat];
   const inWin = (col: string) => `${col} >= ($3::date::timestamp at time zone $2) and ${col} < (($4::date + 1)::timestamp at time zone $2)`;
   const postsWhere = `p.workspace_id = $1 and p.brand_id = $5 and p.relevant is not false and p.brought_in_by = 'panel' and p.content_type is distinct from 'stub' and ($6::text is null or p.platform = $6)`;
-  const commentsWhere = `c.workspace_id = $1 and p.brand_id = $5 and p.relevant is not false and p.brought_in_by = 'panel' and c.sentiment_source is distinct from 'subject' and not coalesce(c.off_topic, false) and ($6::text is null or c.platform = $6)`;
+  // each comment by its own label where the labeller reads comments against the case (commentsUnder in ./dashboard)
+  const perComment = !!(await db.one<{ v: boolean }>("select (settings->'label'->>'about') is not null as v from workspaces where id = $1", [ws]))?.v;
+  const commentsWhere = `c.workspace_id = $1 and p.brand_id = $5 and ${commentsUnder(perComment)} and c.sentiment_source is distinct from 'subject' and not coalesce(c.off_topic, false) and ($6::text is null or c.platform = $6)`;
   const bucket = (col: string) => `to_char(date_trunc('${unit}', ${col} at time zone $2), '${unit === "hour" ? "YYYY-MM-DD HH24:00" : "YYYY-MM-DD"}')`;
 
   const endRow = await db.one<{ end: string | null }>(

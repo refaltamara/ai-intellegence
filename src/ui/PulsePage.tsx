@@ -2,7 +2,7 @@ import { Fragment } from "react";
 import Link from "next/link";
 import type { PulseData, PulseEvent, WatchPost } from "@/pulse/page";
 import { Chart } from "@/ui/Chart";
-import { TrendChart } from "@/ui/TrendChart";
+import { PulseTrends } from "@/ui/pulse/PulseTrends";
 import { fmtNum } from "@/ui/format";
 import { PLATFORM_LABEL } from "@/skills/common";
 import { pulseAskHref, type PulseCard } from "@/dashboard/askref";
@@ -51,47 +51,14 @@ export function PulsePage({ d, title = "Dashboard", ask = true }: { d: PulseData
 
         <Now d={d} ask={ask} />
 
-        <div className="card" style={{ marginBottom: 12 }}>
-          <h4>Comments per hour, and which way they lean <span>{trendSpan(d)} · WIB · bars are volume, the three lines are shares of the blue bar</span><AskWhy card="trend" on={ask} /></h4>
-          <div className="body">
-            <TrendChart
-              x={d.trend.points.map((p) => p.h)}
-              bars={[
-                { name: `About ${d.subject}`, data: d.trend.points.map((p) => p.labelled), color: "var(--blue)" },
-                { name: "Waiting to be read", data: d.trend.points.map((p) => Math.max(0, p.on_topic - p.labelled)), color: "var(--blue-20)" },
-                { name: "Other talk in the same threads", data: d.trend.points.map((p) => p.off_topic), color: "#D5DDE8" },
-              ]}
-              lines={[
-                { name: "Negative", data: d.trend.points.map((p) => share(p.negative, p.labelled)), color: "var(--red)" },
-                { name: "Neutral", data: d.trend.points.map((p) => share(p.neutral, p.labelled)), color: "#8593A8" },
-                { name: `Defending ${d.subject}`, data: d.trend.points.map((p) => share(p.positive, p.labelled)), color: "var(--green)" },
-              ]}
-              barLabel="Comments" lineLabel="share of the comments read that hour"
-              peakNote={d.trend.peak ? `${fmtNum(d.trend.peak.comments)} in one hour` : undefined}
-            />
-          </div>
-          <div className="caveats">The three lines are shares of the same blue bar and add up to 100%: every comment about {d.subject} is negative, neutral or defending {d.subject}. Neutral means it is about {d.subject} or the controversy but takes no side — anger at the government or the news, unless it blames {d.subject}. Pale blue is comments the labeller has not reached yet, which is why an hour can be tall and its lines short. Lines are blank under ten comments read, where a percentage would be noise, and the last hour is still filling.</div>
-        </div>
-
-        <div className="card" style={{ marginBottom: 12 }}>
-          <h4>Posts about {d.subject} per hour, by stance <span>what other accounts publish, not the replies under it</span><AskWhy card="stance" on={ask} /></h4>
-          <div className="body">
-            <TrendChart
-              x={d.trend.points.map((p) => p.h)}
-              bars={[
-                { name: `Against ${d.subject}`, data: d.trend.points.map((p) => p.against), color: "var(--red)" },
-                { name: "Neutral", data: d.trend.points.map((p) => p.neutral_posts), color: "#8593A8" },
-                { name: `Defending ${d.subject}`, data: d.trend.points.map((p) => p.for_), color: "var(--green)" },
-                { name: "No stance yet", data: d.trend.points.map((p) => Math.max(0, p.posts - p.against - p.neutral_posts - p.for_)), color: "#E6EBF2" },
-              ]}
-              lines={[{ name: `Share against ${d.subject}`, data: d.trend.points.map((p) => share(p.against, p.posts)), color: "var(--red)" }]}
-              barLabel="Posts" lineLabel="share of posts that hour" height={260}
-              peakNote={d.trend.peak_posts ? `${fmtNum(d.trend.peak_posts.posts)} posts in one hour` : undefined}
-            />
-            {d.posts_daily.series.length > 0 && <><p className="quiet" style={{ margin: "14px 0 4px", fontWeight: 600 }}>And per day, since the wave started</p><Chart spec={{ type: "stacked_bar", x: d.posts_daily.x.map((h) => h.slice(5)), series: d.posts_daily.series, y_label: "posts" }} /></>}
-          </div>
-          <div className="caveats">The density of the conversation itself: new posts about {d.subject} by other accounts{d.posts_daily.series.length ? ` on ${d.posts_daily.series.map((x) => x.name).join(", ")}` : ""}. A platform where only {d.subject}&apos;s own posts are captured shows nothing here.</div>
-        </div>
+        <PulseTrends
+          subject={d.subject}
+          trend={d.trend}
+          askTrend={<AskWhy card="trend" on={ask} />}
+          askStance={<AskWhy card="stance" on={ask} />}
+          postsDaily={d.posts_daily.series.length > 0 ? <><p className="quiet" style={{ margin: "14px 0 4px", fontWeight: 600 }}>And per day by platform, since the wave started</p><Chart spec={{ type: "stacked_bar", x: d.posts_daily.x.map((h) => h.slice(5)), series: d.posts_daily.series, y_label: "posts" }} /></> : undefined}
+          postsCaveat={<>The density of the conversation itself: new posts about {d.subject} by other accounts{d.posts_daily.series.length ? ` on ${d.posts_daily.series.map((x) => x.name).join(", ")}` : ""}. A platform where only {d.subject}&apos;s own posts are captured shows nothing here.</>}
+        />
 
         {(d.sides.voices.length > 0 || d.sides.topics.length > 0) && <Sides d={d} ask={ask} />}
 
@@ -261,15 +228,6 @@ export function PulsePage({ d, title = "Dashboard", ask = true }: { d: PulseData
 function AskWhy({ card, on }: { card: PulseCard; on: boolean }) {
   if (!on) return null;
   return <Link className="askh" href={pulseAskHref(card)} title="Ask CeMO about this card; its figures go with the question">Ask CeMO</Link>;
-}
-
-/** A share of a base, blank where the base is too small to mean anything. */
-const share = (n: number, base: number) => (base >= 10 ? Math.round((n / base) * 1000) / 10 : null);
-/** "13 Sep 06:00 → 16 Sep 08:00, 75 hours" */
-function trendSpan(d: PulseData): string {
-  const p = d.trend.points;
-  if (!p.length) return "no data yet";
-  return `${when(p[0].h)} → ${when(p[p.length - 1].h)} · ${p.length} hours`;
 }
 
 /**

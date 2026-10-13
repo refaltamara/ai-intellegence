@@ -136,12 +136,14 @@ export function PrDashboard({ d, client, view, hide = [] }: { d: PrDashboardData
   const noNorm = st.baseline.neg_pct == null && !!st.day && st.level === "calm";
   const cv = d.conversation;
   const P = cv.now.posts, Cm = cv.now.comments;
+  // comments in the same threads about something else: left out of every number, said once beside them
+  const other = d.other_comments.now;
   const shareK = (x: Split, k: "negative" | "positive"): number | null => sharePct(x[k], x.labelled);
   // around one subject: the posts and the comments each get their own tiles, so it is clear which is which
   const caseTiles: typeof tilesBase = [
     { key: "mentions", label: "Posts about " + who, value: int(k.mentions.now ?? 0), delta: <Delta k={k.mentions} kind="count" />, sub: `${int(P.labelled)} by other accounts carry a stance`, tone: "blue" },
     { key: "against", label: "Posts against", value: pct(shareK(P, "negative")), delta: <Delta k={{ now: shareK(P, "negative"), prev: shareK(cv.prev.posts, "negative") }} kind="pct" good="down" />, sub: `${int(P.negative)} posts; ${int(P.positive)} defending ${who}`, tone: "coral" },
-    { key: "comments", label: "Comments", value: int(Cm.n), delta: <Delta k={{ now: Cm.n, prev: cv.prev.comments.n }} kind="count" />, sub: Cm.n > Cm.labelled ? `${int(Cm.n - Cm.labelled)} not read yet` : "under those posts; off-topic left out", tone: "mint" },
+    { key: "comments", label: "Comments", value: int(Cm.n), delta: <Delta k={{ now: Cm.n, prev: cv.prev.comments.n }} kind="count" />, sub: [Cm.n > Cm.labelled ? `${int(Cm.n - Cm.labelled)} not read yet` : null, other ? `${int(other)} more in these threads are about something else` : d.per_comment ? null : "under those posts; off-topic left out"].filter(Boolean).join(" · ") || `about ${who}`, tone: "mint" },
     { key: "neg", label: "Comments negative", value: pct(shareK(Cm, "negative")), delta: <Delta k={{ now: shareK(Cm, "negative"), prev: shareK(cv.prev.comments, "negative") }} kind="pct" good="down" />, sub: `${int(Cm.negative)} comments; ${int(Cm.positive)} defending ${who}`, tone: "coral" },
   ];
   const tilesBase: { key: string; label: string; value: string; delta: React.ReactNode; sub: string; tone: string }[] = [
@@ -340,7 +342,8 @@ export function PrDashboard({ d, client, view, hide = [] }: { d: PrDashboardData
         {!showStatus && withPosts && (
           <div className="dcard prconv">
             <LeanBar label={`posts about ${who}`} x={P} neg="against" pos={`defending ${who}`} />
-            <LeanBar label="comments under them" x={Cm} neg="negative" pos={`defending ${who}`} />
+            <LeanBar label={d.per_comment ? `comments about ${who}` : "comments under them"} x={Cm} neg="negative" pos={`defending ${who}`} />
+            {other > 0 && <p className="quiet" style={{ margin: "6px 0 0", fontSize: 12 }}>{int(other)} more comments in these threads are about something else; they are left out of every number here.</p>}
           </div>
         )}
         {showStatus && <div className={`prstatus ${noNorm ? "nonorm" : L.tone}`}>
