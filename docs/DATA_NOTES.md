@@ -304,8 +304,8 @@ One contents file, `data/raw/kahf/contents_threads.csv` (posts only; comments to
   - No overlap between the two. Loaded (load `faf5b0f3`): 4,375 new comments; dropped 225 empty and 139 emoji or symbols only. 51,018 comments in all. 14 are Meta AI replies, loaded as comments as the contract says.
   - **24 replies had been loaded as posts** by the 12 Oct posts pull (the keyword search returns replies that name Kahf). They are kept as posts but set aside (`relevant = false`, `rule:reply`; one was already set aside as off the case), and listed in `drop_urls` with their parent, so each counts once, as a comment. None had comments of their own. Not removed, as on 8 Oct, because nothing is deleted without asking (Refal).
   - Labelled by 19:29 WIB on 12 Oct (about 15 minutes after the load). **3,115 of the 4,375 are off the case** (71%): most of these threads are about the Indonesia–Malaysia quarrel in general (the haze, the rupiah, football, "indon", a cleanser question), not Kahf. 1,903 sit under 8 posts the labeller had already set aside; @birskruth (a facial wash question) 501, @bellngasriofficial (haze) 458, @izztasy 237.
-  - On posts about the case, 998 comments are about it: Malaysian 420 (222 negative), Indonesian 381 (281 positive, defending), unclear 196.
-  - One set-aside post holds comments that are on the case: @syatirah_husna DeW-MFaGWMn (flags outside a supermarket), 142 of its 200 comments about the case, 111 negative. Comments under a set-aside post do not count.
+  - 1,260 are about the case: Malaysian 629 (386 negative), Indonesian 404 (283 positive, defending), unclear 226. A comment counts by its own label, whatever its post: 262 of them sit under set-aside posts, 142 under @syatirah_husna DeW-MFaGWMn (flags outside a supermarket).
+  - On the Pulse: comments about Kahf 29,694 → 30,954; "more in these threads are about something else" 16,946 → 20,061; 51,015 in all (Kahf's own replies aside).
   - Brought into the Beauty case the same hour (`pnpm case sync`: 4,375 comments, 14,404 labels, the 23 set-aside replies). Both hold 4,625 posts (677 set aside) and 51,018 comments; totals reconcile on both.
 
 
