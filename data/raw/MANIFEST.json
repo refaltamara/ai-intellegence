@@ -26,6 +26,14 @@
       "received": "2026-10-12"
     },
     {
+      "path": "beauty-id/instagram_q3_2026_lmd_oct14.csv",
+      "workspace": "beauty-id",
+      "blob": "raw/beauty-id/instagram_q3_2026_lmd_oct14.csv",
+      "bytes": 10787,
+      "sha256": "f362450b27a3a6c18bc330341457ece84c40d53885f364e869f5784641596528",
+      "received": "2026-10-14"
+    },
+    {
       "path": "beauty-id/instagram_q3_2026_oct12.csv",
       "workspace": "beauty-id",
       "blob": "raw/beauty-id/instagram_q3_2026_oct12.csv",
@@ -40,6 +48,22 @@
       "bytes": 28839412,
       "sha256": "4f9c9f6bb8a95a5a63d6044a84ae6d2d4c393d2189f72e1caaba6c7dba6283f3",
       "received": "2026-10-06"
+    },
+    {
+      "path": "beauty-id/lmd_export_2026-10-14_saa.csv",
+      "workspace": "beauty-id",
+      "blob": "raw/beauty-id/lmd_export_2026-10-14_saa.csv",
+      "bytes": 1958111,
+      "sha256": "54e01058c2aec8b2f93d517f8fd870886b74c1ebdb313bdb995a1a00564d4d73",
+      "received": "2026-10-14"
+    },
+    {
+      "path": "beauty-id/lmd_export_2026-10-14.csv",
+      "workspace": "beauty-id",
+      "blob": "raw/beauty-id/lmd_export_2026-10-14.csv",
+      "bytes": 1739570,
+      "sha256": "7b529a43cfd4adb08b560b8871136bf3cfd55e2f8ee761aefffb851e60ce3bd4",
+      "received": "2026-10-14"
     },
     {
       "path": "beauty-id/tiktok_q3_2026_clean_categorized.csv",
@@ -80,6 +104,14 @@
       "bytes": 14632578,
       "sha256": "5372b309c12b4e6946731272cd7f41c9b1286d47bab4c260a6e89a044e28415d",
       "received": "2026-10-12"
+    },
+    {
+      "path": "beauty-id/tiktok_q3_2026_lmd_oct14.csv",
+      "workspace": "beauty-id",
+      "blob": "raw/beauty-id/tiktok_q3_2026_lmd_oct14.csv",
+      "bytes": 502090,
+      "sha256": "77407df6ae5dcc0be89374a61a767f6ba59bd202969bf6e65925f0ed6d21c90c",
+      "received": "2026-10-14"
     },
     {
       "path": "instagram_q1_2026.csv.gz",

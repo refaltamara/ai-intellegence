@@ -212,6 +212,22 @@ Templates for the dump: `Indonesian_Beauty_Q3_2026_{TikTok,Instagram}_template.x
   - Instagram carousels and photos show no views by nature: 12,600 posts, 2,380 reported as 0 and 10,220 blank. Both read the same: rates and medians count views over 0 only.
 - Not cleaned, as before.
 
+**Nine brands from Fair's own database (loaded 14 Oct).** Refal's two exports of the same brands, June to September: `beauty-id/lmd_export_2026-10-14.csv` (4,919 rows, holding the 1,720 of the first file he sent) and `beauty-id/lmd_export_2026-10-14_saa.csv` (5,417 rows).
+- The brands: Esqa, Luxcrime, MOP, Mykonos, SAFF & Co., Somethinc Makeup, Timephoria, Velixir and HMNS. Alchemist is not a Beauty brand and is left out.
+- **Times are UTC**, not Jakarta: they match each TikTok video id and Instagram shortcode to the second.
+- `etl/quarterly/lmd_to_scraper.py` prepares the rows for the usual converters:
+  - writes the times as Jakarta time;
+  - merges the two exports, keeping the highest reading and the earliest time;
+  - keeps 1 July to 30 September and only links Beauty did not hold (Refal: "remove the duplicate links"; 3,872 rows were already held).
+  - `convert_tiktok.py` and `convert_instagram.py` then run as usual. The export's own category and format are the product category and content format, in Q2's words.
+- One video already held under another handle (@el_ithr) was left out.
+- **Load `d743991e`:** 1,376 TikTok links (204 July, 224 August, 948 September) and 27 Instagram links, all new posts.
+  - It was held on "times of day as before". The earlier Q3 exports give a date only, so their posts sit at midnight, while these carry the real time. It was let in from the CLI.
+  - The export says nothing about the cart, so it stays unknown on these links.
+- **Rules:** the brand rule and the not-beauty rule catch none. The market rule sets aside 42: country tags, another language, another script.
+- TikTok for the other brands is as it was: incomplete in early July and from late August. In client material Refal says only that the data is incomplete and we are working on it, never which days (14 Oct).
+- **Instagram Q3's own times are dates.** Those exports carried a date only, stored as midnight in Jakarta. The day is right (0.4% of posts differ from the day in their shortcode); the hour of day is not there to read.
+
 ## Kahf on Threads (profile workspace `kahf-threads`, Fair's scraper, 7 Oct 2026 ~10:00 WIB)
 
 One contents file, `data/raw/kahf/contents_threads.csv` (posts only; comments to follow). Contract: `etl/profiles/kahf-threads.json`; loader: `etl/load_profile.py`.
