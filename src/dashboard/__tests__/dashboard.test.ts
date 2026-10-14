@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { historyTurns } from "../../chat/loop";
 import { contextPreamble } from "../ask";
-import { askHref, decodeAsk, encodeAsk, pulseAskHref, validAsk, type AskContext, type AskRef } from "../askref";
+import { askHref, decodeAsk, encodeAsk, pulseAskHref, repAskHref, validAsk, type AskContext, type AskRef } from "../askref";
 import { caveatsFor, change, filterQuery, readContentQuery, readFilters, unescapeUnicode } from "../data";
 import { daysCovered, monthOf, parsePeriod, periodOptions, shiftPeriod, weekOf } from "../period";
 
@@ -114,5 +114,20 @@ describe("Ask CeMO from the Pulse", () => {
     expect(text).toContain("from the Pulse");
     expect(text).toContain("Last six hours: 112 comments about the case");
     expect(text).not.toContain("from the dashboard");
+  });
+});
+
+describe("Ask CeMO anything about the PR dashboard", () => {
+  it("carries the brand, window and platform only", () => {
+    const ref = decodeAsk(repAskHref("kahf-kol", 7, "threads").split("ask=")[1]);
+    expect(ref).toEqual({ k: "rep", brand: "kahf-kol", days: 7, platform: "threads", brands: [], period: "" });
+    // a platform the dashboard does not know reads as all; numbers sent along are dropped
+    expect(decodeAsk(repAskHref("kahf-kol", 14, "myspace").split("ask=")[1])).toMatchObject({ days: 14, platform: "all" });
+    expect(validAsk({ k: "rep", brand: "kahf-kol", days: 7, platform: "all", negative: 96 })).toEqual({ k: "rep", brand: "kahf-kol", days: 7, platform: "all", brands: [], period: "" });
+  });
+  it("refuses a window the dashboard does not offer, or no brand", () => {
+    expect(validAsk({ k: "rep", brand: "kahf-kol", days: 9, platform: "all" })).toBeNull();
+    expect(validAsk({ k: "rep", brand: "", days: 7, platform: "all" })).toBeNull();
+    expect(validAsk({ k: "rep", brand: "kahf-kol", days: 7, platform: "drop table" })).toBeNull();
   });
 });

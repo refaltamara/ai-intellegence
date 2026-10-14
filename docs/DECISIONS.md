@@ -1181,3 +1181,14 @@ Refal: "the Pulse says 31K, the dashboard 29K, we loaded 51K; and the hourly lin
   - **By platform**: one card per platform, side by side. Each card has the platform's most-commented post and how many posts are against the subject. It shows the comments about the subject by their own label (comments only, never posts standing in as voices), the comments about something else, and the minutes to the first comment. It also has the topics, the pace (hour by hour for the first two days, then by day) with the busiest hour, and the most-liked comments where likes are reported. The same post on three platforms draws three crowds, and they move at different speeds. Shown when there are two platforms or more.
   - **Accounts pulled in**: the @handles commenters tag, counted once per comment, whatever the comment's label. A rival brand asked to sign the creator shows here first. The subject's own handles and the posts' authors are marked. Shown when three comments or more tag someone.
 - **Kahf · KOL refusal (`kahf-kol`)** shows By platform first. It hides Own channels, Data health and Who is talking, as Refal asked, and Amplifiers, which only listed the one creator three times. This is a team change, company version 1, and "Back to Fair's" undoes it.
+
+## Ask CeMO anything on the PR dashboard, and its comments per hour (Refal, 14 Oct 2026)
+
+- **An ask box at the top of the PR dashboard**: "Ask CeMO anything about this", as on the Pulse.
+  - The link carries only what the dashboard shows: the brand, the window (7, 14 or 30 days) and the platform (`{ k: "rep" }` in `src/dashboard/askref.ts`), never its numbers.
+  - `src/reputation/ask.ts` reads the figures again with the page's own `prDashboard`. They become the card above the question: posts and comments about the subject (counts with their shares), what is left out, each platform, the comments per hour, the topics, the issues building, the accounts pulled in, amplifiers (unless reach is hidden) and the most-liked comments.
+  - The question is sent at once. The signal is `dashboard.ask`.
+- **Comments per hour** is a new PR section, after By platform. It is the Pulse's comments chart (`PulseTrends`, comments only, per hour or per day) over the whole wave, on the dashboard's platform when it is filtered to one.
+  - Its data is `pulseTrend` in `src/pulse/page.ts`: the Pulse's wave and trend queries, now shared, with an optional platform that is a literal from the Pulse's platform list.
+  - It is read only around one subject (a case workspace) and only for the dashboard, never for decks. Panels and workspaces without comments leave it out.
+- **Speed:** the By platform card's top post per platform now counts the comments once (`with cc as materialized`). Inlined, the planner guessed one post and counted again for every post: Kahf Threads' dashboard went from 23.5 s to 3.3 s.

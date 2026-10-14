@@ -4,7 +4,8 @@
  * then the issues building and whether they are about us or the whole category, what
  * is rising, the narratives, the amplifiers, our own channels and the customer-service
  * list, the competitive view, and data health. Every figure comes from
- * src/reputation/dashboard.ts; "Ask CeMO" opens Chats with a question, never numbers.
+ * src/reputation/dashboard.ts; "Ask CeMO" opens Chats with a question, never numbers, and the ask box at the top carries
+ * only the dashboard's brand, window and platform (src/reputation/ask.ts reads the figures again).
  */
 import Link from "next/link";
 import { change, compact, dayMonth, int, pct, pts } from "@/competitor/view";
@@ -14,6 +15,9 @@ import { LadderDrawer } from "./LadderDrawer";
 import { Sections } from "../dashboard/Sections";
 import { Customise } from "../dashboard/Customise";
 import type { DashLayout } from "@/dashboard/sections";
+import { repAskHref } from "@/dashboard/askref";
+import { PulseTrends } from "../pulse/PulseTrends";
+import { DashAsk } from "./DashAsk";
 
 const PF: Record<string, string> = { tiktok: "TT", instagram: "IG", threads: "TH", x: "X", youtube: "YT" };
 const PLATFORM: Record<string, string> = { tiktok: "TikTok", instagram: "Instagram", threads: "Threads", x: "X", youtube: "YouTube" };
@@ -200,7 +204,9 @@ export function PrDashboard({ d, client, view, hide = [] }: { d: PrDashboardData
   // a section with nothing it could measure here stays out: service needs comment themes, the competitive view a second brand
   const unmeasured = new Set([...(d.service.measured ? [] : ["service"]), ...(d.brands.length > 1 ? [] : ["competitive"]), ...(d.conversation.by_voice.length ? [] : ["voices"]),
     // around one subject only (a case workspace): the platforms side by side when there are two or more, the tags when a few comments carry one
-    ...((d.by_platform?.length ?? 0) > 1 ? [] : ["platforms"]), ...((d.tagged?.tagging ?? 0) >= 3 ? [] : ["tagged"])]);
+    ...((d.by_platform?.length ?? 0) > 1 ? [] : ["platforms"]), ...((d.tagged?.tagging ?? 0) >= 3 ? [] : ["tagged"]),
+    // the Pulse's comments per hour, around one subject only
+    ...(d.pace?.points.some((p) => p.comments > 0) ? [] : ["pace"])]);
   const maxIssue = Math.max(1, ...d.issues.flatMap((i) => i.daily.map((x) => x.negative)));
   const render: Record<string, (t: string) => React.ReactNode> = {
     issues: (t) => (
@@ -354,6 +360,13 @@ export function PrDashboard({ d, client, view, hide = [] }: { d: PrDashboardData
         </div>
       </div>
     ),
+    pace: (t) => d.pace ? (
+      <div className="dsection prpace">
+        <header><h2>{t}</h2><span>How fast the comments about {who} came{scopeWord}, and which way they lean, over the whole wave (the Pulse&apos;s chart).</span></header>
+        <PulseTrends subject={who} trend={d.pace} commentsOnly titled={false} postsCaveat={null}
+          askTrend={<Link className="askwhy" style={{ marginLeft: "auto" }} href={`${repAskHref(f.brand, f.days, f.platform)}&q=${encodeURIComponent(`What drove the peaks in comments about ${who}, and is it cooling down?`)}`}>Ask CeMO</Link>} />
+      </div>
+    ) : null,
     platforms: (t) => (
       <div className="dsection">
         <header><h2>{t}</h2><span>The same story on each platform, apart: its post, the crowd under it, what they talk about and how fast, in {range}.</span></header>
@@ -406,6 +419,7 @@ export function PrDashboard({ d, client, view, hide = [] }: { d: PrDashboardData
         </div>
       </div>
       <div className="wrap wide">
+        <DashAsk who={who} brand={f.brand} days={f.days} platform={f.platform} />
         {d.notes.length > 0 && <div className="dcaveats">{d.notes.map((c) => <p key={c}>{c}</p>)}</div>}
 
         {!showStatus && withPosts && (

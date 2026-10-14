@@ -32,9 +32,13 @@ export function defaultGrain(trend: Pick<Trend, "points" | "days" | "cut">): Gra
   return talk.length && readable / talk.length < 0.5 ? "day" : "hour";
 }
 
-export function PulseTrends({ subject, trend, askTrend, askStance, postsDaily, postsCaveat }: {
+export function PulseTrends({ subject, trend, askTrend, askStance, postsDaily, postsCaveat, commentsOnly = false, titled = true }: {
   subject: string;
   trend: Trend;
+  /** the comments card alone (the reputation dashboard's "Comments per hour") */
+  commentsOnly?: boolean;
+  /** false where the page already titles the card (the dashboard's section header): the card keeps its span, switch and ask */
+  titled?: boolean;
   askTrend?: ReactNode;
   askStance?: ReactNode;
   /** the posts-per-day-by-platform chart that follows the stance chart */
@@ -58,7 +62,7 @@ export function PulseTrends({ subject, trend, askTrend, askStance, postsDaily, p
   return (
     <>
       <div className="card" style={{ marginBottom: 12 }}>
-        <h4>Comments per {unit}, and which way they lean <span>{span} · WIB · bars are volume, the three lines are shares of the blue bar</span>{switcher}{askTrend}</h4>
+        <h4>{titled ? <>Comments per {unit}, and which way they lean </> : null}<span>{span} · WIB · bars are volume, the three lines are shares of the blue bar</span>{switcher}{askTrend}</h4>
         <div className="body">
           <TrendChart
             grain={grain}
@@ -80,7 +84,7 @@ export function PulseTrends({ subject, trend, askTrend, askStance, postsDaily, p
         <div className="caveats">The three lines are shares of the same blue bar and add up to 100%: every comment about {subject} is negative, neutral or defending {subject}. Neutral means it is about {subject} or the controversy but takes no side — anger at the government or the news, unless it blames {subject}. Pale blue is comments the labeller has not reached yet, which is why a bar can be tall and its lines short. Lines are blank under {PULSE_MIN_READ} comments read in the {unit}, where a percentage would be noise, and the last {unit} is still filling.{trend.cut && grain === "hour" ? " The hourly view covers the last five days; the wave started earlier, so switch to days to see all of it." : ""}</div>
       </div>
 
-      <div className="card" style={{ marginBottom: 12 }}>
+      {!commentsOnly && <div className="card" style={{ marginBottom: 12 }}>
         <h4>Posts about {subject} per {unit}, by stance <span>what other accounts publish, not the replies under it</span>{switcher}{askStance}</h4>
         <div className="body">
           <TrendChart
@@ -99,7 +103,7 @@ export function PulseTrends({ subject, trend, askTrend, askStance, postsDaily, p
           {postsDaily}
         </div>
         <div className="caveats">{postsCaveat} The line is blank under {PULSE_MIN_READ} posts with a stance in the {unit}.</div>
-      </div>
+      </div>}
     </>
   );
 }

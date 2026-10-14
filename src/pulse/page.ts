@@ -120,6 +120,134 @@ export async function pulsePage(ws: string, scope: Scope = PANEL): Promise<Pulse
   return data;
 }
 
+/**
+ * The Pulse's comments per hour alone, for the reputation dashboard of a case workspace (Refal, 14 Oct 2026: "add
+ * comment/hour in dashboard"): the same wave and the same counts as the Pulse's trend card, on one platform when the
+ * dashboard is filtered to one. Null where the workspace has no Pulse.
+ */
+export async function pulseTrend(ws: string, platform = "all", scope: Scope = PANEL): Promise<Trend | null> {
+  const plat = (PLATFORMS as readonly string[]).includes(platform) ? platform : null;
+  const key = `${scopeKey(ws, scope)}\u0001trend\u0001${plat ?? "all"}`;
+  const hit = trendCache.get(key);
+  if (hit && Date.now() - hit.at < TTL_MS) return hit.data;
+  const cfg = await scopeConfig(ws, scope);
+  if (!cfg) return null;
+  const db = new SkillDb();
+  const a = await arcOf(db, ws, cfg.tz, scope, plat);
+  if (!a.firstH || !a.lastH) return null;
+  const { trend } = await trendFor(db, ws, cfg.tz, scope, a.firstH, a.lastH, a.waveH ? a.waveH.slice(0, 10) : null, a.cut, plat);
+  trendCache.set(key, { at: Date.now(), data: trend });
+  return trend;
+}
+const trendCache = new Map<string, { at: number; data: Trend }>();
+
+/** one platform's rows only: a literal from PLATFORMS (never what a request sent), or nothing */
+const onPlatform = (alias: string, plat: string | null) => (plat && (PLATFORMS as readonly string[]).includes(plat) ? `and ${alias}.platform = '${plat}'` : "");
+
+/** where the wave sits: the busiest stretch of the last 13 days, walked back to where the noise floor was, at most
+ * PULSE_MAX_HOURS long (see the Pulse page above); on one platform when `plat` is given */
+async function arcOf(db: SkillDb, ws: string, tz: string, scope: Scope, plat: string | null): Promise<{ firstH: string; lastH: string; waveH: string; cut: boolean }> {
+  const shape = await db.q<Row>(
+    `with last as (select date_trunc('hour', greatest(${panelCommentEdge("$1", "newest", "", scope)},
+                                                      ${panelPostEdge("$1", "newest", "and p.source = 'earned'", scope)}) at time zone $2) as h),
+     hrs as (select generate_series((select h from last) - interval '13 days', (select h from last), interval '1 hour') as h),
+     -- counted once per hour and joined, not one scan of the workspace per hour
+     ch as (select date_trunc('hour', c.posted_at at time zone $2) as h, count(*)::int as n from comments c
+            where c.workspace_id = $1 and c.sentiment_source is distinct from 'subject' and c.posted_at at time zone $2 >= (select min(h) from hrs) and ${commentIn(scope, "c")} ${onPlatform("c", plat)} group by 1),
+     ph as (select date_trunc('hour', p.posted_at at time zone $2) as h, count(*)::int as n from posts p
+            where p.workspace_id = $1 and p.source = 'earned' and p.content_type is distinct from 'stub' and p.relevant is not false and ${postIn(scope, "p")} ${onPlatform("p", plat)} and p.posted_at at time zone $2 >= (select min(h) from hrs) group by 1)
+     select to_char(hrs.h, 'YYYY-MM-DD HH24:00:00') as h, (coalesce(ch.n, 0) + 5 * coalesce(ph.n, 0))::int as n
+     from hrs left join ch on ch.h = hrs.h left join ph on ph.h = hrs.h order by 1`,
+    [ws, tz],
+  );
+  const lastH = (shape.at(-1)?.h as string) ?? "";
+  const ig = ignition(shape.map((r) => r.n as number));
+  const firstH = (shape[Math.max(shape.length - PULSE_MAX_HOURS, ig)]?.h as string) ?? (shape[0]?.h as string) ?? "";
+  // where the wave itself started: the hourly window slides off it once the wave runs past five days
+  const waveH = (shape[ig]?.h as string) ?? firstH;
+  const cut = shape.length - PULSE_MAX_HOURS > ig;
+  return { firstH, lastH, waveH, cut };
+}
+
+/** the wave by hour (and by day since it started): comments about the case and beside it, how they lean, and the posts */
+async function trendFor(db: SkillDb, ws: string, tz: string, scope: Scope, firstH: string, lastH: string, waveDay: string | null, cut: boolean, plat: string | null): Promise<{ trend: Trend; status: Status }> {
+  const hourSeries = `with hrs as (select generate_series($3::timestamp, $4::timestamp, interval '1 hour') as h)`;
+  const [trendComments, trendPosts, dayRows] = await Promise.all([
+    db.q<Row>(
+      `${hourSeries}
+       select to_char(hrs.h, 'YYYY-MM-DD HH24:00') as h, count(c.id)::int as comments,
+              count(c.id) filter (where c.off_topic)::int as off_topic,
+              count(c.id) filter (where not coalesce(c.off_topic, false))::int as on_topic,
+              count(c.id) filter (where not coalesce(c.off_topic, false) and c.sentiment is not null)::int as labelled,
+              count(c.id) filter (where not coalesce(c.off_topic, false) and c.sentiment = 'negative')::int as negative,
+              count(c.id) filter (where not coalesce(c.off_topic, false) and c.sentiment = 'neutral')::int as neutral,
+              count(c.id) filter (where not coalesce(c.off_topic, false) and c.sentiment = 'positive')::int as positive
+       from hrs left join comments c on c.workspace_id = $1 and c.sentiment_source is distinct from 'subject' and ${commentIn(scope, "c")} ${onPlatform("c", plat)}
+            and date_trunc('hour', c.posted_at at time zone $2) = hrs.h
+       group by 1 order by 1`,
+      [ws, tz, firstH, lastH],
+    ),
+    db.q<Row>(
+      `${hourSeries}
+       select to_char(hrs.h, 'YYYY-MM-DD HH24:00') as h, count(p.id)::int as posts,
+              count(p.id) filter (where p.stance = 'negative')::int as against,
+              count(p.id) filter (where p.stance = 'positive')::int as for_,
+              count(p.id) filter (where p.stance = 'neutral')::int as neutral_posts
+       from hrs left join posts p on p.workspace_id = $1 and p.source = 'earned' and p.content_type is distinct from 'stub' and p.relevant is not false and ${postIn(scope, "p")} ${onPlatform("p", plat)}
+            and date_trunc('hour', p.posted_at at time zone $2) = hrs.h
+       group by 1 order by 1`,
+      [ws, tz, firstH, lastH],
+    ),
+    // by day since the wave started: each table grouped once, then joined to the days
+    waveDay && lastH ? db.q<Row>(
+      `with ds as (select generate_series($3::date, $4::date, interval '1 day')::date as d),
+       cc as (select (c.posted_at at time zone $2)::date as d, count(*)::int as comments,
+                     count(*) filter (where c.off_topic)::int as off_topic,
+                     count(*) filter (where not coalesce(c.off_topic, false))::int as on_topic,
+                     count(*) filter (where not coalesce(c.off_topic, false) and c.sentiment is not null)::int as labelled,
+                     count(*) filter (where not coalesce(c.off_topic, false) and c.sentiment = 'negative')::int as negative,
+                     count(*) filter (where not coalesce(c.off_topic, false) and c.sentiment = 'neutral')::int as neutral,
+                     count(*) filter (where not coalesce(c.off_topic, false) and c.sentiment = 'positive')::int as positive
+                from comments c where c.workspace_id = $1 and c.sentiment_source is distinct from 'subject' and ${commentIn(scope, "c")} ${onPlatform("c", plat)}
+                 and c.posted_at >= ($3::date::timestamp at time zone $2) group by 1),
+       pc as (select (p.posted_at at time zone $2)::date as d, count(*)::int as posts,
+                     count(*) filter (where p.stance = 'negative')::int as against, count(*) filter (where p.stance = 'positive')::int as for_,
+                     count(*) filter (where p.stance = 'neutral')::int as neutral_posts
+                from posts p where p.workspace_id = $1 and p.source = 'earned' and p.content_type is distinct from 'stub' and p.relevant is not false and ${postIn(scope, "p")} ${onPlatform("p", plat)}
+                 and p.posted_at >= ($3::date::timestamp at time zone $2) group by 1)
+       select to_char(ds.d, 'YYYY-MM-DD') as h, coalesce(cc.comments, 0)::int as comments, coalesce(cc.off_topic, 0)::int as off_topic, coalesce(cc.on_topic, 0)::int as on_topic,
+              coalesce(cc.labelled, 0)::int as labelled, coalesce(cc.negative, 0)::int as negative, coalesce(cc.neutral, 0)::int as neutral, coalesce(cc.positive, 0)::int as positive,
+              coalesce(pc.posts, 0)::int as posts, coalesce(pc.against, 0)::int as against, coalesce(pc.for_, 0)::int as for_, coalesce(pc.neutral_posts, 0)::int as neutral_posts
+         from ds left join cc on cc.d = ds.d left join pc on pc.d = ds.d order by 1`,
+      [ws, tz, waveDay, lastH.slice(0, 10)],
+    ) : Promise.resolve([] as Row[]),
+  ]);
+  const days: TrendPoint[] = dayRows.map((r) => ({
+    h: r.h as string, comments: r.comments as number, off_topic: r.off_topic as number, on_topic: r.on_topic as number,
+    labelled: r.labelled as number, negative: r.negative as number, neutral: r.neutral as number, positive: r.positive as number,
+    posts: r.posts as number, against: r.against as number, for_: r.for_ as number, neutral_posts: r.neutral_posts as number,
+  }));
+  const postsByHour = new Map(trendPosts.map((r) => [r.h as string, r]));
+  const points: TrendPoint[] = trendComments.map((r) => {
+    const p = postsByHour.get(r.h as string);
+    return {
+      h: r.h as string, comments: r.comments as number, off_topic: r.off_topic as number, on_topic: r.on_topic as number,
+      labelled: r.labelled as number, negative: r.negative as number, neutral: r.neutral as number, positive: r.positive as number,
+      posts: (p?.posts as number) ?? 0, against: (p?.against as number) ?? 0, for_: (p?.for_ as number) ?? 0, neutral_posts: (p?.neutral_posts as number) ?? 0,
+    };
+  });
+  const peak = points.reduce<TrendPoint | null>((a, p) => (a == null || p.comments > a.comments ? p : a), null);
+  const peakPosts = points.reduce<TrendPoint | null>((a, p) => (a == null || p.posts > a.posts ? p : a), null);
+  const trend: Trend = { points, peak, peak_posts: peakPosts, days, cut };
+  const status: Status = {
+    now6: span(points.slice(-6)), prev6: span(points.slice(-12, -6)),
+    day: span(points.slice(-24)), prev_day: span(points.slice(-48, -24)),
+    hours_since_peak: peak ? points.length - 1 - points.findIndex((p) => p.h === peak.h) : null,
+    partial_hour: true,
+  };
+  return { trend, status };
+}
+
 /** the configuration a scope's page reads: the workspace's, or for a case its own subject and case words */
 async function scopeConfig(ws: string, scope: Scope): Promise<(WorkspaceConfig & { subject_name: string | null }) | null> {
   const cfg = await getWorkspace(ws);
@@ -195,25 +323,7 @@ async function build(ws: string, scope: Scope): Promise<PulseData | null> {
   // most of the chart on the quiet weeks before it. So: find the busiest hour, walk back
   // to where the noise floor was, and start there. Capped at five days either way.
   const arcPart = async () => {
-    const shape = await db.q<Row>(
-      `with last as (select date_trunc('hour', greatest(${panelCommentEdge("$1", "newest", "", scope)},
-                                                        ${panelPostEdge("$1", "newest", "and p.source = 'earned'", scope)}) at time zone $2) as h),
-       hrs as (select generate_series((select h from last) - interval '13 days', (select h from last), interval '1 hour') as h),
-       -- counted once per hour and joined, not one scan of the workspace per hour
-       ch as (select date_trunc('hour', c.posted_at at time zone $2) as h, count(*)::int as n from comments c
-              where c.workspace_id = $1 and c.sentiment_source is distinct from 'subject' and c.posted_at at time zone $2 >= (select min(h) from hrs) and ${commentIn(scope, "c")} group by 1),
-       ph as (select date_trunc('hour', p.posted_at at time zone $2) as h, count(*)::int as n from posts p
-              where p.workspace_id = $1 and p.source = 'earned' and p.content_type is distinct from 'stub' and p.relevant is not false and ${postIn(scope, "p")} and p.posted_at at time zone $2 >= (select min(h) from hrs) group by 1)
-       select to_char(hrs.h, 'YYYY-MM-DD HH24:00:00') as h, (coalesce(ch.n, 0) + 5 * coalesce(ph.n, 0))::int as n
-       from hrs left join ch on ch.h = hrs.h left join ph on ph.h = hrs.h order by 1`,
-      [ws, tz],
-    );
-    const lastH = (shape.at(-1)?.h as string) ?? "";
-    const ig = ignition(shape.map((r) => r.n as number));
-    const firstH = (shape[Math.max(shape.length - PULSE_MAX_HOURS, ig)]?.h as string) ?? (shape[0]?.h as string) ?? "";
-    // where the wave itself started: the hourly window slides off it once the wave runs past five days
-    const waveH = (shape[ig]?.h as string) ?? firstH;
-    const cut = shape.length - PULSE_MAX_HOURS > ig;
+    const { firstH, lastH, waveH, cut } = await arcOf(db, ws, tz, scope, null);
 
     // The root: the post of the subject's that the crowd arrived at first. Ranking her posts
     // by total comments picks whichever one the pile-on later spilled onto, which is a
@@ -234,85 +344,8 @@ async function build(ws: string, scope: Scope): Promise<PulseData | null> {
     // a post can sit quiet for weeks before the crowd finds it, and those weeks are a
     // flat line that squashes the days that matter.
     const sinceIso = waveH ? waveH.slice(0, 10) : root ? root.posted_at.slice(0, 10) : null;
-    const [trendPart, dailyPart, spread, commercial] = await Promise.all([trendOf(firstH, lastH, sinceIso, cut), dailyOf(sinceIso), spreadOf(sinceIso), exposureOf(sinceIso)]);
+    const [trendPart, dailyPart, spread, commercial] = await Promise.all([trendFor(db, ws, tz, scope, firstH, lastH, sinceIso, cut, null), dailyOf(sinceIso), spreadOf(sinceIso), exposureOf(sinceIso)]);
     return { root, ...trendPart, ...dailyPart, spread, commercial };
-  };
-  const trendOf = async (firstH: string, lastH: string, waveDay: string | null, cut: boolean) => {
-    const hourSeries = `with hrs as (select generate_series($3::timestamp, $4::timestamp, interval '1 hour') as h)`;
-    const [trendComments, trendPosts, dayRows] = await Promise.all([
-      db.q<Row>(
-        `${hourSeries}
-         select to_char(hrs.h, 'YYYY-MM-DD HH24:00') as h, count(c.id)::int as comments,
-                count(c.id) filter (where c.off_topic)::int as off_topic,
-                count(c.id) filter (where not coalesce(c.off_topic, false))::int as on_topic,
-                count(c.id) filter (where not coalesce(c.off_topic, false) and c.sentiment is not null)::int as labelled,
-                count(c.id) filter (where not coalesce(c.off_topic, false) and c.sentiment = 'negative')::int as negative,
-                count(c.id) filter (where not coalesce(c.off_topic, false) and c.sentiment = 'neutral')::int as neutral,
-                count(c.id) filter (where not coalesce(c.off_topic, false) and c.sentiment = 'positive')::int as positive
-         from hrs left join comments c on c.workspace_id = $1 and c.sentiment_source is distinct from 'subject' and ${commentIn(scope, "c")}
-              and date_trunc('hour', c.posted_at at time zone $2) = hrs.h
-         group by 1 order by 1`,
-        [ws, tz, firstH, lastH],
-      ),
-      db.q<Row>(
-        `${hourSeries}
-         select to_char(hrs.h, 'YYYY-MM-DD HH24:00') as h, count(p.id)::int as posts,
-                count(p.id) filter (where p.stance = 'negative')::int as against,
-                count(p.id) filter (where p.stance = 'positive')::int as for_,
-                count(p.id) filter (where p.stance = 'neutral')::int as neutral_posts
-         from hrs left join posts p on p.workspace_id = $1 and p.source = 'earned' and p.content_type is distinct from 'stub' and p.relevant is not false and ${postIn(scope, "p")}
-              and date_trunc('hour', p.posted_at at time zone $2) = hrs.h
-         group by 1 order by 1`,
-        [ws, tz, firstH, lastH],
-      ),
-      // by day since the wave started: each table grouped once, then joined to the days
-      waveDay && lastH ? db.q<Row>(
-        `with ds as (select generate_series($3::date, $4::date, interval '1 day')::date as d),
-         cc as (select (c.posted_at at time zone $2)::date as d, count(*)::int as comments,
-                       count(*) filter (where c.off_topic)::int as off_topic,
-                       count(*) filter (where not coalesce(c.off_topic, false))::int as on_topic,
-                       count(*) filter (where not coalesce(c.off_topic, false) and c.sentiment is not null)::int as labelled,
-                       count(*) filter (where not coalesce(c.off_topic, false) and c.sentiment = 'negative')::int as negative,
-                       count(*) filter (where not coalesce(c.off_topic, false) and c.sentiment = 'neutral')::int as neutral,
-                       count(*) filter (where not coalesce(c.off_topic, false) and c.sentiment = 'positive')::int as positive
-                  from comments c where c.workspace_id = $1 and c.sentiment_source is distinct from 'subject' and ${commentIn(scope, "c")}
-                   and c.posted_at >= ($3::date::timestamp at time zone $2) group by 1),
-         pc as (select (p.posted_at at time zone $2)::date as d, count(*)::int as posts,
-                       count(*) filter (where p.stance = 'negative')::int as against, count(*) filter (where p.stance = 'positive')::int as for_,
-                       count(*) filter (where p.stance = 'neutral')::int as neutral_posts
-                  from posts p where p.workspace_id = $1 and p.source = 'earned' and p.content_type is distinct from 'stub' and p.relevant is not false and ${postIn(scope, "p")}
-                   and p.posted_at >= ($3::date::timestamp at time zone $2) group by 1)
-         select to_char(ds.d, 'YYYY-MM-DD') as h, coalesce(cc.comments, 0)::int as comments, coalesce(cc.off_topic, 0)::int as off_topic, coalesce(cc.on_topic, 0)::int as on_topic,
-                coalesce(cc.labelled, 0)::int as labelled, coalesce(cc.negative, 0)::int as negative, coalesce(cc.neutral, 0)::int as neutral, coalesce(cc.positive, 0)::int as positive,
-                coalesce(pc.posts, 0)::int as posts, coalesce(pc.against, 0)::int as against, coalesce(pc.for_, 0)::int as for_, coalesce(pc.neutral_posts, 0)::int as neutral_posts
-           from ds left join cc on cc.d = ds.d left join pc on pc.d = ds.d order by 1`,
-        [ws, tz, waveDay, lastH.slice(0, 10)],
-      ) : Promise.resolve([] as Row[]),
-    ]);
-    const days: TrendPoint[] = dayRows.map((r) => ({
-      h: r.h as string, comments: r.comments as number, off_topic: r.off_topic as number, on_topic: r.on_topic as number,
-      labelled: r.labelled as number, negative: r.negative as number, neutral: r.neutral as number, positive: r.positive as number,
-      posts: r.posts as number, against: r.against as number, for_: r.for_ as number, neutral_posts: r.neutral_posts as number,
-    }));
-    const postsByHour = new Map(trendPosts.map((r) => [r.h as string, r]));
-    const points: TrendPoint[] = trendComments.map((r) => {
-      const p = postsByHour.get(r.h as string);
-      return {
-        h: r.h as string, comments: r.comments as number, off_topic: r.off_topic as number, on_topic: r.on_topic as number,
-        labelled: r.labelled as number, negative: r.negative as number, neutral: r.neutral as number, positive: r.positive as number,
-        posts: (p?.posts as number) ?? 0, against: (p?.against as number) ?? 0, for_: (p?.for_ as number) ?? 0, neutral_posts: (p?.neutral_posts as number) ?? 0,
-      };
-    });
-    const peak = points.reduce<TrendPoint | null>((a, p) => (a == null || p.comments > a.comments ? p : a), null);
-    const peakPosts = points.reduce<TrendPoint | null>((a, p) => (a == null || p.posts > a.posts ? p : a), null);
-    const trend: Trend = { points, peak, peak_posts: peakPosts, days, cut };
-    const status: Status = {
-      now6: span(points.slice(-6)), prev6: span(points.slice(-12, -6)),
-      day: span(points.slice(-24)), prev_day: span(points.slice(-48, -24)),
-      hours_since_peak: peak ? points.length - 1 - points.findIndex((p) => p.h === peak.h) : null,
-      partial_hour: true,
-    };
-    return { trend, status };
   };
   const dailyOf = async (sinceIso: string | null) => {
     const days = await db.q<Row>(

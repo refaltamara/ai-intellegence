@@ -17,6 +17,7 @@ import { dayMonth } from "../competitor/view";
 import { SkillDb } from "../skills/db";
 import { PR, type RoleModel } from "../roles/model";
 import { COMMENT_IN_PANEL, panelCommentEdge, panelPlatformsSql, panelPostEdge } from "../db/panel";
+import { pulseTrend, type Trend } from "../pulse/page";
 
 export type Level = "calm" | "watch" | "issue" | "crisis" | "recovering";
 export const WINDOWS = [7, 14, 30] as const;
@@ -126,6 +127,8 @@ export type PrDashboardData = {
   by_platform?: PlatformSplit[];
   /** around one subject: the accounts commenters tag, and how many comments tag anyone */
   tagged?: { comments: number; tagging: number; rows: Tagged[] };
+  /** around one subject, on the dashboard only: the Pulse's comments per hour over the wave (src/pulse/page.ts, pulseTrend) */
+  pace?: Trend;
 };
 
 const n = (v: unknown) => (v == null ? 0 : Number(v));
@@ -254,7 +257,12 @@ export async function prDashboard(ws: string, sp: Record<string, string | string
   if (!basics) return null;
   const f = readPrFilters(sp, basics.brands.map((b) => b.id), basics.client);
   const settled = await settledDay(db, ws, basics.tz, basics.asOf, role.alert ?? PR.alert!);
-  return reputationFacts(ws, { focus: f.brand, from: addDays(settled, -(f.days - 1)), to: settled, platform: f.platform }, role, db, basics);
+  // around one subject the dashboard also draws the Pulse's comments per hour (decks do not, so it is read here, not in reputationFacts)
+  const [d, pace] = await Promise.all([
+    reputationFacts(ws, { focus: f.brand, from: addDays(settled, -(f.days - 1)), to: settled, platform: f.platform }, role, db, basics),
+    basics.per_comment ? pulseTrend(ws, f.platform).catch(() => null) : Promise.resolve(null),
+  ]);
+  return d && pace ? { ...d, pace } : d;
 }
 
 /**
@@ -671,7 +679,8 @@ async function platformSplit(
     db.q(`select p.platform, count(*)::int as n, count(*) filter (where p.stance = 'negative')::int as negative, count(*) filter (where p.stance = 'neutral')::int as neutral,
                  count(*) filter (where p.stance = 'positive')::int as positive, count(p.stance)::int as labelled, extract(epoch from min(p.posted_at))::float8 as first_ep
           from posts p where ${postWhere} and p.source = 'earned' group by 1`, args),
-    db.q(`with cc as (select c.post_id, count(*)::int as n, count(*) filter (where c.sentiment = 'negative')::int as neg from comments c join posts p on p.id = c.post_id where ${where} group by 1)
+    // counted once, then joined: inlined, the planner guessed one post and ran the count again for every post (34 s on kahf-threads)
+    db.q(`with cc as materialized (select c.post_id, count(*)::int as n, count(*) filter (where c.sentiment = 'negative')::int as neg from comments c join posts p on p.id = c.post_id where ${where} group by 1)
           select distinct on (p.platform) p.platform, p.url, p.creator_handle as handle, p.source, coalesce(p.caption, '') as caption, to_char(p.posted_at at time zone $2, 'YYYY-MM-DD HH24:MI') as posted_at,
                  p.views, p.likes, p.stance, coalesce(cc.n, 0) as comments, coalesce(cc.neg, 0) as negative
           from posts p left join cc on cc.post_id = p.id where ${postWhere}

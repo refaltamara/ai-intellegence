@@ -13,6 +13,7 @@ export const SECTIONS: Record<RoleId, SectionDef[]> = {
   pr: [
     { key: "issues", label: "Issues building", width: "full" },
     { key: "platforms", label: "By platform", width: "full" },
+    { key: "pace", label: "Comments per hour", width: "full" },
     { key: "rising", label: "Rising now", width: "half" },
     { key: "amplifiers", label: "Amplifiers", width: "half" },
     { key: "narratives", label: "Narratives", width: "full" },

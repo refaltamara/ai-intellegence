@@ -24,7 +24,9 @@ export type AskTarget =
   | { k: "creator"; creator: string }
   | { k: "post"; url: string }
   /** a card on a case's Pulse (src/pulse/ask.ts); the Pulse has no filters, so platform, brands and period are left empty */
-  | { k: "pulse"; card: PulseCard };
+  | { k: "pulse"; card: PulseCard }
+  /** the PR dashboard as a whole, its ask box (src/reputation/ask.ts): the brand it is about and its window; brands and period stay empty */
+  | { k: "rep"; brand: string; days: number };
 export type AskRef = AskTarget & { platform: PlatformFilter; brands: string[]; period: string };
 export type Fact = { label: string; value: string };
 /** What the chat shows above the question and what the model is told. */
@@ -62,6 +64,14 @@ export function askHref(ref: AskRef): string {
   return `/?ask=${encodeAsk(ref)}`;
 }
 
+/** the PR dashboard's windows (src/reputation/dashboard.ts WINDOWS), here so browser code can build links */
+export const REP_DAYS = [7, 14, 30] as const;
+
+/** The chat link for the PR dashboard's ask box: the brand, window and platform it shows, never its numbers. */
+export function repAskHref(brand: string, days: number, platform: string): string {
+  return askHref({ k: "rep", brand, days, platform: (PLATFORMS as string[]).includes(platform) ? (platform as PlatformFilter) : "all", brands: [], period: "" });
+}
+
 /** The chat link for a card on a case's Pulse. */
 export function pulseAskHref(card: PulseCard): string {
   return askHref({ k: "pulse", card, platform: "all", brands: [], period: "" });
@@ -74,6 +84,11 @@ export function validAsk(v: unknown): AskRef | null {
   if (!v || typeof v !== "object") return null;
   const o = v as Record<string, unknown>;
   if (o.k === "pulse") return (PULSE_CARDS as readonly string[]).includes(String(o.card)) ? { k: "pulse", card: o.card as PulseCard, platform: "all", brands: [], period: "" } : null;
+  if (o.k === "rep") {
+    const platform = (PLATFORMS as string[]).includes(String(o.platform)) ? (o.platform as PlatformFilter) : null;
+    const days = Number(o.days);
+    return platform && str(o.brand, 80) && (REP_DAYS as readonly number[]).includes(days) ? { k: "rep", brand: o.brand as string, days, platform, brands: [], period: "" } : null;
+  }
   const platform = (PLATFORMS as string[]).includes(String(o.platform)) ? (o.platform as PlatformFilter) : null;
   const period = str(o.period, 10);
   const brands = Array.isArray(o.brands) ? o.brands.filter((b): b is string => typeof b === "string" && b.length <= 80).slice(0, 20) : null;
