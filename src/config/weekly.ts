@@ -65,6 +65,15 @@ export const MONTHLY_RULES: Partial<WeeklyRules> = {
   boosted_min_views: 20_000_000,
 };
 
-export function weeklyRules(overrides?: Partial<WeeklyRules> | null, grain: "week" | "month" = "week"): WeeklyRules {
-  return { ...WEEKLY_RULES, ...(grain === "month" ? MONTHLY_RULES : {}), ...(overrides ?? {}) };
+/**
+ * A run of months (the last three, Refal 14 Oct 2026) judges each brand against its own two runs before, needs both
+ * with posts, and scales the month's size floors by the run's length.
+ */
+function runRules(months: number): Partial<WeeklyRules> {
+  const m = MONTHLY_RULES;
+  return { lookback_weeks: 2, min_history_weeks: 2, min_posts: m.min_posts! * months, min_views: m.min_views! * months, boosted_min_views: m.boosted_min_views! * months };
+}
+
+export function weeklyRules(overrides?: Partial<WeeklyRules> | null, grain: "week" | "month" = "week", months = 1): WeeklyRules {
+  return { ...WEEKLY_RULES, ...(grain === "month" ? MONTHLY_RULES : {}), ...(grain === "month" && months > 1 ? runRules(months) : {}), ...(overrides ?? {}) };
 }

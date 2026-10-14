@@ -10,7 +10,7 @@
 import { signal } from "../learning/signals";
 import { getRole } from "../roles/store";
 import { weeklyReport } from "../competitor/facts";
-import { RANGE_RE, dayPeriod, deckPeriod, isRange, latestComplete, type DeckGrain, type Grain } from "../competitor/period";
+import { RANGE_RE, MONTHS_RE, dayPeriod, deckPeriod, isMonthRun, isRange, lastMonths, latestComplete, type DeckGrain, type Grain } from "../competitor/period";
 import { shiftPeriod } from "../dashboard/period";
 import { FORMATS, storeWeekly } from "../competitor/scheduled";
 import { writeNarrative } from "../competitor/write";
@@ -55,8 +55,11 @@ export async function dataSpan(workspaceId: string): Promise<{ first: string; as
   return { first: ctx.earliest.slice(0, 10), asOf: ctx.asOf.slice(0, 10) };
 }
 
-/** The periods a version can be made for: those the data fully covers, newest first. */
-export async function deckPeriods(workspaceId: string, grain: DeckGrain, n = 12): Promise<{ key: string; label: string; from: string }[]> {
+/**
+ * The periods a version can be made for: those the data fully covers, newest first. A brand deck by month also
+ * takes the last three or six months as one period (`runs`), listed after the single months.
+ */
+export async function deckPeriods(workspaceId: string, grain: DeckGrain, n = 12, o: { runs?: boolean } = {}): Promise<{ key: string; label: string; from: string }[]> {
   const ctx = await loadContext(new SkillDb(), workspaceId);
   const out: { key: string; label: string; from: string }[] = [];
   if (grain === "day") {
@@ -69,10 +72,17 @@ export async function deckPeriods(workspaceId: string, grain: DeckGrain, n = 12)
     }
     return out;
   }
-  let p = latestComplete(grain, ctx.asOf);
+  const latest = latestComplete(grain, ctx.asOf);
+  let p = latest;
   while (out.length < n && p.to >= ctx.earliest.slice(0, 10)) {
     out.push({ key: p.key, label: p.label, from: p.from });
     p = shiftPeriod(p, -1);
+  }
+  if (o.runs && grain === "month") {
+    for (const k of [3, 6]) {
+      const run = lastMonths(latest, k);
+      if (run.to >= ctx.earliest.slice(0, 10)) out.push({ key: run.key, label: `${run.label} (last ${k} months)`, from: run.from });
+    }
   }
   return out;
 }
@@ -111,9 +121,11 @@ async function makeVersion(deck: DeckRow, opts: { period?: string; reason: "crea
     key = period.key;
     // chosen days are for PR decks (a case moves faster than a week); the other decks keep their weeks and months
     if (isRange(period) && !spec.rep) throw new Error("chosen dates work for PR decks; pick a week or a month for this deck");
+    // a run of months (the last three) is for brand decks; PR decks take chosen dates instead
+    if (isMonthRun(period) && (spec.rep || spec.social)) throw new Error("a run of months works for brand decks; pick one month, or chosen dates for a PR deck");
     if (period.from > ctx.asOf) throw new Error(`the data runs to ${ctx.asOf}; ${period.label} has not started in it yet`);
     if (period.to < ctx.earliest.slice(0, 10)) throw new Error(`the data starts on ${ctx.earliest.slice(0, 10)}; ${period.label} is before it`);
-    if (opts.reason === "schedule" && deck.last_period && !RANGE_RE.test(deck.last_period) && period.key <= deck.last_period) {
+    if (opts.reason === "schedule" && deck.last_period && !RANGE_RE.test(deck.last_period) && !MONTHS_RE.test(deck.last_period) && period.key <= deck.last_period) {
       await markDeckRun(deck.id, { next_run_at: retryRun(), error: null });
       return { status: "skipped", message: `no new ${grain} of data: ${period.label} is already in the deck (data through ${ctx.asOf})`, report_id: null, period: period.key };
     }
@@ -144,11 +156,12 @@ async function makeVersion(deck: DeckRow, opts: { period?: string; reason: "crea
     }
     if (grain === "day") throw new Error("a day-by-day deck is a PR deck; pick a week or a month for this one");
     const findings = spec.findings?.length && spec.slides.includes("findings") ? await runFindings(spec.findings, deck.workspace_id, { from: period.from, to: period.to }, { views: ROLE_VIEWS[roleOfSpec(spec)] }) : undefined;
-    const r = await weeklyReport(specContract(spec, deck.workspace_id), period.from, { findings });
+    const r = await weeklyReport(specContract(spec, deck.workspace_id), isMonthRun(period) ? period.key : period.from, { findings });
     const written = await writeNarrative(r);
     const stored = await storeWeekly({ workspaceId: deck.workspace_id, runId: null, report: r, narrative: written.narrative, by: written.by, problems: written.problems, formats: FORMATS, deck: { id: deck.id, name: deck.name } });
     await pruneVersions(deck.id, deck.workspace_id, r.week.iso, stored.reportId);
-    const last = deck.last_period && deck.last_period > period.key ? deck.last_period : period.key;
+    // a run of months never moves the schedule: a recurring deck keeps counting single months
+    const last = isMonthRun(period) ? deck.last_period : deck.last_period && deck.last_period > period.key ? deck.last_period : period.key;
     await markDeckRun(deck.id, { last_period: last, next_run_at: deck.recurring ? nextRun(grain) : null, error: null });
     return { status: "ok", message: `${period.label}: ${r.movers.length} mover${r.movers.length === 1 ? "" : "s"}, words by ${written.by === "model" ? "CeMO" : "the plain template"}`, report_id: stored.reportId, period: period.key, narrative_by: written.by };
   } catch (e) {

@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { weeklyRules } from "../../config/weekly";
 import { checkNarrative } from "../../competitor/narrative";
 import { recordDeck, slideTexts } from "../../competitor/pdfdeck";
-import { deckPeriod, latestComplete, periodWords, seriesLabel } from "../../competitor/period";
+import { deckPeriod, lastMonths, latestComplete, monthRun, monthRunBucketSql, monthsIn, periodWords, previousPeriod, seriesLabel } from "../../competitor/period";
 import { cleanSlides, deckSlides } from "../../competitor/slides";
 import type { WeeklyReport } from "../../competitor/types";
 import { deckSystem, factSheet, plainNarrative } from "../../competitor/write";
@@ -49,6 +49,29 @@ describe("deck periods", () => {
     expect(m.lookback_weeks).toBe(3);
     expect(m.min_posts).toBeGreaterThan(weeklyRules().min_posts);
     expect(weeklyRules({ lookback_weeks: 5 }, "month").lookback_weeks).toBe(5);
+  });
+  it("a run of months is one period, against the run before, named as a quarter", () => {
+    const q = deckPeriod("month", "2026-07..2026-09");
+    expect(q).toMatchObject({ key: "2026-07..2026-09", grain: "month", from: "2026-07-01", to: "2026-09-30", label: "Jul–Sep 2026" });
+    expect(monthsIn(q)).toBe(3);
+    expect(previousPeriod(q)).toMatchObject({ key: "2026-04..2026-06", from: "2026-04-01", to: "2026-06-30", label: "Apr–Jun 2026" });
+    expect(monthRun("2025-11", "2026-01").label).toBe("Nov 2025 – Jan 2026");
+    expect(monthRun("2026-07", "2026-07").key).toBe("2026-07");
+    expect(() => monthRun("2026-01", "2026-09")).toThrow(/at most 6/);
+    expect(lastMonths(deckPeriod("month", "2026-09"), 3).key).toBe("2026-07..2026-09");
+    expect(periodWords("month", 3)).toMatchObject({ this: "this quarter", last: "last quarter", over: "QoQ" });
+    expect(periodWords("month", 6).this).toBe("these 6 months");
+    expect(seriesLabel("month", "2026-07-01", 3)).toBe("Jul–Sep");
+    expect(seriesLabel("month", "2026-11-01", 3)).toBe("Nov–Jan");
+    const r = weeklyRules(null, "month", 3);
+    expect(r.lookback_weeks).toBe(2);
+    expect(r.min_posts).toBe(weeklyRules(null, "month").min_posts * 3);
+  });
+  it("buckets a post into the run of months it falls in, counted from the period", () => {
+    const sql = monthRunBucketSql("p.posted_at", "$4", "2026-07-01", 3);
+    expect(sql).toContain("make_date(2026, 7, 1)");
+    expect(sql).toContain(`- ${2026 * 12 + 7})::numeric / 3) * 3`);
+    expect(() => monthRunBucketSql("p.posted_at", "$4", "2026-07-01", 1.5)).toThrow();
   });
   it("a recurring deck looks again at 07:00 WIB on the next Monday or the 1st", () => {
     expect(nextRun("week", new Date("2026-10-01T10:00:00Z"))).toBe("2026-10-05T00:00:00.000Z");

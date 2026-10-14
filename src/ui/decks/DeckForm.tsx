@@ -286,6 +286,8 @@ export function DeckForm({ options, initial, prefill }: { options: DeckOptions; 
           ) : (
           <select value={period} onChange={(e) => setPeriod(e.target.value)}>
             <option value="">Latest {grain} the data covers{periods[0] ? ` (${periods[0].label})` : ""}</option>
+            {/* a brand deck by month can also cover the last three or six months as one period */}
+            {family == null && grain === "month" && options.runs.map((p) => <option key={p.key} value={p.key}>{p.label}</option>)}
             {periods.slice(1).map((p) => <option key={p.key} value={p.key}>{p.label}</option>)}
           </select>
           )}

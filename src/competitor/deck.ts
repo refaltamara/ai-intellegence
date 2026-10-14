@@ -188,7 +188,7 @@ function moversSlide(pres: PptxGenJS, r: WeeklyReport, n: Narrative, page: numbe
     add(s, `${wordsOf(r).last} ${flagValue(f.unit, f.metric, f.previous)} · ${wordsOf(r).span(r.rules.lookback_weeks)} range ${flagValue(f.unit, f.metric, f.low)}–${flagValue(f.unit, f.metric, f.high)}`, { x, y: y + 1.36, w: pw, h: 0.28, fontSize: 10, color: C.ink6 });
     const pick = (p: typeof c.history[number]) => (f.metric === "er" ? p.er : f.unit === "share" ? (f.metric === "posts" ? p.posts_share : p.views_share) : f.metric === "posts" ? p.posts : p.views) ?? 0;
     const series = [...c.history, c.now!];
-    s.addChart(pres.ChartType.bar, [{ name: metricLabel(f.metric, f.unit, m.platform), labels: series.map((p) => seriesLabel(r.grain, p.week)), values: series.map(pick) }], {
+    s.addChart(pres.ChartType.bar, [{ name: metricLabel(f.metric, f.unit, m.platform), labels: series.map((p) => seriesLabel(r.grain, p.week, r.months)), values: series.map(pick) }], {
       x: x - 0.05, y: y + 1.72, w: pw + 0.1, h: 3.05,
       barDir: "col", barGapWidthPct: 45,
       chartColors: [...c.history.map(() => C.bar), C.blue],
@@ -259,7 +259,7 @@ function driverSlide(pres: PptxGenJS, r: WeeklyReport, m: Mover, d: Narrative["d
   // right: the five lenses, then the posts behind them
   const rx = M + lw + 0.45;
   const rw = W - M - rx;
-  const lines = lensLines(m, { lookback: r.rules.lookback_weeks, grain: r.grain });
+  const lines = lensLines(m, { lookback: r.rules.lookback_weeks, grain: r.grain, months: r.months });
   const lh = 0.47;
   lines.forEach((l, i) => {
     const y = 1.72 + i * lh;

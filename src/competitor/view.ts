@@ -95,12 +95,12 @@ export const OFFER_LABEL: Record<string, string> = OFFER_NAME;
 export const HOOK_LABEL: Record<string, string> = HOOK_NAME;
 
 /** The report's period words, for the slides and the fact sheet. */
-export const wordsOf = (r: Pick<WeeklyReport, "grain">) => periodWords(r.grain);
+export const wordsOf = (r: Pick<WeeklyReport, "grain" | "months">) => periodWords(r.grain, r.months);
 
-export function lensLines(m: Mover, p: { lookback: number; grain?: Grain } = { lookback: 8 }): { label: string; segs: Seg[]; warn?: boolean }[] {
+export function lensLines(m: Mover, p: { lookback: number; grain?: Grain; months?: number } = { lookback: 8 }): { label: string; segs: Seg[]; warn?: boolean }[] {
   const lines: { label: string; segs: Seg[]; warn?: boolean }[] = [];
   const pl = PLATFORM_NAME[m.platform];
-  const w = periodWords(p.grain);
+  const w = periodWords(p.grain, p.months);
 
   // Who
   const movedTier = [...m.who.tier_mix].filter((t) => t.tier !== "unknown").sort((a, b) => Math.abs(b.share - b.share_prev) - Math.abs(a.share - a.share_prev))[0];

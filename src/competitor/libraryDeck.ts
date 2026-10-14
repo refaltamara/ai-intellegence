@@ -47,7 +47,7 @@ function trendPanel(s: Slide, r: WeeklyReport, g: GroupResult, c: Cell, x: numbe
     const last = i === series.length - 1;
     const color = last ? (flag ? C.blue : C.blue5) : C.bar;
     if (bh > 0) s.addShape("rect", { x: x + band * i + (band - bw) / 2, y: base - bh, w: bw, h: bh, fill: { color }, line: { color, width: 0 } });
-    if (series.length <= 10 || i % 2 === series.length % 2) add(s, seriesLabel(r.grain, p.week), { x: x + band * i - 0.1, y: base + 0.04, w: band + 0.2, h: 0.18, fontSize: 7.5, color: last ? C.ink : C.ink4, align: "center", bold: last });
+    if (series.length <= 10 || i % 2 === series.length % 2) add(s, seriesLabel(r.grain, p.week, r.months), { x: x + band * i - 0.1, y: base + 0.04, w: band + 0.2, h: 0.18, fontSize: 7.5, color: last ? C.ink : C.ink4, align: "center", bold: last });
   });
   s.addShape("line", { x, y: base, w, h: 0, line: { color: C.line, width: 0.75 } });
 }
