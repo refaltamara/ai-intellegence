@@ -309,6 +309,13 @@ One contents file, `data/raw/kahf/contents_threads.csv` (posts only; comments to
   - Brought into the Beauty case the same hour (`pnpm case sync`: 4,375 comments, 14,404 labels, the 23 set-aside replies). Both hold 4,625 posts (677 set aside) and 51,018 comments; totals reconcile on both.
 
 
+## Kahf: a KOL's refusal (profile workspace `kahf-kol`, 14 Oct 2026; Beauty case `kahf-kol-refusal`)
+
+- **What happened.** Fair, working for ParagonCorp, has been asking Malaysian creators for their rate cards for a Kahf campaign. On 14 Oct, 08:02 to 08:05 WIB, @hanifloid turned the job down and posted a screenshot of the approach on TikTok (a photo post), Instagram and Threads, captioned in Malay ("... saya tak mahu rakyat saya turut struggle ... suport locals"). The caption does not name Kahf; the screenshot does.
+- **Workspace.** A second Kahf case workspace, set up like `kahf-threads`: profile, PR, the Chorus dashboard, restricted to Refal and Raissa, live so the labeller runs. Brand ids are global, so its Kahf row is `kahf-kol` (named Kahf). Its own case context in `settings.label` (sentiment is toward Kahf: applause for turning the job down is negative toward Kahf), `post_off_topic` off (every post is the creator's own post about the approach), and five topics: praise for turning it down, support local and boycott, the approach and the campaign, the AFF meme and the apology, others.
+- **Posts** (`kahf-kol/contents_<platform>_1014.csv`, typed from Refal's message): the three links and the caption. Times come from the post ids (Instagram and Threads codes, the TikTok id): TikTok 01:02:59, Instagram 01:05:27, Threads 01:05:40 UTC. The Instagram post is taken as @hanifloid's: it went up 13 seconds before his Threads post. Threads carries the same caption (the cross-post). No views or likes: only comments were scraped.
+- **Comments, 14 Oct** (ISO times with Z): `dataset_instagram-comment-scraper_2026-10-14_04-55-37-227.csv` (Apify; `kahf-kol/comments_instagram_1014.csv`, columns renamed only), 117 comments, 08:07 to 11:48 WIB; `scrapper-results-20261014-1159.csv` (Fair's scraper; `kahf-kol/comments_threads_1014.csv`), 98 replies, 08:09 to 11:55 WIB, Threads' numeric ids written as their short codes. Loaded (load `7aecacd0`): 175 comments; 40 left out as emoji only or empty. TikTok's comments are to follow.
+
 ## The one loader (DECISIONS, 10 Oct 2026)
 
 Every source goes through the same steps:
