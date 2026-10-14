@@ -336,6 +336,15 @@ One contents file, `data/raw/kahf/contents_threads.csv` (posts only; comments to
 - **TikTok comments, 14 Oct** (`dataset_tiktok-comments-scraper_2026-10-14_06-11-36-625.csv`, Apify; `kahf-kol/comments_tiktok_1014.csv`, columns renamed only): 239 comments, 08:08 to 13:10 WIB, with likes. The scraper gives the photo post as `/video/<id>`; written against the `/photo/` link loaded earlier, so they sit under the one post. Loaded (load `35400c0c`): 212; 27 emoji only or empty. Labelled within two minutes and synced into the Beauty case.
   - TikTok: 193 about Kahf (19 about something else), 187 negative, 1 defending; first comment 5 minutes after the post, busiest 10:00 WIB (47), still about 40 an hour at noon. Most liked: "villain dlm Kudrat tapi hero dalam kehidupan sebenar" (527 likes) and a call to every local Malaysian brand to seize the opportunity (267).
   - The whole case: 387 comments, 353 about Kahf, 342 negative (97%), 1 defending. Bad Lab is tagged in 21 comments (@badlabco 11, @badlabmy 10) and Ubermen in 6; the most-liked comment of all is on Threads (2,932 likes): "Hi @ubermen.my. I'll make you the same offer as I made Bad Lab. Collaborate with this man".
+- **Afternoon batch, 14 Oct** (to 15:22 WIB): `IG_comment_kahf.csv` (144), `thread_replies_kahf.csv` (146) and `tiktok_comment_kahf.csv` (323).
+  - Each file holds every morning comment again. Written as `kahf-kol/comments_<platform>_1014b.csv`; Threads' numeric ids as short codes, 98 of 98 agreeing with the morning file.
+  - Load `c7b400e1`: 132 new comments, newer likes on 66. Labelled within four minutes and synced into the Beauty case.
+  - **The case now:** 519 comments, 479 about Kahf, 460 negative (96%), 1 defending.
+    - By platform: TikTok 286 (257 negative), Threads 137 (118), Instagram 96 (85).
+    - Topics: praise for turning it down 370, support local and boycott 75, the approach 16, the meme 4, others 14.
+    - Voices: Malaysian 355, unclear 163, Indonesian 1.
+  - **The pace:** busiest 09:00 WIB (100), still 41 to 49 an hour at 13:00 and 14:00.
+  - **Tags and likes:** Bad Lab is tagged in 26 comments and Ubermen in 8. The Threads comment to @ubermen.my now has 8,236 likes.
 
 ## The one loader (DECISIONS, 10 Oct 2026)
 
