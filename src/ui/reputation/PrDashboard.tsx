@@ -8,7 +8,7 @@
  */
 import Link from "next/link";
 import { change, compact, dayMonth, int, pct, pts } from "@/competitor/view";
-import type { Issue, Kpi, Level, PostRef, PostsComments, PrDashboardData, Quote, Split } from "@/reputation/dashboard";
+import type { Issue, Kpi, Level, PlatformSplit, PostRef, PostsComments, PrDashboardData, Quote, Split } from "@/reputation/dashboard";
 import { PrFilters } from "./PrFilters";
 import { LadderDrawer } from "./LadderDrawer";
 import { Sections } from "../dashboard/Sections";
@@ -111,6 +111,45 @@ function LeanBar({ label, x, neg, pos }: { label: string; x: Split; neg: string;
   );
 }
 
+/** One platform of a case: its post, the crowd under it by label, the topics, and the pace hour by hour. */
+function PlatformCard({ x, who }: { x: PlatformSplit; who: string }) {
+  const c = x.comments;
+  const p = x.top_post;
+  const max = Math.max(1, ...x.series.map((s) => s.n));
+  const onTopic = x.topics.reduce((a, t) => a + t.n, 0);
+  const time = (s: string) => s.slice(11, 16);
+  return (
+    <article className="dcard prplatcard">
+      <header>{pf(x.platform)}<h3>{PLATFORM[x.platform] ?? x.platform}</h3><small>{int(x.posts.n)} post{x.posts.n === 1 ? "" : "s"}{x.posts.labelled ? ` · ${int(x.posts.negative)} against ${who}` : ""}</small></header>
+      {p && <a className="prplatpost" href={p.url} target="_blank" rel="noreferrer"><b>@{p.handle ?? "brand account"}</b> · {dayMonth(p.posted_at.slice(0, 10))} {time(p.posted_at)} WIB<span>“{p.caption.length > 140 ? p.caption.slice(0, 138) + "…" : p.caption}”</span></a>}
+      {c.n === 0 ? <p className="quiet">No comments loaded for {PLATFORM[x.platform] ?? x.platform} yet.</p> : (
+        <>
+          <div className="prplatnums">
+            <div><b>{int(c.n)}</b><small>comments about {who}{x.other ? ` · ${int(x.other)} about something else` : ""}</small></div>
+            <div><b className="down">{pct(sharePct(c.negative, c.labelled))}</b><small>negative · {pct(sharePct(c.positive, c.labelled))} defending</small></div>
+            <div><b>{x.first_after_min != null ? `${int(x.first_after_min)} min` : "–"}</b><small>to the first comment</small></div>
+          </div>
+          <span className="prplatlean" title={`${int(c.negative)} negative · ${int(c.neutral)} neutral · ${int(c.positive)} defending`}>
+            <i style={{ width: `${(c.negative / Math.max(1, c.n)) * 100}%`, background: "var(--red)" }} />
+            <i style={{ width: `${(c.neutral / Math.max(1, c.n)) * 100}%`, background: "#94A3B8" }} />
+            <i style={{ width: `${(c.positive / Math.max(1, c.n)) * 100}%`, background: "var(--green)" }} />
+          </span>
+          <h4>What they talk about</h4>
+          <ul className="prplattopics">{x.topics.map((t) => (
+            <li key={t.topic}><span>{t.catch_all ? `${t.topic} (no topic fits)` : t.topic}</span><span className="tbar"><i style={{ width: `${(t.n / Math.max(1, onTopic)) * 100}%` }} /></span><b>{pct(sharePct(t.n, onTopic), 0)}</b><small>{int(t.n)}</small></li>
+          ))}</ul>
+          <h4>Pace, {x.bucket === "hour" ? "comments an hour, WIB" : "comments a day"}</h4>
+          <div className="prbars pace" aria-label="Comments over time">
+            {x.series.map((s) => <i key={s.at} title={`${x.bucket === "hour" ? `${dayMonth(s.at.slice(0, 10))} ${time(s.at)}` : dayMonth(s.at)}: ${int(s.n)} comments`} style={{ height: `${Math.max(2, (s.n / max) * 100)}%` }} />)}
+          </div>
+          <small className="muted">{x.series.length ? `${x.bucket === "hour" ? time(x.series[0].at) : dayMonth(x.series[0].at)} to ${x.bucket === "hour" ? time(x.series.at(-1)!.at) : dayMonth(x.series.at(-1)!.at)}` : ""}{x.peak ? ` · busiest ${x.bucket === "hour" ? `hour ${time(x.peak.at)}` : dayMonth(x.peak.at.slice(0, 10))}, ${int(x.peak.n)} comments` : ""}</small>
+          {x.liked.length > 0 && <><h4>Most liked</h4>{x.liked.map((q, n) => <QuoteLine key={n} q={q} />)}</>}
+        </>
+      )}
+    </article>
+  );
+}
+
 function Bars({ data, max }: { data: { d: string; negative: number }[]; max: number }) {
   return (
     <div className="prbars" aria-label="Negative comments per day">
@@ -159,7 +198,9 @@ export function PrDashboard({ d, client, view, hide = [] }: { d: PrDashboardData
   const showStatus = !hide.includes("status");
   const ampViews = d.amplifiers.some((a) => a.views > 0);
   // a section with nothing it could measure here stays out: service needs comment themes, the competitive view a second brand
-  const unmeasured = new Set([...(d.service.measured ? [] : ["service"]), ...(d.brands.length > 1 ? [] : ["competitive"]), ...(d.conversation.by_voice.length ? [] : ["voices"])]);
+  const unmeasured = new Set([...(d.service.measured ? [] : ["service"]), ...(d.brands.length > 1 ? [] : ["competitive"]), ...(d.conversation.by_voice.length ? [] : ["voices"]),
+    // around one subject only (a case workspace): the platforms side by side when there are two or more, the tags when a few comments carry one
+    ...((d.by_platform?.length ?? 0) > 1 ? [] : ["platforms"]), ...((d.tagged?.tagging ?? 0) >= 3 ? [] : ["tagged"])]);
   const maxIssue = Math.max(1, ...d.issues.flatMap((i) => i.daily.map((x) => x.negative)));
   const render: Record<string, (t: string) => React.ReactNode> = {
     issues: (t) => (
@@ -313,6 +354,34 @@ export function PrDashboard({ d, client, view, hide = [] }: { d: PrDashboardData
         </div>
       </div>
     ),
+    platforms: (t) => (
+      <div className="dsection">
+        <header><h2>{t}</h2><span>The same story on each platform, apart: its post, the crowd under it, what they talk about and how fast, in {range}.</span></header>
+        <div className="prplat">{(d.by_platform ?? []).map((x) => <PlatformCard key={x.platform} x={x} who={who} />)}</div>
+      </div>
+    ),
+    tagged: (t) => {
+      const tg = d.tagged!;
+      const max = Math.max(1, ...tg.rows.map((r) => r.comments));
+      return (
+        <div className="dsection">
+          <header><h2>{t}</h2><span>The accounts commenters tag: {int(tg.tagging)} of {int(tg.comments)} comments ({pct(sharePct(tg.tagging, tg.comments))}) pull someone in. A rival brand asked to step in shows here first.</span></header>
+          <div className="dcard tablewrap still">
+            <table className="prtag"><thead><tr><th>Account tagged</th><th className="num">Comments</th><th>Where</th><th className="num">Negative</th><th>In their words</th></tr></thead>
+              <tbody>{tg.rows.map((r) => (
+                <tr key={r.handle}>
+                  <td><b>@{r.handle}</b>{r.subject ? <span className="tag me">you</span> : r.poster ? <span className="tag">the poster</span> : null}<span className="tbar"><i style={{ width: `${(r.comments / max) * 100}%` }} /></span></td>
+                  <td className="num">{int(r.comments)}</td>
+                  <td>{r.platforms.map((p) => <span key={p}>{pf(p)}</span>)}</td>
+                  <td className="num down">{r.negative ? int(r.negative) : "–"}</td>
+                  <td className="q"><a href={r.url} target="_blank" rel="noreferrer">“{r.example.length > 120 ? r.example.slice(0, 118) + "…" : r.example}”</a></td>
+                </tr>))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      );
+    },
     health: (t) => (
       <div className="dsection">
         <header><h2>{t}</h2><span>What is tracked, since when, and what is left out. Posts that do not name their brand stay stored but never count.</span></header>
