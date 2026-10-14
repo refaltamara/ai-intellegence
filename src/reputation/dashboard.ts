@@ -68,6 +68,28 @@ export type Amplifier = { handle: string; platform: string; tier: string | null;
 export type OwnRow = { platform: string; posts: number; views: number; comments: number; neg_pct: number | null; replies: number; others_neg_pct: number | null };
 export type BrandRow = { id: string; name: string; is_focus: boolean; is_client: boolean; posts: number; posts_prev: number; sov: number | null; views: number; comments: number; neg_pct: number | null; neg_pct_prev: number | null; intent_pct: number | null; top_issue: { topic: string; negative: number; negative_prev: number } | null };
 export type Coverage = { platform: string; first: string; last: string; posts: number; off_topic: number; comments: number; reported_comments: number };
+/**
+ * One platform of a case, on its own (Refal, 14 Oct 2026: the same post on three platforms draws three different
+ * crowds). Comments only, each by its own label; the posts by their stance.
+ */
+export type PlatformSplit = {
+  platform: string;
+  posts: Split;
+  top_post: PostRef | null;
+  comments: Split;
+  /** comments in the same threads about something else */
+  other: number;
+  first_comment: string | null;
+  /** minutes from the platform's first post to its first comment */
+  first_after_min: number | null;
+  peak: { at: string; n: number } | null;
+  bucket: "hour" | "day";
+  series: { at: string; n: number }[];
+  topics: { topic: string; catch_all: boolean; n: number; negative: number }[];
+  liked: Quote[];
+};
+/** Accounts commenters tag (@handle): who they pull into the conversation, a rival brand among them. */
+export type Tagged = { handle: string; comments: number; platforms: string[]; negative: number; poster: boolean; subject: boolean; example: string; url: string };
 
 export type PrDashboardData = {
   as_of: string;
@@ -100,6 +122,10 @@ export type PrDashboardData = {
   coverage: Coverage[];
   off_topic_posts: number;
   notes: string[];
+  /** around one subject (a case workspace): the conversation platform by platform; absent elsewhere */
+  by_platform?: PlatformSplit[];
+  /** around one subject: the accounts commenters tag, and how many comments tag anyone */
+  tagged?: { comments: number; tagging: number; rows: Tagged[] };
 };
 
 const n = (v: unknown) => (v == null ? 0 : Number(v));
@@ -570,6 +596,11 @@ export async function reputationFacts(ws: string, win: { focus: string; from: st
     };
   }).filter((b) => b.posts > 0 || b.comments > 0 || b.is_focus).sort((a, b) => b.posts - a.posts);
 
+  // ---- around one subject: each platform on its own, and the accounts commenters pull in (Refal, 14 Oct 2026)
+  const [byPlatform, tagged] = per_comment
+    ? await Promise.all([platformSplit(db, base, focus.id, from, to, under, platC, platP, inDays, topics, toQuote), taggedAccounts(db, base, focus.id, from, to, under, platC, inDays)])
+    : [undefined, undefined];
+
   // ---- data health
   const covRows = await db.q(
     `select p.platform, to_char(min(p.posted_at at time zone $2), 'YYYY-MM-DD') as first, to_char(max(p.posted_at at time zone $2), 'YYYY-MM-DD') as last, count(*)::int as posts,
@@ -611,5 +642,123 @@ export async function reputationFacts(ws: string, win: { focus: string; from: st
     voice_posts: n(kn?.post_voices), conversation, per_comment, other_comments: { now: n(other?.now), prev: n(other?.prev) }, status, kpis, issues, rising, narratives, amplifiers, own, own_worst: ownWorst,
     service: { measured: !!themed?.any, total: n(serviceCount?.n), quotes: serviceQuotes.map(toQuote) },
     competitive, coverage, off_topic_posts: coverage.reduce((a, c) => a + c.off_topic, 0), notes,
+    ...(byPlatform ? { by_platform: byPlatform } : {}), ...(tagged ? { tagged } : {}),
+  };
+}
+
+type InDays = (col: string, a: string, b: string) => string;
+
+/**
+ * Each platform of a case on its own: its post (the most commented, with the stance of all of them), its comments
+ * by their own label, the topics they fall under, the pace and the busiest hour. Comments only here, never posts
+ * standing in as voices, so a platform's numbers are the crowd under its post. $1 workspace, $2 tz, $3 platform.
+ */
+async function platformSplit(
+  db: SkillDb, base: unknown[], brand: string, from: string, to: string, under: string, platC: string, platP: string, inDays: InDays,
+  topics: Map<string, { label: string; catch_all: boolean }>, toQuote: (r: Record<string, unknown>) => Quote,
+): Promise<PlatformSplit[]> {
+  const args = [...base, brand, from, to];
+  const where = `c.workspace_id = $1 and ${under} and p.brand_id = $4 and c.sentiment_source is distinct from 'subject' and c.posted_at is not null ${platC} and ${inDays("c.posted_at", "$5", "$6")}`;
+  const postWhere = `p.workspace_id = $1 and p.brand_id = $4 and p.relevant is not false and p.brought_in_by = 'panel' ${platP} and ${inDays("p.posted_at", "$5", "$6")}`;
+  const [cRows, pRows, tops, tRows, hRows, likedRows] = await Promise.all([
+    db.q(`select c.platform, count(*) filter (where not coalesce(c.off_topic, false))::int as n,
+                 count(*) filter (where not coalesce(c.off_topic, false) and c.sentiment = 'negative')::int as negative,
+                 count(*) filter (where not coalesce(c.off_topic, false) and c.sentiment = 'neutral')::int as neutral,
+                 count(*) filter (where not coalesce(c.off_topic, false) and c.sentiment = 'positive')::int as positive,
+                 count(c.sentiment) filter (where not coalesce(c.off_topic, false))::int as labelled,
+                 count(*) filter (where c.off_topic)::int as other, to_char(min(c.posted_at) at time zone $2, 'YYYY-MM-DD HH24:MI') as first_at, extract(epoch from min(c.posted_at))::float8 as first_ep
+          from comments c join posts p on p.id = c.post_id where ${where} group by 1`, args),
+    db.q(`select p.platform, count(*)::int as n, count(*) filter (where p.stance = 'negative')::int as negative, count(*) filter (where p.stance = 'neutral')::int as neutral,
+                 count(*) filter (where p.stance = 'positive')::int as positive, count(p.stance)::int as labelled, extract(epoch from min(p.posted_at))::float8 as first_ep
+          from posts p where ${postWhere} and p.source = 'earned' group by 1`, args),
+    db.q(`with cc as (select c.post_id, count(*)::int as n, count(*) filter (where c.sentiment = 'negative')::int as neg from comments c join posts p on p.id = c.post_id where ${where} group by 1)
+          select distinct on (p.platform) p.platform, p.url, p.creator_handle as handle, p.source, coalesce(p.caption, '') as caption, to_char(p.posted_at at time zone $2, 'YYYY-MM-DD HH24:MI') as posted_at,
+                 p.views, p.likes, p.stance, coalesce(cc.n, 0) as comments, coalesce(cc.neg, 0) as negative
+          from posts p left join cc on cc.post_id = p.id where ${postWhere}
+          order by p.platform, cc.n desc nulls last, p.views desc nulls last, p.posted_at`, args),
+    db.q(`select c.platform, c.topic_id, count(*)::int as n, count(*) filter (where c.sentiment = 'negative')::int as negative
+          from comments c join posts p on p.id = c.post_id where ${where} and not coalesce(c.off_topic, false) group by 1, 2`, args),
+    db.q(`select c.platform, to_char(date_trunc('hour', c.posted_at at time zone $2), 'YYYY-MM-DD HH24:00') as h, count(*)::int as n
+          from comments c join posts p on p.id = c.post_id where ${where} and not coalesce(c.off_topic, false) group by 1, 2 order by 1, 2`, args),
+    db.q(`select * from (select c.text, c.translation, coalesce(c.likes, 0)::int as likes, c.platform, p.url, c.sentiment, c.theme,
+                 row_number() over (partition by c.platform order by coalesce(c.likes, 0) desc, length(c.text) desc) as rk
+          from comments c join posts p on p.id = c.post_id where ${where} and not coalesce(c.off_topic, false) and c.text is not null and coalesce(c.likes, 0) > 0) x where rk <= 2`, args),
+  ]);
+  const platforms = [...new Set([...pRows, ...cRows].map((r) => String(r.platform)))];
+  const split = (r: Record<string, unknown> | undefined): Split => ({ n: n(r?.n), negative: n(r?.negative), neutral: n(r?.neutral), positive: n(r?.positive), labelled: n(r?.labelled) });
+  const out = platforms.map((pl): PlatformSplit => {
+    const c = cRows.find((r) => r.platform === pl);
+    const p = pRows.find((r) => r.platform === pl);
+    const top = tops.find((r) => r.platform === pl);
+    const hours = hRows.filter((r) => r.platform === pl).map((r) => ({ at: String(r.h), n: n(r.n) }));
+    // the pace: hour by hour while the thread is young, day by day once it runs past two days
+    const span = hours.length ? (Date.parse(hours.at(-1)!.at.replace(" ", "T") + ":00Z") - Date.parse(hours[0].at.replace(" ", "T") + ":00Z")) / 3600000 + 1 : 0;
+    let bucket: "hour" | "day" = "hour";
+    let series = hours;
+    if (span > 48) {
+      bucket = "day";
+      const byDay = new Map<string, number>();
+      for (const h of hours) byDay.set(h.at.slice(0, 10), (byDay.get(h.at.slice(0, 10)) ?? 0) + h.n);
+      series = [...byDay.entries()].map(([at, k]) => ({ at, n: k }));
+    } else if (hours.length) {
+      // every hour from the first to the last, quiet ones as zero, so the bars read as time
+      const filled: { at: string; n: number }[] = [];
+      const t0 = Date.parse(hours[0].at.replace(" ", "T") + ":00Z");
+      const have = new Map(hours.map((h) => [h.at, h.n]));
+      for (let k = 0; k < span; k++) {
+        const at = new Date(t0 + k * 3600000).toISOString().slice(0, 13).replace("T", " ") + ":00";
+        filled.push({ at, n: have.get(at) ?? 0 });
+      }
+      series = filled;
+    }
+    const peak = hours.reduce<{ at: string; n: number } | null>((m, h) => (!m || h.n > m.n ? h : m), null);
+    const firstPost = p?.first_ep != null ? Number(p.first_ep) : null;
+    const firstComment = c?.first_ep != null ? Number(c.first_ep) : null;
+    const topicList = tRows.filter((r) => r.platform === pl).map((r) => {
+      const t = r.topic_id ? topics.get(String(r.topic_id)) : undefined;
+      return { topic: t?.label ?? "No topic", catch_all: t?.catch_all ?? !r.topic_id, n: n(r.n), negative: n(r.negative) };
+    }).sort((a, b) => Number(a.catch_all) - Number(b.catch_all) || b.n - a.n);
+    return {
+      platform: pl,
+      posts: split(p),
+      top_post: top ? { url: String(top.url), platform: pl, handle: (top.handle as string) ?? null, source: String(top.source), caption: String(top.caption), posted_at: String(top.posted_at), views: nn(top.views), likes: nn(top.likes), comments: n(top.comments), negative: n(top.negative), stance: (top.stance as string) ?? null } : null,
+      comments: split(c),
+      other: n(c?.other),
+      first_comment: c?.first_at ? String(c.first_at) : null,
+      first_after_min: firstPost != null && firstComment != null ? Math.max(0, Math.round((firstComment - firstPost) / 60)) : null,
+      peak: peak && peak.n > 0 ? peak : null,
+      bucket,
+      series,
+      topics: topicList,
+      liked: likedRows.filter((r) => r.platform === pl).map(toQuote),
+    };
+  });
+  return out.sort((a, b) => b.comments.n - a.comments.n || b.posts.n - a.posts.n);
+}
+
+/**
+ * The accounts commenters tag (@handle) under the subject's posts, each counted once per comment: a rival brand asked to
+ * step in, friends called over, the poster. Comments about something else count too: a tag is who is being pulled in,
+ * whatever the comment's label. The subject's own handles and the posts' authors are marked.
+ */
+async function taggedAccounts(db: SkillDb, base: unknown[], brand: string, from: string, to: string, under: string, platC: string, inDays: InDays): Promise<{ comments: number; tagging: number; rows: Tagged[] }> {
+  const args = [...base, brand, from, to];
+  const where = `c.workspace_id = $1 and ${under} and p.brand_id = $4 and c.sentiment_source is distinct from 'subject' and c.posted_at is not null ${platC} and ${inDays("c.posted_at", "$5", "$6")}`;
+  const [tot, rows] = await Promise.all([
+    db.one(`select count(*)::int as comments, count(*) filter (where c.text ~ '@[A-Za-z0-9_]')::int as tagging from comments c join posts p on p.id = c.post_id where ${where}`, args),
+    db.q(`with t as (
+            select distinct c.id, c.platform, c.sentiment, coalesce(c.likes, 0) as likes, c.text, p.url, lower(p.creator_handle) as poster, lower(regexp_replace(m[1], '\\.+$', '')) as handle
+            from comments c join posts p on p.id = c.post_id, regexp_matches(c.text, '@([A-Za-z0-9_.]{2,30})', 'g') as m
+            where ${where} and c.text like '%@%')
+          select t.handle, count(distinct t.id)::int as comments, array_agg(distinct t.platform) as platforms,
+                 count(distinct t.id) filter (where t.sentiment = 'negative')::int as negative, bool_or(t.handle = t.poster) as poster,
+                 exists (select 1 from brands b where b.id = $4 and lower(t.handle) in (lower(b.tiktok_handle), lower(b.instagram_handle))) as subject,
+                 (array_agg(t.text order by t.likes desc, length(t.text) desc))[1] as example, (array_agg(t.url order by t.likes desc, length(t.text) desc))[1] as url
+          from t group by t.handle order by 2 desc, 1 limit 12`, args),
+  ]);
+  return {
+    comments: n(tot?.comments),
+    tagging: n(tot?.tagging),
+    rows: rows.map((r) => ({ handle: String(r.handle), comments: n(r.comments), platforms: (r.platforms as string[]) ?? [], negative: n(r.negative), poster: !!r.poster, subject: !!r.subject, example: String(r.example ?? "").replace(/\s+/g, " ").trim(), url: String(r.url) })),
   };
 }

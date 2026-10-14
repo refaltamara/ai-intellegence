@@ -12,9 +12,11 @@ export type SectionDef = { key: string; label: string; width: "full" | "half" };
 export const SECTIONS: Record<RoleId, SectionDef[]> = {
   pr: [
     { key: "issues", label: "Issues building", width: "full" },
+    { key: "platforms", label: "By platform", width: "full" },
     { key: "rising", label: "Rising now", width: "half" },
     { key: "amplifiers", label: "Amplifiers", width: "half" },
     { key: "narratives", label: "Narratives", width: "full" },
+    { key: "tagged", label: "Accounts pulled in", width: "full" },
     { key: "voices", label: "Who is talking", width: "full" },
     { key: "own", label: "Own channels", width: "half" },
     { key: "service", label: "For customer service", width: "half" },

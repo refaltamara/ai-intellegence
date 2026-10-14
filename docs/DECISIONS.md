@@ -1174,3 +1174,10 @@ Refal: "the Pulse says 31K, the dashboard 29K, we loaded 51K; and the hourly lin
 - **A run never moves a recurring deck's schedule:** that keeps counting single months.
 - **Brand decks only.** PR decks take chosen dates; Social decks keep single months.
 - TikTok in the beauty panel starts in April, so a Jul–Sep run has only one earlier run with TikTok posts. Its TikTok brands show their numbers but are not highlighted as unusual.
+
+## A case dashboard, platform by platform (Refal, 14 Oct 2026)
+
+- **Around one subject (a case workspace, `settings.label.about` set), the PR dashboard gains two sections.** Panels compute neither, so their dashboards do not change.
+  - **By platform**: one card per platform, side by side. Each card has the platform's most-commented post and how many posts are against the subject. It shows the comments about the subject by their own label (comments only, never posts standing in as voices), the comments about something else, and the minutes to the first comment. It also has the topics, the pace (hour by hour for the first two days, then by day) with the busiest hour, and the most-liked comments where likes are reported. The same post on three platforms draws three crowds, and they move at different speeds. Shown when there are two platforms or more.
+  - **Accounts pulled in**: the @handles commenters tag, counted once per comment, whatever the comment's label. A rival brand asked to sign the creator shows here first. The subject's own handles and the posts' authors are marked. Shown when three comments or more tag someone.
+- **Kahf · KOL refusal (`kahf-kol`)** shows By platform first. It hides Own channels, Data health and Who is talking, as Refal asked, and Amplifiers, which only listed the one creator three times. This is a team change, company version 1, and "Back to Fair's" undoes it.

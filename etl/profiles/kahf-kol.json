@@ -1,0 +1,58 @@
+{
+  "workspace": "kahf-kol",
+  "subject": {
+    "brand_id": "kahf-kol",
+    "name": "Kahf",
+    "owned_handles": {
+      "threads": [
+        "kahfeveryday",
+        "kahfeveryday.my"
+      ],
+      "instagram": [
+        "kahfeveryday",
+        "kahfeveryday.my"
+      ],
+      "tiktok": [
+        "kahfeveryday",
+        "kahfeveryday.my"
+      ]
+    }
+  },
+  "export_time": "2026-10-14T04:59:00Z",
+  "case_note": "14 Oct 2026: Malaysian creator @hanifloid turned down a Kahf campaign approach (Fair, for ParagonCorp, asking for his rate card) and posted it on Instagram, Threads and TikTok within three minutes (08:02 to 08:05 WIB), captioned \"... suport locals.\" Comments arrive by platform as they are scraped; TikTok's are to follow.",
+  "keywords": [],
+  "keyword_platforms": [],
+  "keyword_platforms_note": "Every post here is the creator's own post about the approach, and his caption does not name Kahf (the screenshot does): nothing is dropped by keyword.",
+  "files": [
+    {
+      "kind": "contents",
+      "platform": "instagram",
+      "file": "kahf-kol/contents_instagram_1014.csv",
+      "note": "Typed from Refal's message, 14 Oct: the post's link and caption. Posted at 01:05:27 UTC, read from the post's id (its first comment came at 01:07). The account is @hanifloid: the post went up 13 seconds before his Threads post, which names him. No post numbers: only comments were scraped."
+    },
+    {
+      "kind": "contents",
+      "platform": "threads",
+      "file": "kahf-kol/contents_threads_1014.csv",
+      "note": "Typed from Refal's message, 14 Oct: the post's link (@hanifloid, DedKb0MEj4F). Posted at 01:05:40 UTC, read from the post's id (its first comment came at 01:09). The caption is the one Refal gave for the Instagram and TikTok posts: the same cross-post. No post numbers."
+    },
+    {
+      "kind": "contents",
+      "platform": "tiktok",
+      "file": "kahf-kol/contents_tiktok_1014.csv",
+      "note": "Typed from Refal's message, 14 Oct: the photo post's link and caption. Posted at 01:02:59 UTC, read from the post's id. No post numbers; comments to follow."
+    },
+    {
+      "kind": "comments",
+      "platform": "instagram",
+      "file": "kahf-kol/comments_instagram_1014.csv",
+      "note": "dataset_instagram-comment-scraper_2026-10-14_04-55-37-227.csv (Apify Instagram comment scraper), 14 Oct: 117 comments on the post, 01:07 to 04:48 UTC (ISO times with Z); columns renamed only (postUrl, id, ownerUsername, text, timestamp, likesCount, repliesCount). Emoji-only comments are left out by the loader's rule."
+    },
+    {
+      "kind": "comments",
+      "platform": "threads",
+      "file": "kahf-kol/comments_threads_1014.csv",
+      "note": "scrapper-results-20261014-1159.csv (Fair's scraper), 14 Oct: 98 replies to the post, 01:09 to 04:55 UTC (ISO times with Z), none a reply to a reply. Threads' numeric comment ids written as their short codes, as in kahf-threads."
+    }
+  ]
+}
