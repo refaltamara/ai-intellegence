@@ -4,13 +4,15 @@ import { currentActor, currentRole, currentWorkspaceId } from "@/auth/current";
 import { deckOptions } from "@/decks/page";
 import { deckWorkspace } from "@/pulses/api";
 import { DeckForm } from "@/ui/decks/DeckForm";
+import { currentBrand } from "@/brand/current";
+import { fairBadge } from "@/brand/demo";
 
 export const dynamic = "force-dynamic";
 
 export default async function NewDeckPage({ searchParams }: { searchParams: Promise<{ slide?: string; brands?: string; grain?: string }> }) {
   const ws = await currentWorkspaceId();
   if (!(await deckWorkspace(ws))) redirect("/pulse");
-  const [options, sp] = await Promise.all([deckOptions(ws, await currentRole(ws), (await currentActor())?.email ?? null), searchParams]);
+  const [options, sp] = await Promise.all([deckOptions(ws, await currentRole(ws), (await currentActor())?.email ?? null, fairBadge(await currentBrand())), searchParams]);
   // from "Add to a deck → New deck" on the Dashboard: that section's slide, brands and grain
   const prefill = sp.slide && options.slides.some((s) => s.kind === sp.slide)
     ? { slide: sp.slide, brands: (sp.brands ?? "").split(",").filter(Boolean).slice(0, 12), grain: sp.grain === "month" ? ("month" as const) : sp.grain === "week" ? ("week" as const) : null }

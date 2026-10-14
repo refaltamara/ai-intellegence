@@ -2,7 +2,8 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 
-export function LoginForm() {
+/** owner: who hands out invitations: Fair, or the presenter's brand for the day (src/brand/demo.ts) */
+export function LoginForm({ owner = "Fair" }: { owner?: string }) {
   const router = useRouter();
   const sp = useSearchParams();
   const [email, setEmail] = useState("");
@@ -29,7 +30,7 @@ export function LoginForm() {
       <label>Password<input type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required /></label>
       {error && <div className="errbox">{error}</div>}
       <button className="btn pri" type="submit" disabled={busy}>{busy ? "Signing in…" : "Sign in"}</button>
-      <p><a href="/reset">Forgot your password?</a> No account yet? Ask your team&apos;s Builder or Fair for an invitation.</p>
+      <p><a href="/reset">Forgot your password?</a> No account yet? Ask your team&apos;s Builder or {owner} for an invitation.</p>
     </form>
   );
 }

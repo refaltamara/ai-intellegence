@@ -4,6 +4,8 @@ import { currentActor, currentRole, currentWorkspaceId } from "@/auth/current";
 import { deckOptions } from "@/decks/page";
 import { getDeck } from "@/decks/store";
 import { DeckForm } from "@/ui/decks/DeckForm";
+import { currentBrand } from "@/brand/current";
+import { fairBadge } from "@/brand/demo";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +14,7 @@ export default async function EditDeckPage({ params }: { params: Promise<{ id: s
   const { id } = await params;
   const deck = await getDeck(id, ws);
   if (!deck) notFound();
-  const options = await deckOptions(ws, await currentRole(ws), (await currentActor())?.email ?? null);
+  const options = await deckOptions(ws, await currentRole(ws), (await currentActor())?.email ?? null, fairBadge(await currentBrand()));
   return (
     <section className="screen">
       <div className="topbar"><div><h1>Edit {deck.name}</h1><span className="meta">Changes apply to the next version; the versions already made stay as they were.</span></div></div>

@@ -15,6 +15,8 @@ import { teamSkills } from "@/skills/team";
 import { resolveAsk } from "@/dashboard/ask";
 import { decodeAsk } from "@/dashboard/askref";
 import { by, signal } from "@/learning/signals";
+import { currentBrand } from "@/brand/current";
+import { fairBadge } from "@/brand/demo";
 
 export const dynamic = "force-dynamic";
 
@@ -38,9 +40,9 @@ export default async function ChatsPage({ searchParams }: { searchParams: Promis
     else await signal(by(actor, ws, role.id), "dashboard.ask_why", { k: askRef.k });
   }
   // the team's own analyses first: Fair's recipes for this role, then what the team made (its badge says whose)
-  const [fairR, ownR] = await Promise.all([recipesFor(role.recipes).catch(() => []), actor ? companyRecipes(ws, role.id, actor.email).catch(() => []) : Promise.resolve([])]);
+  const [fairR, ownR, brand] = await Promise.all([recipesFor(role.recipes).catch(() => []), actor ? companyRecipes(ws, role.id, actor.email).catch(() => []) : Promise.resolve([]), currentBrand()]);
   const teamMenu: SkillOption[] = [
-    ...fairR.map((r) => ({ name: `recipe:${r.key}`, title: r.title, description: r.description, example: r.examples[0] ?? r.title, group: `${role.codename}'s analyses`, badge: "Fair" })),
+    ...fairR.map((r) => ({ name: `recipe:${r.key}`, title: r.title, description: r.description, example: r.examples[0] ?? r.title, group: `${role.codename}'s analyses`, badge: fairBadge(brand) })),
     ...ownR.filter((r) => !fairR.some((f) => f.key === r.key)).map((r) => ({ name: `recipe:${r.key}`, title: r.title, description: r.description, example: r.examples[0] ?? r.title, group: `${role.codename}'s analyses`, badge: r._creation.status === "approved" ? client ?? "Your team" : "Yours, not shared yet", by: r._creation.maker })),
   ];
   const menu: SkillOption[] = [...teamMenu, ...skills.map((d) => ({ name: d.name, title: d.title, description: d.description, example: d.example, group: registry.layers[d.layer]?.title ?? d.layer }))];
