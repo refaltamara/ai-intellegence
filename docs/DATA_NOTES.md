@@ -323,6 +323,13 @@ One contents file, `data/raw/kahf/contents_threads.csv` (posts only; comments to
   - 1,260 are about the case: Malaysian 629 (386 negative), Indonesian 404 (283 positive, defending), unclear 226. A comment counts by its own label, whatever its post: 262 of them sit under set-aside posts, 142 under @syatirah_husna DeW-MFaGWMn (flags outside a supermarket).
   - On the Pulse: comments about Kahf 29,694 → 30,954; "more in these threads are about something else" 16,946 → 20,061; 51,015 in all (Kahf's own replies aside).
   - Brought into the Beauty case the same hour (`pnpm case sync`: 4,375 comments, 14,404 labels, the 23 set-aside replies). Both hold 4,625 posts (677 set aside) and 51,018 comments; totals reconcile on both.
+- **Posts, 14 Oct pull** (`threads_post.csv`, Apify Threads scraper; `kahf/contents_threads_1015a.csv`): 647 rows, 194 posts, 3 Oct to 15 Oct 01:08 WIB (ISO times with Z).
+  - A post can be listed several times; the row with the most likes and replies is kept. Left out: 98 marked as replies (`isReply`: comments, not posts) and the 20 already loaded (their numbers stay as loaded). 76 written, no follower counts.
+  - Loaded (load `1bb6495f`): 76 posts, 4,701 in all.
+  - Labelled within about 4 minutes. **34 are off the case and set aside**, among them the most liked: the haze, the Kalimantan fires, prayers to stop the quarrel, football, a helmet giveaway. Of the 41 with a stance, 26 are against Kahf, 9 defend it and 6 are neutral; one has no caption. Malaysian voices 26 (21 against), Indonesian 10 (7 defending), unclear 5. Topics: boycott 13, the original post 12, others 12, the apology 3, Paragon 1.
+  - Among them is @hanifloid's own Threads post (`DedKb0MEj4F`, 8,526 likes): the KOL refusal, read as against Kahf, now counted in both Kahf workspaces.
+  - Across all 4,701 posts: 711 set aside; of the 3,948 with a stance, 2,419 are against Kahf (61%), 912 defend it and 617 are neutral.
+  - Brought into the Beauty case (`pnpm case sync`: 75 posts, 222 labels). In Beauty, @hanifloid's post was already the KOL refusal case's. The sync now leaves a post that another case holds with that case, counted as `other_case`; before, any post held outside the case stopped the sync. So the Beauty case holds 4,700 posts, and comments match on both sides (51,018).
 
 
 ## Kahf: a KOL's refusal (profile workspace `kahf-kol`, 14 Oct 2026; Beauty case `kahf-kol-refusal`)
@@ -345,6 +352,16 @@ One contents file, `data/raw/kahf/contents_threads.csv` (posts only; comments to
     - Voices: Malaysian 355, unclear 163, Indonesian 1.
   - **The pace:** busiest 09:00 WIB (100), still 41 to 49 an hour at 13:00 and 14:00.
   - **Tags and likes:** Bad Lab is tagged in 26 comments and Ubermen in 8. The Threads comment to @ubermen.my now has 8,236 likes.
+- **Overnight pull, 15 Oct** (about 05:40 WIB): `tiktok_comment_hanifloid.csv` (361) and `IG_comment_hanifloid.csv` (164), Apify; written as `kahf-kol/comments_<platform>_1015.csv`, columns renamed only. Threads was not pulled again.
+  - Instagram holds every comment of the afternoon file again, plus 20 more. TikTok holds 250 of the afternoon's 323, plus 111 new; the 73 missing (deleted, or the scraper's page cut-off) stay as loaded.
+  - Load `b4fa461d`: 111 new comments (TikTok 98, Instagram 13; the rest emoji only or empty), newer likes on 36. They run from 15:22 WIB on 14 Oct to 05:41 WIB on 15 Oct.
+  - Labelled within about 5 minutes and synced into the Beauty case. Of the 111, 102 are about Kahf: 97 negative, 1 defending.
+  - **The case now:** 630 comments, 581 about Kahf, 557 negative (96%), 2 defending.
+    - By platform: TikTok 384 (344 negative), Threads 137 (118), Instagram 109 (95).
+    - Topics: praise for turning it down 446, support local and boycott 81, the approach 32, others 17, the meme 5.
+    - Voices: Malaysian 443, unclear 185, Indonesian 2.
+  - **The pace fell away in the evening:** 30 comments at 15:00 WIB, 22 at 16:00, 15 at 17:00, under a dozen an hour from 18:00, two an hour overnight.
+  - **Tags and likes:** Bad Lab is tagged in 32 comments and Ubermen in 9. On TikTok, "villain dlm Kudrat tapi hero dalam kehidupan sebenar" now has 1,178 likes and the call to Malaysia's local brands has 900.
 
 ## The one loader (DECISIONS, 10 Oct 2026)
 

@@ -77,6 +77,18 @@
       "platform": "tiktok",
       "file": "kahf-kol/comments_tiktok_1014b.csv",
       "note": "tiktok_comment_kahf.csv (Apify TikTok comments scraper), 14 Oct afternoon: 323 comments, 01:08 to 08:19 UTC: every comment of the morning file (239, likes read again) and 84 more, none a reply. Columns renamed only (cid, uniqueId, text, createTimeISO, diggCount, replyCommentTotal); written against the /photo/ link, as in the morning."
+    },
+    {
+      "kind": "comments",
+      "platform": "instagram",
+      "file": "kahf-kol/comments_instagram_1015.csv",
+      "note": "IG_comment_hanifloid.csv (Apify Instagram comment scraper), pulled about 05:45 WIB on 15 Oct: 164 comments, 01:07 to 22:41 UTC on 14 Oct: every comment of the afternoon file (144, likes read again) and 20 more. Columns renamed only."
+    },
+    {
+      "kind": "comments",
+      "platform": "tiktok",
+      "file": "kahf-kol/comments_tiktok_1015.csv",
+      "note": "tiktok_comment_hanifloid.csv (Apify TikTok comments scraper), pulled about 05:40 WIB on 15 Oct: 361 comments, 01:08 to 22:37 UTC on 14 Oct, none a reply: 111 not in the afternoon file; 73 of the afternoon's are not in this pull (deleted, or the scraper's page cut-off) and stay as loaded. Columns renamed only; written against the /photo/ link."
     }
   ]
 }

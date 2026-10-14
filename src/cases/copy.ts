@@ -173,7 +173,8 @@ export async function syncStatements(): Promise<{ key: string; text: string }[]>
   ];
 }
 
-export type SyncPending = { posts_new: number; comments_new: number; posts_gone: number; comments_gone: number };
+/** `other_case`: posts another case of the panel already holds; they stay that case's and the sync leaves them alone */
+export type SyncPending = { posts_new: number; comments_new: number; posts_gone: number; comments_gone: number; other_case: number };
 
 /** what a sync would bring, and what the case holds that the source no longer does (kept, never deleted) */
 export async function syncPending(plan: Pick<CopyPlan, "from" | "to" | "brands"> & { caseId: string }): Promise<{ problems: string[]; pending: SyncPending }> {
@@ -195,15 +196,19 @@ export async function syncPending(plan: Pick<CopyPlan, "from" | "to" | "brands">
                and not exists (select 1 from comments a where a.workspace_id = $1 and a.platform_comment_id = b.platform_comment_id))::int as comments_gone,
             (select count(*) from comments where workspace_id = $1 and platform_comment_id is null)::int as no_id,
             (select array_agg(distinct p.brand_id) from posts p where p.workspace_id = $1 and not ($4::jsonb ? p.brand_id)) as unmapped,
-            (select count(*) from post_items a join posts b on b.workspace_id = $2 and b.platform = a.platform and b.url = a.url and b.brought_in_by <> $3
-               where a.workspace_id = $1)::int as panel`,
+            (select count(*) from post_items a join posts b on b.workspace_id = $2 and b.platform = a.platform and b.url = a.url and b.brought_in_by = 'panel'
+               where a.workspace_id = $1)::int as panel,
+            (select count(distinct a.id) from post_items a join posts b on b.workspace_id = $2 and b.platform = a.platform and b.url = a.url
+               and b.brought_in_by not in ('panel', $3) where a.workspace_id = $1)::int as other_case`,
     [plan.from, plan.to, plan.caseId, toJson(plan.brands)],
   );
   if (o.no_id) problems.push(`${o.no_id} comments in ${plan.from} have no comment id to match them by`);
   if (o.unmapped?.length) problems.push(`brands with no panel brand to go to: ${o.unmapped.join(", ")}`);
   // a post the panel holds too stays the panel's: the sync never writes over the panel's rows
   if (o.panel) problems.push(`${o.panel} of ${plan.from}'s posts are the panel's own in ${plan.to}; a case load (pnpm load run ... --case) handles those`);
-  return { problems, pending: { posts_new: o.posts_new, comments_new: o.comments_new, posts_gone: o.posts_gone, comments_gone: o.comments_gone } };
+  // a post another case brought in stays that case's, with its comments: every statement writes only rows brought in by
+  // this case, so the sync leaves it alone (a creator's own post can belong to two cases: Kahf, 15 Oct 2026)
+  return { problems, pending: { posts_new: o.posts_new, comments_new: o.comments_new, posts_gone: o.posts_gone, comments_gone: o.comments_gone, other_case: o.other_case } };
 }
 
 /** the sync, in one transaction; returns how many rows each step wrote */

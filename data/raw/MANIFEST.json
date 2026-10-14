@@ -258,6 +258,14 @@
       "received": "2026-10-14"
     },
     {
+      "path": "kahf-kol/comments_instagram_1015.csv",
+      "workspace": "kahf-kol",
+      "blob": "raw/kahf-kol/comments_instagram_1015.csv",
+      "bytes": 23388,
+      "sha256": "b488d6388364ee4579d0f56cf55c46320243419a6b9a643fe6855b618a5da1f8",
+      "received": "2026-10-14"
+    },
+    {
       "path": "kahf-kol/comments_threads_1014.csv",
       "workspace": "kahf-kol",
       "blob": "raw/kahf-kol/comments_threads_1014.csv",
@@ -287,6 +295,14 @@
       "blob": "raw/kahf-kol/comments_tiktok_1014b.csv",
       "bytes": 54975,
       "sha256": "b096dc6982025e3ce4a9cefe1584df2ece799e27a6977d199aae37cd0642cbe5",
+      "received": "2026-10-14"
+    },
+    {
+      "path": "kahf-kol/comments_tiktok_1015.csv",
+      "workspace": "kahf-kol",
+      "blob": "raw/kahf-kol/comments_tiktok_1015.csv",
+      "bytes": 62579,
+      "sha256": "a51ecc7aede296e4a79f3f8c07188309604e88f0c4b8f451148f84a3b7da1950",
       "received": "2026-10-14"
     },
     {
@@ -440,6 +456,14 @@
       "bytes": 578279,
       "sha256": "0d5cd888be14a69a12721261a97499c0bc7601b848672428fdc10e174a3ba8f9",
       "received": "2026-10-12"
+    },
+    {
+      "path": "kahf/contents_threads_1015a.csv",
+      "workspace": "kahf-threads",
+      "blob": "raw/kahf-threads/contents_threads_1015a.csv",
+      "bytes": 24835,
+      "sha256": "c5e515856ba20b963bcb528f09c27131e2cb3309e39258c96949e43a8e9c5cab",
+      "received": "2026-10-14"
     },
     {
       "path": "kahf/contents_threads.csv",
