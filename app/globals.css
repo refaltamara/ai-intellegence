@@ -1809,3 +1809,17 @@ tr.warnrow td{background:#FFFBF0}
 .side .switch-err{color:var(--red);font-size:12px;line-height:1.4;margin:6px 14px 0}
 /* the logo mark (src/ui/LogoMark.tsx): the drawing carries its own shape and colours */
 .brand .mark.logo{display:block;flex:none;background:none;border-radius:32%;box-shadow:0 4px 14px rgba(255,98,94,.28)}
+
+/* a presenter's brand: its apps launcher at the top right (src/ui/AppSwitcher.tsx, src/brand/demo.ts) */
+.app.has-apps .topbar{padding-right:84px}
+.appswitch{position:fixed;top:10px;right:22px;z-index:40}
+.appswitch-btn{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;color:var(--text-2);background:transparent;border:0;cursor:pointer}
+.appswitch-btn:hover,.appswitch-btn[aria-expanded="true"]{background:var(--surface);color:var(--text)}
+.appswitch-menu{position:absolute;top:46px;right:0;width:272px;background:#fff;border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow-md);padding:14px}
+.appswitch-menu>b{display:block;font-size:12px;font-weight:600;color:var(--text-3);padding:2px 6px 10px}
+.appswitch-menu .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.appswitch-menu a{display:flex;flex-direction:column;align-items:center;gap:8px;padding:12px 6px;border-radius:12px;font-size:12px;font-weight:600;color:var(--text);text-decoration:none}
+.appswitch-menu a:hover{background:var(--surface)}
+.appswitch-menu a.here{background:var(--blue-10)}
+.appswitch-menu .tile{width:44px;height:44px;display:grid;place-items:center;border-radius:14px}
+.appswitch-menu .tile.affiliate{background:linear-gradient(135deg,#F0566F,#C42A4A);color:#fff}
