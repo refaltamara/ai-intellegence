@@ -19,7 +19,7 @@ import { contractGroups, contractHasClient, type WeeklyContract } from "./contra
 import { assessAll, covered, evaluate } from "./flags";
 import { captionFacts } from "./captions";
 import { landscape } from "./landscape";
-import { deckPeriod, nextStart, periodWords, stepFrom, type Grain } from "./period";
+import { deckPeriod, monthRunBucketSql, monthsIn, nextStart, periodWords, previousPeriod, stepFrom, type Grain } from "./period";
 import { CAPTION_SLIDES, cleanSlides, LANDSCAPE_SLIDES } from "./slides";
 import { shortDay } from "./weeks";
 import type { Cell, CreatorRow, EvidencePost, Finding, Flag, Group, GroupResult, Mover, Panel, PanelPoint, Platform, WeekPoint, WeeklyReport } from "./types";
@@ -57,18 +57,22 @@ export async function weeklyReport(contract: WeeklyContract, week: string, opts:
   const grain: Grain = contract.grain === "month" ? "month" : "week";
   // a whitelisted literal, never input: date_trunc's unit
   const unit = grain === "month" ? "month" : "week";
-  const words = periodWords(grain);
-  const rules = weeklyRules(contract.rules, grain);
+  // a run of months ("2026-07..2026-09") is one period of n months, against the n before; its history steps by n
+  const period = deckPeriod(grain, week);
+  const n = monthsIn(period);
+  const words = periodWords(grain, n);
+  const rules = weeklyRules(contract.rules, grain, n);
   // by default every platform the workspace holds (TikTok and Instagram in the beauty panel)
   const platforms: Platform[] = contract.platforms?.length ? contract.platforms : ((await db.q<{ platform: Platform }>(panelPlatformsSql("$1"), [contract.workspace])).map((r) => r.platform));
   const slides = contract.slides ? cleanSlides(contract.slides) : undefined;
-  const period = deckPeriod(grain, week);
   const W = period.from;
   const L = rules.lookback_weeks;
-  const weeks = Array.from({ length: L + 1 }, (_, i) => stepFrom(grain, W, i - L));
+  const weeks = Array.from({ length: L + 1 }, (_, i) => stepFrom(grain, W, (i - L) * n));
   const from = weeks[0];
   const toExcl = nextStart(period);
-  const step = (d: string, n: number) => stepFrom(grain, d, n);
+  const step = (d: string, k: number) => stepFrom(grain, d, k * n);
+  // the first day of the period a post falls in: date_trunc for a week or a month, the run it falls in for a run of months
+  const bucket = (col: string, tzParam: string) => (n === 1 ? `(date_trunc('${unit}', ${col} at time zone ${tzParam}))::date` : monthRunBucketSql(col, tzParam, W, n));
   const withClient = contractHasClient(contract);
   const { watchlist, portfolio, clientBrands } = contractGroups(contract);
   const all = [...watchlist, ...(withClient ? [portfolio, ...clientBrands] : [])];
@@ -83,7 +87,7 @@ export async function weeklyReport(contract: WeeklyContract, week: string, opts:
      d as (
        select distinct on (g.gkey, p.platform, p.url)
               g.gkey, p.platform, p.url, p.source, p.creator_handle, d7.views, ${ENG_D7} as engagements, coalesce(d7.so_far, false) as so_far, p.has_cart,
-              (date_trunc('${unit}', p.posted_at at time zone $4))::date as wk
+              ${bucket("p.posted_at", "$4")} as wk
        from posts p join g on g.brand_id = p.brand_id ${D7}
        where p.workspace_id = $1 and p.relevant is not false and p.brought_in_by = 'panel' and p.platform = any($5::text[])
          and p.posted_at >= ($6::date::timestamp at time zone $4) and p.posted_at < ($7::date::timestamp at time zone $4)
@@ -106,7 +110,7 @@ export async function weeklyReport(contract: WeeklyContract, week: string, opts:
   );
   const panelRows = await db.q<PanelPoint & { platform: Platform }>(
     `with d as (
-       select distinct on (p.platform, p.url) p.platform, p.url, d7.views, coalesce(d7.so_far, false) as so_far, (date_trunc('${unit}', p.posted_at at time zone $2))::date as wk
+       select distinct on (p.platform, p.url) p.platform, p.url, d7.views, coalesce(d7.so_far, false) as so_far, ${bucket("p.posted_at", "$2")} as wk
        from posts p ${D7}
        where p.workspace_id = $1 and p.relevant is not false and p.brought_in_by = 'panel' and p.platform = any($3::text[])
          and p.posted_at >= ($4::date::timestamp at time zone $2) and p.posted_at < ($5::date::timestamp at time zone $2)
@@ -181,7 +185,7 @@ export async function weeklyReport(contract: WeeklyContract, week: string, opts:
   const movers: Mover[] = [];
   for (const l of leaders) {
     const r = watch.find((w) => w.group.key === l.key)!;
-    movers.push(await drivers(db, ctx.workspaceId, tz, r, l.platform, l.flag, weeks, rules, flagged.filter((f) => f.key === l.key && f.flag !== l.flag).map((f) => ({ platform: f.platform, flag: f.flag })), evidence, brandNameKeys(ctx).keys, { unit, step }));
+    movers.push(await drivers(db, ctx.workspaceId, tz, r, l.platform, l.flag, weeks, rules, flagged.filter((f) => f.key === l.key && f.flag !== l.flag).map((f) => ({ platform: f.platform, flag: f.flag })), evidence, brandNameKeys(ctx).keys, { step, bucket }));
   }
 
   // ---- notes the reader needs next to the numbers
@@ -243,7 +247,7 @@ export async function weeklyReport(contract: WeeklyContract, week: string, opts:
   const captions = !slides || slides.some((k) => CAPTION_SLIDES.has(k))
     ? { ...(await captionFacts(db, { workspaceId: ctx.workspaceId, tz, platforms, groups: reach, clientKey: withClient ? portfolio.key : null, clientName: contract.client?.name ?? "", from: W, to: toExcl, prevFrom: weeks[L - 1] })), floor: (await captionSettings(ctx.workspaceId)).min_views }
     : undefined;
-  const prev = deckPeriod(grain, weeks[L - 1]);
+  const prev = n > 1 ? previousPeriod(period) : deckPeriod(grain, weeks[L - 1]);
 
   return {
     version: 1,
@@ -251,6 +255,7 @@ export async function weeklyReport(contract: WeeklyContract, week: string, opts:
     client: withClient ? contract.client!.name : "",
     workspace_id: ctx.workspaceId,
     grain,
+    ...(n > 1 ? { months: n } : {}),
     ...(slides ? { slides } : {}),
     week: { from: W, to: period.to, label: soFar(period.label, young), iso: period.key },
     previous_week: { from: prev.from, to: prev.to, label: soFar(prev.label, youngIn("prev")) },
@@ -281,7 +286,7 @@ type PostRow = { url: string; creator_handle: string | null; source: string; tie
 /** The fixed lenses behind one highlighted move: who, what, campaign, owned vs earned, action. */
 async function drivers(
   db: SkillDb, workspaceId: string, tz: string, r: GroupResult, platform: Platform, flag: Flag, weeks: string[], rules: ReturnType<typeof weeklyRules>,
-  otherFlags: Mover["other_flags"], evidence: EvidencePost[], brandKeys: string[], g8: { unit: "week" | "month"; step: (d: string, n: number) => string },
+  otherFlags: Mover["other_flags"], evidence: EvidencePost[], brandKeys: string[], g8: { step: (d: string, n: number) => string; bucket: (col: string, tzParam: string) => string },
 ): Promise<Mover> {
   const g = r.group;
   const cell = r.cells[platform]!;
@@ -297,7 +302,7 @@ async function drivers(
   const base = `with d as (
        select distinct on (p.url) p.url, p.creator_handle, p.source, p.tier, p.followers_at_post as followers, d7.views, ${ENG_D7} as engagements,
               p.content_format, p.has_cart, p.product_name, p.caption, p.hashtags, p.posted_at,
-              to_char((date_trunc('${g8.unit}', p.posted_at at time zone $3))::date, 'YYYY-MM-DD') as wk
+              to_char(${g8.bucket("p.posted_at", "$3")}, 'YYYY-MM-DD') as wk
        from posts p ${D7}
        where p.workspace_id = $1 and p.relevant is not false and p.brought_in_by = 'panel' and p.platform = $2 and p.brand_id = any($4::text[])
          and p.posted_at >= ($5::date::timestamp at time zone $3) and p.posted_at < ($6::date::timestamp at time zone $3)

@@ -1163,3 +1163,14 @@ Refal: "the Pulse says 31K, the dashboard 29K, we loaded 51K; and the hourly lin
 - The brands are listed in `src/brand/demo.ts`; it is the one place to add or remove one. This overrides "the platform is Fair Intelligence everywhere" only inside that browser.
 - **The brand's other apps, top right (14 Oct 2026).** Under BPA a grid button at the top right opens BPA's apps, as an office suite's launcher does: Listening (this app) and Affiliate (https://affiliate-bpa.com, BPA's own, same tab), so going from one to the other feels like one product. A slide can link straight into a screen: `/brand/bpa?next=/decks` (same-site paths only, `safeNext`).
 - **Beauty hides Weekly Reports (Refal, 14 Oct 2026).** Not needed any more: Beauty's Brand & KOL team sidebar is Dashboard, Decks, Chats, set as the team's own change (company version 4, "Back to Fair's" on Our Atlas undoes it). The page still opens by its address, and the Paragon schedule still runs and emails until someone pauses it.
+
+## A monthly deck over the last three months (Refal, 14 Oct 2026)
+
+- **A brand deck by month can cover a run of months as one period:** the last three or the last six (key `2026-07..2026-09`, at most six months). Pick it in New deck, under "Latest month", or from New version on the deck.
+- **It is compared with the run of the same length before it.** Jul–Sep is set against Apr–Jun. Its history steps in runs too: each brand is judged against its own two runs before, both with posts.
+  - The month's size floors are multiplied by the run's length.
+  - Three months read as a quarter: "this quarter", "last quarter", "QoQ", and series labelled "Jul–Sep".
+- **How it is counted:** posts are bucketed by the run they fall in, counted from the period's first month (`monthRunBucketSql`); a single week or month keeps `date_trunc`. The weekly and monthly reports come out the same as before, field for field.
+- **A run never moves a recurring deck's schedule:** that keeps counting single months.
+- **Brand decks only.** PR decks take chosen dates; Social decks keep single months.
+- TikTok in the beauty panel starts in April, so a Jul–Sep run has only one earlier run with TikTok posts. Its TikTok brands show their numbers but are not highlighted as unusual.

@@ -5,6 +5,7 @@ import { SLIDES } from "../competitor/slides";
 import { SkillDb } from "../skills/db";
 import { loadContext } from "../skills/params";
 import { deckPeriods } from "./generate";
+import { MONTHS_RE } from "../competitor/period";
 import { brandLabel, type DeckSpec } from "./spec";
 import { templatesFor, type DeckTemplate } from "./templates";
 import { companyRecipes, companyTemplates } from "../company/creations";
@@ -20,6 +21,8 @@ export type DeckOptions = {
   templates: (DeckTemplate & { badge?: string; by?: string })[];
   slides: { kind: string; title: string; description: string; pages: string; required?: boolean; needs?: string }[];
   periods: { day: { key: string; label: string }[]; week: { key: string; label: string }[]; month: { key: string; label: string }[] };
+  /** a brand deck by month can also cover the last three or six months as one period ("2026-07..2026-09") */
+  runs: { key: string; label: string }[];
   /** the workspace's client brand, offered (not set) as the client */
   client: { name: string; brand_ids: string[] } | null;
   /** the Weekly Competitor Pulse's watchlist and client, when this team has one */
@@ -51,7 +54,7 @@ async function teamTemplates(workspaceId: string, role: RoleModel, email: string
 /** fair: the badge on what came with the role ("Fair", or a presenter's brand for the day, src/brand/demo.ts) */
 export async function deckOptions(workspaceId: string, role: RoleModel = BRAND_KOL, email: string | null = null, fair = "Fair"): Promise<DeckOptions> {
   const ctx = await loadContext(new SkillDb(), workspaceId);
-  const [day, week, month] = await Promise.all([deckPeriods(workspaceId, "day", 14), deckPeriods(workspaceId, "week", 12), deckPeriods(workspaceId, "month", 6)]);
+  const [day, week, month] = await Promise.all([deckPeriods(workspaceId, "day", 14), deckPeriods(workspaceId, "week", 12), deckPeriods(workspaceId, "month", 6, { runs: true })]);
   const brands = ctx.brands.map((b) => ({ id: b.id, name: brandLabel(b.name) })).sort((a, b) => a.name.localeCompare(b.name));
   const own = ctx.clientBrandId ? brands.find((b) => b.id === ctx.clientBrandId) : null;
   const c = STARTERS.find((t) => t.workspace === workspaceId);
@@ -60,7 +63,8 @@ export async function deckOptions(workspaceId: string, role: RoleModel = BRAND_K
     brands,
     templates: await teamTemplates(workspaceId, role, email, own?.name ?? null, fair),
     slides: SLIDES.map((s) => ({ kind: s.kind, title: s.title, description: s.description, pages: s.pages, ...(s.required ? { required: true } : {}), ...(s.needs ? { needs: s.needs } : {}) })),
-    periods: { day: day.map((p) => ({ key: p.key, label: p.label })), week: week.map((p) => ({ key: p.key, label: p.label })), month: month.map((p) => ({ key: p.key, label: p.label })) },
+    periods: { day: day.map((p) => ({ key: p.key, label: p.label })), week: week.map((p) => ({ key: p.key, label: p.label })), month: month.filter((p) => !MONTHS_RE.test(p.key)).map((p) => ({ key: p.key, label: p.label })) },
+    runs: month.filter((p) => MONTHS_RE.test(p.key)).map((p) => ({ key: p.key, label: p.label })),
     client: own ? { name: own.name, brand_ids: [own.id] } : null,
     starter: c
       ? {

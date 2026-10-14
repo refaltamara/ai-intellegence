@@ -42,7 +42,7 @@ function moverBlock(r: WeeklyReport, m: Mover, i: number): string {
   const posts = m.what.top_posts.map((p) => `    ${p.ref} ${p.creator_handle ? "@" + p.creator_handle : "brand account"}: ${compact(p.views)} views${p.er != null ? `, ${pct(p.er)} ER` : ""}${p.content_format ? `, ${p.content_format}` : ""}${p.has_cart ? ", yellow cart" : ""}. "${(p.caption ?? "").replace(/\s+/g, " ").slice(0, 140)}"`);
   return [
     `${i + 1}. key="${m.key}" ${m.name} on ${PLATFORM_NAME[m.platform]}: ${metricLabel(f.metric, f.unit, m.platform)} ${f.direction} to ${flagValue(f.unit, f.metric, f.value)} from ${flagValue(f.unit, f.metric, f.previous)} ${w.last} (${w.span(r.rules.lookback_weeks)} range ${flagValue(f.unit, f.metric, f.low)}–${flagValue(f.unit, f.metric, f.high)})`,
-    ...lensLines(m, { lookback: r.rules.lookback_weeks, grain: r.grain }).map((l) => `   ${l.label}: ${l.segs.map((s) => s.t).join("")}`),
+    ...lensLines(m, { lookback: r.rules.lookback_weeks, grain: r.grain, months: r.months }).map((l) => `   ${l.label}: ${l.segs.map((s) => s.t).join("")}`),
     `   Top posts:`,
     ...posts,
     m.other_flags.length ? `   Also highlighted for ${m.name}: ${m.other_flags.map((o) => `${PLATFORM_NAME[o.platform]} ${o.flag.metric} ${o.flag.direction}`).join(", ")}` : "",
@@ -263,7 +263,7 @@ export function deckSystem(r: WeeklyReport): string {
   const w = wordsOf(r);
   const has = new Set(deckSlides(r));
   const who = r.client || "the team reading it";
-  const next = w.unit === "week" ? "this month" : "this quarter";
+  const next = w.unit === "week" ? "this month" : w.unit === "month" ? "this quarter" : "the next six months";
   const fields = [
     `- summary: exactly three items, labels "New", "Working", "Worth testing" in that order. stat: the one number for the callout (max 9 characters). stat_label: max 6 words. text: max 18 words.`,
     has.has("scoreboard") ? `- scoreboard_title: max 12 words, the headline of the ${w.unit}.` : "",

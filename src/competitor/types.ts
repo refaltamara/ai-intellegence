@@ -176,6 +176,8 @@ export type WeeklyReport = {
   workspace_id: string;
   /** week (absent on reports made before 2 Oct 2026) or month */
   grain?: Grain;
+  /** a run of months (the last three, say): how many months each period holds; absent for one week or one month */
+  months?: number;
   /** a deck's slides; absent on the weekly report (src/competitor/slides.ts) */
   slides?: SlideKind[];
   /** the period reported on: a week or a month despite the name */
