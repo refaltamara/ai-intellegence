@@ -53,6 +53,12 @@
       "platform": "threads",
       "file": "kahf-kol/comments_threads_1014.csv",
       "note": "scrapper-results-20261014-1159.csv (Fair's scraper), 14 Oct: 98 replies to the post, 01:09 to 04:55 UTC (ISO times with Z), none a reply to a reply. Threads' numeric comment ids written as their short codes, as in kahf-threads."
+    },
+    {
+      "kind": "comments",
+      "platform": "tiktok",
+      "file": "kahf-kol/comments_tiktok_1014.csv",
+      "note": "dataset_tiktok-comments-scraper_2026-10-14_06-11-36-625.csv (Apify TikTok comments scraper), 14 Oct: 239 comments on the post, 01:08 to 06:10 UTC (ISO times with Z), with likes (diggCount); columns renamed only (cid, uniqueId, text, createTimeISO, diggCount, replyCommentTotal). The scraper gives the post as /video/7696322750981426439; TikTok serves this photo post at both addresses, so the comments are written against the /photo/ link loaded on 14 Oct."
     }
   ]
 }
