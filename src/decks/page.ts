@@ -39,16 +39,17 @@ export type DeckOptions = {
 const STARTERS: WeeklyContract[] = [paragon as WeeklyContract];
 
 /** The templates a team starts from: Fair's in the order its role (and company) asks, then the team's own, badged. */
-async function teamTemplates(workspaceId: string, role: RoleModel, email: string | null, client: string | null): Promise<DeckOptions["templates"]> {
+async function teamTemplates(workspaceId: string, role: RoleModel, email: string | null, client: string | null, fairLabel = "Fair"): Promise<DeckOptions["templates"]> {
   // the code's templates, and those Fair adopted from clients into this role version
   const fair = [...templatesFor(role.id), ...(role.template_defs ?? []).filter((t) => !templatesFor(role.id).some((c) => c.key === t.key))];
   const order = role.deck_templates?.length ? role.deck_templates : fair.map((t) => t.key);
-  const ours = fair.filter((t) => order.includes(t.key)).sort((a, b) => order.indexOf(a.key) - order.indexOf(b.key)).map((t) => ({ ...t, badge: "Fair" }));
+  const ours = fair.filter((t) => order.includes(t.key)).sort((a, b) => order.indexOf(a.key) - order.indexOf(b.key)).map((t) => ({ ...t, badge: fairLabel }));
   const own = await companyTemplates(workspaceId, role.id, email).catch(() => []);
   return [...ours, ...own.map((t) => ({ ...t, badge: t._creation.status === "approved" ? client ?? "Your team" : "Yours, not shared yet", by: t._creation.maker }))];
 }
 
-export async function deckOptions(workspaceId: string, role: RoleModel = BRAND_KOL, email: string | null = null): Promise<DeckOptions> {
+/** fair: the badge on what came with the role ("Fair", or a presenter's brand for the day, src/brand/demo.ts) */
+export async function deckOptions(workspaceId: string, role: RoleModel = BRAND_KOL, email: string | null = null, fair = "Fair"): Promise<DeckOptions> {
   const ctx = await loadContext(new SkillDb(), workspaceId);
   const [day, week, month] = await Promise.all([deckPeriods(workspaceId, "day", 14), deckPeriods(workspaceId, "week", 12), deckPeriods(workspaceId, "month", 6)]);
   const brands = ctx.brands.map((b) => ({ id: b.id, name: brandLabel(b.name) })).sort((a, b) => a.name.localeCompare(b.name));
@@ -57,7 +58,7 @@ export async function deckOptions(workspaceId: string, role: RoleModel = BRAND_K
   const known = new Set(brands.map((b) => b.id));
   return {
     brands,
-    templates: await teamTemplates(workspaceId, role, email, own?.name ?? null),
+    templates: await teamTemplates(workspaceId, role, email, own?.name ?? null, fair),
     slides: SLIDES.map((s) => ({ kind: s.kind, title: s.title, description: s.description, pages: s.pages, ...(s.required ? { required: true } : {}), ...(s.needs ? { needs: s.needs } : {}) })),
     periods: { day: day.map((p) => ({ key: p.key, label: p.label })), week: week.map((p) => ({ key: p.key, label: p.label })), month: month.map((p) => ({ key: p.key, label: p.label })) },
     client: own ? { name: own.name, brand_ids: [own.id] } : null,
@@ -75,7 +76,7 @@ export async function deckOptions(workspaceId: string, role: RoleModel = BRAND_K
     platforms: (await new SkillDb().q<{ platform: string }>(panelPlatformsSql("$1"), [workspaceId])).map((r) => r.platform),
     focus: ctx.clientBrandId ?? brands[0]?.id ?? null,
     team_skills: [
-      ...(await recipesFor(role.recipes).catch(() => [])).map((r) => ({ key: r.key, title: r.title, description: r.description, badge: "Fair" })),
+      ...(await recipesFor(role.recipes).catch(() => [])).map((r) => ({ key: r.key, title: r.title, description: r.description, badge: fair })),
       ...(await companyRecipes(workspaceId, role.id, email).catch(() => [])).filter((r) => r._creation.status === "approved").map((r) => ({ key: r.key, title: r.title, description: r.description, badge: own?.name ?? "Your team", by: r._creation.maker })),
     ],
   };

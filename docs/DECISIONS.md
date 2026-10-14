@@ -1154,3 +1154,10 @@ Refal: "the Pulse says 31K, the dashboard 29K, we loaded 51K; and the hourly lin
 - **The wave's first day is the wave's.** The root post and the daily charts start where the wave did, not where the sliding hourly window starts. Kahf's root went back to @kahfeveryday DeKWiFpE_9K; the slide had moved it to Kahf Malaysia's apology. Maudy's is unchanged.
 - **Why comments look quiet after 8 Oct:** comments come from the threads scraped. There are 90 threads about Kahf from 9 Oct on with 50 or more replies (about 57,000), and 35 of their comments are loaded. Posts, found by search, show the talk continuing: 585 posts on 11 Oct (claims that Indonesians insulted Malaysia's king and Tun Mahathir, and boycott calls spreading to other Indonesian brands), 213 on 12 Oct to midday.
 - Speed: about 0.6 s more database time on Kahf's Pulse and 0.15 s on its dashboard (`pnpm perf`), inside the 10 s Refal allows for a slower page.
+
+## A presenter's brand for the day: BPA Listening (Refal, 14 Oct 2026)
+
+- **For one presentation, the app can go by another name in one browser.** Fair staff open `/brand/bpa`. For a day, that browser alone shows "BPA Listening": the sidebar, the tab title, the sign-in page, the account row (no "Fair ·") and the badge on the role's own analyses and templates. The mark has no name in it, so it stays.
+- `/brand/fair` puts it back; the cookie (`fi_brand`) lapses after 24 hours on its own. Clients cannot set it.
+- **Nothing else moves.** The data, the numbers, other people's screens, emails, CeMO's prompt and the report files already made stay Fair's. A deck or Weekly Report opened in the demo still carries its own footer and client name.
+- The brands are listed in `src/brand/demo.ts`; it is the one place to add or remove one. This overrides "the platform is Fair Intelligence everywhere" only inside that browser.

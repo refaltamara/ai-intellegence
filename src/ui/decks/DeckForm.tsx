@@ -8,6 +8,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import type { DeckOptions } from "@/decks/page";
 import type { DeckSpec } from "@/decks/spec";
+import { isFairBadge } from "../../brand/demo";
 import { MultiSelect } from "../MultiSelect";
 import { PeriodPick } from "./PeriodPick";
 import { SlideDescriber, type AddedSlide } from "./SlideDescriber";
@@ -151,7 +152,7 @@ export function DeckForm({ options, initial, prefill }: { options: DeckOptions; 
           <div className="tpls">
             {options.templates.map((x) => (
               <button key={x.key} type="button" className={template === x.key ? "on" : ""} onClick={() => pickTemplate(x.key)}>
-                <b>{x.name}{x.badge && <i className={`badge ${x.badge === "Fair" ? "fair" : "client"}`} title={x.by ? `Made by ${x.by}` : undefined}>{x.badge}</i>}</b><span>{x.description}</span>
+                <b>{x.name}{x.badge && <i className={`badge ${isFairBadge(x.badge) ? "fair" : "client"}`} title={x.by ? `Made by ${x.by}` : undefined}>{x.badge}</i>}</b><span>{x.description}</span>
                 <small>{x.grain === "month" ? "Month on month" : x.grain === "day" ? "Day on day" : "Week on week"} · {(x.rep_slides ?? x.social_slides ?? x.slides).length} slide types</small>
               </button>
             ))}
@@ -268,7 +269,7 @@ export function DeckForm({ options, initial, prefill }: { options: DeckOptions; 
           {teamSkills.map((x) => (
             <label key={x.key} className={picked.includes(x.key) ? "on" : ""}>
               <input type="checkbox" checked={picked.includes(x.key)} onChange={() => setPicked((p) => (p.includes(x.key) ? p.filter((k) => k !== x.key) : [...p, x.key].slice(0, 6)))} />
-              <span><b>{x.title}<i className={`badge ${x.badge === "Fair" ? "fair" : "client"}`} title={x.by ? `Made by ${x.by}` : undefined}>{x.badge}</i></b><em>{x.description}</em></span>
+              <span><b>{x.title}<i className={`badge ${isFairBadge(x.badge) ? "fair" : "client"}`} title={x.by ? `Made by ${x.by}` : undefined}>{x.badge}</i></b><em>{x.description}</em></span>
             </label>
           ))}
         </div>

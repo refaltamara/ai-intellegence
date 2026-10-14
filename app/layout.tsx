@@ -11,6 +11,8 @@ import { teamsFor } from "@/workspace/teams";
 import { headers } from "next/headers";
 import { caseNamesFor } from "@/cases/store";
 import { sql } from "@/db/client";
+import { currentBrand } from "@/brand/current";
+import type { DemoBrand } from "@/brand/demo";
 
 /** Pages that take the whole screen: sign-in, the team question, connector consent. */
 const FULL_SCREEN = ["/login", "/reset", "/reset/", "/persona", "/oauth/", "/invite/", "/admin", "/admin/"];
@@ -18,14 +20,16 @@ const FULL_SCREEN = ["/login", "/reset", "/reset/", "/persona", "/oauth/", "/inv
 export const dynamic = "force-dynamic";
 
 export async function generateMetadata() {
-  const cfg = await getWorkspace(await currentWorkspaceId()).catch(() => null);
-  return { title: cfg?.product_name ?? "Fair Intelligence", description: `${cfg?.tagline ?? "Social intelligence"} on Fair's social listening data` };
+  const [cfg, brand] = await Promise.all([getWorkspace(await currentWorkspaceId()).catch(() => null), currentBrand()]);
+  return { title: brand?.name ?? cfg?.product_name ?? "Fair Intelligence", description: `${cfg?.tagline ?? "Social intelligence"} on Fair's social listening data` };
 }
 
 export default async function RootLayout({ children }: { children: ReactNode }) {
   const ws = await currentWorkspaceId();
   const session = await currentSession();
   const path = (await headers()).get("x-pathname") ?? "";
+  // a presenter's brand for the day, this browser only (src/brand/demo.ts)
+  const brand = await currentBrand();
   const bare = FULL_SCREEN.some((p) => path === p || (p.endsWith("/") && path.startsWith(p)));
   const [recent, cfg, actor, role] = session && !bare
     ? await Promise.all([
@@ -41,7 +45,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
   const waiting = builder ? await waitingCount(ws, role.id).catch(() => 0) : 0;
   // a case shows only to the people on its list (DECISIONS, 10 Oct 2026, step 5)
   const cases = actor ? (await caseNamesFor(actor, ws).catch(() => [])).length : 0;
-  const user = session ? { email: session.email, role: who(actor, ws, role.id), team: !!actor && can(actor, "team.manage", { workspace: ws }), cms: !!actor && can(actor, "cms.open"), company: { label: `Our ${role.codename}`, waiting }, cases } : null;
+  const user = session ? { email: session.email, role: who(actor, ws, role.id, brand), team: !!actor && can(actor, "team.manage", { workspace: ws }), cms: !!actor && can(actor, "cms.open"), company: { label: `Our ${role.codename}`, waiting }, cases } : null;
   return (
     <html lang="en">
       <head>
@@ -51,7 +55,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
       <body>
         {session && !bare ? (
           <div className="app">
-            <Sidebar recent={recent.map((c) => ({ id: c.id, title: c.title ?? "Untitled", href: `/?c=${c.id}` }))} user={user!} product={{ name: cfg?.product_name ?? "Fair Intelligence", tagline: cfg?.tagline ?? "", label: cfg?.category_label ?? ws, kind: cfg?.kind ?? "category" }} teams={teams} currentWorkspace={ws} currentRole={role.id} />
+            <Sidebar recent={recent.map((c) => ({ id: c.id, title: c.title ?? "Untitled", href: `/?c=${c.id}` }))} user={user!} product={{ name: brand?.name ?? cfg?.product_name ?? "Fair Intelligence", tagline: cfg?.tagline ?? "", label: cfg?.category_label ?? ws, kind: cfg?.kind ?? "category" }} teams={teams} currentWorkspace={ws} currentRole={role.id} />
             <main className="main">{children}</main>
           </div>
         ) : (
@@ -63,9 +67,9 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
 }
 
 /** what the account row says under the email: Fair duties, else the level on this team */
-function who(actor: Actor | null, ws: string, role: Parameters<typeof levelOf>[2]): string {
+function who(actor: Actor | null, ws: string, role: Parameters<typeof levelOf>[2], brand: DemoBrand | null = null): string {
   if (!actor) return "";
-  if (actor.staff.length) return `Fair · ${actor.staff.map((d) => DUTY_LABEL[d]).join(", ")}`;
+  if (actor.staff.length) return `${brand ? "" : "Fair · "}${actor.staff.map((d) => DUTY_LABEL[d]).join(", ")}`;
   const l = levelOf(actor, ws, role);
   return l === "builder" ? "Builder" : l === "member" ? "Member" : "";
 }
