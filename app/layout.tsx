@@ -12,6 +12,7 @@ import { headers } from "next/headers";
 import { caseNamesFor } from "@/cases/store";
 import { sql } from "@/db/client";
 import { currentBrand } from "@/brand/current";
+import { AppSwitcher } from "@/ui/AppSwitcher";
 import type { DemoBrand } from "@/brand/demo";
 
 /** Pages that take the whole screen: sign-in, the team question, connector consent. */
@@ -54,7 +55,8 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
       </head>
       <body>
         {session && !bare ? (
-          <div className="app">
+          <div className={brand?.apps?.length ? "app has-apps" : "app"}>
+            {brand?.apps?.length ? <AppSwitcher apps={brand.apps} owner={brand.short} /> : null}
             <Sidebar recent={recent.map((c) => ({ id: c.id, title: c.title ?? "Untitled", href: `/?c=${c.id}` }))} user={user!} product={{ name: brand?.name ?? cfg?.product_name ?? "Fair Intelligence", tagline: cfg?.tagline ?? "", label: cfg?.category_label ?? ws, kind: cfg?.kind ?? "category" }} teams={teams} currentWorkspace={ws} currentRole={role.id} />
             <main className="main">{children}</main>
           </div>
