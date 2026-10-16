@@ -26,6 +26,14 @@
       "received": "2026-10-12"
     },
     {
+      "path": "beauty-id/instagram_q3_2026_lmd_oct14.csv",
+      "workspace": "beauty-id",
+      "blob": "raw/beauty-id/instagram_q3_2026_lmd_oct14.csv",
+      "bytes": 10787,
+      "sha256": "f362450b27a3a6c18bc330341457ece84c40d53885f364e869f5784641596528",
+      "received": "2026-10-14"
+    },
+    {
       "path": "beauty-id/instagram_q3_2026_oct12.csv",
       "workspace": "beauty-id",
       "blob": "raw/beauty-id/instagram_q3_2026_oct12.csv",
@@ -40,6 +48,22 @@
       "bytes": 28839412,
       "sha256": "4f9c9f6bb8a95a5a63d6044a84ae6d2d4c393d2189f72e1caaba6c7dba6283f3",
       "received": "2026-10-06"
+    },
+    {
+      "path": "beauty-id/lmd_export_2026-10-14_saa.csv",
+      "workspace": "beauty-id",
+      "blob": "raw/beauty-id/lmd_export_2026-10-14_saa.csv",
+      "bytes": 1958111,
+      "sha256": "54e01058c2aec8b2f93d517f8fd870886b74c1ebdb313bdb995a1a00564d4d73",
+      "received": "2026-10-14"
+    },
+    {
+      "path": "beauty-id/lmd_export_2026-10-14.csv",
+      "workspace": "beauty-id",
+      "blob": "raw/beauty-id/lmd_export_2026-10-14.csv",
+      "bytes": 1739570,
+      "sha256": "7b529a43cfd4adb08b560b8871136bf3cfd55e2f8ee761aefffb851e60ce3bd4",
+      "received": "2026-10-14"
     },
     {
       "path": "beauty-id/tiktok_q3_2026_clean_categorized.csv",
@@ -80,6 +104,14 @@
       "bytes": 14632578,
       "sha256": "5372b309c12b4e6946731272cd7f41c9b1286d47bab4c260a6e89a044e28415d",
       "received": "2026-10-12"
+    },
+    {
+      "path": "beauty-id/tiktok_q3_2026_lmd_oct14.csv",
+      "workspace": "beauty-id",
+      "blob": "raw/beauty-id/tiktok_q3_2026_lmd_oct14.csv",
+      "bytes": 502090,
+      "sha256": "77407df6ae5dcc0be89374a61a767f6ba59bd202969bf6e65925f0ed6d21c90c",
+      "received": "2026-10-14"
     },
     {
       "path": "instagram_q1_2026.csv.gz",
@@ -218,11 +250,59 @@
       "received": "2026-10-14"
     },
     {
+      "path": "kahf-kol/comments_instagram_1014b.csv",
+      "workspace": "kahf-kol",
+      "blob": "raw/kahf-kol/comments_instagram_1014b.csv",
+      "bytes": 20431,
+      "sha256": "0f37dc38289782e40ae25091e119511a82e676b3859c719bab16492ad5f9e4b1",
+      "received": "2026-10-14"
+    },
+    {
+      "path": "kahf-kol/comments_instagram_1015.csv",
+      "workspace": "kahf-kol",
+      "blob": "raw/kahf-kol/comments_instagram_1015.csv",
+      "bytes": 23388,
+      "sha256": "b488d6388364ee4579d0f56cf55c46320243419a6b9a643fe6855b618a5da1f8",
+      "received": "2026-10-14"
+    },
+    {
       "path": "kahf-kol/comments_threads_1014.csv",
       "workspace": "kahf-kol",
       "blob": "raw/kahf-kol/comments_threads_1014.csv",
       "bytes": 16184,
       "sha256": "064a2742e3ce5cfd22ddd008a30326dcf92c9b4c743d3f52b0c7f36aac850b15",
+      "received": "2026-10-14"
+    },
+    {
+      "path": "kahf-kol/comments_threads_1014b.csv",
+      "workspace": "kahf-kol",
+      "blob": "raw/kahf-kol/comments_threads_1014b.csv",
+      "bytes": 24552,
+      "sha256": "ef47f1d5b05ea50613feaf808df57b82c7eeee305e3b4fa20cbf15a7608ddb06",
+      "received": "2026-10-14"
+    },
+    {
+      "path": "kahf-kol/comments_tiktok_1014.csv",
+      "workspace": "kahf-kol",
+      "blob": "raw/kahf-kol/comments_tiktok_1014.csv",
+      "bytes": 40882,
+      "sha256": "b602e778dec59490334202d609a12e713de06fecc6d894cca0f69e385ad98f9d",
+      "received": "2026-10-14"
+    },
+    {
+      "path": "kahf-kol/comments_tiktok_1014b.csv",
+      "workspace": "kahf-kol",
+      "blob": "raw/kahf-kol/comments_tiktok_1014b.csv",
+      "bytes": 54975,
+      "sha256": "b096dc6982025e3ce4a9cefe1584df2ece799e27a6977d199aae37cd0642cbe5",
+      "received": "2026-10-14"
+    },
+    {
+      "path": "kahf-kol/comments_tiktok_1015.csv",
+      "workspace": "kahf-kol",
+      "blob": "raw/kahf-kol/comments_tiktok_1015.csv",
+      "bytes": 62579,
+      "sha256": "a51ecc7aede296e4a79f3f8c07188309604e88f0c4b8f451148f84a3b7da1950",
       "received": "2026-10-14"
     },
     {
@@ -376,6 +456,14 @@
       "bytes": 578279,
       "sha256": "0d5cd888be14a69a12721261a97499c0bc7601b848672428fdc10e174a3ba8f9",
       "received": "2026-10-12"
+    },
+    {
+      "path": "kahf/contents_threads_1015a.csv",
+      "workspace": "kahf-threads",
+      "blob": "raw/kahf-threads/contents_threads_1015a.csv",
+      "bytes": 24835,
+      "sha256": "c5e515856ba20b963bcb528f09c27131e2cb3309e39258c96949e43a8e9c5cab",
+      "received": "2026-10-14"
     },
     {
       "path": "kahf/contents_threads.csv",

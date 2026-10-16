@@ -9,6 +9,8 @@ export const CREATION_LIMITS = {
   fact: 50,
   term: 50,
   extension: 10,
+  panel: 30,
+  dashboard: 20,
 } as const;
 
 /** a Member's open creations (draft, waiting, sent back) on one team */

@@ -212,6 +212,22 @@ Templates for the dump: `Indonesian_Beauty_Q3_2026_{TikTok,Instagram}_template.x
   - Instagram carousels and photos show no views by nature: 12,600 posts, 2,380 reported as 0 and 10,220 blank. Both read the same: rates and medians count views over 0 only.
 - Not cleaned, as before.
 
+**Nine brands from Fair's own database (loaded 14 Oct).** Refal's two exports of the same brands, June to September: `beauty-id/lmd_export_2026-10-14.csv` (4,919 rows, holding the 1,720 of the first file he sent) and `beauty-id/lmd_export_2026-10-14_saa.csv` (5,417 rows).
+- The brands: Esqa, Luxcrime, MOP, Mykonos, SAFF & Co., Somethinc Makeup, Timephoria, Velixir and HMNS. Alchemist is not a Beauty brand and is left out.
+- **Times are UTC**, not Jakarta: they match each TikTok video id and Instagram shortcode to the second.
+- `etl/quarterly/lmd_to_scraper.py` prepares the rows for the usual converters:
+  - writes the times as Jakarta time;
+  - merges the two exports, keeping the highest reading and the earliest time;
+  - keeps 1 July to 30 September and only links Beauty did not hold (Refal: "remove the duplicate links"; 3,872 rows were already held).
+  - `convert_tiktok.py` and `convert_instagram.py` then run as usual. The export's own category and format are the product category and content format, in Q2's words.
+- One video already held under another handle (@el_ithr) was left out.
+- **Load `d743991e`:** 1,376 TikTok links (204 July, 224 August, 948 September) and 27 Instagram links, all new posts.
+  - It was held on "times of day as before". The earlier Q3 exports give a date only, so their posts sit at midnight, while these carry the real time. It was let in from the CLI.
+  - The export says nothing about the cart, so it stays unknown on these links.
+- **Rules:** the brand rule and the not-beauty rule catch none. The market rule sets aside 42: country tags, another language, another script.
+- TikTok for the other brands is as it was: incomplete in early July and from late August. In client material Refal says only that the data is incomplete and we are working on it, never which days (14 Oct).
+- **Instagram Q3's own times are dates.** Those exports carried a date only, stored as midnight in Jakarta. The day is right (0.4% of posts differ from the day in their shortcode); the hour of day is not there to read.
+
 ## Kahf on Threads (profile workspace `kahf-threads`, Fair's scraper, 7 Oct 2026 ~10:00 WIB)
 
 One contents file, `data/raw/kahf/contents_threads.csv` (posts only; comments to follow). Contract: `etl/profiles/kahf-threads.json`; loader: `etl/load_profile.py`.
@@ -307,6 +323,13 @@ One contents file, `data/raw/kahf/contents_threads.csv` (posts only; comments to
   - 1,260 are about the case: Malaysian 629 (386 negative), Indonesian 404 (283 positive, defending), unclear 226. A comment counts by its own label, whatever its post: 262 of them sit under set-aside posts, 142 under @syatirah_husna DeW-MFaGWMn (flags outside a supermarket).
   - On the Pulse: comments about Kahf 29,694 → 30,954; "more in these threads are about something else" 16,946 → 20,061; 51,015 in all (Kahf's own replies aside).
   - Brought into the Beauty case the same hour (`pnpm case sync`: 4,375 comments, 14,404 labels, the 23 set-aside replies). Both hold 4,625 posts (677 set aside) and 51,018 comments; totals reconcile on both.
+- **Posts, 14 Oct pull** (`threads_post.csv`, Apify Threads scraper; `kahf/contents_threads_1015a.csv`): 647 rows, 194 posts, 3 Oct to 15 Oct 01:08 WIB (ISO times with Z).
+  - A post can be listed several times; the row with the most likes and replies is kept. Left out: 98 marked as replies (`isReply`: comments, not posts) and the 20 already loaded (their numbers stay as loaded). 76 written, no follower counts.
+  - Loaded (load `1bb6495f`): 76 posts, 4,701 in all.
+  - Labelled within about 4 minutes. **34 are off the case and set aside**, among them the most liked: the haze, the Kalimantan fires, prayers to stop the quarrel, football, a helmet giveaway. Of the 41 with a stance, 26 are against Kahf, 9 defend it and 6 are neutral; one has no caption. Malaysian voices 26 (21 against), Indonesian 10 (7 defending), unclear 5. Topics: boycott 13, the original post 12, others 12, the apology 3, Paragon 1.
+  - Among them is @hanifloid's own Threads post (`DedKb0MEj4F`, 8,526 likes): the KOL refusal, read as against Kahf, now counted in both Kahf workspaces.
+  - Across all 4,701 posts: 711 set aside; of the 3,948 with a stance, 2,419 are against Kahf (61%), 912 defend it and 617 are neutral.
+  - Brought into the Beauty case (`pnpm case sync`: 75 posts, 222 labels). In Beauty, @hanifloid's post was already the KOL refusal case's. The sync now leaves a post that another case holds with that case, counted as `other_case`; before, any post held outside the case stopped the sync. So the Beauty case holds 4,700 posts, and comments match on both sides (51,018).
 
 
 ## Kahf: a KOL's refusal (profile workspace `kahf-kol`, 14 Oct 2026; Beauty case `kahf-kol-refusal`)
@@ -317,6 +340,28 @@ One contents file, `data/raw/kahf/contents_threads.csv` (posts only; comments to
 - **Comments, 14 Oct** (ISO times with Z): `dataset_instagram-comment-scraper_2026-10-14_04-55-37-227.csv` (Apify; `kahf-kol/comments_instagram_1014.csv`, columns renamed only), 117 comments, 08:07 to 11:48 WIB; `scrapper-results-20261014-1159.csv` (Fair's scraper; `kahf-kol/comments_threads_1014.csv`), 98 replies, 08:09 to 11:55 WIB, Threads' numeric ids written as their short codes. Loaded (load `7aecacd0`): 175 comments; 40 left out as emoji only or empty. TikTok's comments are to follow.
 - **Labelled** by the cron within two minutes (06:10 UTC). 15 are off the case. Of the 160 about it, 155 are negative toward Kahf and 5 neutral; none positive. Topics: praise for turning it down 129, support local and boycott 22 (Bad Lab named in 12 comments, Ubermen in 6, "Maka Kami" in 13: commenters asking local brands to sign him), the approach 4 ("this is the second KOL to turn Kahf down"), the AFF meme 3, others 17. Voices: Malaysian 118, unclear 57, Indonesian none. All three posts read as against Kahf.
 - **Beauty case** `kahf-kol-refusal` (`pnpm case copy kahf-kol beauty-id --case kahf-kol-refusal --brand kahf-kol=kahfeveryday`), the same access list; later loads go into `kahf-kol` first and then `pnpm case sync` with the same arguments.
+- **TikTok comments, 14 Oct** (`dataset_tiktok-comments-scraper_2026-10-14_06-11-36-625.csv`, Apify; `kahf-kol/comments_tiktok_1014.csv`, columns renamed only): 239 comments, 08:08 to 13:10 WIB, with likes. The scraper gives the photo post as `/video/<id>`; written against the `/photo/` link loaded earlier, so they sit under the one post. Loaded (load `35400c0c`): 212; 27 emoji only or empty. Labelled within two minutes and synced into the Beauty case.
+  - TikTok: 193 about Kahf (19 about something else), 187 negative, 1 defending; first comment 5 minutes after the post, busiest 10:00 WIB (47), still about 40 an hour at noon. Most liked: "villain dlm Kudrat tapi hero dalam kehidupan sebenar" (527 likes) and a call to every local Malaysian brand to seize the opportunity (267).
+  - The whole case: 387 comments, 353 about Kahf, 342 negative (97%), 1 defending. Bad Lab is tagged in 21 comments (@badlabco 11, @badlabmy 10) and Ubermen in 6; the most-liked comment of all is on Threads (2,932 likes): "Hi @ubermen.my. I'll make you the same offer as I made Bad Lab. Collaborate with this man".
+- **Afternoon batch, 14 Oct** (to 15:22 WIB): `IG_comment_kahf.csv` (144), `thread_replies_kahf.csv` (146) and `tiktok_comment_kahf.csv` (323).
+  - Each file holds every morning comment again. Written as `kahf-kol/comments_<platform>_1014b.csv`; Threads' numeric ids as short codes, 98 of 98 agreeing with the morning file.
+  - Load `c7b400e1`: 132 new comments, newer likes on 66. Labelled within four minutes and synced into the Beauty case.
+  - **The case now:** 519 comments, 479 about Kahf, 460 negative (96%), 1 defending.
+    - By platform: TikTok 286 (257 negative), Threads 137 (118), Instagram 96 (85).
+    - Topics: praise for turning it down 370, support local and boycott 75, the approach 16, the meme 4, others 14.
+    - Voices: Malaysian 355, unclear 163, Indonesian 1.
+  - **The pace:** busiest 09:00 WIB (100), still 41 to 49 an hour at 13:00 and 14:00.
+  - **Tags and likes:** Bad Lab is tagged in 26 comments and Ubermen in 8. The Threads comment to @ubermen.my now has 8,236 likes.
+- **Overnight pull, 15 Oct** (about 05:40 WIB): `tiktok_comment_hanifloid.csv` (361) and `IG_comment_hanifloid.csv` (164), Apify; written as `kahf-kol/comments_<platform>_1015.csv`, columns renamed only. Threads was not pulled again.
+  - Instagram holds every comment of the afternoon file again, plus 20 more. TikTok holds 250 of the afternoon's 323, plus 111 new; the 73 missing (deleted, or the scraper's page cut-off) stay as loaded.
+  - Load `b4fa461d`: 111 new comments (TikTok 98, Instagram 13; the rest emoji only or empty), newer likes on 36. They run from 15:22 WIB on 14 Oct to 05:41 WIB on 15 Oct.
+  - Labelled within about 5 minutes and synced into the Beauty case. Of the 111, 102 are about Kahf: 97 negative, 1 defending.
+  - **The case now:** 630 comments, 581 about Kahf, 557 negative (96%), 2 defending.
+    - By platform: TikTok 384 (344 negative), Threads 137 (118), Instagram 109 (95).
+    - Topics: praise for turning it down 446, support local and boycott 81, the approach 32, others 17, the meme 5.
+    - Voices: Malaysian 443, unclear 185, Indonesian 2.
+  - **The pace fell away in the evening:** 30 comments at 15:00 WIB, 22 at 16:00, 15 at 17:00, under a dozen an hour from 18:00, two an hour overnight.
+  - **Tags and likes:** Bad Lab is tagged in 32 comments and Ubermen in 9. On TikTok, "villain dlm Kudrat tapi hero dalam kehidupan sebenar" now has 1,178 likes and the call to Malaysia's local brands has 900.
 
 ## The one loader (DECISIONS, 10 Oct 2026)
 

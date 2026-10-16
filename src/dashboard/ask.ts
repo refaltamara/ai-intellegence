@@ -15,6 +15,7 @@ import { PLATFORM_NAME } from "./askref";
 import { brandHandles, buckets, content, filterQuery, Params, rankings, tiers, topCreators, totals, type Filters } from "./data";
 import { parsePeriod, shiftPeriod, weekOf, type Period } from "./period";
 import { resolvePulseAsk } from "../pulse/ask";
+import { resolveRepAsk } from "../reputation/ask";
 
 const PLATFORM_LABEL: Record<PlatformFilter, string> = { all: "All platforms", tiktok: "TikTok", instagram: "Instagram", threads: "Threads", x: "X", youtube: "YouTube" };
 const METRIC_LABEL = { posts: "content", views: "views (day 7)", engagements: "engagement", er: "engagement rate" } as const;
@@ -26,6 +27,8 @@ const changeOr = (now: number, prev: number | null | undefined) => (prev == null
 export async function resolveAsk(workspaceId: string, ref: AskRef): Promise<AskContext | null> {
   // a case's Pulse has its own figures and no filters
   if (ref.k === "pulse") return resolvePulseAsk(workspaceId, ref.card);
+  // the PR dashboard as a whole: its own figures, read again
+  if (ref.k === "rep") return resolveRepAsk(workspaceId, ref);
   const db = new SkillDb();
   const ctx = await loadContext(db, workspaceId);
   const period = parsePeriod(ref.period)!;

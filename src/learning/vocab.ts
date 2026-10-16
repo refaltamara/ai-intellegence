@@ -4,7 +4,7 @@
  * (what kind of thing it is, never its title or wording). Pure, so client code and the
  * tests can use it.
  */
-export const CREATION_KINDS_LIST = ["skill", "deck_template", "rule", "fact", "term", "extension"] as const;
+export const CREATION_KINDS_LIST = ["skill", "deck_template", "rule", "fact", "term", "extension", "panel", "dashboard"] as const;
 
 export const INTENTS = ["issue_check", "competitor_comparison", "content", "creators", "audience", "campaigns", "own_accounts", "data_question", "other"] as const;
 export type Intent = (typeof INTENTS)[number];
@@ -70,6 +70,12 @@ export function creationShape(kind: string, spec: Record<string, unknown>): stri
       const from = typeof spec.from === "string" && /^[a-z0-9-]{1,40}$/.test(spec.from) ? spec.from : "scratch";
       return `deck.${from}`;
     }
+    case "panel": {
+      const q = (spec.query ?? {}) as Query;
+      const chart = /^[a-z]{3,10}$/.test(String(spec.chart ?? "")) ? spec.chart : "chart";
+      return `panel.${chart}.${q.entity ?? "posts"}.${dim(q.metrics?.[0] ?? "count")}`.slice(0, 64);
+    }
+    case "dashboard": return `dashboard.${Array.isArray(spec.panels) ? Math.min(spec.panels.length, 9) : 0}`;
     case "rule": return `rule.${ruleCategory(String(spec.text ?? ""))}`;
     case "fact": return "fact";
     case "term": return "term";

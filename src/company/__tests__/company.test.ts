@@ -10,7 +10,7 @@ describe("dashboard sections", () => {
   it("keep the default order and pair half-width sections", () => {
     const a = arrange("pr", undefined);
     expect(a.shown.map((s) => s.key)).toEqual(sectionKeys("pr"));
-    expect(rows(a.shown).map((r) => r.map((s) => s.key))).toEqual([["issues"], ["platforms"], ["rising", "amplifiers"], ["narratives"], ["tagged"], ["voices"], ["own", "service"], ["competitive"], ["health"]]);
+    expect(rows(a.shown).map((r) => r.map((s) => s.key))).toEqual([["issues"], ["platforms"], ["pace"], ["rising", "amplifiers"], ["narratives"], ["tagged"], ["voices"], ["own", "service"], ["competitive"], ["health"]]);
   });
   it("follow the GoPay example: Amplifiers hidden, service complaints first, renamed", () => {
     const a = arrange("pr", { hidden: ["amplifiers"], order: ["service", ...sectionKeys("pr").filter((k) => k !== "service")], names: { service: "Customer care" } });
@@ -41,18 +41,22 @@ describe("company policies", () => {
     expect(sanitize({ "tiles.hidden": ["accounts"] }, "company", PR)).toEqual({});
     expect(sanitize({ "tiles.names": { service: "x".repeat(41) } }, "company", PR)).toEqual({});
   });
-  it("let a person order sections only for themselves, and nothing else of the company's", () => {
+  it("order the sections and the team's panels for everyone; a person no longer has their own order (16 Oct 2026)", () => {
     const order = [...sectionKeys("social")].reverse();
-    expect(sanitize({ "tiles.order": order, "tiles.hidden": ["best"] }, "member", SOCIAL)).toEqual({ "tiles.order": order });
+    expect(sanitize({ "tiles.order": order, "tiles.hidden": ["best"] }, "member", SOCIAL)).toEqual({});
+    expect(sanitize({ "tiles.order": order }, "company", SOCIAL)).toEqual({ "tiles.order": order });
     // an order saved before a release added a section stays; ids the code does not know leave it; a section twice is refused
-    expect(sanitize({ "tiles.order": order.slice(1) }, "member", SOCIAL)).toEqual({ "tiles.order": order.slice(1) });
-    expect(sanitize({ "tiles.order": ["nope", ...order] }, "member", SOCIAL)).toEqual({ "tiles.order": order });
-    expect(sanitize({ "tiles.order": [...order, order[0]] }, "member", SOCIAL)).toEqual({});
+    expect(sanitize({ "tiles.order": order.slice(1) }, "company", SOCIAL)).toEqual({ "tiles.order": order.slice(1) });
+    expect(sanitize({ "tiles.order": ["nope", ...order] }, "company", SOCIAL)).toEqual({ "tiles.order": order });
+    expect(sanitize({ "tiles.order": [...order, order[0]] }, "company", SOCIAL)).toEqual({});
+    // the team's panels sit among the sections, and may be hidden or renamed
+    expect(sanitize({ "tiles.order": ["p:tiktok-affiliates", ...order] }, "company", SOCIAL)).toEqual({ "tiles.order": ["p:tiktok-affiliates", ...order] });
+    expect(sanitize({ "tiles.hidden": ["p:tiktok-affiliates"], "tiles.names": { "p:tiktok-affiliates": "Affiliates" } }, "company", SOCIAL)).toEqual({ "tiles.hidden": ["p:tiktok-affiliates"], "tiles.names": { "p:tiktok-affiliates": "Affiliates" } });
+    expect(sanitize({ "tiles.order": ["p:x"] }, "company", SOCIAL)).toEqual({});
   });
-  it("resolve tiles even though Fair's role has no tiles block", () => {
-    const r = resolve(PR, { "tiles.hidden": ["amplifiers"] }, { "tiles.order": sectionKeys("pr") });
+  it("resolve tiles even though Fair's role has no tiles block; a person's old order is left out", () => {
+    const r = resolve(PR, { "tiles.hidden": ["amplifiers"], "tiles.order": sectionKeys("pr") }, { "tiles.order": [...sectionKeys("pr")].reverse() });
     expect(r.role.tiles).toEqual({ hidden: ["amplifiers"], order: sectionKeys("pr") });
-    expect(r.dropped).toEqual([]);
   });
   it("keep the crisis level above the issue level", () => {
     expect(resolve(PR, { "alert.crisis_multiple": 4, "alert.crisis_min_negative": 100 }).role.alert).toMatchObject({ crisis_multiple: 4, crisis_min_negative: 100 });

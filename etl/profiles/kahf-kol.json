@@ -19,7 +19,7 @@
     }
   },
   "export_time": "2026-10-14T04:59:00Z",
-  "case_note": "14 Oct 2026: Malaysian creator @hanifloid turned down a Kahf campaign approach (Fair, for ParagonCorp, asking for his rate card) and posted it on Instagram, Threads and TikTok within three minutes (08:02 to 08:05 WIB), captioned \"... suport locals.\" Comments arrive by platform as they are scraped; TikTok's are to follow.",
+  "case_note": "14 Oct 2026: Malaysian creator @hanifloid turned down a Kahf campaign approach (Fair, for ParagonCorp, asking for his rate card) and posted it on Instagram, Threads and TikTok within three minutes (08:02 to 08:05 WIB), captioned \"... suport locals.\" Comments arrive by platform as they are scraped: a morning batch (to about 11:50 WIB, TikTok to 13:10) and an afternoon batch (to about 15:20 WIB) that holds every morning comment again.",
   "keywords": [],
   "keyword_platforms": [],
   "keyword_platforms_note": "Every post here is the creator's own post about the approach, and his caption does not name Kahf (the screenshot does): nothing is dropped by keyword.",
@@ -53,6 +53,42 @@
       "platform": "threads",
       "file": "kahf-kol/comments_threads_1014.csv",
       "note": "scrapper-results-20261014-1159.csv (Fair's scraper), 14 Oct: 98 replies to the post, 01:09 to 04:55 UTC (ISO times with Z), none a reply to a reply. Threads' numeric comment ids written as their short codes, as in kahf-threads."
+    },
+    {
+      "kind": "comments",
+      "platform": "tiktok",
+      "file": "kahf-kol/comments_tiktok_1014.csv",
+      "note": "dataset_tiktok-comments-scraper_2026-10-14_06-11-36-625.csv (Apify TikTok comments scraper), 14 Oct: 239 comments on the post, 01:08 to 06:10 UTC (ISO times with Z), with likes (diggCount); columns renamed only (cid, uniqueId, text, createTimeISO, diggCount, replyCommentTotal). The scraper gives the post as /video/7696322750981426439; TikTok serves this photo post at both addresses, so the comments are written against the /photo/ link loaded on 14 Oct."
+    },
+    {
+      "kind": "comments",
+      "platform": "instagram",
+      "file": "kahf-kol/comments_instagram_1014b.csv",
+      "note": "IG_comment_kahf.csv (Apify Instagram comment scraper), 14 Oct afternoon: 144 comments, 01:07 to 08:17 UTC: every comment of the morning file (117, likes read again) and 27 more. Columns renamed only (postUrl, id, ownerUsername, text, timestamp, likesCount, repliesCount)."
+    },
+    {
+      "kind": "comments",
+      "platform": "threads",
+      "file": "kahf-kol/comments_threads_1014b.csv",
+      "note": "thread_replies_kahf.csv (Fair's scraper, scraped 08:23 UTC), 14 Oct afternoon: 146 replies, 01:09 to 08:22 UTC: every reply of the morning file (98) and 48 more, none a reply to a reply. Threads' numeric comment ids written as their short codes (98 of 98 agree with the morning file)."
+    },
+    {
+      "kind": "comments",
+      "platform": "tiktok",
+      "file": "kahf-kol/comments_tiktok_1014b.csv",
+      "note": "tiktok_comment_kahf.csv (Apify TikTok comments scraper), 14 Oct afternoon: 323 comments, 01:08 to 08:19 UTC: every comment of the morning file (239, likes read again) and 84 more, none a reply. Columns renamed only (cid, uniqueId, text, createTimeISO, diggCount, replyCommentTotal); written against the /photo/ link, as in the morning."
+    },
+    {
+      "kind": "comments",
+      "platform": "instagram",
+      "file": "kahf-kol/comments_instagram_1015.csv",
+      "note": "IG_comment_hanifloid.csv (Apify Instagram comment scraper), pulled about 05:45 WIB on 15 Oct: 164 comments, 01:07 to 22:41 UTC on 14 Oct: every comment of the afternoon file (144, likes read again) and 20 more. Columns renamed only."
+    },
+    {
+      "kind": "comments",
+      "platform": "tiktok",
+      "file": "kahf-kol/comments_tiktok_1015.csv",
+      "note": "tiktok_comment_hanifloid.csv (Apify TikTok comments scraper), pulled about 05:40 WIB on 15 Oct: 361 comments, 01:08 to 22:37 UTC on 14 Oct, none a reply: 111 not in the afternoon file; 73 of the afternoon's are not in this pull (deleted, or the scraper's page cut-off) and stay as loaded. Columns renamed only; written against the /photo/ link."
     }
   ]
 }

@@ -851,6 +851,8 @@ th{background:linear-gradient(180deg,#F8FAFE,#F4F7FC)}
 .teamswitch button:hover:not(.on){color:var(--text);background:#fff}
 .teamswitch button.on{background:var(--tone);color:#fff;box-shadow:0 6px 14px -6px var(--tone)}
 .teamswitch button:disabled{cursor:default}
+.teamswitch button.na{opacity:.42;cursor:not-allowed;font-weight:600}
+.teamswitch button.na:hover{background:transparent;color:var(--text-2)}
 .wspick{display:flex;flex-direction:column;gap:4px;margin-top:-6px}
 .wspick span{font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-3);padding-left:4px}
 .wspick select{width:100%;padding:8px 10px;border-radius:10px;border:1px solid var(--line);background:#fff;font:inherit;font-size:12.5px;font-weight:600;color:var(--text);box-shadow:var(--shadow-xs)}
@@ -884,6 +886,12 @@ th{background:linear-gradient(180deg,#F8FAFE,#F4F7FC)}
 .team .d{font-size:14px;color:var(--text-2);line-height:1.5}
 .team .w{font-size:12px;color:var(--text-3);margin-top:4px}
 .team .go{margin-top:10px;font-size:13px;font-weight:700;color:var(--tone)}
+.team.na{opacity:.55}
+.team.na .w{font-weight:600}
+.team.multi:hover{transform:none}
+.team .wsl{display:flex;flex-direction:column;gap:6px;margin-top:10px}
+.team .wsl button{text-align:left;padding:9px 12px;border-radius:10px;border:1px solid var(--line);background:#fff;font-size:13px;font-weight:700;color:var(--tone);transition:border-color .2s var(--ease),background .2s var(--ease)}
+.team .wsl button:hover:not(:disabled){border-color:var(--tone);background:var(--tone-10)}
 
 /* ---------- connector: consent and the connect page ---------- */
 .consent .box{max-width:460px}
@@ -1365,6 +1373,34 @@ th{background:linear-gradient(180deg,#F8FAFE,#F4F7FC)}
 .deckitem .dkind,.dpinned .dkind{font-size:10.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--blue)}
 .deckitem .drec{color:var(--blue);font-weight:600}
 .deckitem .derr{color:var(--red)}
+/* Decks as one list with each deck's status (16 Oct 2026) */
+.dlist{display:flex;flex-direction:column;gap:12px;margin-bottom:22px}
+.dfilter{align-self:flex-start}
+.dfilter button{padding:4px 11px;border-radius:999px;font-size:12px;font-weight:600;color:var(--text-2)}
+.dfilter button.on{background:var(--text);color:#fff}
+.dfilter button small{opacity:.6;margin-left:3px}
+.dtable{width:100%;border-collapse:collapse}
+.dtable th{text-align:left;font-size:11.5px;font-weight:700;color:var(--text-3);padding:10px 12px;border-bottom:1px solid var(--line);white-space:nowrap}
+.dtable td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;font-size:13px}
+.tablewrap .dtable tbody tr{cursor:default}
+.tablewrap .dtable tbody tr:hover td{background:transparent}
+.dtable tr:last-child td{border-bottom:0}
+.dtable .dname a{color:var(--text)}
+.dtable .dname a:hover b{color:var(--blue)}
+.dtable .dname small,.dtable .ddetail,.dtable .derr{display:block;font-size:11.5px;color:var(--text-3);margin-top:3px;line-height:1.4}
+.dtable .derr{color:var(--red)}
+.dtable .dbrands{max-width:220px;color:var(--text-2)}
+.dstate{display:inline-block;font-size:11px;font-weight:800;letter-spacing:.02em;padding:2px 9px;border-radius:999px;background:var(--line);color:var(--text-2)}
+.dstate.monitoring{background:var(--mint-10);color:var(--mint)}
+.dstate.paused{background:var(--sun-10);color:var(--sun)}
+.dstate.ended{background:#EEF1F5;color:var(--text-3)}
+.dstate.one-off{background:var(--blue-10);color:var(--blue)}
+.dtable tr.ds-ended td{color:var(--text-3)}
+.dtable .dacts{white-space:nowrap;text-align:right}
+.dtable .dacts .btn{margin-left:4px}
+.dtable .dacts .btn.danger{color:var(--red)}
+.dtable .duntilrow{display:inline-flex;gap:6px;align-items:center}
+.dtable .duntilrow input{padding:4px 7px;border:1px solid var(--line);border-radius:8px;font:inherit;font-size:12px}
 .dpinned{display:flex;flex-direction:column;gap:4px;border:1px solid var(--blue);border-radius:18px;padding:16px 18px;margin-bottom:16px;background:linear-gradient(135deg,#fff 55%,var(--blue-10));color:inherit;text-decoration:none;max-width:560px}
 .dpinned b{font-size:15px;font-weight:800}
 .dpinned span:last-child{font-size:12.5px;color:var(--text-2)}
@@ -1385,6 +1421,14 @@ th{background:linear-gradient(180deg,#F8FAFE,#F4F7FC)}
 .deckform section.cgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));align-items:end}
 .deckform .seg{align-self:flex-start}
 .deckform .dcheck.wide{grid-column:1/-1}
+.deckform .ddescribe{background:linear-gradient(135deg,var(--blue-10),#fff 70%);border:1px solid var(--line);border-radius:16px;padding:16px 18px}
+.deckform .ddescribe h3{margin:0 0 4px}
+.deckform .ddescribe .ddrow{display:flex;gap:10px;align-items:flex-start;margin-top:10px}
+.deckform .ddescribe textarea{flex:1;padding:9px 11px;border:1px solid var(--line);border-radius:10px;font:inherit;font-size:13.5px;resize:vertical;background:#fff}
+.deckform .ddescribe .ddone{margin-top:10px;font-size:13px;color:var(--text-2)}
+.deckform .duntil{grid-column:1/-1;display:flex;gap:8px;align-items:center;font-size:13px;font-weight:600;padding-left:24px}
+.deckform .duntil input{padding:5px 8px;border:1px solid var(--line);border-radius:8px;font:inherit;font-weight:500}
+.deckform .duntil small{font-weight:400;color:var(--text-3)}
 .slidepick b small{margin-left:4px}
 
 /* ---------------------------------------------------------------- PR dashboard (DECISIONS 3 Oct 2026) */
@@ -1664,7 +1708,8 @@ ul.dropped{margin:8px 0 0 16px;font-size:12px;color:var(--red)}
 table.changes.counts th{font-size:11px;color:var(--text-3);text-align:left;font-weight:600;padding:4px}
 .replay .prladder{gap:1px}.replay .prladder i{border-radius:1px;height:16px}
 .nav a.ours{margin-top:6px;border-top:1px dashed var(--line-2);border-radius:0 0 9px 9px;padding-top:11px}
-.nav a.ours .count{margin-left:auto;background:var(--violet);color:#fff;font-size:11px;border-radius:999px;padding:0 7px;line-height:18px}
+.nav a.ours .count,.bottom a.ours .count{margin-left:auto;background:var(--violet);color:#fff;font-size:11px;border-radius:999px;padding:0 7px;line-height:18px}
+.nav a[href="/cases"] .count{margin-left:auto;background:var(--coral-10,#fdecea);color:var(--coral);font-size:11px;border-radius:999px;padding:0 7px;line-height:18px}
 .company .badgekey{font-size:12px;color:var(--text-3)}
 .clist{list-style:none;display:flex;flex-direction:column;gap:8px}
 .crow{display:flex;gap:14px;align-items:flex-start;justify-content:space-between;border:1px solid var(--line);border-radius:var(--r-sm);background:#fff;padding:10px 14px}
@@ -1847,3 +1892,36 @@ tr.warnrow td{background:#FFFBF0}
 .appswitch-menu a.here{background:var(--blue-10)}
 .appswitch-menu .tile{width:44px;height:44px;display:grid;place-items:center;border-radius:14px}
 .appswitch-menu .tile.affiliate{background:linear-gradient(135deg,#F0566F,#C42A4A);color:#fff}
+
+/* the team's own Dashboard panels, built by asking (Refal, 16 Oct 2026; src/ui/dashboard/PanelView.tsx) */
+.dpanel{padding:14px 16px 16px;display:flex;flex-direction:column;gap:10px}
+.dpanel .dphead{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.dpanel .dphead h3{margin:0;font-size:15px}
+.dpanel .dphead small{display:block;margin-top:2px;font-size:11.5px;line-height:1.4}
+.dpanel .dpacts{display:flex;gap:4px;flex-shrink:0}
+.dpanel .viz,.pdraft .viz{padding:0}
+.pask{margin:4px 0 14px}
+.pask .pulse-ask{margin-bottom:8px}
+.pdraft{border:1px dashed var(--blue);border-radius:14px;padding:12px 14px;background:#fff;display:flex;flex-direction:column;gap:10px}
+.pdraft-head{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.pdraft-head > span:last-child{display:flex;gap:6px}
+.pnote{font-size:11.5px;margin:0}
+.pchange{font-size:12.5px;color:var(--text-2);margin:6px 0 0}
+.pbars{display:flex;flex-direction:column;gap:6px}
+.pbar{display:grid;grid-template-columns:minmax(90px,32%) 1fr auto;gap:10px;align-items:center;font-size:12.5px}
+.pbar .pn{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-2)}
+.pbar .pt{height:12px;background:var(--line);border-radius:4px;overflow:hidden}
+.pbar .pt i{display:block;height:100%;border-radius:0 4px 4px 0}
+.pbar .pv{font-variant-numeric:tabular-nums;font-weight:700;color:var(--text);white-space:nowrap}
+.pbar .pv small{font-weight:600;color:var(--text-3);margin-left:4px}
+.pshare .pstack{display:flex;gap:2px;height:22px;border-radius:6px;overflow:hidden}
+.pshare .pstack i{display:block;min-width:2px}
+.pnum{display:flex;flex-direction:column;gap:2px}
+.pnum > b{font-size:34px;font-weight:900;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.pnum > span{font-size:12.5px;color:var(--text-2)}
+.pnum .pmore{display:flex;gap:14px;flex-wrap:wrap;margin-top:6px;font-size:12px;color:var(--text-2)}
+.dtpl{list-style:none;margin:10px 0;padding:0;display:flex;flex-direction:column;gap:8px}
+.dtpl li{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--line);border-radius:12px}
+.dtpl li small{display:block;margin-top:2px;font-size:11.5px}
+.dtsave{display:flex;gap:8px;align-items:center}
+.dtsave input{flex:1;padding:7px 10px;border:1px solid var(--line);border-radius:9px;font:inherit;font-size:13px}

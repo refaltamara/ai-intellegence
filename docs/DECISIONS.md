@@ -1181,3 +1181,52 @@ Refal: "the Pulse says 31K, the dashboard 29K, we loaded 51K; and the hourly lin
   - **By platform**: one card per platform, side by side. Each card has the platform's most-commented post and how many posts are against the subject. It shows the comments about the subject by their own label (comments only, never posts standing in as voices), the comments about something else, and the minutes to the first comment. It also has the topics, the pace (hour by hour for the first two days, then by day) with the busiest hour, and the most-liked comments where likes are reported. The same post on three platforms draws three crowds, and they move at different speeds. Shown when there are two platforms or more.
   - **Accounts pulled in**: the @handles commenters tag, counted once per comment, whatever the comment's label. A rival brand asked to sign the creator shows here first. The subject's own handles and the posts' authors are marked. Shown when three comments or more tag someone.
 - **Kahf · KOL refusal (`kahf-kol`)** shows By platform first. It hides Own channels, Data health and Who is talking, as Refal asked, and Amplifiers, which only listed the one creator three times. This is a team change, company version 1, and "Back to Fair's" undoes it.
+
+## Ask CeMO anything on the PR dashboard, and its comments per hour (Refal, 14 Oct 2026)
+
+- **An ask box at the top of the PR dashboard**: "Ask CeMO anything about this", as on the Pulse.
+  - The link carries only what the dashboard shows: the brand, the window (7, 14 or 30 days) and the platform (`{ k: "rep" }` in `src/dashboard/askref.ts`), never its numbers.
+  - `src/reputation/ask.ts` reads the figures again with the page's own `prDashboard`. They become the card above the question: posts and comments about the subject (counts with their shares), what is left out, each platform, the comments per hour, the topics, the issues building, the accounts pulled in, amplifiers (unless reach is hidden) and the most-liked comments.
+  - The question is sent at once. The signal is `dashboard.ask`.
+- **Comments per hour** is a new PR section, after By platform. It is the Pulse's comments chart (`PulseTrends`, comments only, per hour or per day) over the whole wave, on the dashboard's platform when it is filtered to one.
+  - Its data is `pulseTrend` in `src/pulse/page.ts`: the Pulse's wave and trend queries, now shared, with an optional platform that is a literal from the Pulse's platform list.
+  - It is read only around one subject (a case workspace) and only for the dashboard, never for decks. Panels and workspaces without comments leave it out.
+- **Speed:** the By platform card's top post per platform now counts the comments once (`with cc as materialized`). Inlined, the planner guessed one post and counted again for every post: Kahf Threads' dashboard went from 23.5 s to 3.3 s.
+
+## One product for every team: four places, every role, Dashboards built by asking, Decks as a list (Refal, 16 Oct 2026)
+
+Refal asked for the product to stop being case by case: the same on every workspace and every role. Points 1 to 4 were agreed. Chats, Cases (who opens a case, what a case page holds, who makes one), the PR crisis view and what a "subscription" spans are still open.
+
+- **The four places.** The sidebar is Dashboard, Decks, Chats and Cases for every team on every workspace (`MAIN_NAV`, `roleNav`).
+  - A role's stored `nav` no longer narrows it. Weekly Reports, Pulse and Reports left the sidebar, but their pages still open:
+    - a deck version opens in the Weekly Reports viewer;
+    - Reports are linked from Decks;
+    - a case workspace's crisis view is linked from its PR Dashboard ("Crisis view").
+  - Cases is always there. With no case on a person's list the page says so plainly, so nobody learns that a case exists. A count shows when they are on some.
+  - "Our Chorus/Atlas/Spark" moved to the bottom of the sidebar.
+  - Decks on a workspace without decks (a profile not on the reputation dashboard) says so instead of sending people to Pulse.
+- **Every role, everywhere.** The team switcher always shows PR, Brand & KOL and Social Media (`ROLE_ORDER`); a role the workspace does not offer shows as not available there. The sign-in picker is one card per role, with the workspaces it works on, or "Not available on your workspaces yet".
+- **The Dashboard is built by asking, and it is the team's.**
+  - Every role starts with its Dashboard as Fair made it.
+  - A Builder asks "What do you want to see here?" and CeMO drafts a panel (`src/dashboard/panelDraft.ts`):
+    - a panel is one query over the whitelisted builder plus a chart from a fixed set (line, bar, stacked, table, number, share; `src/dashboard/panelSpec.ts`);
+    - it runs over the Dashboard's own filters and is shown before it is added;
+    - Change redrafts a panel with what it is now in front of CeMO; Remove takes it off (restorable from Our <team>).
+  - A panel follows the Dashboard's period, platform and brands unless its own query fixes them; a panel over time looks back its own span from the Dashboard's last day.
+  - Panels are creations (kind `panel`), live when a Builder adds them. They sit among the sections as `p:<key>`, and Customise moves, hides and renames them like sections.
+  - Members see the Dashboard locked: Customise and the ask box are a Builder's, and a person's own section order is no longer kept (`tiles.order` is the company's).
+- **Week on week.** The query builder takes `change: true`. With a day, week or month in `group_by`, each metric gets its change from the period before, in SQL: per cent for a count or a sum (`<metric>_change_pct`), points for a rate or a share (`<metric>_change_pts`). A panel whose window ends inside its last week or month marks that point "so far".
+- **Dashboard templates** (`src/dashboard/library.ts`, creations of kind `dashboard`).
+  - The library starts with Fair's default for the team's role, then every Dashboard a Builder saved on the workspace.
+  - A template holds the layout and the panels, never data.
+  - A Builder uses one for the whole team. Panels the team had that the template lacks are hidden, never deleted; a template from another role brings its panels and leaves its sections. Anyone may browse.
+  - The library's reach is one workspace until "subscription" is decided.
+- **Decks as one list** (`src/decks/status.ts`). Each deck shows what it is, its brands, how often it repeats and its status:
+  - **Monitoring** every day, week or month, until a day or until stopped, with its next look;
+  - **Paused**;
+  - **Ended**;
+  - **One-off**.
+  - `decks.ends_on` and `decks.paused_at` (migration 0044). The cron skips a paused deck; past its end date it makes nothing more and the deck reads as ended. Pause, Resume, Until…, Restart, Stop and Delete sit on each row, and New deck takes an "Until" day.
+  - The client's Weekly Competitor Pulse schedule (an agent) is a row in the same list, with Pause and Resume, opening its viewer.
+- **Describe the deck you want** (`src/decks/describe.ts`). On New deck, CeMO lays the deck out from the team's templates, library slides and analyses, and drafts at most two new slides (kept as the team's skills) for what nothing else shows. The draft fills the form; nothing is made until the person creates it. They adjust it with comments and save it as a template from the viewer, as before.
+- **Credits** are charged for a drafted panel or a laid-out deck as for a drafted slide; nothing is stopped until `settings.credits.enforce`. Whether building costs credits is still open.

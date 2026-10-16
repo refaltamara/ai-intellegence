@@ -15,6 +15,9 @@ export type DeckRow = {
   spec: DeckSpec;
   recurring: boolean;
   next_run_at: string | null;
+  /** a recurring deck's last day to cover; null = until stopped (src/decks/status.ts) */
+  ends_on: string | null;
+  paused_at: string | null;
   last_period: string | null;
   last_error: string | null;
   conversation_id: string | null;
@@ -54,20 +57,24 @@ export async function getDeck(id: string, workspaceId: string): Promise<DeckRow 
   return r[0] ?? null;
 }
 
-export async function createDeck(d: { workspaceId: string; userId: string | null; name: string; source: DeckSource; template: string | null; spec: DeckSpec; recurring: boolean; conversationId?: string | null }): Promise<DeckRow> {
+export async function createDeck(d: { workspaceId: string; userId: string | null; name: string; source: DeckSource; template: string | null; spec: DeckSpec; recurring: boolean; endsOn?: string | null; conversationId?: string | null }): Promise<DeckRow> {
   const r = (await sql.query(
-    "insert into decks (workspace_id, user_id, name, source, template, spec, recurring, conversation_id) values ($1, $2, $3, $4, $5, $6::jsonb, $7, $8) returning *",
-    [d.workspaceId, d.userId, d.name, d.source, d.template, toJson(d.spec), d.recurring, d.conversationId ?? null],
+    "insert into decks (workspace_id, user_id, name, source, template, spec, recurring, ends_on, conversation_id) values ($1, $2, $3, $4, $5, $6::jsonb, $7, $8::date, $9) returning *",
+    [d.workspaceId, d.userId, d.name, d.source, d.template, toJson(d.spec), d.recurring, d.recurring ? d.endsOn ?? null : null, d.conversationId ?? null],
   )) as DeckRow[];
   return r[0];
 }
 
-export async function updateDeck(id: string, workspaceId: string, patch: { name?: string; spec?: DeckSpec; recurring?: boolean; next_run_at?: string | null }): Promise<DeckRow | null> {
+export async function updateDeck(id: string, workspaceId: string, patch: { name?: string; spec?: DeckSpec; recurring?: boolean; next_run_at?: string | null; ends_on?: string | null; paused?: boolean }): Promise<DeckRow | null> {
   const r = (await sql.query(
     `update decks set name = coalesce($3, name), spec = coalesce($4::jsonb, spec), recurring = coalesce($5, recurring),
-            next_run_at = case when $6::boolean then $7::timestamptz else next_run_at end, updated_at = now()
+            next_run_at = case when $6::boolean then $7::timestamptz else next_run_at end,
+            ends_on = case when $8::boolean then $9::date else ends_on end,
+            paused_at = case when $10::boolean is null then paused_at when $10 then coalesce(paused_at, now()) else null end,
+            updated_at = now()
      where id = $1 and workspace_id = $2 returning *`,
-    [id, workspaceId, patch.name ?? null, patch.spec ? toJson(patch.spec) : null, patch.recurring ?? null, patch.next_run_at !== undefined, patch.next_run_at ?? null],
+    [id, workspaceId, patch.name ?? null, patch.spec ? toJson(patch.spec) : null, patch.recurring ?? null, patch.next_run_at !== undefined, patch.next_run_at ?? null,
+     patch.ends_on !== undefined, patch.ends_on ?? null, patch.paused ?? null],
   )) as DeckRow[];
   return r[0] ?? null;
 }
@@ -112,7 +119,7 @@ export async function pruneVersions(deckId: string, workspaceId: string, iso: st
   await sql.query("delete from reports where workspace_id = $1 and deck_id = $2 and blocks->'week'->>'iso' = $3 and id <> $4", [workspaceId, deckId, iso, keep]);
 }
 
-/** Recurring decks whose next look is due. */
+/** Recurring decks whose next look is due; a paused one waits until it is resumed. */
 export async function dueDecks(limit = 2): Promise<DeckRow[]> {
-  return (await sql.query("select * from decks where recurring and next_run_at is not null and next_run_at <= now() and workspace_id in (select id from workspaces where status = 'live') order by next_run_at limit $1", [limit])) as DeckRow[];
+  return (await sql.query("select * from decks where recurring and paused_at is null and next_run_at is not null and next_run_at <= now() and workspace_id in (select id from workspaces where status = 'live') order by next_run_at limit $1", [limit])) as DeckRow[];
 }

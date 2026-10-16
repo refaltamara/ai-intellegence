@@ -48,6 +48,10 @@ export const SIGNALS = {
   "dashboard.ask_why": { surface: "dashboard", family: "use", label: "Ask why", payload: { k: "id" } },
   "dashboard.filter": { surface: "dashboard", family: "use", label: "Opened with a filter", payload: { filter: "id" } },
   "pulse.ask": { surface: "dashboard", family: "use", label: "Asked CeMO from the Pulse", payload: { card: "id", typed: "bool" } },
+  "dashboard.ask": { surface: "dashboard", family: "use", label: "Asked CeMO from the dashboard", payload: { typed: "bool" } },
+  "dashboard.panel_drafted": { surface: "dashboard", family: "shaping", label: "Dashboard panel drafted", payload: { chart: ["line", "bar", "stacked", "table", "number", "share"], status: ["ok", "empty", "error"], change: "bool" } },
+  "dashboard.panel_added": { surface: "dashboard", family: "shaping", label: "Dashboard panel added or changed", payload: { chart: ["line", "bar", "stacked", "table", "number", "share"], revised: "bool" } },
+  "dashboard.template_used": { surface: "dashboard", family: "shaping", label: "Dashboard template used", payload: { source: ["fair", "team"] } },
 
   "deck.template_chosen": { surface: "decks", family: "use", label: "Deck started", payload: { template: "id", source: ["fair", "company", "scratch", "chat"] } },
   "deck.version_made": { surface: "decks", family: "use", label: "Deck version made", payload: { deck: "uuid", report: "uuid", by: ["cron", "person"] } },
@@ -57,6 +61,7 @@ export const SIGNALS = {
   // teams build their own (DECISIONS, 7 Oct 2026): what changed, from where, never the words
   "deck.changed": { surface: "decks", family: "shaping", label: "Deck changed", payload: { deck: "uuid", from: ["chat", "comment", "form"], template: "bool", added: "int", removed: "int", grain: "bool" } },
   "deck.slide_drafted": { surface: "decks", family: "shaping", label: "Own slide drafted", payload: { from: ["form", "chat", "comment"], status: ["ok", "empty", "error"] } },
+  "deck.described": { surface: "decks", family: "shaping", label: "Deck laid out from a description", payload: { template: "id", added: "int" } },
   "deck.comment": { surface: "decks", family: "use", label: "Slide comment", payload: { report: "uuid", n: "int", cemo: "bool" } },
   "casewords.changed": { surface: "company", family: "shaping", label: "Case words changed", payload: { list: ["partners", "boycott"], action: ["add", "remove", "request", "approve", "decline"] } },
 

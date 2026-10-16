@@ -31,13 +31,14 @@ import { refuseTerm, refuseText, type Memory, type Term } from "./rules";
 import { validateExt, type ExtDefInput } from "../extensions/spec";
 import { by, signal } from "../learning/signals";
 import { creationShape } from "../learning/vocab";
+import { validatePanel, type PanelSpec } from "../dashboard/panelSpec";
 
-export const CREATION_KINDS = ["skill", "deck_template", "rule", "fact", "term", "extension"] as const;
+export const CREATION_KINDS = ["skill", "deck_template", "rule", "fact", "term", "extension", "panel", "dashboard"] as const;
 export type CreationKind = (typeof CREATION_KINDS)[number];
 export type CreationStatus = "draft" | "waiting" | "approved" | "sent_back" | "rejected" | "removed";
 export const isCreationKind = (v: unknown): v is CreationKind => (CREATION_KINDS as readonly string[]).includes(v as string);
 
-export const KIND_LABEL: Record<CreationKind, string> = { skill: "Skill", deck_template: "Deck template", rule: "House rule", fact: "Memory", term: "Vocabulary", extension: "Data extension" };
+export const KIND_LABEL: Record<CreationKind, string> = { skill: "Skill", deck_template: "Deck template", rule: "House rule", fact: "Memory", term: "Vocabulary", extension: "Data extension", panel: "Dashboard panel", dashboard: "Dashboard template" };
 
 export type Creation = {
   id: string;
@@ -113,6 +114,28 @@ export async function cleanCreation(kind: CreationKind, role: RoleId, input: Rec
     // the definition rides on the creation, so a removed extension can be brought back (src/extensions/)
     const v = validateExt(input as Partial<ExtDefInput>);
     return v.ok ? { title: v.def.name, key: v.def.key, spec: v.def as unknown as Record<string, unknown> } : { error: v.errors.join(" ") };
+  }
+  if (kind === "panel") {
+    // a Dashboard panel (src/dashboard/panelSpec.ts): its key stays when a Builder changes it
+    const title = String(input.title ?? "").trim();
+    const key = typeof input.key === "string" && /^[a-z0-9][a-z0-9-]{2,60}$/.test(input.key) ? input.key : `pn-${slug(title).slice(0, 40)}-${Math.random().toString(36).slice(2, 6)}`;
+    const spec = { ...input, key } as unknown as PanelSpec;
+    delete (spec as unknown as Record<string, unknown>).replaces;
+    const errors = validatePanel(spec);
+    return errors.length ? { error: `The panel does not check out: ${errors.join(" ")}` } : { title: spec.title, key, spec: spec as unknown as Record<string, unknown> };
+  }
+  if (kind === "dashboard") {
+    // a Dashboard template for the library (src/dashboard/library.ts): the sections' order, what is hidden and renamed, and the panels
+    const name = String(input.name ?? "").trim().slice(0, 60);
+    if (!name) return { error: "Give the template a name." };
+    const panels = Array.isArray(input.panels) ? (input.panels as PanelSpec[]) : [];
+    const bad = panels.map((p) => validatePanel(p)).find((e) => e.length);
+    if (bad) return { error: `A panel in it does not check out: ${bad.join(" ")}` };
+    const t = (input.tiles && typeof input.tiles === "object" ? input.tiles : {}) as { order?: unknown; hidden?: unknown; names?: unknown };
+    const ids = (v: unknown) => (Array.isArray(v) ? v.filter((x): x is string => typeof x === "string" && x.length <= 70).slice(0, 60) : []);
+    const names = t.names && typeof t.names === "object" ? Object.fromEntries(Object.entries(t.names as Record<string, unknown>).filter(([k, v]) => k.length <= 70 && typeof v === "string" && v.trim() && v.length <= 40)) : {};
+    const key = typeof input.key === "string" && /^dt-[a-z0-9-]{1,48}$/.test(input.key) ? input.key : `dt-${slug(name).slice(0, 36)}-${Math.random().toString(36).slice(2, 6)}`;
+    return { title: name, key, spec: { name, role, description: String(input.description ?? "").trim().slice(0, 200), tiles: { order: ids(t.order), hidden: ids(t.hidden), names }, panels } };
   }
   if (kind === "skill") {
     const title = String(input.title ?? "").trim();

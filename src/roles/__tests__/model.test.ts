@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BRAND_KOL, PR, ROLES, fillRole, isRoleId, roleNav, workspaceRoles } from "../model";
+import { BRAND_KOL, MAIN_NAV, PR, ROLES, ROLE_ORDER, SOCIAL, fillRole, isRoleId, roleNav, workspaceRoles } from "../model";
 import { teamFor } from "../../workspace/config";
 
 describe("role models", () => {
@@ -12,12 +12,15 @@ describe("role models", () => {
     expect(workspaceRoles("category", undefined)).toEqual(["brand_kol"]);
     expect(workspaceRoles("profile", [])).toEqual(["pr"]);
   });
-  it("a one-person profile keeps its crisis view and boards", () => {
-    expect(roleNav(PR, "profile")).toEqual(["dashboard", "pulse", "chats", "reports"]);
-    // a profile on the reputation dashboard keeps its crisis view as Pulse, beside the decks
-    expect(roleNav(PR, "profile", true)).toEqual(["dashboard", "pulse", "decks", "chats"]);
-    expect(roleNav(PR, "category")).toEqual(PR.nav);
-    expect(roleNav(BRAND_KOL, "category")).toContain("weekly");
+  it("every team has the same four places, whatever the workspace or the role's stored nav (16 Oct 2026)", () => {
+    expect(MAIN_NAV).toEqual(["dashboard", "decks", "chats", "cases"]);
+    for (const r of [PR, BRAND_KOL, SOCIAL]) for (const kind of ["category", "profile"]) expect(roleNav(r, kind)).toEqual(MAIN_NAV);
+    expect(roleNav({ ...PR, nav: ["dashboard", "pulse", "chats", "reports"] }, "profile", true)).toEqual(MAIN_NAV);
+    expect(roleNav(BRAND_KOL, "category")).not.toContain("weekly");
+  });
+  it("the switcher shows all three roles, in one order", () => {
+    expect([...ROLE_ORDER]).toEqual(["pr", "brand_kol", "social"]);
+    expect(ROLE_ORDER.every((r) => r in ROLES)).toBe(true);
   });
   it("team cards come from the role, with the profile's own words for PR", () => {
     expect(teamFor({ kind: "category" }, PR).label).toBe("PR team");

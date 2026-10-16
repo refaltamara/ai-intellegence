@@ -60,7 +60,8 @@ const DRAFT_TOOL: Anthropic.Tool = {
 
 const slug = (s: string) => s.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 30) || "slide";
 
-async function brief(ws: string): Promise<string> {
+/** what CeMO knows about the data when it drafts an analysis: brands, platforms, dates, topics, voices (also for Dashboard panels) */
+export async function dataBrief(ws: string): Promise<string> {
   const db = new SkillDb();
   const ctx = await loadContext(db, ws);
   const cfg = await getWorkspace(ws);
@@ -92,7 +93,7 @@ export async function draftSlide(ws: string, role: RoleId, text: string, actor: 
   const client = anthropicClient({ workspace: ws, purpose: "slide_draft" });
   const call = (req: Anthropic.MessageCreateParamsNonStreaming) => client.messages.create(req);
   const base = { model: modelId(), max_tokens: 4000, system: SYSTEM, tools: [DRAFT_TOOL] };
-  let messages: Anthropic.MessageParam[] = [{ role: "user", content: `${await brief(ws)}\n\nThe slide they want: ${ask}` }];
+  let messages: Anthropic.MessageParam[] = [{ role: "user", content: `${await dataBrief(ws)}\n\nThe slide they want: ${ask}` }];
   let recipe: RecipeSpec | null = null;
   let errors: string[] = [];
   try {

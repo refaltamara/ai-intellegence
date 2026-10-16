@@ -1,14 +1,18 @@
 /**
  * Lays out a Dashboard's sections in the order its role asks for (src/dashboard/sections.ts):
  * hidden ones left out with a small line that says so, two half-width sections side by side.
+ * The team's own panels ("p:<key>") are drawn here too (src/ui/dashboard/PanelBuilder.tsx).
  */
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { rows, type Arranged } from "@/dashboard/sections";
+import type { PanelData, PanelScope } from "@/dashboard/panels";
 import { SeenTile } from "./SeenTile";
+import { PanelCard } from "./PanelBuilder";
 
-export function Sections({ arranged, render, who, showHref }: { arranged: Arranged; render: Record<string, (title: string) => ReactNode>; who: string | null; showHref: string }) {
+export function Sections({ arranged, render: own, who, showHref, panels = [], builder = false, scope }: { arranged: Arranged; render: Record<string, (title: string) => ReactNode>; who: string | null; showHref: string; panels?: PanelData[]; builder?: boolean; scope?: PanelScope }) {
   const title = (k: string) => arranged.shown.find((x) => x.key === k)!.title;
+  const render: Record<string, (title: string) => ReactNode> = { ...own, ...Object.fromEntries(panels.map((p) => [p.id, (t: string) => <PanelCard d={p} title={t} builder={builder} scope={scope} />])) };
   return (
     <>
       {rows(arranged.shown).map((row) =>

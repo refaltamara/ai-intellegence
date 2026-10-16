@@ -1,8 +1,9 @@
 "use client";
 /**
  * "Customise" on a Dashboard (CMS plan, The Builder): a Builder hides, renames and moves
- * sections for everyone on the team; anyone may put the sections in their own order. The
- * server keeps only what each layer may set (src/roles/policy.ts).
+ * sections and the team's own panels for everyone on the team. Since 16 Oct 2026 the
+ * Dashboard is the team's and locked for Members: only a Builder sees this. The server keeps
+ * only what each layer may set (src/roles/policy.ts).
  */
 import { useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
@@ -15,7 +16,7 @@ export function Customise({ sections, builder, codename, client }: { sections: I
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState(sections);
-  const [scope, setScope] = useState<"team" | "me">(builder ? "team" : "me");
+  const scope = "team" as const;
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
   const move = (i: number, by: number) => setItems((xs) => { const j = i + by; if (j < 0 || j >= xs.length) return xs; const out = [...xs]; [out[i], out[j]] = [out[j], out[i]]; return out; });
@@ -23,11 +24,10 @@ export function Customise({ sections, builder, codename, client }: { sections: I
   async function save() {
     setBusy(true); setMsg("");
     const order = items.map((x) => x.key);
-    const body = scope === "team"
-      ? { action: "apply", note: "Customised the Dashboard", changes: { "tiles.order": order, "tiles.hidden": items.filter((x) => x.hidden).map((x) => x.key), "tiles.names": Object.fromEntries(items.filter((x) => x.title.trim() && x.title.trim() !== x.label).map((x) => [x.key, x.title.trim()])) } }
-      : { action: "personal", settings: { "tiles.order": order } };
-    // an empty renaming goes back to Fair's names
-    if (scope === "team" && !Object.keys((body.changes as Record<string, unknown>)["tiles.names"] as object).length) (body.changes as Record<string, unknown>)["tiles.names"] = null;
+    const body = { action: "apply", note: "Customised the Dashboard", changes: { "tiles.order": order, "tiles.hidden": items.filter((x) => x.hidden).map((x) => x.key), "tiles.names": Object.fromEntries(items.filter((x) => x.title.trim() && x.title.trim() !== x.label).map((x) => [x.key, x.title.trim()])) } as Record<string, unknown> };
+    // an empty renaming goes back to Fair's names; nothing hidden shows everything
+    if (!Object.keys(body.changes["tiles.names"] as object).length) body.changes["tiles.names"] = null;
+    if (!(body.changes["tiles.hidden"] as string[]).length) body.changes["tiles.hidden"] = null;
     const r = await fetch("/api/builder/company", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
     const j = await r.json().catch(() => ({}));
     setBusy(false);
@@ -40,13 +40,7 @@ export function Customise({ sections, builder, codename, client }: { sections: I
     <div className="drawer" role="dialog" aria-label="Customise the Dashboard">
       <div className="drawer-in">
         <header><h3>Customise the Dashboard</h3><button className="x" onClick={() => setOpen(false)} aria-label="Close">×</button></header>
-        {builder && (
-          <div className="seg sm scope">
-            <button className={scope === "team" ? "on" : ""} onClick={() => setScope("team")}>For everyone on {client ? `${client}'s ` : ""}{codename}</button>
-            <button className={scope === "me" ? "on" : ""} onClick={() => setScope("me")}>Just for me</button>
-          </div>
-        )}
-        <p className="muted">{scope === "team" ? "Hide, rename and move sections for the whole team. The status and the headline numbers stay on top." : "Put the sections in the order you read them. Only you see this order."}</p>
+        <p className="muted">For everyone on {client ? `${client}'s ` : ""}{codename}{builder ? "" : " (a Builder's change)"}: hide, rename and move sections and your panels. The status and the headline numbers stay on top.</p>
         <ol className="custlist">
           {items.map((x, i) => (
             <li key={x.key} className={x.hidden ? "off" : ""}>

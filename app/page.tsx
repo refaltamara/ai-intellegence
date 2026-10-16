@@ -37,6 +37,7 @@ export default async function ChatsPage({ searchParams }: { searchParams: Promis
   const actor = await currentActor();
   if (askRef && askContext) {
     if (askRef.k === "pulse") await signal(by(actor, ws, role.id), "pulse.ask", { card: askRef.card, typed: sp.go === "1" });
+    else if (askRef.k === "rep") await signal(by(actor, ws, role.id), "dashboard.ask", { typed: sp.go === "1" });
     else await signal(by(actor, ws, role.id), "dashboard.ask_why", { k: askRef.k });
   }
   // the team's own analyses first: Fair's recipes for this role, then what the team made (its badge says whose)

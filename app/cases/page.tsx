@@ -1,6 +1,9 @@
-/** Cases (DECISIONS, 10 Oct 2026, step 5): the watches inside this panel that this person is on the list of. */
+/**
+ * Cases (DECISIONS, 10 Oct 2026, step 5): the watches inside this panel that this person is on the list of. One of
+ * the four places on every team since 16 Oct: with no case on their list a person sees the same plain page as when
+ * the panel has none, so nobody learns a case exists unless they are on its list.
+ */
 import Link from "next/link";
-import { notFound } from "next/navigation";
 import { currentActor, currentWorkspaceId } from "@/auth/current";
 import { casesFor } from "@/cases/store";
 import { fmtNum } from "@/ui/format";
@@ -12,8 +15,16 @@ const day = (d: string | null) => (d ? new Date(`${d}T00:00:00Z`).toLocaleDateSt
 export default async function CasesPage() {
   const [actor, ws] = await Promise.all([currentActor(), currentWorkspaceId()]);
   const cases = actor ? await casesFor(actor, ws) : [];
-  // nobody learns a case exists unless they are on its list
-  if (!cases.length) notFound();
+  if (!cases.length) {
+    return (
+      <section className="screen">
+        <div className="topbar"><div><h1>Cases</h1><span className="meta">Watches inside the panel, such as a crisis around one brand.</span></div></div>
+        <div className="wrap wide">
+          <div className="empty">No cases for you here. A case is a watch Fair sets up inside the panel, for example a crisis around one brand: its posts and comments are counted on their own, and only the people on its list see it. Ask Fair to open one.</div>
+        </div>
+      </section>
+    );
+  }
   return (
     <section className="screen">
       <div className="topbar">

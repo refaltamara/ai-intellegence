@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import type { NavKey } from "@/roles/model";
+import { ROLES, ROLE_ORDER, type NavKey } from "@/roles/model";
 import type { TeamChoice } from "@/workspace/teams";
 import { TeamIcon } from "./TeamIcon";
 import { LogoMark } from "./LogoMark";
@@ -10,11 +10,11 @@ import { LogoMark } from "./LogoMark";
 type NavItem = { key: NavKey; href: string; label: string; tone: string; icon: React.ReactNode };
 
 /**
- * The same places for every role: the fixed numbers (Dashboard), the decks the team
- * builds (Decks), the conversation (Chats); the role model decides which appear
- * (src/roles/model.ts). What CeMO can do lives behind "/" in the composer; the data
- * inventory sits under the account. At the top: the workspace (the data) and, when
- * it offers more than one, the role (how you work on it).
+ * The same four places for every team (Refal, 16 Oct 2026): the numbers (Dashboard), the decks the team
+ * builds (Decks), the conversation (Chats) and the watches inside the panel (Cases; each case shows only to
+ * the people on its list). What CeMO can do lives behind "/" in the composer; the data inventory sits under
+ * the account. At the top: the workspace (the data) and the role (how you work on it), all three roles
+ * always, one the workspace does not offer shown as not available there.
  */
 const NAV: NavItem[] = [
   { key: "dashboard", href: "/dashboard", label: "Dashboard", tone: "coral", icon: <><rect x="3" y="3" width="7" height="9" rx="1.5" /><rect x="14" y="3" width="7" height="5" rx="1.5" /><rect x="14" y="12" width="7" height="9" rx="1.5" /><rect x="3" y="16" width="7" height="5" rx="1.5" /></> },
@@ -24,6 +24,7 @@ const NAV: NavItem[] = [
   { key: "pulse", href: "/pulse", label: "Pulse", tone: "violet", icon: <path d="M3 12h4l3-8 4 16 3-8h4" /> },
   { key: "chats", href: "/", label: "Chats", tone: "blue", icon: <path d="M21 12a8 8 0 0 1-8 8H7l-4 3V12a8 8 0 0 1 8-8h2a8 8 0 0 1 8 8z" /> },
   { key: "reports", href: "/reports", label: "Reports", tone: "mint", icon: <><path d="M6 3h9l4 4v14H6z" /><path d="M9 12h6M9 16h6" /></> },
+  { key: "cases", href: "/cases", label: "Cases", tone: "coral", icon: <path d="M5 21V4h12l-2 4.5 2 4.5H5" /> },
 ];
 
 type Product = { name: string; tagline: string; label: string; kind: string };
@@ -72,7 +73,7 @@ export function Sidebar({ recent, user, product, teams, currentWorkspace, curren
   const team = teams.find((t) => t.workspace_id === currentWorkspace && t.role === currentRole) ?? teams.find((t) => t.workspace_id === currentWorkspace);
   const workspaces = teams.filter((t, i) => teams.findIndex((x) => x.workspace_id === t.workspace_id) === i);
   const roles = teams.filter((t) => t.workspace_id === currentWorkspace);
-  const nav = team?.nav ?? ["dashboard", "chats"];
+  const nav: NavKey[] = team?.nav ?? ["dashboard", "decks", "chats", "cases"];
   // switching workspace keeps the role when the other workspace offers it
   const pickWorkspace = (id: string) => {
     const t = teams.find((x) => x.workspace_id === id && x.role === currentRole) ?? teams.find((x) => x.workspace_id === id);
@@ -89,37 +90,35 @@ export function Sidebar({ recent, user, product, teams, currentWorkspace, curren
           </select>
         </label>
       )}
-      {roles.length > 1 && (
-        <div className="teamswitch" role="tablist" aria-label="Team">
-          {roles.map((t) => (
+      <div className="teamswitch" role="tablist" aria-label="Team">
+        {ROLE_ORDER.map((id) => {
+          const t = roles.find((x) => x.role === id);
+          if (!t) {
+            const r = ROLES[id];
+            return (
+              <button key={id} role="tab" aria-selected={false} aria-disabled="true" className="na" data-tone={r.tone} disabled title={`${r.label}: not available on ${team?.name ?? "this workspace"}`}>
+                <TeamIcon kind={id} size={14} />
+                {r.short}
+              </button>
+            );
+          }
+          return (
             <button key={t.key} role="tab" aria-selected={t.key === team?.key} className={t.key === team?.key ? "on" : ""} data-tone={t.tone} onClick={() => switchTo(t)} disabled={!!switching} title={`${t.label} · ${t.codename} ${t.version}: ${t.description}`}>
               <TeamIcon kind={t.role} size={14} />
               {switching === t.key ? "…" : t.short}
             </button>
-          ))}
-        </div>
-      )}
+          );
+        })}
+      </div>
       {switchError && <p className="switch-err" role="alert">{switchError}</p>}
       <nav className="nav">
-        {NAV.filter((n) => nav.includes(n.key)).map((n) => (
-          <Link key={n.href} href={n.href} className={active(n.href) ? "on" : ""} data-tone={n.tone}>
+        {nav.flatMap((k) => NAV.filter((n) => n.key === k)).map((n) => (
+          <Link key={n.href} href={n.href} className={active(n.href) ? "on" : ""} data-tone={n.tone} title={n.key === "cases" ? "Cases: watches inside the panel, such as a crisis; each one shows only to the people on its list" : undefined}>
             <span className="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">{n.icon}</svg></span>
             {n.label}
+            {n.key === "cases" && (user.cases ?? 0) > 0 && <b className="count" title={`${user.cases} case${user.cases === 1 ? "" : "s"} you are on`}>{user.cases}</b>}
           </Link>
         ))}
-        {(user.cases ?? 0) > 0 && (
-          <Link href="/cases" className={active("/cases") ? "on" : ""} data-tone="coral" title="Cases: watches inside this panel that only the people on each case's list see">
-            <span className="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 21V4h12l-2 4.5 2 4.5H5" /></svg></span>
-            Cases
-          </Link>
-        )}
-        {user.company && (
-          <Link href="/company" className={`ours ${active("/company") ? "on" : ""}`} data-tone="violet" title="Your team's own version: what it changed, made and approved">
-            <span className="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.4 6.8 19.1l1-5.8L3.5 9.2l5.9-.9z" /></svg></span>
-            {user.company.label}
-            {user.company.waiting > 0 && <b className="count" title={`${user.company.waiting} waiting for your approval`}>{user.company.waiting}</b>}
-          </Link>
-        )}
       </nav>
       <div>
         <h6>Recent chats</h6>
@@ -131,6 +130,13 @@ export function Sidebar({ recent, user, product, teams, currentWorkspace, curren
         </div>
       </div>
       <div className="bottom">
+        {user.company && (
+          <Link href="/company" className={`connect ours ${active("/company") ? "on" : ""}`} title="Your team's own version: what it changed, made and approved">
+            <span className="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.4 6.8 19.1l1-5.8L3.5 9.2l5.9-.9z" /></svg></span>
+            {user.company.label}
+            {user.company.waiting > 0 && <b className="count" title={`${user.company.waiting} waiting for your approval`}>{user.company.waiting}</b>}
+          </Link>
+        )}
         <Link href="/connect" className={`connect ${path.startsWith("/connect") ? "on" : ""}`}>
           <span className="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 7V3M15 7V3M7 7h10v4a5 5 0 0 1-10 0z" /><path d="M12 16v5" /></svg></span>
           Connect Claude / ChatGPT

@@ -2266,6 +2266,12 @@
       "platform": "threads",
       "file": "kahf/comments_threads_1012b.csv",
       "note": "dataset_threads-replies-scraper_2026-10-12_11-24-30-313.csv (a replies scraper), 12 Oct: 196 rows on 4 posts already loaded: 4 are the posts themselves (left out), 31 replies already loaded (left out); 161 written, 7 Oct 23:57 to 11 Oct 20:16 WIB"
+    },
+    {
+      "kind": "contents",
+      "platform": "threads",
+      "file": "kahf/contents_threads_1015a.csv",
+      "note": "threads_post.csv (Apify Threads scraper), 14 Oct: 647 rows, 194 posts (a post listed up to several times: the row with the most likes and replies kept), 3 to 14 Oct 18:08 UTC (ISO times with Z). Left out: 98 rows marked as replies (isReply; comments, not posts), the 20 top-level posts already loaded (their numbers stay as loaded). 76 written; no follower counts in the export."
     }
   ]
 }
