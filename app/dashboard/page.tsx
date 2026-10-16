@@ -44,7 +44,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const ctxSig = by(actor, ws, role.id);
   await signal(ctxSig, "dashboard.view", { filtered: filters.length > 0 });
   for (const f of filters) await signal(ctxSig, "dashboard.filter", { filter: f });
-  const view: DashLayout = { layout: arrange(role.id, role.tiles, sp.show === "all"), builder: !!actor && can(actor, "company.change", { workspace: ws, role: role.id }), codename: role.codename, clientName, showHref: `/dashboard?${q}`, alert: role.alert };
+  const view: DashLayout = { layout: arrange(role.id, role.tiles, sp.show === "all"), builder: !!actor && can(actor, "company.change", { workspace: ws, role: role.id }), codename: role.codename, clientName, showHref: `/dashboard?${q}`, alert: role.alert, crisis: cfg?.kind === "profile" && !!cfg.reputation };
   if (role.id === "social") {
     const d = await socialDashboard(ws, sp, role);
     if (!d) redirect("/data");

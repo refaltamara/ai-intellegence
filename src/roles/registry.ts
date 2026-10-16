@@ -10,7 +10,7 @@ import { REP_SLIDE_KINDS } from "../reputation/slides";
 import { SOCIAL_SLIDE_KINDS } from "../social/slides";
 import type { NavKey, RoleId } from "./model";
 
-export const NAV_KEYS: NavKey[] = ["dashboard", "weekly", "decks", "pulse", "chats", "reports"];
+export const NAV_KEYS: NavKey[] = ["dashboard", "weekly", "decks", "pulse", "chats", "reports", "cases"];
 
 /** the layers of skills.registry.json; a role's skill_order ranks them */
 export const SKILL_LAYERS = ["audience", "brands", "comments", "conversation", "creators", "posts"] as const;

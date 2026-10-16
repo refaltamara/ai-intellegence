@@ -5,7 +5,6 @@
  * made before Decks are listed at the bottom.
  */
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import { currentRole, currentWorkspaceId } from "@/auth/current";
 import { listDecks } from "@/decks/store";
 import { deckTemplate } from "@/decks/templates";
@@ -20,7 +19,17 @@ const day = (iso: string) => new Date(iso).toLocaleDateString("en-GB", { timeZon
 
 export default async function DecksPage() {
   const ws = await currentWorkspaceId();
-  if (!(await deckWorkspace(ws))) redirect("/pulse");
+  // a one-person profile that is not on the reputation dashboard has no decks yet: Decks says so (it stays one of the four places)
+  if (!(await deckWorkspace(ws))) {
+    return (
+      <section className="screen">
+        <div className="topbar"><div><h1>Decks</h1><span className="meta">Slide decks from a template, from scratch or from Chats.</span></div></div>
+        <div className="wrap wide">
+          <div className="empty">Decks are not available on this workspace yet: its data is watched hour by hour on the Dashboard. <Link href="/reports">Reports from Chats</Link> are kept on their own page.</div>
+        </div>
+      </section>
+    );
+  }
   const [all, weekly0, pulses, role] = await Promise.all([listDecks(ws), weeklyItems(ws), listPulses(ws), currentRole(ws)]);
   // each role keeps its own decks: PR decks are one brand's reputation (spec.rep), Social Media decks its own accounts (spec.social), the rest Brand & KOL's
   const pr = role.id === "pr";

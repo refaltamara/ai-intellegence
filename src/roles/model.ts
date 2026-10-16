@@ -2,7 +2,7 @@
  * Role models (DECISIONS, 3 Oct 2026). A workspace is a dataset; a role is how the
  * product behaves on it: the first screen, the places in the sidebar, the decks it
  * offers, how CeMO thinks and what it drafts. Every role gets the same three
- * features (Dashboard, Decks, Chats); the model behind them differs.
+ * places (Dashboard, Decks, Chats, Cases; MAIN_NAV); the model behind them differs.
  *
  * These constants are each role's 1.0 (Chorus, Atlas, Spark): the seed of
  * role_versions and the fallback when the tables are empty. What a request runs on is
@@ -13,7 +13,17 @@
 import type { DeckTemplate } from "../decks/templates";
 
 export type RoleId = "pr" | "brand_kol" | "social";
-export type NavKey = "dashboard" | "weekly" | "decks" | "pulse" | "chats" | "reports";
+export type NavKey = "dashboard" | "weekly" | "decks" | "pulse" | "chats" | "reports" | "cases";
+
+/**
+ * The product's four places, the same on every team and every workspace (Refal, 16 Oct 2026): Dashboard, Decks,
+ * Chats, Cases. Weekly Reports, Pulse and Reports left the sidebar; their pages still open from inside these
+ * (a deck version in the viewer, a profile's crisis view from its Dashboard, Reports from Decks).
+ */
+export const MAIN_NAV: NavKey[] = ["dashboard", "decks", "chats", "cases"];
+
+/** every role, in the order the team switcher shows them; one a workspace does not offer shows as not available there */
+export const ROLE_ORDER = ["pr", "brand_kol", "social"] as const;
 export type Tone = "blue" | "violet" | "mint" | "coral" | "sun";
 
 export type RoleModel = {
@@ -63,7 +73,7 @@ export const PR: RoleModel = {
   description: "What people say about you and your competitors, which issues are building, who is amplifying them, and when to respond.",
   tone: "coral",
   home: "/dashboard",
-  nav: ["dashboard", "decks", "chats"],
+  nav: MAIN_NAV,
   voice: [
     "On this team you are the comms advisor to {{client}}'s PR team. Think in conversations, narratives and issues, not creators or campaigns.",
     "Read every question from a reputation point of view: what people say about {{client}}, how fast it is moving, where it is spreading, who is amplifying it, whether it is about {{client}} alone or the whole category, and whether a response is needed.",
@@ -93,7 +103,7 @@ export const BRAND_KOL: RoleModel = {
   description: "Competitors, creators and campaigns across the category: who is winning, with whom, and what to do next.",
   tone: "blue",
   home: "/dashboard",
-  nav: ["dashboard", "weekly", "decks", "chats"],
+  nav: MAIN_NAV,
   voice: "",
   deck_templates: [],
 };
@@ -107,7 +117,7 @@ export const SOCIAL: RoleModel = {
   description: "Your own accounts: what you posted, what worked, which formats and times win, how the community answers, and how your channels compare with the competitors'.",
   tone: "mint",
   home: "/dashboard",
-  nav: ["dashboard", "decks", "chats"],
+  nav: MAIN_NAV,
   voice: [
     "On this team you are the content lead for {{client}}'s own social accounts. Think in posts, formats, timing and community, not creators or reputation crises.",
     "Judge a post against its own account's usual, not against other accounts: a photo on Instagram has no views, so read engagement there; read views where the platform reports them.",
@@ -133,9 +143,6 @@ export function isRoleId(v: unknown): v is RoleId {
   return typeof v === "string" && v in ROLES;
 }
 
-/** A one-person profile keeps its crisis view (Pulse boards, Reports) until it moves onto the reputation dashboard. */
-const PROFILE_NAV: NavKey[] = ["dashboard", "pulse", "chats", "reports"];
-
 /** The roles a workspace offers: its settings, else one by kind (a profile is watched by PR, a panel by Brand & KOL). */
 export function workspaceRoles(kind: string, configured?: unknown): RoleId[] {
   const list = Array.isArray(configured) ? configured.filter(isRoleId) : [];
@@ -143,13 +150,12 @@ export function workspaceRoles(kind: string, configured?: unknown): RoleId[] {
   return kind === "profile" ? ["pr"] : ["brand_kol"];
 }
 
-/** A profile on the reputation dashboard keeps its crisis view as Pulse, beside the decks. */
-const PROFILE_REPUTATION_NAV: NavKey[] = ["dashboard", "pulse", "decks", "chats"];
-
-/** The sidebar for a role on a workspace. */
-export function roleNav(role: RoleModel, kind: string, reputation = kind !== "profile"): NavKey[] {
-  if (role.id === "pr" && kind === "profile") return reputation ? PROFILE_REPUTATION_NAV : PROFILE_NAV;
-  return role.nav;
+/**
+ * The sidebar for a role on a workspace: the four places for everyone (MAIN_NAV). A role's stored `nav` (from a
+ * release or a company's change made before 16 Oct) no longer narrows it.
+ */
+export function roleNav(_role: RoleModel, _kind: string, _reputation?: boolean): NavKey[] {
+  return MAIN_NAV;
 }
 
 export function fillRole(t: string, client: string): string {

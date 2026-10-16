@@ -415,6 +415,7 @@ export function PrDashboard({ d, client, view, hide = [] }: { d: PrDashboardData
         <div><h1>Dashboard</h1><span className="meta">{who} · {range}{scopeWord} vs the {f.days} days before · data through {dayMonth(d.as_of)} {d.as_of.slice(0, 4)}</span></div>
         <div className="topright">
           <PrFilters brand={f.brand} days={f.days} platform={f.platform} brands={d.brands} platforms={d.platforms} client={client} />
+          {view.crisis && <Link className="btn sm ghost" href="/pulse" title="The crisis view: the wave hour by hour, what is moving and who is driving it">Crisis view</Link>}
           <Customise sections={layout.all} builder={view.builder} codename={view.codename} client={view.clientName} />
         </div>
       </div>

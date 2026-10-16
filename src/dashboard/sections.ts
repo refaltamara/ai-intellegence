@@ -84,4 +84,5 @@ export function rows(shown: SectionDef[]): SectionDef[][] {
 }
 
 /** how the team has its Dashboard, and what this person may change there */
-export type DashLayout = { layout: Arranged; builder: boolean; codename: string; clientName: string | null; showHref: string; alert?: RoleModel["alert"] };
+/** `crisis`: a profile on the reputation dashboard keeps its hour-by-hour crisis view at /pulse, linked from here since Pulse left the sidebar (16 Oct 2026) */
+export type DashLayout = { layout: Arranged; builder: boolean; codename: string; clientName: string | null; showHref: string; alert?: RoleModel["alert"]; crisis?: boolean };
