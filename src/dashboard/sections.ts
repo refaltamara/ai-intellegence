@@ -6,6 +6,7 @@
  * components may import it.
  */
 import type { RoleId, RoleModel } from "../roles/model";
+import type { PanelData, PanelScope } from "./panels";
 
 export type SectionDef = { key: string; label: string; width: "full" | "half" };
 
@@ -54,16 +55,18 @@ export type Arranged = { shown: (SectionDef & { title: string })[]; hidden: (Sec
 /**
  * The sections in the order the role asks for (unknown ids dropped). A section the order
  * does not name, such as one a release added after the order was saved, goes right after
- * the section it follows by default, so it still shows where Fair put it. `show` brings
- * back what a Builder hid, for this view only.
+ * the section it follows by default, so it still shows where Fair put it. The team's own
+ * panels ("p:<key>", src/dashboard/panels.ts) sit among them where the order puts them, a
+ * new one at the end. `show` brings back what a Builder hid, for this view only.
  */
-export function arrange(role: RoleId, tiles: Tiles | undefined, show = false): Arranged {
+export function arrange(role: RoleId, tiles: Tiles | undefined, show = false, panels: SectionDef[] = []): Arranged {
   const defs = SECTIONS[role];
-  const byKey = new Map(defs.map((d) => [d.key, d]));
+  const byKey = new Map([...defs, ...panels].map((d) => [d.key, d]));
   const order = [...new Set((tiles?.order ?? []).filter((k) => byKey.has(k)))];
   defs.forEach((d, i) => {
     if (!order.includes(d.key)) order.splice(i ? order.indexOf(defs[i - 1].key) + 1 : 0, 0, d.key);
   });
+  for (const p of panels) if (!order.includes(p.key)) order.push(p.key);
   const hidden = new Set((tiles?.hidden ?? []).filter((k) => byKey.has(k)));
   const all = order.map((k) => ({ ...byKey.get(k)!, title: tiles?.names?.[k]?.trim() || byKey.get(k)!.label }));
   return { shown: all.filter((s) => show || !hidden.has(s.key)), hidden: all.filter((s) => hidden.has(s.key)), all: all.map((s) => ({ ...s, hidden: hidden.has(s.key) })) };
@@ -85,4 +88,9 @@ export function rows(shown: SectionDef[]): SectionDef[][] {
 
 /** how the team has its Dashboard, and what this person may change there */
 /** `crisis`: a profile on the reputation dashboard keeps its hour-by-hour crisis view at /pulse, linked from here since Pulse left the sidebar (16 Oct 2026) */
-export type DashLayout = { layout: Arranged; builder: boolean; codename: string; clientName: string | null; showHref: string; alert?: RoleModel["alert"]; crisis?: boolean };
+export type DashLayout = {
+  layout: Arranged; builder: boolean; codename: string; clientName: string | null; showHref: string; alert?: RoleModel["alert"]; crisis?: boolean;
+  /** the team's own panels, run over the Dashboard's filters (src/dashboard/panels.ts), and those filters for drafting one */
+  panels?: PanelData[];
+  scope?: PanelScope;
+};

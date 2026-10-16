@@ -32,6 +32,8 @@ function what(c: Creation): string {
   if (c.kind === "skill") return String(s.description ?? "");
   if (c.kind === "deck_template") return `${s.grain === "day" ? "Daily" : s.grain === "week" ? "Weekly" : "Monthly"} · ${((s.rep_slides ?? s.social_slides ?? s.slides) as string[]).length} slides${Array.isArray(s.findings) && s.findings.length ? ` + ${s.findings.length} of your team's` : ""}${s.description ? ` · ${s.description}` : ""}`;
   if (c.kind === "term") return c.title;
+  if (c.kind === "panel") return `${String(s.description ?? "")} · on the Dashboard`;
+  if (c.kind === "dashboard") return `${Array.isArray(s.panels) ? s.panels.length : 0} panel${Array.isArray(s.panels) && s.panels.length === 1 ? "" : "s"}${s.description ? ` · ${s.description}` : ""} · in the Dashboard templates`;
   if (c.kind === "extension") {
     const est = (c as Creation & { estimate?: { credits_now: number } }).estimate;
     return `On ${s.target}s: ${((s.values ?? []) as { name: string }[]).map((v) => v.name).join(", ")} · ${s.source === "cemo" ? "CeMO reads each" : s.source === "rule" ? "keyword rules" : "from a file"}${est ? ` · about ${Math.round(est.credits_now).toLocaleString("en-US")} credits to fill` : ""}`;

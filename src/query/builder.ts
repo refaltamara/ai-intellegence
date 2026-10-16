@@ -148,7 +148,29 @@ export type QueryMetricsInput = {
   metrics: string[];
   order_by?: string;
   limit?: number;
+  /**
+   * With a day, week or month in group_by: each row also carries the change from the period before (week on week,
+   * month on month), within the same other groups, counted in SQL (16 Oct 2026): <metric>_change_pct for a count or
+   * a sum, <metric>_change_pts (points) for a rate or a share. The first period in the window has none.
+   */
+  change?: boolean;
 };
+
+const TIME_DIMS = ["day", "week", "month"];
+/** a metric that is already a rate or a share: its change is in points */
+export const isRate = (m: string) => m.endsWith("_pct") || m.startsWith("share_of") || m === "net_sentiment";
+
+/** A grouped query with each metric's change from the period before (lag over the time dimension), ordered and cut after. */
+function withChange(inner: string, groupBy: string[], metrics: string[], order: string, limit: string): string {
+  const time = groupBy.find((g) => TIME_DIMS.includes(g))!;
+  const others = groupBy.filter((g) => g !== time);
+  const w = `(${others.length ? `partition by ${others.map((g) => `q.${g}`).join(", ")} ` : ""}order by q.${time})`;
+  // a rate or a share moves in points (negative share 25% → 32% is +7 points), a count or a sum in per cent
+  const change = metrics.map((m) => (isRate(m)
+    ? `round((q.${m} - lag(q.${m}) over ${w})::numeric, 1)::float8 as ${m}_change_pts`
+    : `case when coalesce(lag(q.${m}) over ${w}, 0) = 0 then null else round(((q.${m} - lag(q.${m}) over ${w})::numeric / abs(lag(q.${m}) over ${w})::numeric * 100), 1)::float8 end as ${m}_change_pct`));
+  return `select q.*, ${change.join(", ")} from (${inner}) q order by ${order} limit ${limit}`;
+}
 
 export type QueryMetricsResult = {
   status: "ok" | "error";
@@ -240,10 +262,13 @@ async function queryComments(input: QueryMetricsInput, workspaceId: string, db: 
   const limit = Math.max(1, Math.min(200, Number(input.limit ?? 50) || 50));
   const dims = groupBy.map((g) => `${ext.dims.get(g) ?? COMMENT_DIM_SQL[g](ctx)} as ${g}`);
   const mets = metrics.map((m) => `${COMMENT_METRIC_SQL[m]} as ${m}`);
-  const sql = `select ${[...dims, ...mets].join(", ")}, count(*) over() as matched
+  const inner = `select ${[...dims, ...mets].join(", ")}, count(*) over() as matched
     from comments c join posts p on p.id = c.post_id left join topics t on t.id = c.topic_id ${ext.joins.join(" ")}
     where ${where.join(" and ")}
-    ${groupBy.length ? `group by ${groupBy.map((_, i) => i + 1).join(", ")}` : ""}
+    ${groupBy.length ? `group by ${groupBy.map((_, i) => i + 1).join(", ")}` : ""}`;
+  const sql = input.change && groupBy.some((g) => TIME_DIMS.includes(g))
+    ? withChange(inner, groupBy, metrics, `${orderCol} ${dir} nulls last`, add(limit))
+    : `${inner}
     order by ${orderCol} ${dir} nulls last limit ${add(limit)}`;
   const rows = await db.q<Row>(sql, params);
   const matched = rows.length ? Number(rows[0].matched) : 0;
@@ -328,10 +353,13 @@ export async function queryMetrics(input: QueryMetricsInput, workspaceId: string
     // views at day 7 come with how many of the posts counted so far, over every group (not only the rows returned)
     const viewsAsked = metrics.some((m) => VIEW_METRICS.has(m));
     const soFarAsked = viewsAsked && r === "d7";
-    const sql = `select ${[...dims, ...mets].join(", ")}, count(*) over() as matched
+    const inner = `select ${[...dims, ...mets].join(", ")}, count(*) over() as matched
       ${soFarAsked ? ", sum(count(*) filter (where d7.so_far)) over () as so_far_all, sum(count(*)) over () as posts_all" : ""}
       from posts p ${r === "d7" ? D7 : ""} left join topics pt on pt.id = p.topic_id ${ext.joins.join(" ")} where ${where.join(" and ")}
-      ${groupBy.length ? `group by ${groupBy.map((_, i) => i + 1).join(", ")}` : ""}
+      ${groupBy.length ? `group by ${groupBy.map((_, i) => i + 1).join(", ")}` : ""}`;
+    const sql = input.change && groupBy.some((g) => TIME_DIMS.includes(g))
+      ? withChange(inner, groupBy, metrics, `${orderCol} ${dir} nulls last`, add(limit))
+      : `${inner}
       order by ${orderCol} ${dir} nulls last limit ${add(limit)}`;
     const rows = await db.q<Row>(sql, params);
     const matched = rows.length ? Number(rows[0].matched) : 0;

@@ -49,6 +49,9 @@ export const SIGNALS = {
   "dashboard.filter": { surface: "dashboard", family: "use", label: "Opened with a filter", payload: { filter: "id" } },
   "pulse.ask": { surface: "dashboard", family: "use", label: "Asked CeMO from the Pulse", payload: { card: "id", typed: "bool" } },
   "dashboard.ask": { surface: "dashboard", family: "use", label: "Asked CeMO from the dashboard", payload: { typed: "bool" } },
+  "dashboard.panel_drafted": { surface: "dashboard", family: "shaping", label: "Dashboard panel drafted", payload: { chart: ["line", "bar", "stacked", "table", "number", "share"], status: ["ok", "empty", "error"], change: "bool" } },
+  "dashboard.panel_added": { surface: "dashboard", family: "shaping", label: "Dashboard panel added or changed", payload: { chart: ["line", "bar", "stacked", "table", "number", "share"], revised: "bool" } },
+  "dashboard.template_used": { surface: "dashboard", family: "shaping", label: "Dashboard template used", payload: { source: ["fair", "team"] } },
 
   "deck.template_chosen": { surface: "decks", family: "use", label: "Deck started", payload: { template: "id", source: ["fair", "company", "scratch", "chat"] } },
   "deck.version_made": { surface: "decks", family: "use", label: "Deck version made", payload: { deck: "uuid", report: "uuid", by: ["cron", "person"] } },

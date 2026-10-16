@@ -13,6 +13,8 @@ import { CONTENT_PAGE, ER_MIN_POSTS, ER_MIN_VIEWS, filterQuery, type ContentCard
 import { DashFilters } from "./DashFilters";
 import { Sections } from "./Sections";
 import { Customise } from "./Customise";
+import { DashTemplates } from "./DashTemplates";
+import { PanelAsk } from "./PanelBuilder";
 import type { DashLayout } from "@/dashboard/sections";
 import { MentionsChart } from "./MentionsChart";
 import { RankTable } from "./RankTable";
@@ -211,7 +213,8 @@ export function Dashboard({ d, content, cq, view }: { d: DashboardData; content:
         <div><h1>Dashboard</h1><span className="meta">{f.period.label} vs {f.prev.label} · data through {dayMonth(d.as_of)} {d.as_of.slice(0, 4)}</span></div>
         <div className="topright">
           <DashFilters platform={f.platform} brands={f.brands} period={f.period.key} months={d.options.months} weeks={d.options.weeks} brandOptions={d.options.brands} platforms={d.options.platforms} />
-          <Customise sections={view.layout.all} builder={view.builder} codename={view.codename} client={view.clientName} />
+          {view.builder && <Customise sections={view.layout.all} builder codename={view.codename} client={view.clientName} />}
+          <DashTemplates builder={view.builder} codename={view.codename} />
         </div>
       </div>
       <div className="wrap wide">
@@ -229,7 +232,8 @@ export function Dashboard({ d, content, cq, view }: { d: DashboardData; content:
           ))}
         </div>
 
-        <Sections arranged={view.layout} render={render} who={view.clientName} showHref={view.showHref} />
+        {view.builder && view.scope && <PanelAsk scope={view.scope} />}
+        <Sections arranged={view.layout} render={render} who={view.clientName} showHref={view.showHref} panels={view.panels} builder={view.builder} scope={view.scope} />
       </div>
     </section>
   );

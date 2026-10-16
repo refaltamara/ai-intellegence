@@ -1892,3 +1892,36 @@ tr.warnrow td{background:#FFFBF0}
 .appswitch-menu a.here{background:var(--blue-10)}
 .appswitch-menu .tile{width:44px;height:44px;display:grid;place-items:center;border-radius:14px}
 .appswitch-menu .tile.affiliate{background:linear-gradient(135deg,#F0566F,#C42A4A);color:#fff}
+
+/* the team's own Dashboard panels, built by asking (Refal, 16 Oct 2026; src/ui/dashboard/PanelView.tsx) */
+.dpanel{padding:14px 16px 16px;display:flex;flex-direction:column;gap:10px}
+.dpanel .dphead{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.dpanel .dphead h3{margin:0;font-size:15px}
+.dpanel .dphead small{display:block;margin-top:2px;font-size:11.5px;line-height:1.4}
+.dpanel .dpacts{display:flex;gap:4px;flex-shrink:0}
+.dpanel .viz,.pdraft .viz{padding:0}
+.pask{margin:4px 0 14px}
+.pask .pulse-ask{margin-bottom:8px}
+.pdraft{border:1px dashed var(--blue);border-radius:14px;padding:12px 14px;background:#fff;display:flex;flex-direction:column;gap:10px}
+.pdraft-head{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.pdraft-head > span:last-child{display:flex;gap:6px}
+.pnote{font-size:11.5px;margin:0}
+.pchange{font-size:12.5px;color:var(--text-2);margin:6px 0 0}
+.pbars{display:flex;flex-direction:column;gap:6px}
+.pbar{display:grid;grid-template-columns:minmax(90px,32%) 1fr auto;gap:10px;align-items:center;font-size:12.5px}
+.pbar .pn{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-2)}
+.pbar .pt{height:12px;background:var(--line);border-radius:4px;overflow:hidden}
+.pbar .pt i{display:block;height:100%;border-radius:0 4px 4px 0}
+.pbar .pv{font-variant-numeric:tabular-nums;font-weight:700;color:var(--text);white-space:nowrap}
+.pbar .pv small{font-weight:600;color:var(--text-3);margin-left:4px}
+.pshare .pstack{display:flex;gap:2px;height:22px;border-radius:6px;overflow:hidden}
+.pshare .pstack i{display:block;min-width:2px}
+.pnum{display:flex;flex-direction:column;gap:2px}
+.pnum > b{font-size:34px;font-weight:900;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.pnum > span{font-size:12.5px;color:var(--text-2)}
+.pnum .pmore{display:flex;gap:14px;flex-wrap:wrap;margin-top:6px;font-size:12px;color:var(--text-2)}
+.dtpl{list-style:none;margin:10px 0;padding:0;display:flex;flex-direction:column;gap:8px}
+.dtpl li{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--line);border-radius:12px}
+.dtpl li small{display:block;margin-top:2px;font-size:11.5px}
+.dtsave{display:flex;gap:8px;align-items:center}
+.dtsave input{flex:1;padding:7px 10px;border:1px solid var(--line);border-radius:9px;font:inherit;font-size:13px}

@@ -20,6 +20,9 @@ import { PulsePage } from "@/ui/PulsePage";
 import { getWorkspace } from "@/workspace/store";
 import { sql } from "@/db/client";
 import { by, signal } from "@/learning/signals";
+import { runTeamPanels, teamPanels, type PanelScope } from "@/dashboard/panels";
+import { panelId } from "@/dashboard/panelSpec";
+import { ROLE_VIEWS } from "@/definitions/catalog";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -34,6 +37,8 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     return <PulsePage d={d} />;
   }
   const sp = await searchParams;
+  // the team's own panels (src/dashboard/panels.ts) sit among the sections and run over the Dashboard's filters
+  const specsP = teamPanels(ws, role.id).catch(() => []);
   // the sections in the team's order, with what a Builder hid (Show brings them back for this view)
   const actor = await currentActor();
   const clientName = cfg?.client_brand_id ? (await clientBrandName(ws, cfg.client_brand_id)) : null;
@@ -44,21 +49,27 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const ctxSig = by(actor, ws, role.id);
   await signal(ctxSig, "dashboard.view", { filtered: filters.length > 0 });
   for (const f of filters) await signal(ctxSig, "dashboard.filter", { filter: f });
-  const view: DashLayout = { layout: arrange(role.id, role.tiles, sp.show === "all"), builder: !!actor && can(actor, "company.change", { workspace: ws, role: role.id }), codename: role.codename, clientName, showHref: `/dashboard?${q}`, alert: role.alert, crisis: cfg?.kind === "profile" && !!cfg.reputation };
+  const specs = await specsP;
+  const runPanels = (scope: PanelScope) => runTeamPanels(ws, role.id, scope, ROLE_VIEWS[role.id], specs);
+  const view: DashLayout = { layout: arrange(role.id, role.tiles, sp.show === "all", specs.map((p) => ({ key: panelId(p.key), label: p.title, width: p.width }))), builder: !!actor && can(actor, "company.change", { workspace: ws, role: role.id }), codename: role.codename, clientName, showHref: `/dashboard?${q}`, alert: role.alert, crisis: cfg?.kind === "profile" && !!cfg.reputation };
   if (role.id === "social") {
     const d = await socialDashboard(ws, sp, role);
     if (!d) redirect("/data");
-    return <SocialDashboard d={d} client={cfg?.client_brand_id ?? null} view={view} />;
+    const scope: PanelScope = { from: d.filters.from, to: d.filters.to, platform: d.filters.platform, brands: [d.filters.brand] };
+    return <SocialDashboard d={d} client={cfg?.client_brand_id ?? null} view={{ ...view, scope, panels: await runPanels(scope) }} />;
   }
   if (role.id === "pr") {
     const d = await prDashboard(ws, sp, role);
     if (!d) redirect("/data");
-    return <PrDashboard d={d} client={cfg?.client_brand_id ?? null} view={view} hide={cfg?.pr_hide ?? []} />;
+    const scope: PanelScope = { from: d.filters.from, to: d.filters.to, platform: d.filters.platform, brands: [d.filters.brand] };
+    return <PrDashboard d={d} client={cfg?.client_brand_id ?? null} view={{ ...view, scope, panels: await runPanels(scope) }} hide={cfg?.pr_hide ?? []} />;
   }
   const ctx = await loadContext(new SkillDb(), ws);
   const cq = readContentQuery(sp);
-  const [d, posts] = await Promise.all([dashboardData(ws, sp), content(ctx, readFilters(sp, ctx), cq)]);
-  return <Dashboard d={d} content={posts} cq={cq} view={view} />;
+  const f = readFilters(sp, ctx);
+  const scope: PanelScope = { from: f.period.from, to: f.period.to, platform: f.platform, brands: f.brands };
+  const [d, posts, panels] = await Promise.all([dashboardData(ws, sp), content(ctx, f, cq), runPanels(scope)]);
+  return <Dashboard d={d} content={posts} cq={cq} view={{ ...view, scope, panels }} />;
 }
 
 async function clientBrandName(ws: string, id: string): Promise<string | null> {

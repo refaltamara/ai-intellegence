@@ -34,11 +34,16 @@ const subsetOf = (allowed: (fair: RoleModel) => readonly string[], keep: string[
 };
 
 /** sections of the role's Dashboard: at most all but two hidden; [] shows everything again */
+/** a team's own dashboard panel (src/dashboard/panels.ts) sits among the sections as "p:<key>" (16 Oct 2026) */
+const PANEL_ID = /^p:[a-z0-9][a-z0-9-]{2,60}$/;
+const tileKey = (keys: string[], x: unknown) => typeof x === "string" && (keys.includes(x) || PANEL_ID.test(x));
 const hiddenSections: Check = (v, fair) => {
   const keys = sectionKeys(fair.id);
-  if (!Array.isArray(v) || v.length > keys.length - 2) return undefined;
+  if (!Array.isArray(v)) return undefined;
   const list = [...new Set(v)];
-  return list.every((x) => typeof x === "string" && keys.includes(x)) ? list : undefined;
+  // at least two of the role's own sections stay shown; panels may all be hidden
+  if (list.filter((x) => keys.includes(x as string)).length > keys.length - 2) return undefined;
+  return list.every((x) => tileKey(keys, x)) ? list : undefined;
 };
 /**
  * an order of the role's Dashboard sections, each once. A saved order outlives releases: a section a release adds later
@@ -47,7 +52,7 @@ const hiddenSections: Check = (v, fair) => {
 const sectionOrder: Check = (v, fair) => {
   const keys = sectionKeys(fair.id);
   if (!Array.isArray(v) || new Set(v).size !== v.length || !v.every((x) => typeof x === "string")) return undefined;
-  const known = (v as string[]).filter((x) => keys.includes(x));
+  const known = (v as string[]).filter((x) => tileKey(keys, x));
   return known.length ? known : undefined;
 };
 /** new titles for some sections, each up to 40 characters */
@@ -55,7 +60,7 @@ const sectionNames: Check = (v, fair) => {
   if (!v || typeof v !== "object" || Array.isArray(v)) return undefined;
   const keys = sectionKeys(fair.id);
   const e = Object.entries(v as Record<string, unknown>);
-  return e.every(([k, x]) => keys.includes(k) && typeof x === "string" && x.trim() && x.length <= 40) ? Object.fromEntries(e.map(([k, x]) => [k, (x as string).trim()])) : undefined;
+  return e.every(([k, x]) => tileKey(keys, k) && typeof x === "string" && x.trim() && x.length <= 40) ? Object.fromEntries(e.map(([k, x]) => [k, (x as string).trim()])) : undefined;
 };
 
 export type Policy = { who: Layer; check: Check };
@@ -84,7 +89,8 @@ export const POLICIES: Record<string, Policy> = {
   skill_order: { who: "company", check: subsetOf(() => SKILL_LAYERS) },
   "tiles.hidden": { who: "company", check: hiddenSections },
   "tiles.names": { who: "company", check: sectionNames },
-  "tiles.order": { who: "member", check: sectionOrder },
+  // the Dashboard is the team's, locked for Members (Refal, 16 Oct 2026): only a Builder orders it, for everyone
+  "tiles.order": { who: "company", check: sectionOrder },
   "prefs.days": { who: "member", check: oneOf([7, 14, 30, 90]) },
   "prefs.answer": { who: "member", check: oneOf(["short", "full"] as const) },
 };
@@ -176,7 +182,7 @@ export const POLICY_HELP: Record<string, { label: string; range: string; roles?:
   skill_order: { label: "Which kinds of analysis come first in the composer's menu", range: "audience, brands, comments, conversation, creators, posts" },
   "tiles.hidden": { label: "Dashboard sections hidden for everyone", range: "section ids; at least two stay; [] shows all" },
   "tiles.names": { label: "Dashboard sections renamed for everyone", range: "{ section id: new title up to 40 characters }" },
-  "tiles.order": { label: "Dashboard sections in order (each person may also set their own)", range: "section ids, once each; a section left out keeps its default place" },
+  "tiles.order": { label: "Dashboard sections and panels in order, for everyone", range: "section ids and p:<panel> ids, once each; a section left out keeps its default place" },
   "prefs.days": { label: "Default window on the Dashboard", range: "7, 14, 30 or 90 days" },
   "prefs.answer": { label: "How long CeMO's answers are", range: "short or full" },
 };

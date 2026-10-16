@@ -8,6 +8,8 @@ import { change, compact, dayMonth, int, pct, pts } from "@/competitor/view";
 import { BAND_HOURS, BAND_ORDER, type Kpi, type OwnPost, type Quote, type SocialData } from "@/social/dashboard";
 import { Sections } from "../dashboard/Sections";
 import { Customise } from "../dashboard/Customise";
+import { DashTemplates } from "../dashboard/DashTemplates";
+import { PanelAsk } from "../dashboard/PanelBuilder";
 import type { DashLayout } from "@/dashboard/sections";
 import { PrFilters } from "../reputation/PrFilters";
 
@@ -190,7 +192,8 @@ export function SocialDashboard({ d, client, view }: { d: SocialData; client: st
         <div><h1>Dashboard</h1><span className="meta">{who}&apos;s own accounts · {range} vs the {f.days} days before · data through {dayMonth(d.as_of)} {d.as_of.slice(0, 4)}</span></div>
         <div className="topright">
           <PrFilters brand={f.brand} days={f.days} platform={f.platform} brands={d.brands} platforms={d.platforms} client={client} windows={[7, 30, 90]} def={30} />
-          <Customise sections={view.layout.all} builder={view.builder} codename={view.codename} client={view.clientName} />
+          {view.builder && <Customise sections={view.layout.all} builder codename={view.codename} client={view.clientName} />}
+          <DashTemplates builder={view.builder} codename={view.codename} />
         </div>
       </div>
       <div className="wrap wide">
@@ -207,7 +210,8 @@ export function SocialDashboard({ d, client, view }: { d: SocialData; client: st
           ))}
         </div>
 
-        <Sections arranged={view.layout} render={render} who={view.clientName} showHref={view.showHref} />
+        {view.builder && view.scope && <PanelAsk scope={view.scope} />}
+        <Sections arranged={view.layout} render={render} who={view.clientName} showHref={view.showHref} panels={view.panels} builder={view.builder} scope={view.scope} />
       </div>
     </section>
   );

@@ -14,6 +14,8 @@ import { PrFilters } from "./PrFilters";
 import { LadderDrawer } from "./LadderDrawer";
 import { Sections } from "../dashboard/Sections";
 import { Customise } from "../dashboard/Customise";
+import { DashTemplates } from "../dashboard/DashTemplates";
+import { PanelAsk } from "../dashboard/PanelBuilder";
 import type { DashLayout } from "@/dashboard/sections";
 import { repAskHref } from "@/dashboard/askref";
 import { PulseTrends } from "../pulse/PulseTrends";
@@ -416,7 +418,8 @@ export function PrDashboard({ d, client, view, hide = [] }: { d: PrDashboardData
         <div className="topright">
           <PrFilters brand={f.brand} days={f.days} platform={f.platform} brands={d.brands} platforms={d.platforms} client={client} />
           {view.crisis && <Link className="btn sm ghost" href="/pulse" title="The crisis view: the wave hour by hour, what is moving and who is driving it">Crisis view</Link>}
-          <Customise sections={layout.all} builder={view.builder} codename={view.codename} client={view.clientName} />
+          {view.builder && <Customise sections={layout.all} builder codename={view.codename} client={view.clientName} />}
+          <DashTemplates builder={view.builder} codename={view.codename} />
         </div>
       </div>
       <div className="wrap wide">
@@ -456,7 +459,8 @@ export function PrDashboard({ d, client, view, hide = [] }: { d: PrDashboardData
           ))}
         </div>
 
-        <Sections arranged={{ ...layout, shown: layout.shown.filter((x) => !unmeasured.has(x.key)) }} render={render} who={hiddenFor} showHref={showHref} />
+        {view.builder && view.scope && <PanelAsk scope={view.scope} />}
+        <Sections arranged={{ ...layout, shown: layout.shown.filter((x) => !unmeasured.has(x.key)) }} render={render} who={hiddenFor} showHref={showHref} panels={view.panels} builder={view.builder} scope={view.scope} />
       </div>
     </section>
   );
