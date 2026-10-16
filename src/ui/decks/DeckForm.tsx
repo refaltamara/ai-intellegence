@@ -12,9 +12,11 @@ import { isFairBadge } from "../../brand/demo";
 import { MultiSelect } from "../MultiSelect";
 import { PeriodPick } from "./PeriodPick";
 import { SlideDescriber, type AddedSlide } from "./SlideDescriber";
+import { DeckDescriber } from "./DeckDescriber";
+import type { DeckDraft } from "@/decks/describe";
 
 type Group = DeckSpec["watchlist"][number];
-type Initial = { id: string; name: string; spec: DeckSpec; recurring: boolean; template: string | null };
+type Initial = { id: string; name: string; spec: DeckSpec; recurring: boolean; template: string | null; ends_on?: string | null };
 
 const PLATFORM_NAME: Record<string, string> = { tiktok: "TikTok", instagram: "Instagram", threads: "Threads", x: "X", youtube: "YouTube" };
 
@@ -37,6 +39,8 @@ export function DeckForm({ options, initial, prefill }: { options: DeckOptions; 
   const [slides, setSlides] = useState<string[]>(initial?.spec.slides ?? (prefill ? [...new Set(["summary", prefill.slide, "moves", "evidence"])] : t.slides));
   const [period, setPeriod] = useState(initial?.spec.grain === "day" ? (options.periods.day[0]?.key ?? "") : "");
   const [recurring, setRecurring] = useState(initial?.recurring ?? t.recurring);
+  // until when it repeats (16 Oct 2026); empty = until stopped
+  const [until, setUntil] = useState(initial?.ends_on ?? "");
   const [busy, setBusy] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const [error, setError] = useState("");
@@ -70,6 +74,26 @@ export function DeckForm({ options, initial, prefill }: { options: DeckOptions; 
     if (x.rep_slides ?? x.social_slides) setRepSlides((x.rep_slides ?? x.social_slides)!);
     // a team template carries its own slides (the team's analyses)
     setPicked((x.findings ?? []).filter((f) => f.skill.startsWith("recipe:")).map((f) => f.skill.slice(7)));
+  };
+  // "Describe the deck you want": CeMO's layout fills the form (src/decks/describe.ts); the person checks it before creating
+  const applyDraft = (d: DeckDraft) => {
+    const x = options.templates.find((y) => y.key === d.template);
+    if (!x) return;
+    pickTemplate(x.key);
+    setName(d.name);
+    setGrain(d.grain);
+    setPeriod(d.grain === "day" ? options.periods.day[0]?.key ?? "" : "");
+    if (x.family) {
+      if (d.focus) setFocus(d.focus);
+      setRepPlatform(d.platform);
+      setRepSlides(d.slides);
+    } else {
+      if (d.brands.length) setWatch(d.brands.map((id) => ({ name: brandName.get(id) ?? id, group: "core" as const, brand_ids: [id] })));
+      if (d.platforms.length) setPlatforms(d.platforms);
+      setSlides(d.slides);
+    }
+    if (d.added.length) setAdded((a) => [...a, ...d.added.filter((n) => !a.some((y) => y.key === n.key))]);
+    setPicked([...new Set([...(x.findings ?? []).filter((f) => f.skill.startsWith("recipe:")).map((f) => f.skill.slice(7)), ...d.skills])]);
   };
   useEffect(() => {
     if (!busy) return;
@@ -116,13 +140,13 @@ export function DeckForm({ options, initial, prefill }: { options: DeckOptions; 
     setElapsed(0);
     try {
       if (!edit) {
-        const r = await fetch("/api/decks", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: name.trim() || (family === "reputation" ? tName : t.name), template, spec: spec(), recurring, period: period || undefined }) });
+        const r = await fetch("/api/decks", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: name.trim() || (family === "reputation" ? tName : t.name), template, spec: spec(), recurring, ends_on: recurring && until ? until : null, period: period || undefined }) });
         const j = await r.json().catch(() => ({}));
         if (!r.ok || !j.deck) throw new Error(j.error ?? "Could not make the deck");
         router.push(`/decks/${j.deck.id}${j.version?.report_id ? `?v=${j.version.report_id}` : ""}`);
         return;
       }
-      const r = await fetch(`/api/decks/${initial!.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: name.trim() || initial!.name, spec: spec(), recurring }) });
+      const r = await fetch(`/api/decks/${initial!.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: name.trim() || initial!.name, spec: spec(), recurring, ...(recurring ? { ends_on: until || null } : {}) }) });
       const j = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(j.error ?? "Could not save");
       if (alsoTemplate) {
@@ -146,9 +170,10 @@ export function DeckForm({ options, initial, prefill }: { options: DeckOptions; 
 
   return (
     <div className="deckform">
+      {!edit && <DeckDescriber onDraft={applyDraft} />}
       {!edit && (
         <section>
-          <h3>Start from</h3>
+          <h3>Or start from</h3>
           <div className="tpls">
             {options.templates.map((x) => (
               <button key={x.key} type="button" className={template === x.key ? "on" : ""} onClick={() => pickTemplate(x.key)}>
@@ -294,6 +319,9 @@ export function DeckForm({ options, initial, prefill }: { options: DeckOptions; 
         </div>
         {edit && <label className="dcheck wide"><input type="checkbox" checked={alsoTemplate} onChange={(e) => setAlsoTemplate(e.target.checked)} /> Also change the template this deck came from <small>({initial?.template?.startsWith("co-") ? "your team's template" : "saved as your team's own template; Fair's stays as it is"}; a Member&apos;s change waits for a Builder)</small></label>}
         <label className="dcheck wide"><input type="checkbox" checked={recurring} onChange={(e) => setRecurring(e.target.checked)} /> Make the next version every {grain} <small>({grain === "day" ? "each morning at 07:00 WIB, for the day before, once its data has landed" : `when a new ${grain} of data lands`}; data runs to {options.data_through}{/\.\./.test(period) ? `; the days you chose make the first version, then one ${grain} each` : ""})</small></label>
+        {recurring && (
+          <label className="duntil">Until <input type="date" value={until} min={options.data_through} onChange={(e) => setUntil(e.target.value)} aria-label="The last day this deck covers" /> <small>{until ? "then it stops, and the Decks list shows it as ended" : "empty: until you stop it from the Decks list"}</small></label>
+        )}
       </section>
 
       {error && <div className="errbox">{error}</div>}

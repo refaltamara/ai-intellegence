@@ -23,6 +23,7 @@ import { sql } from "../db/client";
 import { roleOfSpec, specContract, type DeckSpec } from "./spec";
 import { ROLE_VIEWS } from "../definitions/catalog";
 import { markDeckRun, pruneVersions, type DeckRow } from "./store";
+import { lookAgain } from "./status";
 import { reputationReport, writeRep } from "../reputation/deck";
 import { storeReputation } from "../reputation/store";
 import { socialReport, writeSocial } from "../social/deck";
@@ -43,6 +44,9 @@ export function nextRun(grain: DeckGrain, now = new Date()): string {
   const ahead = ((8 - d.getUTCDay()) % 7) || 7;
   return new Date(d.getTime() + ahead * DAY).toISOString();
 }
+
+/** The first day of the period after `p`: what the next scheduled look would make (the day after, or the period after). */
+export const followingFrom = (grain: DeckGrain, p: { from: string; to: string }) => (grain === "day" ? addDays(p.from, 1) : addDays(p.to, 1));
 
 /** A day later, at 07:00 WIB: when the period's data has not landed yet, or a run failed. */
 export function retryRun(now = new Date()): string {
@@ -96,7 +100,7 @@ export async function generateDeckVersion(deck: DeckRow, opts: { period?: string
   // a version the model writes costs credits (src/credits/ledger.ts); at the cap it waits, the deck's earlier versions stay
   const ok = await canSpend(deck.workspace_id, CREDIT_PRICES.deck_version);
   if (!ok.ok) {
-    await markDeckRun(deck.id, { next_run_at: deck.recurring ? retryRun() : null, error: ok.message.slice(0, 500) }).catch(() => undefined);
+    await markDeckRun(deck.id, { next_run_at: lookAgain(deck, null, retryRun()), error: ok.message.slice(0, 500) }).catch(() => undefined);
     return { status: "error", message: ok.message, report_id: null, period: null };
   }
   const out = await makeVersion(deck, opts);
@@ -125,8 +129,13 @@ async function makeVersion(deck: DeckRow, opts: { period?: string; reason: "crea
     if (isMonthRun(period) && (spec.rep || spec.social)) throw new Error("a run of months works for brand decks; pick one month, or chosen dates for a PR deck");
     if (period.from > ctx.asOf) throw new Error(`the data runs to ${ctx.asOf}; ${period.label} has not started in it yet`);
     if (period.to < ctx.earliest.slice(0, 10)) throw new Error(`the data starts on ${ctx.earliest.slice(0, 10)}; ${period.label} is before it`);
+    // past its end date a recurring deck makes nothing more: it has ended (the list says so)
+    if (opts.reason === "schedule" && deck.ends_on && period.from > deck.ends_on) {
+      await markDeckRun(deck.id, { next_run_at: null, error: null });
+      return { status: "skipped", message: `ended: ${period.label} starts after the deck's end date (${deck.ends_on})`, report_id: null, period: period.key };
+    }
     if (opts.reason === "schedule" && deck.last_period && !RANGE_RE.test(deck.last_period) && !MONTHS_RE.test(deck.last_period) && period.key <= deck.last_period) {
-      await markDeckRun(deck.id, { next_run_at: retryRun(), error: null });
+      await markDeckRun(deck.id, { next_run_at: lookAgain(deck, followingFrom(grain, period), retryRun()), error: null });
       return { status: "skipped", message: `no new ${grain} of data: ${period.label} is already in the deck (data through ${ctx.asOf})`, report_id: null, period: period.key };
     }
     if (spec.social) {
@@ -138,7 +147,7 @@ async function makeVersion(deck: DeckRow, opts: { period?: string; reason: "crea
       const stored = await storeSocial({ workspaceId: deck.workspace_id, report: r, narrative: written.narrative, by: written.by, problems: written.problems, deck: { id: deck.id, name: deck.name } });
       await pruneVersions(deck.id, deck.workspace_id, r.period.key, stored.reportId);
       const last = deck.last_period && deck.last_period > period.key ? deck.last_period : period.key;
-      await markDeckRun(deck.id, { last_period: last, next_run_at: deck.recurring ? nextRun(grain) : null, error: null });
+      await markDeckRun(deck.id, { last_period: last, next_run_at: lookAgain(deck, followingFrom(grain, period), nextRun(grain)), error: null });
       return { status: "ok", message: `${period.label}: ${r.kpis.posts.now ?? 0} own posts, words by ${written.by === "model" ? "CeMO" : "the plain template"}`, report_id: stored.reportId, period: period.key, narrative_by: written.by };
     }
     if (spec.rep) {
@@ -151,7 +160,7 @@ async function makeVersion(deck: DeckRow, opts: { period?: string; reason: "crea
       await pruneVersions(deck.id, deck.workspace_id, r.period.key, stored.reportId);
       // chosen days never move the schedule: it keeps counting weeks or months
       const last = isRange(period) ? deck.last_period : deck.last_period && deck.last_period > period.key ? deck.last_period : period.key;
-      await markDeckRun(deck.id, { last_period: last, next_run_at: deck.recurring ? nextRun(grain) : null, error: null });
+      await markDeckRun(deck.id, { last_period: last, next_run_at: lookAgain(deck, followingFrom(grain, period), nextRun(grain)), error: null });
       return { status: "ok", message: `${period.label}: ${r.status.level}, ${r.issues.length} issue${r.issues.length === 1 ? "" : "s"}, words by ${written.by === "model" ? "CeMO" : "the plain template"}`, report_id: stored.reportId, period: period.key, narrative_by: written.by };
     }
     if (grain === "day") throw new Error("a day-by-day deck is a PR deck; pick a week or a month for this one");
@@ -162,11 +171,11 @@ async function makeVersion(deck: DeckRow, opts: { period?: string; reason: "crea
     await pruneVersions(deck.id, deck.workspace_id, r.week.iso, stored.reportId);
     // a run of months never moves the schedule: a recurring deck keeps counting single months
     const last = isMonthRun(period) ? deck.last_period : deck.last_period && deck.last_period > period.key ? deck.last_period : period.key;
-    await markDeckRun(deck.id, { last_period: last, next_run_at: deck.recurring ? nextRun(grain) : null, error: null });
+    await markDeckRun(deck.id, { last_period: last, next_run_at: lookAgain(deck, followingFrom(grain, period), nextRun(grain)), error: null });
     return { status: "ok", message: `${period.label}: ${r.movers.length} mover${r.movers.length === 1 ? "" : "s"}, words by ${written.by === "model" ? "CeMO" : "the plain template"}`, report_id: stored.reportId, period: period.key, narrative_by: written.by };
   } catch (e) {
     const message = (e as Error).message;
-    await markDeckRun(deck.id, { next_run_at: deck.recurring ? retryRun() : null, error: message.slice(0, 500) }).catch(() => undefined);
+    await markDeckRun(deck.id, { next_run_at: lookAgain(deck, null, retryRun()), error: message.slice(0, 500) }).catch(() => undefined);
     return { status: "error", message, report_id: null, period: key };
   }
 }

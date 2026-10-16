@@ -1,8 +1,9 @@
 /**
  * Decks (DECISIONS, 2 Oct 2026): slide decks the team builds from a template, from scratch or from a
  * conversation in Chats, each with its versions, Ask AI on every slide and, if asked, a new version every
- * week or month. The client's Weekly Competitor Pulse stays on its own page (Weekly Reports). Pulse boards
- * made before Decks are listed at the bottom.
+ * day, week or month. Since 16 Oct 2026 one list with each deck's status (monitoring until a day or until
+ * stopped, paused, ended, one-off; src/decks/status.ts); the client's Weekly Competitor Pulse is a row in it
+ * (Weekly Reports left the sidebar; its viewer still opens). Pulse boards made before Decks are listed at the bottom.
  */
 import Link from "next/link";
 import { currentRole, currentWorkspaceId } from "@/auth/current";
@@ -11,7 +12,10 @@ import { deckTemplate } from "@/decks/templates";
 import { deckWorkspace } from "@/pulses/api";
 import { listPulses } from "@/pulses/store";
 import { weeklyItems } from "@/reports/weekly";
-import { DeckList } from "@/ui/decks/DeckList";
+import { DeckList, type DeckItem } from "@/ui/decks/DeckList";
+import { deckStatus, dateLabel } from "@/decks/status";
+import { listAgents } from "@/agents/store";
+import { sql } from "@/db/client";
 
 export const dynamic = "force-dynamic";
 
@@ -30,38 +34,62 @@ export default async function DecksPage() {
       </section>
     );
   }
-  const [all, weekly0, pulses, role] = await Promise.all([listDecks(ws), weeklyItems(ws), listPulses(ws), currentRole(ws)]);
+  const [all, weekly0, pulses, role, agents, brandRows] = await Promise.all([listDecks(ws), weeklyItems(ws), listPulses(ws), currentRole(ws), listAgents(ws), sql.query("select id, name from brands where workspace_id = $1", [ws]).then((r) => r as { id: string; name: string }[])]);
+  const brandName = new Map(brandRows.map((b) => [b.id, b.name]));
   // each role keeps its own decks: PR decks are one brand's reputation (spec.rep), Social Media decks its own accounts (spec.social), the rest Brand & KOL's
   const pr = role.id === "pr";
   const family = (d: (typeof all)[number]) => (d.spec?.rep ? "pr" : d.spec?.social ? "social" : "brand_kol");
   const decks = all.filter((d) => family(d) === role.id);
+  // the client's weekly report schedule (an agent) is a Brand & KOL row, opening the Weekly Reports viewer
   const weekly = role.id === "brand_kol" ? weekly0 : [];
-  const clients = [...new Set(weekly.map((w) => w.client))];
+  const schedules = role.id === "brand_kol" ? agents.filter((a) => a.kind === "weekly_report") : [];
   const boards = pulses.filter((p) => p.cards > 0);
+  const every = (g: string) => (g === "month" ? "Monthly" : g === "day" ? "Daily" : "Weekly");
+  const names = (w: { name: string }[]) => `${w.slice(0, 4).map((x) => x.name).join(", ")}${w.length > 4 ? ` +${w.length - 4}` : ""}`;
+  const items: DeckItem[] = [
+    ...schedules.map((a): DeckItem => {
+      const c = (a.params as { contract?: { watchlist?: { name: string }[] } }).contract;
+      const mine = weekly;
+      const st = a.status === "active" ? { state: "monitoring" as const, label: "Monitoring", detail: `${a.schedule_human ?? "every week"} until stopped${a.next_run_at ? `; next ${dateLabel(a.next_run_at.slice(0, 10))}` : ""}` } : { state: "paused" as const, label: "Paused", detail: "no new reports until resumed" };
+      return { id: a.id, type: "weekly", href: "/weekly", name: a.name, kind: "Weekly Competitor Pulse · emailed as PDF and PowerPoint", brands: names(c?.watchlist ?? []), repeats: "Weekly", state: st.state, status: st.label, detail: st.detail, ends_on: null, latest: mine.length ? mine[mine.length - 1].label : null, versions: mine.length, updated: day(a.last_run_at ?? a.created_at), error: null };
+    }),
+    ...decks.map((d): DeckItem => {
+      const st = deckStatus({ recurring: d.recurring, grain: d.spec.grain, ends_on: d.ends_on, paused_at: d.paused_at, next_run_at: d.next_run_at });
+      return {
+        id: d.id,
+        type: "deck",
+        href: `/decks/${d.id}`,
+        name: d.name,
+        kind: deckTemplate(d.template)?.name ?? (d.source === "chat" ? "From Chats" : d.source === "pulse" ? "From a Pulse board" : d.template?.startsWith("co-") ? "Your team's template" : "Deck"),
+        brands: d.spec.rep ? brandName.get(d.spec.rep.focus) ?? d.spec.rep.focus : d.spec.social ? brandName.get(d.spec.social.focus) ?? d.spec.social.focus : names(d.spec.watchlist),
+        repeats: d.recurring ? every(d.spec.grain) : "–",
+        state: st.state,
+        status: st.label,
+        detail: st.detail,
+        ends_on: d.ends_on,
+        latest: d.latest?.label ?? null,
+        versions: d.versions,
+        updated: day(d.updated_at),
+        error: d.last_error,
+      };
+    }),
+  ];
+  // what is still running first, then what is paused, then the one-offs, then what has ended
+  const ORDER = { monitoring: 0, paused: 1, "one-off": 2, ended: 3 } as const;
+  items.sort((a, b) => ORDER[a.state] - ORDER[b.state]);
+  const today = new Date(Date.now() + 7 * 3_600_000).toISOString().slice(0, 10);
   return (
     <section className="screen">
       <div className="topbar">
-        <div><h1>Decks</h1><span className="meta">Slide decks from a template, from scratch or from Chats: actual slides, Ask AI on each, PDF and PowerPoint, and a new version every week or month if you want one.</span></div>
-        <Link className="btn pri sm" href="/decks/new">+ New deck</Link>
+        <div><h1>Decks</h1><span className="meta">Slide decks from a template, from scratch or from Chats: actual slides, Ask AI on each, PDF and PowerPoint, and a new version every day, week or month until a day you choose.</span></div>
+        <div className="topright">
+          <Link className="btn sm ghost" href="/reports" title="Reports made from Chats, and the schedules behind them">Reports</Link>
+          <Link className="btn pri sm" href="/decks/new">+ New deck</Link>
+        </div>
       </div>
       <div className="wrap wide">
-        {weekly.length > 0 && (
-          <Link href="/weekly" className="dpinned">
-            <span className="dkind">Weekly Reports</span>
-            <b>{weekly[0].deck}{clients.length === 1 ? ` · ${clients[0]}` : ""}</b>
-            <span>{weekly.length} week{weekly.length === 1 ? "" : "s"}, latest {weekly[weekly.length - 1].label}. Kept on its own page for presenting.</span>
-          </Link>
-        )}
-        {decks.length > 0 ? (
-          <DeckList decks={decks.map((d) => ({
-            id: d.id,
-            name: d.name,
-            kind: deckTemplate(d.template)?.name ?? (d.source === "chat" ? "From Chats" : d.source === "pulse" ? "From a Pulse board" : "Deck"),
-            latest: d.latest?.label ?? null,
-            meta: `${d.spec.grain === "month" ? "Month on month" : d.spec.grain === "day" ? "Day on day" : "Week on week"} · ${d.spec.watchlist.map((w) => w.name).slice(0, 4).join(", ")}${d.spec.watchlist.length > 4 ? ` +${d.spec.watchlist.length - 4}` : ""} · ${d.versions} version${d.versions === 1 ? "" : "s"} · updated ${day(d.updated_at)}`,
-            recurring: d.recurring ? `A new version every ${d.spec.grain}` : null,
-            error: d.last_error,
-          }))} />
+        {items.length > 0 ? (
+          <DeckList decks={items} today={today} />
         ) : (
           <div className="empty">No decks yet. <Link href="/decks/new">Start one from a template</Link>{pr ? ": the Weekly Reputation Report is the one to send up every week." : role.id === "social" ? ": the Monthly Content Review is the one to send up every month." : ", or ask CeMO something in Chats and turn the conversation into a deck."}</div>
         )}

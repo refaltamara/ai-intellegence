@@ -18,7 +18,7 @@ export default async function EditDeckPage({ params }: { params: Promise<{ id: s
   return (
     <section className="screen">
       <div className="topbar"><div><h1>Edit {deck.name}</h1><span className="meta">Changes apply to the next version; the versions already made stay as they were.</span></div></div>
-      <div className="wrap wide"><DeckForm options={options} initial={{ id: deck.id, name: deck.name, spec: deck.spec, recurring: deck.recurring, template: deck.template }} /></div>
+      <div className="wrap wide"><DeckForm options={options} initial={{ id: deck.id, name: deck.name, spec: deck.spec, recurring: deck.recurring, template: deck.template, ends_on: deck.ends_on }} /></div>
     </section>
   );
 }

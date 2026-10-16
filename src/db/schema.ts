@@ -1063,6 +1063,10 @@ export const decks = pgTable(
     spec: jsonb("spec").notNull(),
     recurring: boolean("recurring").notNull().default(false),
     nextRunAt: ts("next_run_at"),
+    /** a recurring deck's last day to cover (16 Oct 2026); null = until stopped. Past it, no more versions: the deck has ended */
+    endsOn: date("ends_on"),
+    /** paused by a person: the cron skips it until it is resumed */
+    pausedAt: ts("paused_at"),
     lastPeriod: text("last_period"),
     lastError: text("last_error"),
     conversationId: uuid("conversation_id").references(() => conversations.id, { onDelete: "set null" }),
