@@ -14,3 +14,7 @@ next-env.d.ts
 /data/raw/*
 !/data/raw/README.md
 !/data/raw/MANIFEST.json
+
+# Local personal docs
+wahyu-docs/
+
