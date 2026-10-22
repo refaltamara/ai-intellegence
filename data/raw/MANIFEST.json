@@ -274,6 +274,14 @@
       "received": "2026-10-22"
     },
     {
+      "path": "kahf-daily/comments_threads_1022e.csv",
+      "workspace": "kahf-daily",
+      "blob": "raw/kahf-daily/comments_threads_1022e.csv",
+      "bytes": 75194,
+      "sha256": "7f3ac2a02f6a629cef06a37f80e198582fb65f87b226c2bb7f7d34e055593f6a",
+      "received": "2026-10-22"
+    },
+    {
       "path": "kahf-daily/comments_x_1022.csv",
       "workspace": "kahf-daily",
       "blob": "raw/kahf-daily/comments_x_1022.csv",

@@ -126,6 +126,13 @@
       "file": "kahf-daily/comments_x_1022.csv",
       "export_time": "2026-10-22T08:52:41Z",
       "note": "dataset_x-post-replies-scraper_2026-10-22_08-52-41-626.json (Apify X replies scraper): 310 replies under 15 tweets, 11 to 22 Oct; the 141 from 17 Oct kept (169 earlier left out). Several of the tweets are Friday reminders to read Surah Al-Kahf: the labeller sets their replies aside as Irrelevant."
+    },
+    {
+      "kind": "comments",
+      "platform": "threads",
+      "file": "kahf-daily/comments_threads_1022e.csv",
+      "export_time": "2026-10-22T10:05:13Z",
+      "note": "scrapper-results-20261022-1708.xlsx (Fair's scraper, 10:05 UTC on 22 Oct): 387 comments under Kahf's 22 Oct statement, 10:00 to 17:02 WIB, none a reply to a reply, 3 of them Kahf's own (never labelled), 1 without text. 69 of the 76 held from the morning file are in it under the same ids (Threads' numeric ids written as their short codes), so 318 are new. The scraper's own sentiment, csat and theme columns are empty and not loaded."
     }
   ]
 }
