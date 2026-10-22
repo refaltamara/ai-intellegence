@@ -1,0 +1,63 @@
+{
+  "workspace": "kahf-daily",
+  "subject": {
+    "brand_id": "kahf-daily",
+    "name": "Kahf",
+    "owned_handles": {
+      "threads": ["kahfeveryday", "kahfeveryday.my"],
+      "instagram": ["kahfeveryday", "kahfeveryday.my"],
+      "tiktok": ["kahfeveryday", "kahfeveryday.my"],
+      "x": ["kahfeveryday", "kahfeveryday.my"]
+    }
+  },
+  "export_time": "2026-10-22T03:39:51Z",
+  "case_note": "22 Oct 2026: Refal tracks Kahf day by day from 17 Oct (\"any contents before 17 Oct we don't have to care for now, it's the past\"): Kahf's own two accounts (@kahfeveryday, @kahfeveryday.my, Refal: \"only those 2\") and posts by others that name Kahf, with a Malaysia view read from the language (Malay = Malaysian). Kahf posted a new statement on Threads at 10:01 WIB on 22 Oct; its replies are the first comments. Topics are not set yet (Refal: \"don't categorize into topic yet\").",
+  "keywords": ["kahf", "khaf", "k\\*\\*f"],
+  "keyword_platforms": ["threads", "tiktok", "x"],
+  "keyword_platforms_note": "Searches for \"kahf\" and \"khaf\" also return posts from threads about something else; a post by someone else that does not name Kahf is left out. Posts that name the word but not the brand (Surah Al-Kahf, the Herat–Khaf railway, the Urdu \"khafa\") are set aside by the labeller (settings.label.post_off_topic).",
+  "drop_urls": [
+    { "url": "https://www.threads.com/@kahfeveryday/post/Dex9_XNmgo_", "reason": "Kahf's 22 Oct statement continues in its own thread: one post", "parent": "https://www.threads.com/@kahfeveryday/post/Dex9_cQGtqd" },
+    { "url": "https://www.threads.com/@kahfeveryday/post/Dex9_ZAGnTh", "reason": "Kahf's 22 Oct statement continues in its own thread: one post", "parent": "https://www.threads.com/@kahfeveryday/post/Dex9_cQGtqd" },
+    { "url": "https://www.threads.com/@kahfeveryday/post/Dex9_Y4GiEv", "reason": "Kahf's 22 Oct statement continues in its own thread: one post", "parent": "https://www.threads.com/@kahfeveryday/post/Dex9_cQGtqd" }
+  ],
+  "files": [
+    {
+      "kind": "contents",
+      "platform": "threads",
+      "file": "kahf-daily/contents_threads_own_1022.csv",
+      "export_time": "2026-10-22T03:39:51Z",
+      "note": "threads_own_kahf.csv (a Threads profile scraper, scraped 03:39 UTC on 22 Oct): 200 posts by @kahfeveryday and @kahfeveryday.my back to July 2025; the 4 from 17 Oct kept, all @kahfeveryday's 22 Oct statement (10:01 WIB) and the three posts that continue it in its own thread (listed in drop_urls with the statement as their parent). Columns renamed only; times ISO with a zone."
+    },
+    {
+      "kind": "contents",
+      "platform": "threads",
+      "file": "kahf-daily/contents_threads_search_1022.csv",
+      "note": "thread_kahf_ref.csv and thread_khaf_ref.csv (a Threads keyword search for \"kahf\" and \"khaf\", 513 posts each, 2 in both): 421 posted from 17 Oct (to 01:05 WIB on 22 Oct), one row per post, the larger reading kept. Replies found by the search are loaded as posts, as in kahf-threads. No views or followers in the search. Columns renamed only."
+    },
+    {
+      "kind": "contents",
+      "platform": "tiktok",
+      "file": "kahf-daily/contents_tiktok_own_1022.csv",
+      "note": "tiktok_own_kahf.csv (Apify TikTok profile scraper): @kahfeveryday's last 50 videos, 20 to 21 Oct, all from 17 Oct. Columns renamed only."
+    },
+    {
+      "kind": "contents",
+      "platform": "tiktok",
+      "file": "kahf-daily/contents_tiktok_search_1022.csv",
+      "note": "tiktok_kahf.csv (Apify TikTok search for \"kahf\", 282 videos): 71 posted from 17 Oct, some of them @kahfeveryday's and @kahfeveryday.my's own (those count as own). Columns renamed only."
+    },
+    {
+      "kind": "contents",
+      "platform": "x",
+      "file": "kahf-daily/contents_x_search_1022.csv",
+      "note": "twitter_kahf.csv (an X search for \"kahf\", 1,000 tweets, one repeated): 245 posted from 17 Oct (to 09:22 WIB on 22 Oct). Most are Friday reminders to read Surah Al-Kahf. twitter_own_kahf.csv (@kahfeveryday) holds nothing from 17 Oct and is not loaded; the scraper found no @kahfeveryday.my on X. Columns renamed only."
+    },
+    {
+      "kind": "comments",
+      "platform": "threads",
+      "file": "kahf-daily/comments_threads_1022.csv",
+      "export_time": "2026-10-22T06:19:44Z",
+      "note": "dataset_threads-replies-scraper_2026-10-22_06-19-45-159.csv (Apify Threads replies scraper, 06:19 UTC on 22 Oct): 80 replies to @kahfeveryday's 22 Oct statement, 10:00 to 13:17 WIB, one of them Kahf's own continuation (kept as Kahf's reply, never labelled); the post's own row left out. ISO times with Z. Columns renamed only."
+    }
+  ]
+}

@@ -363,6 +363,24 @@ One contents file, `data/raw/kahf/contents_threads.csv` (posts only; comments to
   - **The pace fell away in the evening:** 30 comments at 15:00 WIB, 22 at 16:00, 15 at 17:00, under a dozen an hour from 18:00, two an hour overnight.
   - **Tags and likes:** Bad Lab is tagged in 32 comments and Ubermen in 9. On TikTok, "villain dlm Kudrat tapi hero dalam kehidupan sebenar" now has 1,178 likes and the call to Malaysia's local brands has 900.
 
+## Kahf: day by day from 17 Oct (profile workspace `kahf-daily`, 22 Oct 2026)
+
+- **What it is.** Refal tracks Kahf daily from 17 Oct ("any contents before 17 Oct we don't have to care for now"): Kahf's own two accounts, @kahfeveryday and @kahfeveryday.my ("only those 2"), and posts by others that name Kahf, with a Malaysia view read from the language (Malay = Malaysian, "works for caption & comments"). Topics are not set yet ("I'll tell you when").
+- **Workspace.** A third Kahf case workspace, set up like `kahf-kol`: profile, PR, the Chorus dashboard, restricted to Refal and Raissa, live so the labeller runs; brand id `kahf-daily` (named Kahf). Its case context in `settings.label` takes the story to the 22 Oct statement, says which way sentiment points (toward Kahf), and sets aside posts about Surah Al-Kahf, the Herat–Khaf railway, the Urdu "khafa" and people's names (`post_off_topic`). Voices: Malaysian, Indonesian.
+- **Files, 22 Oct** (contract `etl/profiles/kahf-daily.json`, files under `kahf-daily/`, columns renamed only, rows posted before 17 Oct 00:00 WIB left out):
+  - Threads, Kahf's own (`threads_own_kahf.csv`, 200 posts back to July 2025): 4 from 17 Oct, all the 22 Oct statement (10:01 WIB) and the three posts continuing it in its own thread, which count as one post (the three are in `drop_urls` with the statement as their parent).
+  - Threads search for "kahf" and "khaf" (`thread_kahf_ref.csv`, `thread_khaf_ref.csv`, 513 each, 2 in both): 421 from 17 Oct. No views or followers in the search.
+  - TikTok, Kahf's own (`tiktok_own_kahf.csv`, the last 50, 20 to 21 Oct) and the search for "kahf" (`tiktok_kahf.csv`, 282; 71 from 17 Oct, some of them Kahf's own).
+  - X search for "kahf" (`twitter_kahf.csv`, 1,000; 245 from 17 Oct). Kahf's own X (`twitter_own_kahf.csv`) has nothing from 17 Oct; the scraper found no @kahfeveryday.my on X.
+  - Instagram: Kahf's profiles (`IG_won_kahf.csv`) have nothing from 17 Oct; not loaded.
+  - Comments: the 80 replies to the 22 Oct statement (`dataset_threads-replies-scraper_2026-10-22_06-19-45-159.csv`, Apify, 10:00 to 13:17 WIB), one of them Kahf's own continuation.
+- **Load `8bc4b2aa`**: 632 posts (56 Kahf's own: the statement and 55 TikTok videos; 576 by others) and 76 comments (4 emoji only left out). Left out by the keyword rule: 132 Threads search results and 10 TikTok videos that do not name Kahf, most of them the wider Indonesia–Malaysia boycott talk (santan Kara, "beda level"), some of them large (a cashier saying "barang ni" has sat untouched for two weeks: 5,642 likes; the photo, not the caption, may name Kahf).
+- **Labelled** by the cron within minutes. Set aside as not about Kahf: X 143 of 243 (Friday reminders to read Surah Al-Kahf, the railway), Threads 56 of 286, TikTok 18 of 47. Of the 359 posts about Kahf, 17 to 22 Oct: 94 against, 95 defending, 170 neutral. Voices on posts: Indonesian 214, Malaysian 98, not clear 47. From 17 to 21 Oct, 68 to 93% of Malaysians' posts each day are against Kahf, and 0 to 9% of Indonesians' (22 Oct so far: 2 of 4 and 2 of 12).
+- **The 22 Oct statement:** 74 comments about Kahf by 13:17 WIB (1 about something else, Kahf's own reply left out): 51 accepting it, 21 negative, 2 neutral. Indonesians 33 (30 accepting), Malaysians 12 (all 12 negative), not clear 29. First comment 10 minutes after the post; busiest 11:00 WIB (33). Most liked: an Indonesian who worked with Kahf praising it for owning the mistake (34 likes); against it, "Terlalu banyak 'kami'" (30).
+- **On the dashboard** (Kahf · Daily tracking → Dashboard): Posts to watch (the statement), Day by day, Who is talking, By platform, Comments per hour, Own channels; Issues and Narratives hidden until topics are set (team change, company version 1).
+- **Beauty case** `kahf-daily-tracking` (`pnpm case copy kahf-daily beauty-id --case kahf-daily-tracking --brand kahf-daily=kahfeveryday`), the same access list: 632 posts, 76 comments, 1,376 labels. Later loads go into `kahf-daily` first, then `pnpm case sync` with the same arguments. Its page links to `kahf-daily`'s own dashboard.
+- **Settings**: `settings.pr.since` 2026-10-17; `settings.pr.watch` the apology, its section named "The apology, 22 Oct" (company version 2).
+
 ## The one loader (DECISIONS, 10 Oct 2026)
 
 Every source goes through the same steps:

@@ -65,7 +65,7 @@ export async function dataBrief(ws: string): Promise<string> {
   const db = new SkillDb();
   const ctx = await loadContext(db, ws);
   const cfg = await getWorkspace(ws);
-  const topics = await db.q<{ label: string }>("select label from topics where workspace_id = $1 and case_id is null order by sort_order, label limit 30", [ws]).catch(() => []);
+  const topics = await db.q<{ label: string }>("select label from topics where workspace_id = $1 and case_id is null and kind not in ('aside', 'post') order by sort_order, label limit 30", [ws]).catch(() => []);
   const platforms = await db.q<{ platform: string }>(panelPlatformsSql("$1"), [ws]);
   const label = ((await db.q<{ label: { voices?: string[] } | null }>("select settings->'label' as label from workspaces where id = $1", [ws]))[0]?.label) ?? null;
   return [

@@ -242,6 +242,54 @@
       "received": "2026-10-03"
     },
     {
+      "path": "kahf-daily/comments_threads_1022.csv",
+      "workspace": "kahf-daily",
+      "blob": "raw/kahf-daily/comments_threads_1022.csv",
+      "bytes": 15141,
+      "sha256": "585556d212bfea65e7416c87f27c3991e34154486db0bf423cf6507424d47676",
+      "received": "2026-10-22"
+    },
+    {
+      "path": "kahf-daily/contents_threads_own_1022.csv",
+      "workspace": "kahf-daily",
+      "blob": "raw/kahf-daily/contents_threads_own_1022.csv",
+      "bytes": 1842,
+      "sha256": "2cbe9579f12a975de00458d053e6e04af88f3cab8634bb3fe57155fcda8fa160",
+      "received": "2026-10-22"
+    },
+    {
+      "path": "kahf-daily/contents_threads_search_1022.csv",
+      "workspace": "kahf-daily",
+      "blob": "raw/kahf-daily/contents_threads_search_1022.csv",
+      "bytes": 120901,
+      "sha256": "0afff04987de36a3ff1a7e7174178fa00e90ffb31995a24bc512ccb46db8ad33",
+      "received": "2026-10-22"
+    },
+    {
+      "path": "kahf-daily/contents_tiktok_own_1022.csv",
+      "workspace": "kahf-daily",
+      "blob": "raw/kahf-daily/contents_tiktok_own_1022.csv",
+      "bytes": 11218,
+      "sha256": "f4a0c7298f955c83d06da75b7807b7bdc1d6b1cf275e9d6fc71488f9ce0b312e",
+      "received": "2026-10-22"
+    },
+    {
+      "path": "kahf-daily/contents_tiktok_search_1022.csv",
+      "workspace": "kahf-daily",
+      "blob": "raw/kahf-daily/contents_tiktok_search_1022.csv",
+      "bytes": 16883,
+      "sha256": "d9b687ef86c44eba91cdace697cf0c329814eb539a780562f348e86204ada5fe",
+      "received": "2026-10-22"
+    },
+    {
+      "path": "kahf-daily/contents_x_search_1022.csv",
+      "workspace": "kahf-daily",
+      "blob": "raw/kahf-daily/contents_x_search_1022.csv",
+      "bytes": 63891,
+      "sha256": "a878f1fa93183e8106415040cdd360645fbc3fc0f49b80dad4690724161599f7",
+      "received": "2026-10-22"
+    },
+    {
       "path": "kahf-kol/comments_instagram_1014.csv",
       "workspace": "kahf-kol",
       "blob": "raw/kahf-kol/comments_instagram_1014.csv",

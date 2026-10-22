@@ -48,23 +48,24 @@ export async function recordLabels(ws: string, labeller: string, version: string
 }
 
 /** the labeller's comment labels as rows: off-topic is its own judgment; a sentiment only when the comment is on topic */
-export function commentLabelRows(l: { id: string; sentiment: string; confidence: number | null; topic?: string | null; voice?: string | null }): LabelRow[] {
+export function commentLabelRows(l: { id: string; sentiment: string; confidence: number | null; topic?: string | null; voice?: string | null; aside?: string | null }): LabelRow[] {
   const off = l.sentiment === "off_topic";
   return [
     { target: "comment", target_id: l.id, kind: "off_topic", value: off ? "yes" : "no", confidence: l.confidence },
     { target: "comment", target_id: l.id, kind: "sentiment", value: off ? null : l.sentiment, confidence: l.confidence },
-    { target: "comment", target_id: l.id, kind: "topic", value: l.topic ?? null, confidence: l.confidence },
+    // a row set aside keeps its reason as its topic (a topic of kind "aside"), as the core does
+    { target: "comment", target_id: l.id, kind: "topic", value: (off ? l.aside : null) ?? l.topic ?? null, confidence: l.confidence },
     { target: "comment", target_id: l.id, kind: "voice", value: l.voice ?? null },
   ];
 }
 
 /** the labeller's post labels: a stance, or set aside as not about the subject or the case */
-export function postLabelRows(l: { id: string; sentiment: string; confidence: number | null; topic?: string | null; voice?: string | null }): LabelRow[] {
+export function postLabelRows(l: { id: string; sentiment: string; confidence: number | null; topic?: string | null; voice?: string | null; aside?: string | null }): LabelRow[] {
   const off = l.sentiment === "off_topic";
   return [
     { target: "post", target_id: l.id, kind: "stance", value: off ? null : l.sentiment, confidence: l.confidence },
     { target: "post", target_id: l.id, kind: "relevant", value: off ? "no" : null, confidence: l.confidence },
-    { target: "post", target_id: l.id, kind: "topic", value: l.topic ?? null, confidence: l.confidence },
+    { target: "post", target_id: l.id, kind: "topic", value: (off ? l.aside : null) ?? l.topic ?? null, confidence: l.confidence },
     { target: "post", target_id: l.id, kind: "voice", value: l.voice ?? null },
   ];
 }
