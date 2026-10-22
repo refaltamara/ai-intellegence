@@ -1528,7 +1528,11 @@ th{background:linear-gradient(180deg,#F8FAFE,#F4F7FC)}
 .prtag td .tag{margin-left:6px;font-size:10.5px;padding:1px 6px}
 .pr .dcard .tablewrap{border:0}
 /* posts to watch and day by day (22 Oct 2026) */
+.owndash{display:inline-flex;align-items:center;gap:8px;margin-right:8px}
+.owndash small{font-size:11px}
 .prwatch .prplatpost span{-webkit-line-clamp:4}
+.prwatchdays th{white-space:nowrap}
+.prwatchsum{margin:0;font-size:14px;line-height:1.5;color:var(--text);font-weight:600}
 .prwatch>small.muted{font-size:11.5px}
 .prwatch .prfoot{margin-top:2px}
 .vdot{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:6px;vertical-align:0}
@@ -1537,6 +1541,10 @@ th{background:linear-gradient(180deg,#F8FAFE,#F4F7FC)}
 .prdaily td .tag{margin-left:6px;font-size:10px;padding:1px 6px}
 .prdaily tr.arriving td{color:var(--text-2)}
 .prdaily .vbar{min-width:60px;max-width:180px;height:8px}
+.prdaily th.aside,.prdaily td.aside{background:var(--surface);color:var(--text-2)}
+.prdaily td.aside .vsplit{display:block;font-size:10px;margin-top:1px}
+.prdaily td.aside .vsplit span{margin-left:6px}
+.prdaily td.aside .vsplit .vdot{width:6px;height:6px;margin-right:3px}
 @media (max-width:1200px){.kpis.six,.kpis.five{grid-template-columns:repeat(3,minmax(0,1fr))}.prissues{grid-template-columns:1fr}}
 @media (max-width:720px){.kpis.six,.kpis.five{grid-template-columns:repeat(2,minmax(0,1fr))}.prstatus{flex-direction:column;align-items:stretch}}
 

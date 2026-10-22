@@ -10,6 +10,8 @@ import { getCase } from "@/cases/store";
 import { pulsePage } from "@/pulse/page";
 import { PageLoading } from "@/ui/PageLoading";
 import { PulsePage } from "@/ui/PulsePage";
+import { OwnDashboard } from "@/ui/cases/OwnDashboard";
+import { teamsFor } from "@/workspace/teams";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -28,15 +30,18 @@ export default async function CasePage({ params }: { params: Promise<{ id: strin
       </section>
     );
   }
+  // a case copied from a case workspace keeps that workspace's own dashboard (Refal, 22 Oct 2026), for whoever can reach it
+  const source = c.settings.copied_from;
+  const team = source ? (await teamsFor(actor)).find((t) => t.workspace_id === source && t.role === "pr") ?? null : null;
   return (
     <Suspense fallback={<PageLoading label="Loading the case…" />}>
-      <CaseView ws={ws} id={c.id} name={c.name} />
+      <CaseView ws={ws} id={c.id} name={c.name} own={team ? { workspace: team.workspace_id, role: team.role, name: team.name } : null} />
     </Suspense>
   );
 }
 
-async function CaseView({ ws, id, name }: { ws: string; id: string; name: string }) {
+async function CaseView({ ws, id, name, own }: { ws: string; id: string; name: string; own: { workspace: string; role: string; name: string } | null }) {
   const d = await pulsePage(ws, { caseId: id });
   if (!d) notFound();
-  return <PulsePage d={d} title={name} ask={false} />;
+  return <PulsePage d={d} title={name} ask={false} actions={own ? <OwnDashboard {...own} /> : null} />;
 }

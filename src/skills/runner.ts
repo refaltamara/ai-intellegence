@@ -43,7 +43,7 @@ async function layerCountsUncached(db: SkillDb, workspaceId: string, scope: Scop
     `select (select count(*) from (select 1 from posts where workspace_id = $1 and ${postIn(scope, "posts")} limit 1) x)::int as posts,
             ${scope.caseId ? `(select count(distinct p.creator_id) from posts p where p.workspace_id = $1 and ${postIn(scope, "p")})` : `(select count(*) from creators where workspace_id = $1 and brought_in_by = 'panel')`}::int as creators,
             (select count(*) from (select 1 from comments c where c.workspace_id = $1 and ${commentIn(scope, "c")} limit 1) x)::int as comments,
-            (select count(*) from topics where workspace_id = $1 and case_id is not distinct from $2::text)::int as topics,
+            (select count(*) from topics where workspace_id = $1 and case_id is not distinct from $2::text and kind not in ('aside', 'post'))::int as topics,
             (select count(*) from post_snapshots)::int as post_snapshots`,
     [workspaceId, scope.caseId],
   );

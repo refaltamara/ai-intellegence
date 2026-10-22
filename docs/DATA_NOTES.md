@@ -378,7 +378,8 @@ One contents file, `data/raw/kahf/contents_threads.csv` (posts only; comments to
 - **Labelled** by the cron within minutes. Set aside as not about Kahf: X 143 of 243 (Friday reminders to read Surah Al-Kahf, the railway), Threads 56 of 286, TikTok 18 of 47. Of the 359 posts about Kahf, 17 to 22 Oct: 94 against, 95 defending, 170 neutral. Voices on posts: Indonesian 214, Malaysian 98, not clear 47. From 17 to 21 Oct, 68 to 93% of Malaysians' posts each day are against Kahf, and 0 to 9% of Indonesians' (22 Oct so far: 2 of 4 and 2 of 12).
 - **The 22 Oct statement:** 74 comments about Kahf by 13:17 WIB (1 about something else, Kahf's own reply left out): 51 accepting it, 21 negative, 2 neutral. Indonesians 33 (30 accepting), Malaysians 12 (all 12 negative), not clear 29. First comment 10 minutes after the post; busiest 11:00 WIB (33). Most liked: an Indonesian who worked with Kahf praising it for owning the mistake (34 likes); against it, "Terlalu banyak 'kami'" (30).
 - **On the dashboard** (Kahf · Daily tracking → Dashboard): Posts to watch (the statement), Day by day, Who is talking, By platform, Comments per hour, Own channels; Issues and Narratives hidden until topics are set (team change, company version 1).
-- **Not in the Beauty case list yet.** `kahf-threads` and `kahf-kol` were copied into Beauty as cases; this one stays on its own until Refal asks.
+- **Beauty case** `kahf-daily-tracking` (`pnpm case copy kahf-daily beauty-id --case kahf-daily-tracking --brand kahf-daily=kahfeveryday`), the same access list: 632 posts, 76 comments, 1,376 labels. Later loads go into `kahf-daily` first, then `pnpm case sync` with the same arguments. Its page links to `kahf-daily`'s own dashboard.
+- **Settings**: `settings.pr.since` 2026-10-17; `settings.pr.watch` the apology, its section named "The apology, 22 Oct" (company version 2).
 
 ## The one loader (DECISIONS, 10 Oct 2026)
 

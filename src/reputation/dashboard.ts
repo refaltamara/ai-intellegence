@@ -134,6 +134,8 @@ export type PrDashboardData = {
   daily?: Daily;
   /** around one subject, on the dashboard only: the posts in settings.pr.watch with their comments */
   watched?: Watched[];
+  /** the day tracking began (settings.pr.since), where the workspace says: nothing before it is in the data */
+  tracked_since?: string;
 };
 
 const n = (v: unknown) => (v == null ? 0 : Number(v));
@@ -262,15 +264,20 @@ export async function prDashboard(ws: string, sp: Record<string, string | string
   if (!basics) return null;
   const f = readPrFilters(sp, basics.brands.map((b) => b.id), basics.client);
   const settled = await settledDay(db, ws, basics.tz, basics.asOf, role.alert ?? PR.alert!);
-  const from = addDays(settled, -(f.days - 1));
+  // the workspace's own pr settings: the posts to watch and the day tracking began (Refal, 22 Oct 2026)
+  const prSet = basics.per_comment ? (await db.one<{ pr: { watch?: unknown; since?: unknown } | null }>("select settings->'pr' as pr from workspaces where id = $1", [ws]))?.pr ?? null : null;
+  const since = typeof prSet?.since === "string" && /^\d{4}-\d{2}-\d{2}$/.test(prSet.since) ? prSet.since : undefined;
+  // a window never starts before tracking began: the days before it hold nothing
+  const from0 = addDays(settled, -(f.days - 1));
+  const from = since && from0 < since && since <= settled ? since : from0;
   // around one subject the dashboard also draws the Pulse's comments per hour, the days up to the newest data and the
   // posts to watch (decks do not, so they are read here, not in reputationFacts)
   const one = basics.per_comment;
   const plat = f.platform !== "all" && basics.platforms.includes(f.platform) ? f.platform : null;
   const focus = basics.brands.find((b) => b.id === f.brand)?.id ?? basics.client ?? basics.brands[0].id;
-  const watch = one ? readWatch((await db.one<{ watch: unknown }>("select settings->'pr'->'watch' as watch from workspaces where id = $1", [ws]))?.watch) : [];
+  const watch = one ? readWatch(prSet?.watch) : [];
   const [d, pace, daily, watched] = await Promise.all([
-    reputationFacts(ws, { focus: f.brand, from, to: settled, platform: f.platform }, role, db, basics),
+    reputationFacts(ws, { focus: f.brand, from, to: settled, platform: f.platform, ...(since ? { since } : {}) }, role, db, basics),
     one ? pulseTrend(ws, f.platform).catch(() => null) : Promise.resolve(null),
     one ? dailyFacts(db, ws, basics.tz, focus, from, basics.asOf > settled ? basics.asOf : settled, settled, plat, commentsUnder(true)).catch(() => null) : Promise.resolve(null),
     watch.length ? watchedPosts(db, ws, basics.tz, watch).catch(() => []) : Promise.resolve([]),
@@ -284,7 +291,7 @@ export async function prDashboard(ws: string, sp: Record<string, string | string
  * against the same number of days before it. The status is read on the window's last day, or on the last
  * settled day when the window runs past it.
  */
-export async function reputationFacts(ws: string, win: { focus: string; from: string; to: string; platform: string; prev?: { from: string; to: string } }, role: RoleModel = PR, db: SkillDb = new SkillDb(), basics?: Basics): Promise<PrDashboardData | null> {
+export async function reputationFacts(ws: string, win: { focus: string; from: string; to: string; platform: string; prev?: { from: string; to: string }; /** the day tracking began (settings.pr.since): one note for it, none per platform */ since?: string }, role: RoleModel = PR, db: SkillDb = new SkillDb(), basics?: Basics): Promise<PrDashboardData | null> {
   const alert = role.alert ?? PR.alert!;
   const b0 = basics ?? (await workspaceBasics(db, ws));
   if (!b0) return null;
@@ -635,7 +642,9 @@ export async function reputationFacts(ws: string, win: { focus: string; from: st
   const notes: string[] = [];
   if (to === settled && settled < asOf) notes.push(`Comments for ${dayMonth(addDays(settled, 1))}${addDays(settled, 1) < asOf ? ` to ${dayMonth(asOf)}` : ""} are still arriving (half of a post's comments come in its first 15 hours), so this view ends on ${dayMonth(settled)}.`);
   else if (to > settled) notes.push(`Comments for ${dayMonth(addDays(settled, 1))} to ${dayMonth(to)} are still arriving (half of a post's comments come in its first 15 hours); those days will grow.`);
-  for (const c of coverage) if (c.first > prevFrom) notes.push(`${PLATFORM_LABEL[c.platform] ?? c.platform} has been tracked since ${dayMonth(c.first)}, so comparisons with the previous ${f.days} days include it on one side only.`);
+  // where the workspace says when tracking began, that is said once; a platform that started later still gets its own note
+  if (win.since) notes.push(`Tracked since ${dayMonth(win.since)} ${win.since.slice(0, 4)}${coverage.length ? ` on ${coverage.map((c) => PLATFORM_LABEL[c.platform] ?? c.platform).join(", ").replace(/, ([^,]*)$/, " and $1")}` : ""}.${prevTo < win.since ? " Nothing before it is tracked, so there is no earlier window to compare with." : ""}`);
+  for (const c of coverage) if (c.first > prevFrom && !(win.since && c.first <= addDays(win.since, 1))) notes.push(`${PLATFORM_LABEL[c.platform] ?? c.platform} has been tracked since ${dayMonth(c.first)}, so comparisons with the previous ${f.days} days include it on one side only.`);
   const weekly = await db.q<{ wk: string; posts: number }>(
     `select to_char(date_trunc('week', p.posted_at at time zone $2), 'YYYY-MM-DD') as wk, count(*)::int as posts from posts p where p.workspace_id = $1 and p.brought_in_by = 'panel' and p.posted_at >= (($3::date - 63)::timestamp at time zone $2) group by 1 order by 1`,
     [ws, tz, asOf],
@@ -659,6 +668,7 @@ export async function reputationFacts(ws: string, win: { focus: string; from: st
       : `${d.neg_pct}% of ${d.comments.toLocaleString("en-US")} ${said} about ${focus.name} were negative on ${dayMonth(d.d)}, against a ${alert.baseline_days}-day norm of ${status.baseline.neg_pct}%${status.multiple != null ? ` (${status.multiple}×)` : ""}.${lvl === "recovering" ? " Calm again after an issue in the last week." : ""}`;
 
   return {
+    ...(win.since ? { tracked_since: win.since } : {}),
     as_of: asOf, settled, tz, focus: { id: focus.id, name: focus.name, is_client: focus.id === client }, brands: brands.map((b) => ({ id: b.id, name: b.name })), platforms,
     filters: { ...f, from, to, prev_from: prevFrom, prev_to: prevTo },
     voice_posts: n(kn?.post_voices), conversation, per_comment, other_comments: { now: n(other?.now), prev: n(other?.prev) }, status, kpis, issues, rising, narratives, amplifiers, own, own_worst: ownWorst,

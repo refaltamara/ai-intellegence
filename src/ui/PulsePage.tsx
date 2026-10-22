@@ -21,7 +21,7 @@ const when = (s: string | null, dayOnly = false) => {
 };
 
 /** `ask` off (a case's page, DECISIONS 10 Oct 2026): no ask box and no "Ask CeMO" on the cards, whose figures are read back for the panel */
-export function PulsePage({ d, title = "Dashboard", ask = true }: { d: PulseData; title?: string; ask?: boolean }) {
+export function PulsePage({ d, title = "Dashboard", ask = true, actions }: { d: PulseData; title?: string; ask?: boolean; /** beside the date pill, e.g. a case's "Open its own dashboard" */ actions?: React.ReactNode }) {
   const t = d.totals;
   // Shares are taken on the comments that are about the subject. Folding in the thread
   // noise — sellers, memes, strangers arguing with each other — halves the number and
@@ -37,7 +37,7 @@ export function PulsePage({ d, title = "Dashboard", ask = true }: { d: PulseData
     <section className="screen">
       <div className="topbar">
         <div><h1>{title}</h1><span className="meta">What is being said about {d.subject}, hour by hour, across {t.platforms} platform{t.platforms === 1 ? "" : "s"}</span></div>
-        <span className="pill live">Posts through {d.postsAsOf} · comments through {d.asOf} WIB</span>
+        <div className="topright">{actions}<span className="pill live">Posts through {d.postsAsOf} · comments through {d.asOf} WIB</span></div>
       </div>
       <div className="wrap wide">
         <div className="stats">
