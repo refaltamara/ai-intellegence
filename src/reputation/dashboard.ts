@@ -65,7 +65,9 @@ export type Issue = {
   scope: "only_us" | "category" | "mixed";
 };
 export type Rising = PostRef & { day: number; projected: number | null; neg_pct: number | null };
-export type Narrative = { split: PostsComments; topic_id: string; topic: string; catch_all: boolean; comments: number; comments_prev: number; share: number | null; neg_pct: number | null; neg_pct_prev: number | null; quote: Quote | null };
+export type Narrative = { split: PostsComments; topic_id: string; topic: string; catch_all: boolean; comments: number; comments_prev: number; share: number | null; neg_pct: number | null; neg_pct_prev: number | null; quote: Quote | null;
+  /** who is talking on it, posts and comments together (where the labeller reads voices), biggest first */
+  voices: { voice: string; n: number; negative: number; labelled: number }[] };
 export type Amplifier = { handle: string; platform: string; tier: string | null; followers: number | null; posts: number; views: number; likes: number; comments: number; neg_pct: number | null; top_url: string; /** their posts that carry a stance, and how many are against */ stanced: number; against: number };
 export type OwnRow = { platform: string; posts: number; views: number; comments: number; neg_pct: number | null; replies: number; others_neg_pct: number | null };
 export type BrandRow = { id: string; name: string; is_focus: boolean; is_client: boolean; posts: number; posts_prev: number; sov: number | null; views: number; comments: number; neg_pct: number | null; neg_pct_prev: number | null; intent_pct: number | null; top_issue: { topic: string; negative: number; negative_prev: number } | null };
@@ -163,6 +165,18 @@ export const VOICES = `(select c.id, c.post_id, c.workspace_id, c.platform, c.po
    union all
    select p.id, p.id, p.workspace_id, p.platform, p.posted_at, p.stance, 'post', p.topic_id, p.likes, p.caption, null::text, null::text, null::boolean, true, p.voice, false
      from posts p where p.source = 'earned' and p.stance_source = 'model' and p.relevant is not false and p.brought_in_by = 'panel')`;
+
+/**
+ * A row's topic as the topic lists count it: a topic of one post (kind `post`) counts under the overall topic it rolls
+ * up into (its id in `tags[2]`; Refal, 22 Oct 2026: the apology's topics roll up into Kahf's overall topics), and under
+ * none when it names no parent. `t` is the row's own topic, `par` its parent (`topicJoins`).
+ */
+export const topicJoins = (topic = "c.topic_id") =>
+  `left join topics t on t.id = ${topic} left join topics par on t.kind = 'post' and par.workspace_id = t.workspace_id and par.id = t.tags[2]`;
+export const ROLLED_TOPIC = "coalesce(par.id, case when t.kind = 'post' then null else t.id end)";
+/** A row under a topic, its own or one of a post's topics that rolls up into it ($arg is the topic id). */
+export const topicIs = (arg: string, c = "c") =>
+  `(${c}.topic_id = ${arg} or ${c}.topic_id in (select t2.id from topics t2 where t2.workspace_id = ${c}.workspace_id and t2.kind = 'post' and t2.tags[2] = ${arg}))`;
 
 /**
  * Which comments count, by their post (Refal, 13 Oct 2026: the dashboard and the Pulse gave Kahf two numbers). Where the
@@ -400,15 +414,15 @@ export async function reputationFacts(ws: string, win: { focus: string; from: st
   };
 
   // ---- topics for everyone in both windows (narratives, issues, the industry check)
-  const topicRows = await db.q<{ topic_id: string | null; label: string | null; catch_all: boolean | null; brand_id: string; win: string; is_post: boolean; comments: number; negative: number; neutral: number; positive: number; labelled: number }>(
-    `select c.topic_id, t.label, t.is_catch_all as catch_all, p.brand_id,
-            case when ${inDays("c.posted_at", "$4", "$5")} then 'now' else 'prev' end as win, c.is_post,
+  const topicRows = await db.q<{ topic_id: string | null; label: string | null; catch_all: boolean | null; brand_id: string; win: string; is_post: boolean; voice: string | null; comments: number; negative: number; neutral: number; positive: number; labelled: number }>(
+    `select ${ROLLED_TOPIC} as topic_id, coalesce(par.label, t.label) as label, coalesce(par.is_catch_all, t.is_catch_all) as catch_all, p.brand_id,
+            case when ${inDays("c.posted_at", "$4", "$5")} then 'now' else 'prev' end as win, c.is_post, c.voice,
             count(*)::int as comments, count(*) filter (where c.sentiment = 'negative')::int as negative, count(*) filter (where c.sentiment = 'neutral')::int as neutral,
             count(*) filter (where c.sentiment = 'positive')::int as positive, count(c.sentiment)::int as labelled
-     from ${VOICES} c join posts p on p.id = c.post_id left join topics t on t.id = c.topic_id
+     from ${VOICES} c join posts p on p.id = c.post_id ${topicJoins()}
      where c.workspace_id = $1 and ${under} and c.sentiment_source is distinct from 'subject' and not c.off_topic and c.posted_at is not null ${platC}
        and ${inDays("c.posted_at", "$6", "$5")}
-     group by 1, 2, 3, 4, 5, 6`,
+     group by 1, 2, 3, 4, 5, 6, 7`,
     [...base, from, to, prevFrom],
   );
   const tKey = (r: { topic_id: string | null }) => r.topic_id ?? "";
@@ -439,11 +453,16 @@ export async function reputationFacts(ws: string, win: { focus: string; from: st
       topic_id: id, topic: t.label, catch_all: t.catch_all, comments: c, comments_prev: prev.reduce((a, r) => a + n(r.comments), 0), share: share(c, focusNowTotal),
       neg_pct: share(now.reduce((a, r) => a + n(r.negative), 0), lab), neg_pct_prev: share(prev.reduce((a, r) => a + n(r.negative), 0), prev.reduce((a, r) => a + n(r.labelled), 0)),
       quote: null,
+      voices: [...now.filter((r) => r.voice).reduce((m, r) => {
+        const v = m.get(r.voice!) ?? { voice: r.voice!, n: 0, negative: 0, labelled: 0 };
+        v.n += n(r.comments); v.negative += n(r.negative); v.labelled += n(r.labelled);
+        return m.set(r.voice!, v);
+      }, new Map<string, Narrative["voices"][number]>()).values()].sort((a, b) => b.n - a.n),
     });
   }
   narratives.sort((a, b) => Number(a.catch_all) - Number(b.catch_all) || b.comments - a.comments);
   await Promise.all(narratives.slice(0, 8).map(async (x) => {
-    const r = await db.q(quoteSql("and c.topic_id = $8"), [...base, focus.id, from, to, 1, x.topic_id]);
+    const r = await db.q(quoteSql(`and ${topicIs("$8")}`), [...base, focus.id, from, to, 1, x.topic_id]);
     x.quote = r[0] ? toQuote(r[0]) : null;
   }));
 
@@ -469,16 +488,16 @@ export async function reputationFacts(ws: string, win: { focus: string; from: st
       db.q<{ d: string; negative: number }>(
         `with days as (select generate_series($5::date, $6::date, interval '1 day')::date as d)
          select to_char(days.d, 'YYYY-MM-DD') as d, count(c.id)::int as negative
-         from days left join (select c.id, (c.posted_at at time zone $2)::date as day from ${onBrandComments} and p.brand_id = $4 and c.topic_id = $7 and c.sentiment = 'negative') c on c.day = days.d
+         from days left join (select c.id, (c.posted_at at time zone $2)::date as day from ${onBrandComments} and p.brand_id = $4 and ${topicIs("$7")} and c.sentiment = 'negative') c on c.day = days.d
          group by days.d order by days.d`, [...base, focus.id, from, to, id]),
-      db.q<{ platform: string; negative: number }>(`select c.platform, count(*)::int as negative from ${onBrandComments} and p.brand_id = $4 and c.topic_id = $7 and c.sentiment = 'negative' and ${inDays("c.posted_at", "$5", "$6")} group by 1 order by 2 desc`, [...base, focus.id, from, to, id]),
-      db.q<{ theme: string; n: number }>(`select c.theme, count(*)::int as n from ${onBrandComments} and p.brand_id = $4 and c.topic_id = $7 and c.sentiment = 'negative' and c.theme is not null and c.theme <> 'unknown' and ${inDays("c.posted_at", "$5", "$6")} group by 1 order by 2 desc limit 5`, [...base, focus.id, from, to, id]),
+      db.q<{ platform: string; negative: number }>(`select c.platform, count(*)::int as negative from ${onBrandComments} and p.brand_id = $4 and ${topicIs("$7")} and c.sentiment = 'negative' and ${inDays("c.posted_at", "$5", "$6")} group by 1 order by 2 desc`, [...base, focus.id, from, to, id]),
+      db.q<{ theme: string; n: number }>(`select c.theme, count(*)::int as n from ${onBrandComments} and p.brand_id = $4 and ${topicIs("$7")} and c.sentiment = 'negative' and c.theme is not null and c.theme <> 'unknown' and ${inDays("c.posted_at", "$5", "$6")} group by 1 order by 2 desc limit 5`, [...base, focus.id, from, to, id]),
       db.q(`select p.url, p.platform, p.creator_handle as handle, p.source, left(regexp_replace(coalesce(p.caption, ''), '\\s+', ' ', 'g'), 200) as caption, to_char(p.posted_at at time zone $2, 'YYYY-MM-DD') as posted_at, p.views::float8 as views, p.likes,
                    count(*) filter (where not c.is_post)::int as comments, count(*) filter (where c.sentiment = 'negative' and not c.is_post)::int as negative,
                    max(c.sentiment) filter (where c.is_post) as stance, count(*) filter (where c.sentiment = 'negative')::int as weight
-            from ${onBrandComments} and p.brand_id = $4 and c.topic_id = $7 and ${inDays("c.posted_at", "$5", "$6")}
+            from ${onBrandComments} and p.brand_id = $4 and ${topicIs("$7")} and ${inDays("c.posted_at", "$5", "$6")}
             group by p.id order by weight desc, comments desc, p.likes desc nulls last limit 3`, [...base, focus.id, from, to, id]),
-      db.q(quoteSql("and c.topic_id = $8 and c.sentiment = 'negative'"), [...base, focus.id, from, to, 3, id]),
+      db.q(quoteSql(`and ${topicIs("$8")} and c.sentiment = 'negative'`), [...base, focus.id, from, to, 3, id]),
     ]);
     const series = dailyRows.map((r) => ({ d: r.d, negative: n(r.negative) }));
     // the stage is read on the days the data has reached: a deck's week can run past today, and empty days to come are not a fade
