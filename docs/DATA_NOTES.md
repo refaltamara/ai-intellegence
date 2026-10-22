@@ -385,8 +385,17 @@ One contents file, `data/raw/kahf/contents_threads.csv` (posts only; comments to
   - The posts they sit under, with the reading each file carries: 25 Threads posts (four from 15 and 16 Oct, which keep their date and never count in a window from 17 Oct; their comments from 17 Oct do) and 15 tweets from the X search.
   - **Load `a6114e21`**: 2,461 rows in 12 files; 180 new posts, 1,436 new comments; no post left out.
 - **Labelled** by the cron in about 15 minutes. Of the 1,436 comments outside the apology, 149 are about Kahf; set aside, 972 as Other brands' boycott and 315 as Irrelevant. Of the 972, 551 sit under @callmekingindo, an Indonesia–Malaysia slanging match (football, haze, the rupiah) that names Kahf only in passing. Posts by others about Kahf: Threads 245, TikTok 30, X 101 (X's are mostly everyday product talk: roll-on, face wash, sunscreen, seller promos).
-- **The apology's topics.** 35 of its 75 comments took a topic. One batch of 40 (the most liked) came back without topics twice, every other field intact. The model's answer for topic was on no list, and the parser dropped it. The parser now also takes an id without the workspace prefix or a topic's name, and the cron logs a topic that still lands nowhere (`unknown_topics`). The 40 are read again once that is deployed.
-- **Beauty case synced** (`pnpm case sync`, same arguments): 164 posts, 1,436 comments, 5,802 labels.
+- **The apology's topics.** At first only 35 of its 75 comments took a topic. One batch of 40 (the most liked) came back twice without topics, every other field intact: the model's topic was on no list, and the parser dropped it. Since #114 the parser also takes an id without the workspace prefix or a topic's name, and the cron logs a topic that still lands nowhere (`unknown_topics`). Read again after it was deployed, all 75 have one: Cheering Kahf on 30, Respect for owning up 21, Boycott stays 10, Too late 7, Others 7. Malaysians are 10 of the 75 (5 Boycott stays, 2 Too late, 3 Others).
+- **Overall topics and the quarrel (#114, Refal approved).** The overall topics (Boycott stays, Blaming Kahf, Switching away, Using and backing Kahf, Others) and a third set-aside reason (Indonesia–Malaysia quarrel) were added. Every comment and earned post the model had read was read again (1,476 comments, 736 posts; the 35 apology comments with a topic kept theirs).
+  - Comments outside the apology: set aside as quarrel 841, Irrelevant 289, Other brands' boycott 125. About Kahf: Switching away 95, Boycott stays 34, Using and backing Kahf 34, Others 12, Blaming Kahf 6.
+  - Posts by others: set aside as Irrelevant 315, quarrel 77, Other brands' boycott 29. About Kahf: Using and backing Kahf 188 (Threads 106, X 53, TikTok 29), Others 54, Blaming Kahf 33, Boycott stays 24, Switching away 16.
+  - On the dashboard, 17 to 22 Oct, posts and comments together, the apology rolled up:
+    - Using and backing Kahf 48.1% (Indonesians 228, none negative);
+    - Switching away 19.6% (Malaysians 56);
+    - Others 12.3%;
+    - Boycott stays 11.8% (Malaysians 53, 51 negative);
+    - Blaming Kahf 8.1% (Malaysians 30, all negative).
+- **Beauty case synced** (`pnpm case sync`, same arguments): 164 posts, 1,436 comments, 5,802 labels; after the re-read, 1,476 comments and 603 links updated and 6,857 labels. The sync now also brings a topic the source changed (label, definition, order, tags) into the case, with the topic ids in its tags moved under the case (`topics_updated`): the case's apology topics name the case's own overall topics.
 
 ## The one loader (DECISIONS, 10 Oct 2026)
 
