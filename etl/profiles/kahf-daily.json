@@ -4,21 +4,49 @@
     "brand_id": "kahf-daily",
     "name": "Kahf",
     "owned_handles": {
-      "threads": ["kahfeveryday", "kahfeveryday.my"],
-      "instagram": ["kahfeveryday", "kahfeveryday.my"],
-      "tiktok": ["kahfeveryday", "kahfeveryday.my"],
-      "x": ["kahfeveryday", "kahfeveryday.my"]
+      "threads": [
+        "kahfeveryday",
+        "kahfeveryday.my"
+      ],
+      "instagram": [
+        "kahfeveryday",
+        "kahfeveryday.my"
+      ],
+      "tiktok": [
+        "kahfeveryday",
+        "kahfeveryday.my"
+      ],
+      "x": [
+        "kahfeveryday",
+        "kahfeveryday.my"
+      ]
     }
   },
   "export_time": "2026-10-22T03:39:51Z",
   "case_note": "22 Oct 2026: Refal tracks Kahf day by day from 17 Oct (\"any contents before 17 Oct we don't have to care for now, it's the past\"): Kahf's own two accounts (@kahfeveryday, @kahfeveryday.my, Refal: \"only those 2\") and posts by others that name Kahf, with a Malaysia view read from the language (Malay = Malaysian). Kahf posted a new statement on Threads at 10:01 WIB on 22 Oct; its replies are the first comments. Topics are not set yet (Refal: \"don't categorize into topic yet\").",
-  "keywords": ["kahf", "khaf", "k\\*\\*f"],
-  "keyword_platforms": ["threads", "tiktok", "x"],
-  "keyword_platforms_note": "Searches for \"kahf\" and \"khaf\" also return posts from threads about something else; a post by someone else that does not name Kahf is left out. Posts that name the word but not the brand (Surah Al-Kahf, the Herat–Khaf railway, the Urdu \"khafa\") are set aside by the labeller (settings.label.post_off_topic).",
+  "keywords": [
+    "kahf",
+    "khaf",
+    "k\\*\\*f"
+  ],
+  "keyword_platforms": [],
+  "keyword_platforms_note": "22 Oct afternoon (Refal: \"post that dont name Kahf dont be excluded, however ... 'other brands boycot' or if its irrelevant put 'Irrelevant'\"): no post is left out by keyword any more. The labeller sets aside what is not about Kahf and says why: Other brands' boycott or Irrelevant (topics of kind aside). Until then, posts by others that did not name Kahf (kahf, khaf, k**f) were left out at load.",
   "drop_urls": [
-    { "url": "https://www.threads.com/@kahfeveryday/post/Dex9_XNmgo_", "reason": "Kahf's 22 Oct statement continues in its own thread: one post", "parent": "https://www.threads.com/@kahfeveryday/post/Dex9_cQGtqd" },
-    { "url": "https://www.threads.com/@kahfeveryday/post/Dex9_ZAGnTh", "reason": "Kahf's 22 Oct statement continues in its own thread: one post", "parent": "https://www.threads.com/@kahfeveryday/post/Dex9_cQGtqd" },
-    { "url": "https://www.threads.com/@kahfeveryday/post/Dex9_Y4GiEv", "reason": "Kahf's 22 Oct statement continues in its own thread: one post", "parent": "https://www.threads.com/@kahfeveryday/post/Dex9_cQGtqd" }
+    {
+      "url": "https://www.threads.com/@kahfeveryday/post/Dex9_XNmgo_",
+      "reason": "Kahf's 22 Oct statement continues in its own thread: one post",
+      "parent": "https://www.threads.com/@kahfeveryday/post/Dex9_cQGtqd"
+    },
+    {
+      "url": "https://www.threads.com/@kahfeveryday/post/Dex9_ZAGnTh",
+      "reason": "Kahf's 22 Oct statement continues in its own thread: one post",
+      "parent": "https://www.threads.com/@kahfeveryday/post/Dex9_cQGtqd"
+    },
+    {
+      "url": "https://www.threads.com/@kahfeveryday/post/Dex9_Y4GiEv",
+      "reason": "Kahf's 22 Oct statement continues in its own thread: one post",
+      "parent": "https://www.threads.com/@kahfeveryday/post/Dex9_cQGtqd"
+    }
   ],
   "files": [
     {
@@ -58,6 +86,46 @@
       "file": "kahf-daily/comments_threads_1022.csv",
       "export_time": "2026-10-22T06:19:44Z",
       "note": "dataset_threads-replies-scraper_2026-10-22_06-19-45-159.csv (Apify Threads replies scraper, 06:19 UTC on 22 Oct): 80 replies to @kahfeveryday's 22 Oct statement, 10:00 to 13:17 WIB, one of them Kahf's own continuation (kept as Kahf's reply, never labelled); the post's own row left out. ISO times with Z. Columns renamed only."
+    },
+    {
+      "kind": "contents",
+      "platform": "threads",
+      "file": "kahf-daily/contents_threads_parents_1022.csv",
+      "note": "The 25 Threads posts the afternoon comments sit under, with the reading each comment file carries for its post (the replies scraper's own row for the post: likes, replies, reposts, views; @callmekingindo's from the Threads search). Four are from before 17 Oct (@nora_focus, @rizkirizq and @hanifloid on 16 Oct, @yuuritana_ on 15 Oct): they keep their own date and so never count in a window from 17 Oct; their comments from 17 Oct do."
+    },
+    {
+      "kind": "contents",
+      "platform": "x",
+      "file": "kahf-daily/contents_x_parents_1022.csv",
+      "note": "The 15 tweets the X replies sit under, from the X search (any date), so a reply never makes a stub of a tweet we have."
+    },
+    {
+      "kind": "comments",
+      "platform": "threads",
+      "file": "kahf-daily/comments_threads_1022b.csv",
+      "export_time": "2026-10-22T08:49:30Z",
+      "note": "dataset_threads-replies-scraper_2026-10-22_08-49-30-539.csv (Apify Threads replies scraper): 15 replies under 4 posts (@dalsambal90, @nora_focus, @nabellasukri, @hapsari770); the 14 from 17 Oct 00:00 WIB kept. Columns renamed only; ISO times with Z."
+    },
+    {
+      "kind": "comments",
+      "platform": "threads",
+      "file": "kahf-daily/comments_threads_1022c.csv",
+      "export_time": "2026-10-22T08:52:43Z",
+      "note": "dataset_threads-replies-scraper_2026-10-22_08-52-43-803.csv (Apify Threads replies scraper): 752 replies under 20 posts, 15 Oct 10:27 to 22 Oct 15:47 WIB; the 717 from 17 Oct kept (35 earlier left out). No reply in both runs. Columns renamed only."
+    },
+    {
+      "kind": "comments",
+      "platform": "threads",
+      "file": "kahf-daily/comments_threads_1022d.csv",
+      "export_time": "2026-10-22T08:54:44Z",
+      "note": "scrapper-results-20261022-1617.csv (Fair's scraper): 678 comments under @callmekingindo's post (DewJUKfAcbd), 21 Oct 17:10 to 22 Oct 15:50 WIB, none a reply to a reply. Threads' numeric comment ids written as their short codes (as in kahf-threads; checked on the search file's post ids)."
+    },
+    {
+      "kind": "comments",
+      "platform": "x",
+      "file": "kahf-daily/comments_x_1022.csv",
+      "export_time": "2026-10-22T08:52:41Z",
+      "note": "dataset_x-post-replies-scraper_2026-10-22_08-52-41-626.json (Apify X replies scraper): 310 replies under 15 tweets, 11 to 22 Oct; the 141 from 17 Oct kept (169 earlier left out). Several of the tweets are Friday reminders to read Surah Al-Kahf: the labeller sets their replies aside as Irrelevant."
     }
   ]
 }
