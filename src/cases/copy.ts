@@ -43,6 +43,11 @@ export function bind(text: string, args: CopyArgs): [string, unknown[]] {
 
 /** a source topic id under the case: <case>:<the part after the source workspace's prefix> */
 const T = (x: string) => `(case when ${x} is null then null when ${x} like :src || ':%' then :case || ':' || substr(${x}, length(:src) + 2) else :case || ':' || ${x} end)`;
+/** a topic's tags with any source topic id in them moved under the case (a post's own topic names its parent there) */
+const TAGS = (x: string) =>
+  `(case when ${x} is null then null else array(select case when u.tag like :src || ':%' then :case || ':' || substr(u.tag, length(:src) + 2) else u.tag end from unnest(${x}) with ordinality u(tag, i) order by u.i) end)`;
+/** a topic's columns as the case takes them */
+const topicCols = (cols: string[], a: string) => cols.map((c) => (c === "tags" ? TAGS(`${a}.tags`) : `${a}.${c}`)).join(", ");
 /** the panel's link for a source link */
 const NEW_LINK = (o: string, n: string) => `join posts ${n} on ${n}.workspace_id = :dst and ${n}.platform = ${o}.platform and ${n}.url = ${o}.url and ${n}.brand_id = (:brands ->> ${o}.brand_id)`;
 
@@ -57,7 +62,7 @@ export async function copyStatements(): Promise<string[]> {
   const comment = await columns("comments", ["id", "workspace_id", "post_id", "item_id", "topic_id"]);
   return [
     `insert into topics (id, workspace_id, case_id, parent_id, ${topic.join(", ")})
-     select ${T("t.id")}, :dst, :case, ${T("t.parent_id")}, ${list(topic, "t")} from topics t where t.workspace_id = :src`,
+     select ${T("t.id")}, :dst, :case, ${T("t.parent_id")}, ${topicCols(topic, "t")} from topics t where t.workspace_id = :src`,
     `insert into creators (workspace_id, brought_in_by, ${creator.join(", ")})
      select :dst, :case, ${list(creator, "c")} from creators c where c.workspace_id = :src
      on conflict (workspace_id, platform, handle) do nothing`,
@@ -117,8 +122,12 @@ export async function syncStatements(): Promise<{ key: string; text: string }[]>
        and x.labelled_at = l.labelled_at and x.labeller_id is not distinct from l.labeller_id and x.workspace_id = :dst)`;
   return [
     { key: "topics", text: `insert into topics (id, workspace_id, case_id, parent_id, ${topic.join(", ")})
-     select ${T("t.id")}, :dst, :case, ${T("t.parent_id")}, ${list(topic, "t")} from topics t where t.workspace_id = :src
+     select ${T("t.id")}, :dst, :case, ${T("t.parent_id")}, ${topicCols(topic, "t")} from topics t where t.workspace_id = :src
      on conflict (id) do nothing returning 1` },
+    // a topic the source renamed, redefined, reordered or re-tagged since (22 Oct 2026: Kahf's reasons and the apology's parents)
+    { key: "topics_updated", text: `update topics n set (${topic.join(", ")}) = (${topicCols(topic, "o")})
+       from topics o where o.workspace_id = :src and n.workspace_id = :dst and n.case_id = :case and n.id = ${T("o.id")}
+        and (${list(topic, "n")}) is distinct from (${topicCols(topic, "o")}) returning 1` },
     { key: "accounts", text: `insert into creators (workspace_id, brought_in_by, ${creator.join(", ")})
      select :dst, :case, ${list(creator, "c")} from creators c where c.workspace_id = :src
      on conflict (workspace_id, platform, handle) do nothing returning 1` },
