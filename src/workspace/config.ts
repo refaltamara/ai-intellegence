@@ -32,7 +32,8 @@ export type WorkspaceSettings = {
   /** a profile that has moved onto the reputation dashboard ("reputation"); its crisis view moves to Pulse */
   dashboard?: "reputation" | "crisis";
   /** what the PR dashboard and decks leave out for this case (Fair sets it): "status" (the norm and ladder), "reach", "intent" (CSAT is no longer shown: DECISIONS, 10 Oct 2026) */
-  pr?: { hide?: string[] };
+  /** PR dashboard: parts left out, and the posts the team watches (each with its own section card; src/reputation/daily.ts) */
+  pr?: { hide?: string[]; watch?: { url: string; label?: string }[] };
 };
 
 /** Who a workspace is for: people choose a team when they sign in, and the team decides the data and the first screen. */

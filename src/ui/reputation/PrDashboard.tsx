@@ -10,6 +10,7 @@
 import Link from "next/link";
 import { change, compact, dayMonth, int, pct, pts } from "@/competitor/view";
 import type { Issue, Kpi, Level, PlatformSplit, PostRef, PostsComments, PrDashboardData, Quote, Split } from "@/reputation/dashboard";
+import type { Daily, Lean, Watched } from "@/reputation/daily";
 import { PrFilters } from "./PrFilters";
 import { LadderDrawer } from "./LadderDrawer";
 import { Sections } from "../dashboard/Sections";
@@ -156,6 +157,98 @@ function PlatformCard({ x, who }: { x: PlatformSplit; who: string }) {
   );
 }
 
+/** the labeller's voices (read from the language), each with its own colour; "unclear" last and grey */
+const VOICE_COLOR: Record<string, string> = { Malaysian: "#eb6834", Indonesian: "#2a78d6", unclear: "#CBD5E1" };
+const voiceColor = (v: string) => VOICE_COLOR[v] ?? "#94A3B8";
+const voiceName = (v: string) => (v === "unclear" ? "Not clear" : v);
+const negOf = (x: Lean) => sharePct(x.negative, x.read);
+const time = (s: string) => s.slice(11, 16);
+
+/** A post the team is watching (settings.pr.watch): the post as last read, and the crowd under it. */
+export function WatchCard({ w, who }: { w: Watched; who: string }) {
+  const c = w.comments;
+  const max = Math.max(1, ...w.series.map((s) => s.n));
+  const q = (x: Watched["against"][number]): Quote => ({ text: x.text, translation: null, likes: x.likes, platform: w.platform, url: w.url, sentiment: x.sentiment, theme: x.voice && x.voice !== "unclear" ? x.voice : null });
+  const reach = [w.views != null ? `${compact(w.views)} views` : null, w.likes != null ? `${int(w.likes)} likes` : null, w.shares ? `${int(w.shares)} reposts` : null].filter(Boolean).join(" · ");
+  return (
+    <article className="dcard prplatcard prwatch">
+      <header>{pf(w.platform)}<h3>{w.label ?? `@${w.handle ?? "account"}`}</h3><small>@{w.handle ?? "account"}{w.source === "owned" ? " (own account)" : ""} · {dayMonth(w.posted_at.slice(0, 10))} {time(w.posted_at)} WIB · <a href={w.url} target="_blank" rel="noreferrer">Open post ↗</a></small></header>
+      <a className="prplatpost" href={w.url} target="_blank" rel="noreferrer"><span>“{w.caption.length > 260 ? w.caption.slice(0, 258) + "…" : w.caption}”</span></a>
+      {reach && <small className="muted">{reach}{w.read_at ? ` when last read, ${dayMonth(w.read_at.slice(0, 10))} ${time(w.read_at)} WIB` : ""}</small>}
+      {c.n === 0 ? <p className="quiet">No comments loaded for this post yet.</p> : (
+        <>
+          <div className="prplatnums">
+            <div><b>{int(c.n)}</b><small>comments about {who}{w.other ? ` · ${int(w.other)} about something else` : ""}{c.n > c.read ? ` · ${int(c.n - c.read)} not read yet` : ""}</small></div>
+            <div><b className="down">{pct(negOf(c))}</b><small>negative · {pct(sharePct(c.positive, c.read))} defending {who}</small></div>
+            <div><b>{w.first_after_min != null ? `${int(w.first_after_min)} min` : "–"}</b><small>to the first comment</small></div>
+          </div>
+          <span className="prplatlean" title={`${int(c.negative)} negative · ${int(c.read - c.negative - c.positive)} neutral · ${int(c.positive)} defending`}>
+            <i style={{ width: `${(c.negative / Math.max(1, c.n)) * 100}%`, background: "var(--red)" }} />
+            <i style={{ width: `${((c.read - c.negative - c.positive) / Math.max(1, c.n)) * 100}%`, background: "#94A3B8" }} />
+            <i style={{ width: `${(c.positive / Math.max(1, c.n)) * 100}%`, background: "var(--green)" }} />
+          </span>
+          {w.voices.some((v) => v.voice !== "unclear") && (
+            <>
+              <h4>Who is commenting</h4>
+              <table className="prsplit"><thead><tr><th></th><th className="num">Comments</th><th className="num">Negative</th><th className="num">Defending</th></tr></thead>
+                <tbody>{w.voices.map((v) => (
+                  <tr key={v.voice}><td><i className="vdot" style={{ background: voiceColor(v.voice) }} />{voiceName(v.voice)}</td><td className="num">{int(v.n)}</td><td className="num down">{pct(negOf(v))}</td><td className="num up">{pct(sharePct(v.positive, v.read))}</td></tr>))}
+                </tbody>
+              </table>
+            </>
+          )}
+          <h4>Pace, {w.bucket === "hour" ? "comments an hour, WIB" : "comments a day"}</h4>
+          <div className="prbars pace" aria-label="Comments over time">
+            {w.series.map((s) => <i key={s.at} title={`${w.bucket === "hour" ? `${dayMonth(s.at.slice(0, 10))} ${time(s.at)}` : dayMonth(s.at)}: ${int(s.n)} comments, ${int(s.negative)} negative`} style={{ height: `${Math.max(2, (s.n / max) * 100)}%` }} />)}
+          </div>
+          <small className="muted">{w.first_comment && w.last_comment ? `Comments loaded from ${dayMonth(w.first_comment.slice(0, 10))} ${time(w.first_comment)} to ${dayMonth(w.last_comment.slice(0, 10))} ${time(w.last_comment)} WIB` : ""}{w.peak ? ` · busiest ${w.bucket === "hour" ? `hour ${time(w.peak.at)}` : dayMonth(w.peak.at.slice(0, 10))}, ${int(w.peak.n)} comments` : ""}{w.own_replies ? ` · ${int(w.own_replies)} ${w.own_replies === 1 ? "reply" : "replies"} by ${who} left out` : ""}</small>
+          {w.against.length > 0 && <><h4>Most liked against {who}</h4>{w.against.map((x, k) => <QuoteLine key={k} q={q(x)} />)}</>}
+          {w.defending.length > 0 && <><h4>Most liked defending {who}</h4>{w.defending.map((x, k) => <QuoteLine key={k} q={q(x)} />)}</>}
+        </>
+      )}
+      <footer className="prfoot"><Link className="askwhy" href={ask(`What are people saying under ${w.label ?? `@${w.handle}'s post`} (${w.url}), Malaysians and Indonesians apart? Is it landing?`)}>Ask CeMO</Link></footer>
+    </article>
+  );
+}
+
+/** Day by day: the subject's own posts and the talk about it, and which side it comes from. */
+export function DailyTable({ x, who }: { x: Daily; who: string }) {
+  const named = x.voices.filter((v) => v !== "unclear");
+  const total = (r: Daily["rows"][number]) => x.voices.reduce((a, v) => a + r.voices[v].posts.n + r.voices[v].comments.n, 0);
+  const max = Math.max(1, ...x.rows.map(total));
+  const cell = (l: Lean, word: string) => l.n === 0 ? <span className="muted">–</span> : <>{int(l.n)}<small className={l.read ? "down" : "muted"}> {l.read ? `${pct(negOf(l))} ${word}` : "not read yet"}</small></>;
+  return (
+    <div className="dcard tablewrap still">
+      <table className="prdaily">
+        <thead><tr><th>Day</th><th className="num">{who}&apos;s posts</th><th className="num">Comments on them</th><th className="num">Posts by others</th><th className="num">Comments about {who}</th>
+          {named.map((v) => <th className="num" key={v}><i className="vdot" style={{ background: voiceColor(v) }} />{v}</th>)}<th>Who is talking</th></tr></thead>
+        <tbody>{[...x.rows].reverse().map((r) => {
+          const t = total(r);
+          return (
+            <tr key={r.d} className={r.arriving ? "arriving" : ""}>
+              <td><b>{dayMonth(r.d)}</b>{r.arriving ? <span className="tag">still arriving</span> : null}</td>
+              <td className="num" title={Object.entries(r.own.by).map(([h, k]) => `@${h}: ${k}`).join(" · ")}>{r.own.n ? int(r.own.n) : <span className="muted">–</span>}{r.own.n > 0 && Object.keys(r.own.by).length > 1 ? <small className="muted"> {Object.entries(r.own.by).map(([h, k]) => `@${h} ${k}`).join(" · ")}</small> : null}</td>
+              <td className="num">{cell(r.own.comments, "negative")}</td>
+              <td className="num">{cell(r.mentions, "against")}</td>
+              <td className="num">{cell(r.comments, "negative")}</td>
+              {named.map((v) => {
+                const both: Lean = { n: r.voices[v].posts.n + r.voices[v].comments.n, read: r.voices[v].posts.read + r.voices[v].comments.read, negative: r.voices[v].posts.negative + r.voices[v].comments.negative, positive: r.voices[v].posts.positive + r.voices[v].comments.positive };
+                return <td className="num" key={v}>{cell(both, "negative")}</td>;
+              })}
+              <td><span className="prplatlean vbar" style={{ width: `${Math.max(4, (t / max) * 100)}%` }} title={x.voices.map((v) => `${voiceName(v)}: ${int(r.voices[v].posts.n + r.voices[v].comments.n)}`).join(" · ")}>
+                {x.voices.map((v) => <i key={v} style={{ width: `${t ? ((r.voices[v].posts.n + r.voices[v].comments.n) / t) * 100 : 0}%`, background: voiceColor(v) }} />)}
+              </span></td>
+            </tr>
+          );
+        })}</tbody>
+      </table>
+      <p className="quiet" style={{ fontSize: 12, margin: "8px 0 0" }}>
+        Posts by others count those about {who}; posts the labeller set aside as about something else are left out. &quot;Against&quot; and &quot;negative&quot; are shares of those already read. {named.length ? `${named.join(" and ")} is read from each post's and comment's language; the columns count posts and comments together. ` : ""}Times are WIB.
+      </p>
+    </div>
+  );
+}
+
 function Bars({ data, max }: { data: { d: string; negative: number }[]; max: number }) {
   return (
     <div className="prbars" aria-label="Negative comments per day">
@@ -208,7 +301,9 @@ export function PrDashboard({ d, client, view, hide = [] }: { d: PrDashboardData
     // around one subject only (a case workspace): the platforms side by side when there are two or more, the tags when a few comments carry one
     ...((d.by_platform?.length ?? 0) > 1 ? [] : ["platforms"]), ...((d.tagged?.tagging ?? 0) >= 3 ? [] : ["tagged"]),
     // the Pulse's comments per hour, around one subject only
-    ...(d.pace?.points.some((p) => p.comments > 0) ? [] : ["pace"])]);
+    ...(d.pace?.points.some((p) => p.comments > 0) ? [] : ["pace"]),
+    // around one subject only: the posts the team watches (settings.pr.watch), and the days up to the newest data
+    ...(d.watched?.length ? [] : ["watch"]), ...(d.daily?.rows.length ? [] : ["daily"])]);
   const maxIssue = Math.max(1, ...d.issues.flatMap((i) => i.daily.map((x) => x.negative)));
   const render: Record<string, (t: string) => React.ReactNode> = {
     issues: (t) => (
@@ -367,6 +462,18 @@ export function PrDashboard({ d, client, view, hide = [] }: { d: PrDashboardData
         <header><h2>{t}</h2><span>How fast the comments about {who} came{scopeWord}, and which way they lean, over the whole wave (the Pulse&apos;s chart).</span></header>
         <PulseTrends subject={who} trend={d.pace} commentsOnly titled={false} postsCaveat={null}
           askTrend={<Link className="askwhy" style={{ marginLeft: "auto" }} href={`${repAskHref(f.brand, f.days, f.platform)}&q=${encodeURIComponent(`What drove the peaks in comments about ${who}, and is it cooling down?`)}`}>Ask CeMO</Link>} />
+      </div>
+    ) : null,
+    watch: (t) => (
+      <div className="dsection">
+        <header><h2>{t}</h2><span>The posts the team is watching, from the moment they went up: the post as last read, and the comments under it by their own label.</span></header>
+        <div className="prplat">{(d.watched ?? []).map((w) => <WatchCard key={w.url} w={w} who={who} />)}</div>
+      </div>
+    ),
+    daily: (t) => d.daily ? (
+      <div className="dsection">
+        <header><h2>{t}</h2><span>Each day from {dayMonth(d.daily.from)} to {dayMonth(d.daily.to)}{scopeWord}, newest first: {who}&apos;s own posts, the posts and comments about {who}, and who they come from.</span></header>
+        <DailyTable x={d.daily} who={who} />
       </div>
     ) : null,
     platforms: (t) => (

@@ -18,6 +18,7 @@ import { SkillDb } from "../skills/db";
 import { PR, type RoleModel } from "../roles/model";
 import { COMMENT_IN_PANEL, panelCommentEdge, panelPlatformsSql, panelPostEdge } from "../db/panel";
 import { pulseTrend, type Trend } from "../pulse/page";
+import { dailyFacts, readWatch, watchedPosts, type Daily, type Watched } from "./daily";
 
 export type Level = "calm" | "watch" | "issue" | "crisis" | "recovering";
 export const WINDOWS = [7, 14, 30] as const;
@@ -129,6 +130,10 @@ export type PrDashboardData = {
   tagged?: { comments: number; tagging: number; rows: Tagged[] };
   /** around one subject, on the dashboard only: the Pulse's comments per hour over the wave (src/pulse/page.ts, pulseTrend) */
   pace?: Trend;
+  /** around one subject, on the dashboard only: each day of the window up to the newest data (src/reputation/daily.ts) */
+  daily?: Daily;
+  /** around one subject, on the dashboard only: the posts in settings.pr.watch with their comments */
+  watched?: Watched[];
 };
 
 const n = (v: unknown) => (v == null ? 0 : Number(v));
@@ -257,12 +262,21 @@ export async function prDashboard(ws: string, sp: Record<string, string | string
   if (!basics) return null;
   const f = readPrFilters(sp, basics.brands.map((b) => b.id), basics.client);
   const settled = await settledDay(db, ws, basics.tz, basics.asOf, role.alert ?? PR.alert!);
-  // around one subject the dashboard also draws the Pulse's comments per hour (decks do not, so it is read here, not in reputationFacts)
-  const [d, pace] = await Promise.all([
-    reputationFacts(ws, { focus: f.brand, from: addDays(settled, -(f.days - 1)), to: settled, platform: f.platform }, role, db, basics),
-    basics.per_comment ? pulseTrend(ws, f.platform).catch(() => null) : Promise.resolve(null),
+  const from = addDays(settled, -(f.days - 1));
+  // around one subject the dashboard also draws the Pulse's comments per hour, the days up to the newest data and the
+  // posts to watch (decks do not, so they are read here, not in reputationFacts)
+  const one = basics.per_comment;
+  const plat = f.platform !== "all" && basics.platforms.includes(f.platform) ? f.platform : null;
+  const focus = basics.brands.find((b) => b.id === f.brand)?.id ?? basics.client ?? basics.brands[0].id;
+  const watch = one ? readWatch((await db.one<{ watch: unknown }>("select settings->'pr'->'watch' as watch from workspaces where id = $1", [ws]))?.watch) : [];
+  const [d, pace, daily, watched] = await Promise.all([
+    reputationFacts(ws, { focus: f.brand, from, to: settled, platform: f.platform }, role, db, basics),
+    one ? pulseTrend(ws, f.platform).catch(() => null) : Promise.resolve(null),
+    one ? dailyFacts(db, ws, basics.tz, focus, from, basics.asOf > settled ? basics.asOf : settled, settled, plat, commentsUnder(true)).catch(() => null) : Promise.resolve(null),
+    watch.length ? watchedPosts(db, ws, basics.tz, watch).catch(() => []) : Promise.resolve([]),
   ]);
-  return d && pace ? { ...d, pace } : d;
+  if (!d) return d;
+  return { ...d, ...(pace ? { pace } : {}), ...(daily ? { daily } : {}), ...(watched.length ? { watched } : {}) };
 }
 
 /**
