@@ -219,9 +219,22 @@ export function stanceBatchPrompt(posts: PostForLabel[]): string {
 }
 
 /** Keep only well-formed labels for ids we asked about; one per id. */
-export function parseLabels(input: unknown, wanted: Iterable<string>, allow: readonly string[] = COMMENT_CLASSES, extra: { topics?: string[]; voices?: string[]; aside?: string[] } = {}): { labels: Label[]; missing: string[] } {
+/** An id from the list, also when the model gave it without the workspace's prefix ("apology-respect" for
+ *  "kahf-daily:apology-respect") or gave the topic's name instead (names: lower-cased name → id). */
+function known(list: string[] | undefined, v: unknown, names?: Record<string, string>): string | undefined {
+  const s = String(v ?? "").trim();
+  if (!list?.length || !s) return undefined;
+  if (list.includes(s)) return s;
+  const bare = list.filter((id) => id.slice(id.indexOf(":") + 1) === s);
+  if (bare.length === 1) return bare[0];
+  const named = names?.[s.toLowerCase()];
+  return named && list.includes(named) ? named : undefined;
+}
+
+export function parseLabels(input: unknown, wanted: Iterable<string>, allow: readonly string[] = COMMENT_CLASSES, extra: { topics?: string[]; voices?: string[]; aside?: string[]; names?: Record<string, string> } = {}): { labels: Label[]; missing: string[]; unknown?: string[] } {
   const ids = new Set(wanted);
   const out = new Map<string, Label>();
+  const unknown = new Set<string>();
   const raw = (input as { labels?: unknown })?.labels;
   if (Array.isArray(raw)) {
     for (const item of raw) {
@@ -233,13 +246,16 @@ export function parseLabels(input: unknown, wanted: Iterable<string>, allow: rea
       const c = typeof confidence === "number" && Number.isFinite(confidence) ? Math.min(1, Math.max(0, confidence)) : 0.5;
       const label: Label = { id: sid, sentiment: s, confidence: Math.round(c * 100) / 100 };
       // a topic or voice outside the workspace's list is dropped, not the label: sentiment still counts
-      if (extra.topics?.includes(String(topic))) label.topic = String(topic);
+      const t = known(extra.topics, topic, extra.names);
+      if (t) label.topic = t;
+      else if (extra.topics?.length && topic != null && String(topic).trim()) unknown.add(String(topic).slice(0, 60));
       if (extra.voices && [...extra.voices, "unclear"].includes(String(voice))) label.voice = String(voice);
       // a reason only for what is set aside; an off_topic row without a known one falls to the last reason (the catch-all)
-      if (extra.aside?.length && (s as string) === "off_topic") label.aside = extra.aside.includes(String(aside)) ? String(aside) : extra.aside[extra.aside.length - 1];
+      if (extra.aside?.length && (s as string) === "off_topic") label.aside = known(extra.aside, aside, extra.names) ?? extra.aside[extra.aside.length - 1];
       out.set(sid, label);
     }
   }
   const missing = [...ids].filter((i) => !out.has(i));
-  return { labels: [...out.values()], missing };
+  // topics the model gave that are on no list: logged by the labeller, so a batch that loses its topics says why
+  return { labels: [...out.values()], missing, ...(unknown.size ? { unknown: [...unknown] } : {}) };
 }

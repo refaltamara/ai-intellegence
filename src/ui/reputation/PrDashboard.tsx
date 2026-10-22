@@ -329,6 +329,8 @@ export function PrDashboard({ d, client, view, hide = [] }: { d: PrDashboardData
   const scopeWord = f.platform === "all" ? "" : ` on ${PLATFORM[f.platform] ?? f.platform}`;
   // around one subject the labelled posts are counted with the comments (src/reputation/dashboard.ts, VOICES)
   const withPosts = d.voice_posts > 0;
+  // a topic's voices, where the labeller reads them (a case such as Kahf: Malaysian, Indonesian)
+  const withVoices = d.narratives.some((x) => x.voices.some((v) => v.voice !== "unclear"));
   const said = withPosts ? "posts and comments" : "comments";
   const noNorm = st.baseline.neg_pct == null && !!st.day && st.level === "calm";
   const cv = d.conversation;
@@ -440,9 +442,9 @@ export function PrDashboard({ d, client, view, hide = [] }: { d: PrDashboardData
     ),
     narratives: (t) => (
       <div className="dsection">
-        <header><h2>{t}</h2><span>What people say about {who}, by topic: how much of the conversation each holds, and how it leans.</span></header>
+        <header><h2>{t}</h2><span>What people say about {who}, by topic: how much of the conversation each holds, and how it leans{withVoices ? ", and who is saying it" : ""}.</span></header>
         <div className="dcard tablewrap still">
-          <table className="prnarr"><thead><tr><th>Topic</th>{withPosts ? <><th className="num">Posts</th><th className="num">Against</th><th className="num">Comments</th><th className="num">Negative</th></> : <th className="num">Comments</th>}<th className="num">Share</th><th className="num">Change</th>{!withPosts && <th className="num">Negative</th>}<th>In their words</th></tr></thead>
+          <table className="prnarr"><thead><tr><th>Topic</th>{withPosts ? <><th className="num">Posts</th><th className="num">Against</th><th className="num">Comments</th><th className="num">Negative</th></> : <th className="num">Comments</th>}<th className="num">Share</th>{!noPrev && <th className="num">Change</th>}{!withPosts && <th className="num">Negative</th>}{withVoices && <th>Who</th>}<th>In their words</th></tr></thead>
             <tbody>{d.narratives.filter((x) => x.comments > 0).map((x) => (
               <tr key={x.topic_id}>
                 <td><b>{x.catch_all ? `${x.topic} (no topic fits)` : x.topic}</b></td>
@@ -451,8 +453,11 @@ export function PrDashboard({ d, client, view, hide = [] }: { d: PrDashboardData
                   <td className="num">{int(x.split.comments.n)}</td><td className="num down">{pct(sharePct(x.split.comments.negative, x.split.comments.labelled))}</td>
                 </> : <td className="num">{int(x.comments)}</td>}
                 <td className="num">{pct(x.share)}</td>
-                <td className="num">{change(x.comments, x.comments_prev)}</td>
+                {!noPrev && <td className="num">{change(x.comments, x.comments_prev)}</td>}
                 {!withPosts && <td className="num">{pct(x.neg_pct)} <small className={x.neg_pct != null && x.neg_pct_prev != null && x.neg_pct > x.neg_pct_prev ? "down" : "up"}>{pts(x.neg_pct, x.neg_pct_prev)}</small></td>}
+                {withVoices && <td className="prwho">{x.voices.filter((v) => v.voice !== "unclear").slice(0, 3).map((v) => (
+                  <div key={v.voice}><span className="vdot" style={{ background: voiceColor(v.voice) }} />{v.voice} {int(v.n)} <small className="muted">{pct(sharePct(v.negative, v.labelled))} negative</small></div>
+                ))}</td>}
                 <td className="q">{x.quote ? <a href={x.quote.url} target="_blank" rel="noreferrer">“{x.quote.text.length > 110 ? x.quote.text.slice(0, 108) + "…" : x.quote.text}”</a> : "–"}</td>
               </tr>))}
             </tbody>

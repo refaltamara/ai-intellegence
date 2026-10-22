@@ -1497,6 +1497,8 @@ th{background:linear-gradient(180deg,#F8FAFE,#F4F7FC)}
 .prpost small{font-size:11px;color:var(--text-3)}
 .prnarr td.q{max-width:360px;font-size:12px;color:var(--text-2)}
 .prnarr td.q a{color:var(--text-2)}
+.prnarr td.prwho{font-size:12px;white-space:nowrap}
+.prnarr td.prwho div+div{margin-top:2px}
 .pr td small.down,.pr td.down{color:var(--red)}.pr td small.up{color:var(--green)}
 .pr tr.me td{background:var(--blue-10)}
 .prbig{font-size:13px;color:var(--text-2);margin-bottom:10px}

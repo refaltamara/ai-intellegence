@@ -250,11 +250,51 @@
       "received": "2026-10-22"
     },
     {
+      "path": "kahf-daily/comments_threads_1022b.csv",
+      "workspace": "kahf-daily",
+      "blob": "raw/kahf-daily/comments_threads_1022b.csv",
+      "bytes": 3147,
+      "sha256": "1b05b7e15d7a4a886d1ac2f7f6dd309c06bb08f7290990eec4e11ce34f4086d6",
+      "received": "2026-10-22"
+    },
+    {
+      "path": "kahf-daily/comments_threads_1022c.csv",
+      "workspace": "kahf-daily",
+      "blob": "raw/kahf-daily/comments_threads_1022c.csv",
+      "bytes": 141856,
+      "sha256": "811680dac04a19a37329a3a35c53195e2362225ad1f24bc8f28e93fadfb5b1ff",
+      "received": "2026-10-22"
+    },
+    {
+      "path": "kahf-daily/comments_threads_1022d.csv",
+      "workspace": "kahf-daily",
+      "blob": "raw/kahf-daily/comments_threads_1022d.csv",
+      "bytes": 114987,
+      "sha256": "1ffe0e15f0a54ba77e9c95bed9b73565ad727363a4ff83976d392df92dc7f98c",
+      "received": "2026-10-22"
+    },
+    {
+      "path": "kahf-daily/comments_x_1022.csv",
+      "workspace": "kahf-daily",
+      "blob": "raw/kahf-daily/comments_x_1022.csv",
+      "bytes": 24826,
+      "sha256": "93ad716924309ef98e41a58500ea87fb37c375a7fcc57949ea291edd8c0919a6",
+      "received": "2026-10-22"
+    },
+    {
       "path": "kahf-daily/contents_threads_own_1022.csv",
       "workspace": "kahf-daily",
       "blob": "raw/kahf-daily/contents_threads_own_1022.csv",
       "bytes": 1842,
       "sha256": "2cbe9579f12a975de00458d053e6e04af88f3cab8634bb3fe57155fcda8fa160",
+      "received": "2026-10-22"
+    },
+    {
+      "path": "kahf-daily/contents_threads_parents_1022.csv",
+      "workspace": "kahf-daily",
+      "blob": "raw/kahf-daily/contents_threads_parents_1022.csv",
+      "bytes": 7999,
+      "sha256": "ac9cede37705f771cfcb4e44d2673d666391d4ed8008f17ccffc75e24d3df61a",
       "received": "2026-10-22"
     },
     {
@@ -279,6 +319,14 @@
       "blob": "raw/kahf-daily/contents_tiktok_search_1022.csv",
       "bytes": 16883,
       "sha256": "d9b687ef86c44eba91cdace697cf0c329814eb539a780562f348e86204ada5fe",
+      "received": "2026-10-22"
+    },
+    {
+      "path": "kahf-daily/contents_x_parents_1022.csv",
+      "workspace": "kahf-daily",
+      "blob": "raw/kahf-daily/contents_x_parents_1022.csv",
+      "bytes": 3421,
+      "sha256": "b79ed8e0b09b022d8b89a5acf88b40dfafe16c523b2f8ea86ff053018fcd4543",
       "received": "2026-10-22"
     },
     {

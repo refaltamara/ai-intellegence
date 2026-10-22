@@ -54,6 +54,25 @@ describe("labelling with a workspace context", () => {
       { id: "c", sentiment: "neutral", confidence: 0.5, topic: "kahf-threads:others", voice: "unclear" },
     ]);
   });
+  it("takes a topic or reason given without the workspace's prefix (22 Oct 2026: a batch of 40 under Kahf's apology came back without topics)", () => {
+    const { labels, unknown } = parseLabels({ labels: [
+      { id: "a", sentiment: "positive", topic: "apology-respect" },
+      { id: "b", sentiment: "off_topic", topic: "apology-others", aside: "irrelevant" },
+      { id: "c", sentiment: "negative", topic: "respect" },
+      { id: "d", sentiment: "positive", topic: "Respect for owning up" },
+    ] }, ["a", "b", "c", "d"], ["positive", "neutral", "negative", "off_topic"], {
+      topics: ["kahf-daily:apology-respect", "kahf-daily:apology-others"], aside: ["kahf-daily:other-brands", "kahf-daily:irrelevant"],
+      names: { "respect for owning up": "kahf-daily:apology-respect" },
+    });
+    expect(labels.map((l) => [l.id, l.topic ?? null, l.aside ?? null])).toEqual([
+      ["a", "kahf-daily:apology-respect", null],
+      ["b", "kahf-daily:apology-others", "kahf-daily:irrelevant"],
+      ["c", null, null],
+      ["d", "kahf-daily:apology-respect", null],
+    ]);
+    // what still lands nowhere is reported, so the labeller can log why a topic was lost
+    expect(unknown).toEqual(["respect"]);
+  });
   it("asks why a row is set aside, where the workspace names reasons (22 Oct 2026)", () => {
     const daily: LabelContext = { ...kahf, topics: undefined, aside: [
       { id: "kahf-daily:other-brands", label: "Other brands' boycott", definition: "the boycott of other Indonesian brands", catch_all: false },

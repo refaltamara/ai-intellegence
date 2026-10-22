@@ -37,6 +37,8 @@ export type LabelOutcome = {
   stopped: "done" | "budget" | "error";
   error?: string;
   last_error?: string;
+  /** topics a batch answered with that are on no list (at most five), kept so a lost topic says why */
+  unknown_topics?: string[];
 };
 
 export type LabelOptions = { budgetMs?: number; batchSize?: number; parallel?: number; client?: Anthropic };
@@ -111,7 +113,14 @@ export async function labelWorkspace(workspaceId: string, opts: LabelOptions = {
   const subject = (await clientName(workspaceId)) ?? cfg.name;
   out.subject = subject;
   const ctx = await labelContext(workspaceId, subject);
-  const extra = { topics: ctx.topics?.map((t) => t.id), voices: ctx.voices, aside: ctx.aside?.map((t) => t.id) };
+  // every topic's and reason's name, so an answer that gives the name rather than the id still lands
+  const names = Object.fromEntries([...(ctx.topics ?? []), ...(ctx.aside ?? []), ...[...(ctx.post_topics?.values() ?? [])].flat()].map((t) => [t.label.toLowerCase(), t.id]));
+  const extra = { topics: ctx.topics?.map((t) => t.id), voices: ctx.voices, aside: ctx.aside?.map((t) => t.id), names };
+  const noteUnknown = (r: { unknown?: string[] }) => {
+    if (!r.unknown?.length) return;
+    out.unknown_topics = [...new Set([...(out.unknown_topics ?? []), ...r.unknown])].slice(0, 5);
+    console.warn(`[label] ${workspaceId}: topics on no list: ${r.unknown.slice(0, 5).join(", ")}`);
+  };
   const commentTool = labelTool("comments", ctx);
   const postTool = labelTool("posts", ctx);
   const client = opts.client ?? anthropicClient({ workspace: workspaceId, purpose: "comment_labels" });
@@ -140,7 +149,9 @@ export async function labelWorkspace(workspaceId: string, opts: LabelOptions = {
             tools: [tool],
             messages: [{ role: "user", content: commentBatchPrompt(subject, b) }],
           }, tool.name);
-          return parseLabels(use?.input, b.map((r) => r.id), COMMENT_CLASSES, k ? { ...extra, topics: own.topics?.map((t) => t.id) } : extra);
+          const parsed = parseLabels(use?.input, b.map((r) => r.id), COMMENT_CLASSES, k ? { ...extra, topics: own.topics?.map((t) => t.id) } : extra);
+          noteUnknown(parsed);
+          return parsed;
         } catch (e) {
           out.calls_failed += 1;
           out.last_error = (e as Error).message?.slice(0, 300);
@@ -188,7 +199,9 @@ export async function labelWorkspace(workspaceId: string, opts: LabelOptions = {
             tools: [postTool],
             messages: [{ role: "user", content: stanceBatchPrompt(b) }],
           }, postTool.name);
-          return parseLabels(use?.input, b.map((r) => r.id), ctx.post_off_topic ? [...SENTIMENTS, "off_topic"] : SENTIMENTS, extra);
+          const parsed = parseLabels(use?.input, b.map((r) => r.id), ctx.post_off_topic ? [...SENTIMENTS, "off_topic"] : SENTIMENTS, extra);
+          noteUnknown(parsed);
+          return parsed;
         } catch (e) {
           out.calls_failed += 1;
           out.last_error = (e as Error).message?.slice(0, 300);
