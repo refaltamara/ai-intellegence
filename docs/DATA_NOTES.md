@@ -396,6 +396,14 @@ One contents file, `data/raw/kahf/contents_threads.csv` (posts only; comments to
     - Boycott stays 11.8% (Malaysians 53, 51 negative);
     - Blaming Kahf 8.1% (Malaysians 30, all negative).
 - **Beauty case synced** (`pnpm case sync`, same arguments): 164 posts, 1,436 comments, 5,802 labels; after the re-read, 1,476 comments and 603 links updated and 6,857 labels. The sync now also brings a topic the source changed (label, definition, order, tags) into the case, with the topic ids in its tags moved under the case (`topics_updated`): the case's apology topics name the case's own overall topics.
+- **22 Oct, 17:08: the apology's comments to 17:02 WIB** (Fair's scraper, `scrapper-results-20261022-1708.xlsx` → `comments_threads_1022e.csv`, load `20f241e9`).
+  - The file holds 387 comments, 10:00 to 17:02 WIB. 69 of the 76 we held are in it under the same ids, so the short-code ids line up. 9 were left out (1 empty, 8 emoji only), which leaves 309 new, 2 of them Kahf's own.
+  - Labelled with the apology's topics within minutes, every comment with a topic. Under the apology now: 360 comments about Kahf (248 negative, 81 positive) and 22 set aside (quarrel 14, Irrelevant 6, other brands 2).
+  - By topic: Boycott stays, sell at home 153; Others 64; Too late, only for sales 63; Cheering Kahf on 45; Respect for owning up 35.
+  - By voice: Malaysians 197 (174 negative), Indonesians 58 (42 positive), not clear 105.
+  - **The afternoon turned.** Of the 74 read by 13:17 WIB, 51 accepted the apology. Of the 283 written after 13:17, 228 are negative, and 187 come from Malaysians (164 of them negative).
+  - Overall topics on the dashboard after this load, 17 to 22 Oct: Using and backing Kahf 35.4%, Boycott stays 24.6%, Others 14.9%, Switching away 13.0%, Blaming Kahf 12.0%.
+  - Beauty case synced: 309 comments, 68 updated, 1,206 labels.
 
 ## The one loader (DECISIONS, 10 Oct 2026)
 
