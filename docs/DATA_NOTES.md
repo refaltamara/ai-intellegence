@@ -404,6 +404,27 @@ One contents file, `data/raw/kahf/contents_threads.csv` (posts only; comments to
   - **The afternoon turned.** Of the 74 read by 13:17 WIB, 51 accepted the apology. Of the 283 written after 13:17, 228 are negative, and 187 come from Malaysians (164 of them negative).
   - Overall topics on the dashboard after this load, 17 to 22 Oct: Using and backing Kahf 35.4%, Boycott stays 24.6%, Others 14.9%, Switching away 13.0%, Blaming Kahf 12.0%.
   - Beauty case synced: 309 comments, 68 updated, 1,206 labels.
+- **23 Oct, morning: new contents** (scraped 07:43 to 07:48 WIB; files `contents_*_1023.csv`, loads `a60225a9` and `875b853a`).
+  - **What the files hold:**
+    - Threads search: 146 posts, 145 of them from 17 Oct.
+    - TikTok search: 174 videos, 42 of them from 17 Oct.
+    - Kahf's TikTok: 20 videos, all from 17 Oct.
+    - X search: 200 tweets.
+    - Kahf's X: 19 tweets, the newest from 25 Sep; no @kahfeveryday.my found. Not loaded.
+    - Kahf's Threads: 40 posts. From 17 Oct, only the 22 Oct statement and its continuations; it gives a later reading of the statement: 1,432 replies, 1,075 likes, 120,641 views.
+    - Kahf's Instagram: 20 posts, the newest from 6 Oct. Not loaded.
+  - **Against what we held, from 17 Oct:**
+    - 296 new: 275 posts by others and 21 of Kahf's own TikTok videos, nearly all from 22 and 23 Oct.
+    - 108 were in the 22 Oct files and take the later reading.
+    - Refal has the new ones as a list (`Kahf-new-contents_2026-10-23.xlsx`, yesterday's columns).
+  - **A renamed account.** One X account renamed itself since 22 Oct (@waddahellyx, now @wtf_rana). Its tweet is written under the url we held, so it stays one post (the loader's one-url check found it).
+  - **Labelled.** Of the 275 new posts by others, 121 are about Kahf and 154 are set aside: Irrelevant 136 (23 Oct is a Friday: Surah Al-Kahf reminders), quarrel 12, other brands 6.
+    - Using and backing Kahf 38.
+    - Others 34.
+    - Boycott stays 29, 28 of them by Malaysians.
+    - Blaming Kahf 13, 11 of them by Malaysians.
+    - Switching away 7.
+  - Beauty case synced: 296 posts, 107 links updated, 404 readings, 825 labels.
 
 ## The one loader (DECISIONS, 10 Oct 2026)
 
