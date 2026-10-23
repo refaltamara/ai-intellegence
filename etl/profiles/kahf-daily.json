@@ -161,6 +161,13 @@
       "file": "kahf-daily/contents_x_search_1023.csv",
       "export_time": "2026-10-23T00:43:25Z",
       "note": "dataset_tweet-scraper_2026-10-23_00-43-25-662.csv (X search for \"kahf\", 200 tweets, all from 17 Oct): 102 new, 98 in the 22 Oct file (a later reading). 23 Oct is a Friday: many are reminders to read Surah Al-Kahf, which the labeller sets aside as Irrelevant. One tweet's author renamed their account since 22 Oct (@waddahellyx, now @wtf_rana): its url is written as held, so it stays one post. Kahf's own X (dataset_tweet-scraper_2026-10-23_00-46-47-912.csv) holds 19 tweets, the newest from 25 Sep, and found no @kahfeveryday.my: not loaded. Columns renamed only."
+    },
+    {
+      "kind": "contents",
+      "platform": "threads",
+      "file": "kahf-daily/contents_threads_own_1023.csv",
+      "export_time": "2026-10-23T00:48:28Z",
+      "note": "dataset_meta-threads-scraper_2026-10-23_00-48-28-851.csv (Kahf's Threads, @kahfeveryday and @kahfeveryday.my, 40 posts back to 19 Aug): the 4 from 17 Oct, all the 22 Oct statement and its three continuations (in drop_urls). A later reading of the statement: 1,432 replies, 1,075 likes, 120,641 views. Kahf's Instagram (dataset_instagram-scraper_2026-10-23_00-48-30-976.csv, 20 posts, newest 6 Oct) holds nothing from 17 Oct: not loaded. Columns renamed only."
     }
   ]
 }
