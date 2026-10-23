@@ -425,6 +425,18 @@ One contents file, `data/raw/kahf/contents_threads.csv` (posts only; comments to
     - Blaming Kahf 13, 11 of them by Malaysians.
     - Switching away 7.
   - Beauty case synced: 296 posts, 107 links updated, 404 readings, 825 labels.
+- **23 Oct, 09:41: the apology's comments to 09:34 WIB** (Fair's scraper, `threads-comments-d6bbda2b-….xlsx` → `comments_threads_1023.csv`, load `7bcdc486`).
+  - **The file:** 713 comments, 10:00 WIB on 22 Oct to 09:34 WIB on 23 Oct.
+    - 246 of the 385 held are in it under the same ids. The 139 held but not returned stay.
+    - 22 were left out (9 empty, 13 emoji only), so 445 are new.
+  - **Under the apology now:** 830 comments, 3 of them Kahf's own.
+    - 788 are about Kahf: 640 negative, 101 positive.
+    - 39 are set aside.
+  - **By topic:** Boycott stays, sell at home 395; Too late, only for sales 168; Others 125; Cheering Kahf on 62; Respect for owning up 38.
+  - **By voice:** Malaysians 492 (456 negative), Indonesians 81 (49 positive), not clear 215.
+  - **23 Oct so far (to 09:34):** 90 comments about Kahf, 85 negative, 65 of them from Malaysians.
+  - **Overall topics after this load,** 17 to 23 Oct: Boycott stays 34.3% (now first), Using and backing Kahf 25.7%, Others 15.8%, Blaming Kahf 15.7%, Switching away 8.4%.
+  - Beauty case synced: 445 comments, 108 updated, 1,763 labels.
 
 ## The one loader (DECISIONS, 10 Oct 2026)
 
