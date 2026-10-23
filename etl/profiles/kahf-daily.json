@@ -133,6 +133,34 @@
       "file": "kahf-daily/comments_threads_1022e.csv",
       "export_time": "2026-10-22T10:05:13Z",
       "note": "scrapper-results-20261022-1708.xlsx (Fair's scraper, 10:05 UTC on 22 Oct): 387 comments under Kahf's 22 Oct statement, 10:00 to 17:02 WIB, none a reply to a reply, 3 of them Kahf's own (never labelled), 1 without text. 69 of the 76 held from the morning file are in it under the same ids (Threads' numeric ids written as their short codes), so 318 are new. The scraper's own sentiment, csat and theme columns are empty and not loaded."
+    },
+    {
+      "kind": "contents",
+      "platform": "threads",
+      "file": "kahf-daily/contents_threads_search_1023.csv",
+      "export_time": "2026-10-23T00:44:02Z",
+      "note": "dataset_threads-search-scraper_2026-10-23_00-44-02-341.csv (Apify Threads search for \"kahf\", 200 rows, 146 posts): the 145 from 17 Oct, one row per post, the larger reading kept. 141 are new; 4 were in the 22 Oct files and take this later reading. Columns renamed only."
+    },
+    {
+      "kind": "contents",
+      "platform": "tiktok",
+      "file": "kahf-daily/contents_tiktok_own_1023.csv",
+      "export_time": "2026-10-23T00:47:40Z",
+      "note": "dataset_tiktok-profile-scraper_2026-10-23_00-47-40-930.csv (Apify TikTok profile scraper, @kahfeveryday): its last 20 videos, all from 17 Oct; most from 22 Oct. Columns renamed only."
+    },
+    {
+      "kind": "contents",
+      "platform": "tiktok",
+      "file": "kahf-daily/contents_tiktok_search_1023.csv",
+      "export_time": "2026-10-23T00:44:23Z",
+      "note": "dataset_tiktok-scraper_2026-10-23_00-44-23-709.csv (Apify TikTok search for \"kahf\", 174 videos): the 42 from 17 Oct (132 earlier left out), some of them Kahf's own. Columns renamed only."
+    },
+    {
+      "kind": "contents",
+      "platform": "x",
+      "file": "kahf-daily/contents_x_search_1023.csv",
+      "export_time": "2026-10-23T00:43:25Z",
+      "note": "dataset_tweet-scraper_2026-10-23_00-43-25-662.csv (X search for \"kahf\", 200 tweets, all from 17 Oct): 102 new, 98 in the 22 Oct file (a later reading). 23 Oct is a Friday: many are reminders to read Surah Al-Kahf, which the labeller sets aside as Irrelevant. One tweet's author renamed their account since 22 Oct (@waddahellyx, now @wtf_rana): its url is written as held, so it stays one post. Kahf's own X (dataset_tweet-scraper_2026-10-23_00-46-47-912.csv) holds 19 tweets, the newest from 25 Sep, and found no @kahfeveryday.my: not loaded. Columns renamed only."
     }
   ]
 }
