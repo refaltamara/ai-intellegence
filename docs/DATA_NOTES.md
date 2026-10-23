@@ -363,6 +363,81 @@ One contents file, `data/raw/kahf/contents_threads.csv` (posts only; comments to
   - **The pace fell away in the evening:** 30 comments at 15:00 WIB, 22 at 16:00, 15 at 17:00, under a dozen an hour from 18:00, two an hour overnight.
   - **Tags and likes:** Bad Lab is tagged in 32 comments and Ubermen in 9. On TikTok, "villain dlm Kudrat tapi hero dalam kehidupan sebenar" now has 1,178 likes and the call to Malaysia's local brands has 900.
 
+## Kahf: day by day from 17 Oct (profile workspace `kahf-daily`, 22 Oct 2026)
+
+- **What it is.** Refal tracks Kahf daily from 17 Oct ("any contents before 17 Oct we don't have to care for now"): Kahf's own two accounts, @kahfeveryday and @kahfeveryday.my ("only those 2"), and posts by others that name Kahf, with a Malaysia view read from the language (Malay = Malaysian, "works for caption & comments"). Topics are not set yet ("I'll tell you when").
+- **Workspace.** A third Kahf case workspace, set up like `kahf-kol`: profile, PR, the Chorus dashboard, restricted to Refal and Raissa, live so the labeller runs; brand id `kahf-daily` (named Kahf). Its case context in `settings.label` takes the story to the 22 Oct statement, says which way sentiment points (toward Kahf), and sets aside posts about Surah Al-Kahf, the Herat–Khaf railway, the Urdu "khafa" and people's names (`post_off_topic`). Voices: Malaysian, Indonesian.
+- **Files, 22 Oct** (contract `etl/profiles/kahf-daily.json`, files under `kahf-daily/`, columns renamed only, rows posted before 17 Oct 00:00 WIB left out):
+  - Threads, Kahf's own (`threads_own_kahf.csv`, 200 posts back to July 2025): 4 from 17 Oct, all the 22 Oct statement (10:01 WIB) and the three posts continuing it in its own thread, which count as one post (the three are in `drop_urls` with the statement as their parent).
+  - Threads search for "kahf" and "khaf" (`thread_kahf_ref.csv`, `thread_khaf_ref.csv`, 513 each, 2 in both): 421 from 17 Oct. No views or followers in the search.
+  - TikTok, Kahf's own (`tiktok_own_kahf.csv`, the last 50, 20 to 21 Oct) and the search for "kahf" (`tiktok_kahf.csv`, 282; 71 from 17 Oct, some of them Kahf's own).
+  - X search for "kahf" (`twitter_kahf.csv`, 1,000; 245 from 17 Oct). Kahf's own X (`twitter_own_kahf.csv`) has nothing from 17 Oct; the scraper found no @kahfeveryday.my on X.
+  - Instagram: Kahf's profiles (`IG_won_kahf.csv`) have nothing from 17 Oct; not loaded.
+  - Comments: the 80 replies to the 22 Oct statement (`dataset_threads-replies-scraper_2026-10-22_06-19-45-159.csv`, Apify, 10:00 to 13:17 WIB), one of them Kahf's own continuation.
+- **Load `8bc4b2aa`**: 632 posts (56 Kahf's own: the statement and 55 TikTok videos; 576 by others) and 76 comments (4 emoji only left out). Left out by the keyword rule: 132 Threads search results and 10 TikTok videos that do not name Kahf, most of them the wider Indonesia–Malaysia boycott talk (santan Kara, "beda level"), some of them large (a cashier saying "barang ni" has sat untouched for two weeks: 5,642 likes; the photo, not the caption, may name Kahf).
+- **Labelled** by the cron within minutes. Set aside as not about Kahf: X 143 of 243 (Friday reminders to read Surah Al-Kahf, the railway), Threads 56 of 286, TikTok 18 of 47. Of the 359 posts about Kahf, 17 to 22 Oct: 94 against, 95 defending, 170 neutral. Voices on posts: Indonesian 214, Malaysian 98, not clear 47. From 17 to 21 Oct, 68 to 93% of Malaysians' posts each day are against Kahf, and 0 to 9% of Indonesians' (22 Oct so far: 2 of 4 and 2 of 12).
+- **The 22 Oct statement:** 74 comments about Kahf by 13:17 WIB (1 about something else, Kahf's own reply left out): 51 accepting it, 21 negative, 2 neutral. Indonesians 33 (30 accepting), Malaysians 12 (all 12 negative), not clear 29. First comment 10 minutes after the post; busiest 11:00 WIB (33). Most liked: an Indonesian who worked with Kahf praising it for owning the mistake (34 likes); against it, "Terlalu banyak 'kami'" (30).
+- **On the dashboard** (Kahf · Daily tracking → Dashboard): Posts to watch (the statement), Day by day, Who is talking, By platform, Comments per hour, Own channels; Issues and Narratives hidden until topics are set (team change, company version 1).
+- **Beauty case** `kahf-daily-tracking` (`pnpm case copy kahf-daily beauty-id --case kahf-daily-tracking --brand kahf-daily=kahfeveryday`), the same access list: 632 posts, 76 comments, 1,376 labels. Later loads go into `kahf-daily` first, then `pnpm case sync` with the same arguments. Its page links to `kahf-daily`'s own dashboard.
+- **Settings**: `settings.pr.since` 2026-10-17; `settings.pr.watch` the apology, its section named "The apology, 22 Oct" (company version 2).
+- **22 Oct afternoon: comments under the posts Refal picked from the content list.** The keyword rule is off (`keyword_platforms: []`): posts that do not name Kahf are kept and set aside with a reason. Before loading, the 75 apology comments and the 217 posts set aside without a reason were reset to be read again (with the apology's topics and the reasons).
+  - Threads replies (Apify): 14 comments under 4 posts (`…08-49-30-539.csv`) and 717 under 20 posts (`…08-52-43-803.csv`, 35 from before 17 Oct left out). Fair's scraper: 678 comments under @callmekingindo's post (`scrapper-results-20261022-1617.csv`; Threads' numeric comment ids written as their short codes). X replies (Apify JSON): 141 under 15 tweets (169 from before 17 Oct left out).
+  - The posts they sit under, with the reading each file carries: 25 Threads posts (four from 15 and 16 Oct, which keep their date and never count in a window from 17 Oct; their comments from 17 Oct do) and 15 tweets from the X search.
+  - **Load `a6114e21`**: 2,461 rows in 12 files; 180 new posts, 1,436 new comments; no post left out.
+- **Labelled** by the cron in about 15 minutes. Of the 1,436 comments outside the apology, 149 are about Kahf; set aside, 972 as Other brands' boycott and 315 as Irrelevant. Of the 972, 551 sit under @callmekingindo, an Indonesia–Malaysia slanging match (football, haze, the rupiah) that names Kahf only in passing. Posts by others about Kahf: Threads 245, TikTok 30, X 101 (X's are mostly everyday product talk: roll-on, face wash, sunscreen, seller promos).
+- **The apology's topics.** At first only 35 of its 75 comments took a topic. One batch of 40 (the most liked) came back twice without topics, every other field intact: the model's topic was on no list, and the parser dropped it. Since #114 the parser also takes an id without the workspace prefix or a topic's name, and the cron logs a topic that still lands nowhere (`unknown_topics`). Read again after it was deployed, all 75 have one: Cheering Kahf on 30, Respect for owning up 21, Boycott stays 10, Too late 7, Others 7. Malaysians are 10 of the 75 (5 Boycott stays, 2 Too late, 3 Others).
+- **Overall topics and the quarrel (#114, Refal approved).** The overall topics (Boycott stays, Blaming Kahf, Switching away, Using and backing Kahf, Others) and a third set-aside reason (Indonesia–Malaysia quarrel) were added. Every comment and earned post the model had read was read again (1,476 comments, 736 posts; the 35 apology comments with a topic kept theirs).
+  - Comments outside the apology: set aside as quarrel 841, Irrelevant 289, Other brands' boycott 125. About Kahf: Switching away 95, Boycott stays 34, Using and backing Kahf 34, Others 12, Blaming Kahf 6.
+  - Posts by others: set aside as Irrelevant 315, quarrel 77, Other brands' boycott 29. About Kahf: Using and backing Kahf 188 (Threads 106, X 53, TikTok 29), Others 54, Blaming Kahf 33, Boycott stays 24, Switching away 16.
+  - On the dashboard, 17 to 22 Oct, posts and comments together, the apology rolled up:
+    - Using and backing Kahf 48.1% (Indonesians 228, none negative);
+    - Switching away 19.6% (Malaysians 56);
+    - Others 12.3%;
+    - Boycott stays 11.8% (Malaysians 53, 51 negative);
+    - Blaming Kahf 8.1% (Malaysians 30, all negative).
+- **Beauty case synced** (`pnpm case sync`, same arguments): 164 posts, 1,436 comments, 5,802 labels; after the re-read, 1,476 comments and 603 links updated and 6,857 labels. The sync now also brings a topic the source changed (label, definition, order, tags) into the case, with the topic ids in its tags moved under the case (`topics_updated`): the case's apology topics name the case's own overall topics.
+- **22 Oct, 17:08: the apology's comments to 17:02 WIB** (Fair's scraper, `scrapper-results-20261022-1708.xlsx` → `comments_threads_1022e.csv`, load `20f241e9`).
+  - The file holds 387 comments, 10:00 to 17:02 WIB. 69 of the 76 we held are in it under the same ids, so the short-code ids line up. 9 were left out (1 empty, 8 emoji only), which leaves 309 new, 2 of them Kahf's own.
+  - Labelled with the apology's topics within minutes, every comment with a topic. Under the apology now: 360 comments about Kahf (248 negative, 81 positive) and 22 set aside (quarrel 14, Irrelevant 6, other brands 2).
+  - By topic: Boycott stays, sell at home 153; Others 64; Too late, only for sales 63; Cheering Kahf on 45; Respect for owning up 35.
+  - By voice: Malaysians 197 (174 negative), Indonesians 58 (42 positive), not clear 105.
+  - **The afternoon turned.** Of the 74 read by 13:17 WIB, 51 accepted the apology. Of the 283 written after 13:17, 228 are negative, and 187 come from Malaysians (164 of them negative).
+  - Overall topics on the dashboard after this load, 17 to 22 Oct: Using and backing Kahf 35.4%, Boycott stays 24.6%, Others 14.9%, Switching away 13.0%, Blaming Kahf 12.0%.
+  - Beauty case synced: 309 comments, 68 updated, 1,206 labels.
+- **23 Oct, morning: new contents** (scraped 07:43 to 07:48 WIB; files `contents_*_1023.csv`, loads `a60225a9` and `875b853a`).
+  - **What the files hold:**
+    - Threads search: 146 posts, 145 of them from 17 Oct.
+    - TikTok search: 174 videos, 42 of them from 17 Oct.
+    - Kahf's TikTok: 20 videos, all from 17 Oct.
+    - X search: 200 tweets.
+    - Kahf's X: 19 tweets, the newest from 25 Sep; no @kahfeveryday.my found. Not loaded.
+    - Kahf's Threads: 40 posts. From 17 Oct, only the 22 Oct statement and its continuations; it gives a later reading of the statement: 1,432 replies, 1,075 likes, 120,641 views.
+    - Kahf's Instagram: 20 posts, the newest from 6 Oct. Not loaded.
+  - **Against what we held, from 17 Oct:**
+    - 296 new: 275 posts by others and 21 of Kahf's own TikTok videos, nearly all from 22 and 23 Oct.
+    - 108 were in the 22 Oct files and take the later reading.
+    - Refal has the new ones as a list (`Kahf-new-contents_2026-10-23.xlsx`, yesterday's columns).
+  - **A renamed account.** One X account renamed itself since 22 Oct (@waddahellyx, now @wtf_rana). Its tweet is written under the url we held, so it stays one post (the loader's one-url check found it).
+  - **Labelled.** Of the 275 new posts by others, 121 are about Kahf and 154 are set aside: Irrelevant 136 (23 Oct is a Friday: Surah Al-Kahf reminders), quarrel 12, other brands 6.
+    - Using and backing Kahf 38.
+    - Others 34.
+    - Boycott stays 29, 28 of them by Malaysians.
+    - Blaming Kahf 13, 11 of them by Malaysians.
+    - Switching away 7.
+  - Beauty case synced: 296 posts, 107 links updated, 404 readings, 825 labels.
+- **23 Oct, 09:41: the apology's comments to 09:34 WIB** (Fair's scraper, `threads-comments-d6bbda2b-….xlsx` → `comments_threads_1023.csv`, load `7bcdc486`).
+  - **The file:** 713 comments, 10:00 WIB on 22 Oct to 09:34 WIB on 23 Oct.
+    - 246 of the 385 held are in it under the same ids. The 139 held but not returned stay.
+    - 22 were left out (9 empty, 13 emoji only), so 445 are new.
+  - **Under the apology now:** 830 comments, 3 of them Kahf's own.
+    - 788 are about Kahf: 640 negative, 101 positive.
+    - 39 are set aside.
+  - **By topic:** Boycott stays, sell at home 395; Too late, only for sales 168; Others 125; Cheering Kahf on 62; Respect for owning up 38.
+  - **By voice:** Malaysians 492 (456 negative), Indonesians 81 (49 positive), not clear 215.
+  - **23 Oct so far (to 09:34):** 90 comments about Kahf, 85 negative, 65 of them from Malaysians.
+  - **Overall topics after this load,** 17 to 23 Oct: Boycott stays 34.3% (now first), Using and backing Kahf 25.7%, Others 15.8%, Blaming Kahf 15.7%, Switching away 8.4%.
+  - Beauty case synced: 445 comments, 108 updated, 1,763 labels.
+
 ## The one loader (DECISIONS, 10 Oct 2026)
 
 Every source goes through the same steps:

@@ -37,6 +37,8 @@ export type LabelOutcome = {
   stopped: "done" | "budget" | "error";
   error?: string;
   last_error?: string;
+  /** topics a batch answered with that are on no list (at most five), kept so a lost topic says why */
+  unknown_topics?: string[];
 };
 
 export type LabelOptions = { budgetMs?: number; batchSize?: number; parallel?: number; client?: Anthropic };
@@ -111,7 +113,14 @@ export async function labelWorkspace(workspaceId: string, opts: LabelOptions = {
   const subject = (await clientName(workspaceId)) ?? cfg.name;
   out.subject = subject;
   const ctx = await labelContext(workspaceId, subject);
-  const extra = { topics: ctx.topics?.map((t) => t.id), voices: ctx.voices };
+  // every topic's and reason's name, so an answer that gives the name rather than the id still lands
+  const names = Object.fromEntries([...(ctx.topics ?? []), ...(ctx.aside ?? []), ...[...(ctx.post_topics?.values() ?? [])].flat()].map((t) => [t.label.toLowerCase(), t.id]));
+  const extra = { topics: ctx.topics?.map((t) => t.id), voices: ctx.voices, aside: ctx.aside?.map((t) => t.id), names };
+  const noteUnknown = (r: { unknown?: string[] }) => {
+    if (!r.unknown?.length) return;
+    out.unknown_topics = [...new Set([...(out.unknown_topics ?? []), ...r.unknown])].slice(0, 5);
+    console.warn(`[label] ${workspaceId}: topics on no list: ${r.unknown.slice(0, 5).join(", ")}`);
+  };
   const commentTool = labelTool("comments", ctx);
   const postTool = labelTool("posts", ctx);
   const client = opts.client ?? anthropicClient({ workspace: workspaceId, purpose: "comment_labels" });
@@ -124,18 +133,25 @@ export async function labelWorkspace(workspaceId: string, opts: LabelOptions = {
     while (inBudget()) {
       const { rows, retry } = await nextComments(workspaceId, batch * parallel);
       if (!rows.length) break;
-      const batches = chunk(rows, batch);
-      const results = await Promise.all(batches.map(async (b) => {
+      // comments under a post with its own topics are labelled apart, with that post's topics only
+      const groups = new Map<string, CommentForLabel[]>();
+      for (const r of rows) { const k = ctx.post_topics?.has(r.post_url) ? r.post_url : ""; groups.set(k, [...(groups.get(k) ?? []), r]); }
+      const batches = [...groups.entries()].flatMap(([k, g]) => chunk(g, batch).map((b) => ({ k, b })));
+      const results = await Promise.all(batches.map(async ({ k, b }) => {
+        const own = k ? { ...ctx, topics: ctx.post_topics!.get(k) } : ctx;
+        const tool = k ? labelTool("comments", own) : commentTool;
         try {
           const { use } = await toolAnswer((req) => callModel(client, req), {
             model: modelId(),
             max_tokens: 8000,
             output_config: { effort: "low" },
-            system: [{ type: "text", text: commentSystem(ctx), cache_control: { type: "ephemeral" } }],
-            tools: [commentTool],
+            system: [{ type: "text", text: commentSystem(own), cache_control: { type: "ephemeral" } }],
+            tools: [tool],
             messages: [{ role: "user", content: commentBatchPrompt(subject, b) }],
-          }, commentTool.name);
-          return parseLabels(use?.input, b.map((r) => r.id), COMMENT_CLASSES, extra);
+          }, tool.name);
+          const parsed = parseLabels(use?.input, b.map((r) => r.id), COMMENT_CLASSES, k ? { ...extra, topics: own.topics?.map((t) => t.id) } : extra);
+          noteUnknown(parsed);
+          return parsed;
         } catch (e) {
           out.calls_failed += 1;
           out.last_error = (e as Error).message?.slice(0, 300);
@@ -152,13 +168,14 @@ export async function labelWorkspace(workspaceId: string, opts: LabelOptions = {
           `update comments c set sentiment = case when l.sentiment = 'off_topic' then 'neutral' else l.sentiment end,
                   off_topic = (l.sentiment = 'off_topic'),
                   sentiment_confidence = l.confidence, sentiment_source = 'model', classified_at = now(),
-                  topic_id = coalesce(l.topic, c.topic_id), topic_confidence = case when l.topic is not null then l.confidence else c.topic_confidence end,
+                  topic_id = case when l.aside is not null then l.aside else coalesce(l.topic, c.topic_id) end,
+                  topic_confidence = case when coalesce(l.aside, l.topic) is not null then l.confidence else c.topic_confidence end,
                   voice = coalesce(l.voice, c.voice)
-           from jsonb_to_recordset($1::jsonb) as l(id uuid, sentiment text, confidence numeric, topic text, voice text) where c.id = l.id and c.workspace_id = $2`,
+           from jsonb_to_recordset($1::jsonb) as l(id uuid, sentiment text, confidence numeric, topic text, voice text, aside text) where c.id = l.id and c.workspace_id = $2`,
           [toJson(labels), workspaceId],
         );
-        // each judgment also kept with its author: this model, and the instructions it ran with
-        await recordLabels(workspaceId, modelLabeller(modelId()), promptVersion(commentSystem(ctx)), labels.flatMap(commentLabelRows)).catch((e) => console.error("[labels]", (e as Error).message));
+        // each judgment also kept with its author: this model, and the instructions it ran with (a post's own topics are part of them)
+        await recordLabels(workspaceId, modelLabeller(modelId()), promptVersion(commentSystem(ctx) + (ctx.post_topics ? JSON.stringify([...ctx.post_topics]) : "")), labels.flatMap(commentLabelRows)).catch((e) => console.error("[labels]", (e as Error).message));
         out.comments_labelled += labels.length;
       }
       if (missing.length) {
@@ -182,7 +199,9 @@ export async function labelWorkspace(workspaceId: string, opts: LabelOptions = {
             tools: [postTool],
             messages: [{ role: "user", content: stanceBatchPrompt(b) }],
           }, postTool.name);
-          return parseLabels(use?.input, b.map((r) => r.id), ctx.post_off_topic ? [...SENTIMENTS, "off_topic"] : SENTIMENTS, extra);
+          const parsed = parseLabels(use?.input, b.map((r) => r.id), ctx.post_off_topic ? [...SENTIMENTS, "off_topic"] : SENTIMENTS, extra);
+          noteUnknown(parsed);
+          return parsed;
         } catch (e) {
           out.calls_failed += 1;
           out.last_error = (e as Error).message?.slice(0, 300);
@@ -199,9 +218,10 @@ export async function labelWorkspace(workspaceId: string, opts: LabelOptions = {
           `update posts p set stance = case when l.sentiment = 'off_topic' then null else l.sentiment end, stance_source = 'model',
                   relevant = case when l.sentiment = 'off_topic' then false else p.relevant end,
                   checked_by = case when l.sentiment = 'off_topic' then $3 else p.checked_by end,
-                  topic_id = coalesce(l.topic, p.topic_id), topic_confidence = case when l.topic is not null then l.confidence else p.topic_confidence end,
+                  topic_id = case when l.aside is not null then l.aside else coalesce(l.topic, p.topic_id) end,
+                  topic_confidence = case when coalesce(l.aside, l.topic) is not null then l.confidence else p.topic_confidence end,
                   voice = coalesce(l.voice, p.voice)
-           from jsonb_to_recordset($1::jsonb) as l(id uuid, sentiment text, confidence numeric, topic text, voice text) where p.id = l.id and p.workspace_id = $2`,
+           from jsonb_to_recordset($1::jsonb) as l(id uuid, sentiment text, confidence numeric, topic text, voice text, aside text) where p.id = l.id and p.workspace_id = $2`,
           [toJson(labels), workspaceId, modelLabeller(modelId())],
         );
         await recordLabels(workspaceId, modelLabeller(modelId()), promptVersion(stanceSystem(ctx)), labels.flatMap(postLabelRows)).catch((e) => console.error("[labels]", (e as Error).message));
@@ -242,17 +262,24 @@ export async function labelWorkspace(workspaceId: string, opts: LabelOptions = {
 
 /**
  * The workspace's labelling context: settings.label (about, context, languages, voices, post_off_topic)
- * and its topics, the catch-all last. A workspace without settings.label keeps the original prompts.
+ * and its topics, the catch-all last; topics of kind "aside" are the reasons a row is set aside, in their own order. A workspace without settings.label keeps the original prompts.
  */
 export async function labelContext(workspaceId: string, subject: string): Promise<LabelContext> {
   const rows = (await sql.query("select settings->'label' as label from workspaces where id = $1", [workspaceId])) as { label: Record<string, unknown> | null }[];
   const l = rows[0]?.label;
   if (!l || typeof l !== "object") return { subject };
   const str = (k: string) => (typeof l[k] === "string" && (l[k] as string).trim() ? (l[k] as string).trim() : undefined);
-  const topics = l.topics === false ? [] : ((await sql.query(
-    "select id, label, definition, is_catch_all as catch_all from topics where workspace_id = $1 and case_id is null order by is_catch_all, sort_order, label",
+  const all = l.topics === false ? [] : ((await sql.query(
+    "select id, label, definition, is_catch_all as catch_all, kind, tags from topics where workspace_id = $1 and case_id is null order by is_catch_all, sort_order, label",
     [workspaceId],
-  )) as LabelTopic[]);
+  )) as (LabelTopic & { kind: string; tags: string[] | null })[]);
+  // topics of kind "aside" are why a row is set aside, not what it is about; topics of kind "post" belong to one post
+  // (its url in tags): the comments under it are sorted into them and nothing else (Refal, 22 Oct 2026)
+  const strip = ({ kind: _k, tags: _t, ...t }: LabelTopic & { kind: string; tags: string[] | null }): LabelTopic => t;
+  const topics = all.filter((t) => t.kind !== "aside" && t.kind !== "post").map(strip);
+  const aside = all.filter((t) => t.kind === "aside").map(strip);
+  const postTopics = new Map<string, LabelTopic[]>();
+  for (const t of all.filter((x) => x.kind === "post" && x.tags?.[0])) postTopics.set(t.tags![0], [...(postTopics.get(t.tags![0]) ?? []), strip(t)]);
   const voices = Array.isArray(l.voices) ? (l.voices as unknown[]).filter((v): v is string => typeof v === "string" && /^[\w' -]{2,30}$/.test(v)) : [];
   return {
     subject: str("subject") ?? subject,
@@ -263,6 +290,9 @@ export async function labelContext(workspaceId: string, subject: string): Promis
     voices: voices.length ? voices : undefined,
     voice_hint: str("voice_hint"),
     post_off_topic: l.post_off_topic === true,
+    aside: aside.length ? aside : undefined,
+    // each post's own topics, the catch-all last (the query's order)
+    post_topics: postTopics.size ? postTopics : undefined,
   };
 }
 

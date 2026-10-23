@@ -28,7 +28,7 @@ export type CommentForLabel = {
 
 export type PostForLabel = { id: string; platform: string; handle: string | null; caption: string; url: string };
 
-export type Label = { id: string; sentiment: CommentClass; confidence: number; topic?: string; voice?: string };
+export type Label = { id: string; sentiment: CommentClass; confidence: number; topic?: string; voice?: string; /** why an off_topic row is set aside (a topic of kind "aside") */ aside?: string };
 
 /** A topic the labeller may put a row under (the workspace's `topics` rows); the catch-all takes what fits nowhere else. */
 export type LabelTopic = { id: string; label: string; definition: string | null; catch_all: boolean };
@@ -52,6 +52,13 @@ export type LabelContext = {
   voice_hint?: string;
   /** posts that are not about the subject or the case are set aside (relevant = false) rather than called neutral */
   post_off_topic?: boolean;
+  /**
+   * why a row is set aside (topics of kind "aside", e.g. "Other brands' boycott", "Irrelevant"; Refal, 22 Oct 2026):
+   * every off_topic post or comment names one, so what is left out can still be counted by reason
+   */
+  aside?: LabelTopic[];
+  /** topics that belong to one post (its url): the comments under it are put under them instead of the workspace's */
+  post_topics?: Map<string, LabelTopic[]>;
 };
 
 const ctxOf = (c: LabelContext | string): LabelContext => (typeof c === "string" ? { subject: c } : c);
@@ -61,7 +68,7 @@ const POST_CLASSES = [...SENTIMENTS, "off_topic"] as const;
 export function labelTool(kind: "comments" | "posts", c: LabelContext | string): Anthropic.Tool {
   const ctx = ctxOf(c);
   const base = kind === "comments" ? LABEL_COMMENTS_TOOL : LABEL_POSTS_TOOL;
-  if (!ctx.topics?.length && !ctx.voices?.length && !(kind === "posts" && ctx.post_off_topic)) return base;
+  if (!ctx.topics?.length && !ctx.voices?.length && !(kind === "posts" && ctx.post_off_topic) && !ctx.aside?.length) return base;
   const props: Record<string, unknown> = {
     id: { type: "string" },
     sentiment: { type: "string", enum: kind === "comments" ? [...COMMENT_CLASSES] : ctx.post_off_topic ? [...POST_CLASSES] : [...SENTIMENTS] },
@@ -70,6 +77,7 @@ export function labelTool(kind: "comments" | "posts", c: LabelContext | string):
   const required = ["id", "sentiment"];
   if (ctx.topics?.length) { props.topic = { type: "string", enum: ctx.topics.map((t) => t.id) }; required.push("topic"); }
   if (ctx.voices?.length) { props.voice = { type: "string", enum: [...ctx.voices, "unclear"] }; required.push("voice"); }
+  if (ctx.aside?.length && (kind === "comments" || ctx.post_off_topic)) props.aside = { type: "string", enum: ctx.aside.map((t) => t.id), description: "only when sentiment is off_topic: why it is set aside" };
   return { ...base, input_schema: { type: "object", properties: { labels: { type: "array", items: { type: "object", properties: props, required } } }, required: ["labels"] } };
 }
 
@@ -80,6 +88,10 @@ function contextLines(ctx: LabelContext, what: "comment" | "post"): string[] {
   if (ctx.topics?.length) {
     out.push("", `Also put each ${what} under exactly one topic (use the topic id):`);
     for (const t of ctx.topics) out.push(`- ${t.id}: ${t.label}${t.definition ? `: ${t.definition}` : ""}${t.catch_all ? " (anything that fits no other topic, including off-topic)" : ""}`);
+  }
+  if (ctx.aside?.length && (what === "comment" || ctx.post_off_topic)) {
+    out.push("", `When a ${what} is off_topic, also say why it is set aside, with aside (use the id; the last one takes whatever fits no other):`);
+    for (const t of ctx.aside) out.push(`- ${t.id}: ${t.label}${t.definition ? `: ${t.definition}` : ""}`);
   }
   if (ctx.voices?.length) {
     out.push("", `Also say which community the author speaks as: ${ctx.voices.join(", ")}, or unclear. ${ctx.voice_hint ?? "Judge from the language, the flag or country they name, and how they refer to the countries involved."} Use unclear when you cannot tell; never guess from a name alone.`);
@@ -207,25 +219,43 @@ export function stanceBatchPrompt(posts: PostForLabel[]): string {
 }
 
 /** Keep only well-formed labels for ids we asked about; one per id. */
-export function parseLabels(input: unknown, wanted: Iterable<string>, allow: readonly string[] = COMMENT_CLASSES, extra: { topics?: string[]; voices?: string[] } = {}): { labels: Label[]; missing: string[] } {
+/** An id from the list, also when the model gave it without the workspace's prefix ("apology-respect" for
+ *  "kahf-daily:apology-respect") or gave the topic's name instead (names: lower-cased name → id). */
+function known(list: string[] | undefined, v: unknown, names?: Record<string, string>): string | undefined {
+  const s = String(v ?? "").trim();
+  if (!list?.length || !s) return undefined;
+  if (list.includes(s)) return s;
+  const bare = list.filter((id) => id.slice(id.indexOf(":") + 1) === s);
+  if (bare.length === 1) return bare[0];
+  const named = names?.[s.toLowerCase()];
+  return named && list.includes(named) ? named : undefined;
+}
+
+export function parseLabels(input: unknown, wanted: Iterable<string>, allow: readonly string[] = COMMENT_CLASSES, extra: { topics?: string[]; voices?: string[]; aside?: string[]; names?: Record<string, string> } = {}): { labels: Label[]; missing: string[]; unknown?: string[] } {
   const ids = new Set(wanted);
   const out = new Map<string, Label>();
+  const unknown = new Set<string>();
   const raw = (input as { labels?: unknown })?.labels;
   if (Array.isArray(raw)) {
     for (const item of raw) {
       if (!item || typeof item !== "object") continue;
-      const { id, sentiment, confidence, topic, voice } = item as { id?: unknown; sentiment?: unknown; confidence?: unknown; topic?: unknown; voice?: unknown };
+      const { id, sentiment, confidence, topic, voice, aside } = item as { id?: unknown; sentiment?: unknown; confidence?: unknown; topic?: unknown; voice?: unknown; aside?: unknown };
       const sid = String(id ?? "");
       const s = String(sentiment ?? "").toLowerCase().replace(/[\s-]/g, "_") as Sentiment;
       if (!ids.has(sid) || !allow.includes(s) || out.has(sid)) continue;
       const c = typeof confidence === "number" && Number.isFinite(confidence) ? Math.min(1, Math.max(0, confidence)) : 0.5;
       const label: Label = { id: sid, sentiment: s, confidence: Math.round(c * 100) / 100 };
       // a topic or voice outside the workspace's list is dropped, not the label: sentiment still counts
-      if (extra.topics?.includes(String(topic))) label.topic = String(topic);
+      const t = known(extra.topics, topic, extra.names);
+      if (t) label.topic = t;
+      else if (extra.topics?.length && topic != null && String(topic).trim()) unknown.add(String(topic).slice(0, 60));
       if (extra.voices && [...extra.voices, "unclear"].includes(String(voice))) label.voice = String(voice);
+      // a reason only for what is set aside; an off_topic row without a known one falls to the last reason (the catch-all)
+      if (extra.aside?.length && (s as string) === "off_topic") label.aside = known(extra.aside, aside, extra.names) ?? extra.aside[extra.aside.length - 1];
       out.set(sid, label);
     }
   }
   const missing = [...ids].filter((i) => !out.has(i));
-  return { labels: [...out.values()], missing };
+  // topics the model gave that are on no list: logged by the labeller, so a batch that loses its topics says why
+  return { labels: [...out.values()], missing, ...(unknown.size ? { unknown: [...unknown] } : {}) };
 }
