@@ -204,6 +204,22 @@ export function IconPlus(p: P) {
   return <Svg {...p} view="0 0 24 24"><path d="M12 5v14M5 12h14" {...stroke} /></Svg>;
 }
 
+/** the agency dashboard's calendar (new-agency-dashboard/src/components/icons/icon-calendar.tsx) */
+export function IconCalendar(p: P) {
+  return (
+    <Svg {...p} view="0 0 20 20">
+      <path d="M13.9583 2.96699V1.66699C13.9583 1.32533 13.675 1.04199 13.3333 1.04199C12.9917 1.04199 12.7083 1.32533 12.7083 1.66699V2.91699H7.29165V1.66699C7.29165 1.32533 7.00832 1.04199 6.66665 1.04199C6.32499 1.04199 6.04165 1.32533 6.04165 1.66699V2.96699C3.79165 3.17532 2.69999 4.51699 2.53332 6.50866C2.51665 6.75032 2.71665 6.95032 2.94999 6.95032H17.05C17.2917 6.95032 17.4917 6.74199 17.4667 6.50866C17.3 4.51699 16.2083 3.17532 13.9583 2.96699Z" fill="currentColor" />
+      <path opacity="0.4" d="M16.6667 8.2002C17.125 8.2002 17.5 8.5752 17.5 9.03353V14.1669C17.5 16.6669 16.25 18.3335 13.3333 18.3335H6.66667C3.75 18.3335 2.5 16.6669 2.5 14.1669V9.03353C2.5 8.5752 2.875 8.2002 3.33333 8.2002H16.6667Z" fill="currentColor" />
+      <circle cx="7.08" cy="11.67" r="0.83" fill="currentColor" />
+      <circle cx="10" cy="11.67" r="0.83" fill="currentColor" />
+      <circle cx="12.92" cy="11.67" r="0.83" fill="currentColor" />
+      <circle cx="7.08" cy="14.58" r="0.83" fill="currentColor" />
+      <circle cx="10" cy="14.58" r="0.83" fill="currentColor" />
+      <circle cx="12.92" cy="14.58" r="0.83" fill="currentColor" />
+    </Svg>
+  );
+}
+
 export function IconDownload(p: P) {
   return <Svg {...p} view="0 0 24 24"><path d="M12 4v11M7.5 10.5L12 15l4.5-4.5M5 19.5h14" {...stroke} /></Svg>;
 }

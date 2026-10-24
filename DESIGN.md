@@ -174,7 +174,7 @@ Most things sit flat on a border. Shadow marks something that floats.
 ## 4. Icons
 
 - First choice: **Fair's two-tone icons** in `src/ui/kit/icons.tsx`. Each is one shape at `opacity="0.4"` under one solid shape, both `fill="currentColor"`, drawn on a 16, 20 or 24 viewBox, rendered by the internal `Svg` helper (`block shrink-0`, `aria-hidden`).
-  Available: `IconChart`, `IconDocument`, `IconMessages`, `IconBriefcase`, `IconFolderFavorite`, `IconPlug`, `IconPeople`, `IconSetting`, `IconDocumentCloud`, `IconEye`, `IconEyeSlash`, `IconSignOut`, `IconNotification`, `IconProfile2User`, `IconLikeShapes`.
+  Available: `IconCalendar`, `IconChart`, `IconDocument`, `IconMessages`, `IconBriefcase`, `IconFolderFavorite`, `IconPlug`, `IconPeople`, `IconSetting`, `IconDocumentCloud`, `IconEye`, `IconEyeSlash`, `IconSignOut`, `IconNotification`, `IconProfile2User`, `IconLikeShapes`.
 - System glyphs, stroked 2px round: `IconMenu`, `IconClose`, `IconChevronLeft/Right/Down`, `IconCheck`, `IconSearch`, `IconPlus`, `IconDownload`; `IconMore` is three filled dots.
 - Team icons always through `<RoleIcon role="pr|brand_kol|social" />` (bell, two people, like-badge), so the picker and the sidebar never disagree.
 - **Adding an icon:** add a function to `icons.tsx` in the same two-tone manner (a 40% background shape, a solid foreground shape). No icon library imports (no `lucide-react`), no emoji, no generic "AI" sparkles.
@@ -255,6 +255,13 @@ Tailwind defaults: `sm` 640, `md` 768 (sidebar becomes a drawer below it), `lg` 
 - Options are `{ value, label, disabled?, group? }`. A `disabled` option shows but cannot be picked, and the arrows skip it. A run of options with the same `group` gets a small heading (what an `<optgroup>` was, such as "Months" and "Weeks"). Values are strings: map numbers with `String()` in and `Number()` out.
 - Name it with `label` (shown above it) or `ariaLabel` (no visible label: a filter row, a table cell, a `Field`). Inside a `Field`, pass `group` to the `Field`, because a `<label>` around the button would open it on a click on the label's text.
 - Width: full width by default. In a row of filters or a table cell, set `className="w-auto min-w-48"` (or the width the longest option needs). `placeholder` is shown while no option matches the value, such as "choose…" or "→ brand".
+
+**`DateInput`** (`DateInput.tsx`): the agency dashboard's date field, and **every date field uses it; never `<input type="date">`**.
+- Props: `{ value: "YYYY-MM-DD" | "", onChange, min?, max?, label?, ariaLabel?, size?: "sm" | "md", disabled?, error?, className? }`. `min` and `max` are `YYYY-MM-DD` strings.
+- Typing is masked to `DD/MM/YYYY`: a day above 31 or a month above 12 is refused. The parent hears a value only when it is a real date inside the bounds, and leaving the field with half or an impossible date clears it.
+- The calendar icon (`IconCalendar`) opens a month calendar portalled with `data-dropdown-portal` (`z-[60]`). It flips up when there is no room below. Weeks start on Sunday. The selected day is `bg-primary text-white`; today has a thin brand ring; days outside the bounds are disabled.
+- Keyboard: ArrowDown in the field opens the calendar, and focus moves to the selected day. Arrows move a day or a week, across months, and stop at the bounds. Enter picks, and Escape closes and returns focus to the field.
+- Sizes: `sm` matches `TextField` (40px, 44px on phones), `md` matches `TextInput` (52px). Inside a legacy `<label>` caption, use a `div` instead, so a click on the caption does not open the calendar.
 
 **`Field`, `TextField`, `Chip`** (`Form.tsx`): compact filter forms. `Field` puts a bold `text-xs` label and an optional hint above its control; pass `group` when it holds several controls (chips, min/max pair, multi-select, a `SelectInput`) so it renders a labelled group instead of a `<label>`. Inputs are `h-10 rounded-xl`. `Chip` is a toggle (`aria-pressed`), `on` = `bg-brand-palette-50 border-brand-palette-300 text-brand-palette-700`.
 
@@ -428,6 +435,7 @@ Spinners run only while work is running. Nothing pulses, floats or loops for dec
 - Add a global header bar, a `max-w` page container, gradients as decoration, glows, coloured shadows, blurred blobs, decorative status dots, or pill badges above headings.
 - Add `dark:` variants, an icon library, or emoji.
 - Use a native `<select>`; a choice from a list is a `SelectInput` with `withSearch`.
+- Use `<input type="date">`; a date is a `DateInput`.
 - Use `h-screen`, `overflow-hidden` on root containers, or `<div onClick>`.
 
 ---

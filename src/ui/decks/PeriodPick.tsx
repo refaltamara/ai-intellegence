@@ -7,7 +7,7 @@
  * (6 to 8 Oct) is one click away, not the last line of a list.
  */
 import { useState } from "react";
-import { TextField } from "../kit/Form";
+import { DateInput } from "../kit/DateInput";
 import { SelectInput } from "../kit/SelectInput";
 import { Segmented } from "../kit/Segmented";
 
@@ -59,15 +59,15 @@ export function PeriodPick({ periods, value, onChange, range, day, replaced }: {
       )}
       {range && mode === DAY && (
         <span className="flex flex-wrap items-center gap-2 text-xs text-gray-500">
-          <TextField type="date" className="w-40" value={one} {...bounds} onChange={(e) => { setOne(e.target.value); onChange(e.target.value); }} aria-label="Day" />
+          <DateInput className="w-40" value={one} {...bounds} onChange={(v) => { setOne(v); onChange(v); }} ariaLabel="Day" />
           {replaced?.(one) && <span>(replace)</span>}
         </span>
       )}
       {range && mode === RANGE && (
         <span className="flex flex-wrap items-center gap-2 text-xs text-gray-500">
-          <TextField type="date" className="w-40" value={from} {...bounds} onChange={(e) => { setFrom(e.target.value); set(e.target.value, to); }} aria-label="From" />
+          <DateInput className="w-40" value={from} {...bounds} onChange={(v) => { setFrom(v); set(v, to); }} ariaLabel="From" />
           <span>to</span>
-          <TextField type="date" className="w-40" value={to} {...bounds} onChange={(e) => { setTo(e.target.value); set(from, e.target.value); }} aria-label="To" />
+          <DateInput className="w-40" value={to} {...bounds} onChange={(v) => { setTo(v); set(from, v); }} ariaLabel="To" />
           {n > 0 && <span>{n} day{n === 1 ? "" : "s"}{day && n > 1 ? ", day by day" : ""}</span>}
         </span>
       )}

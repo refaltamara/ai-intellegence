@@ -13,6 +13,7 @@ import { cn } from "../cn";
 import { Button } from "../kit/Button";
 import { Chip, Field, TextField } from "../kit/Form";
 import { SelectInput } from "../kit/SelectInput";
+import { DateInput } from "../kit/DateInput";
 import { IconCheck } from "../kit/icons";
 import { Segmented } from "../kit/Segmented";
 import { Spinner } from "../kit/Spinner";
@@ -340,9 +341,10 @@ export function DeckForm({ options, initial, prefill }: { options: DeckOptions; 
             hint={`${grain === "day" ? "Each morning at 07:00 WIB, for the day before, once its data has landed" : `When a new ${grain} of data lands`}${/\.\./.test(period) ? `; the days you chose make the first version, then one ${grain} each` : ""}.`} />
           {recurring && (
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 pl-13">
-              <label className="flex items-center gap-2 text-xs font-semibold text-gray-700">Until
-                <TextField type="date" className="w-44" value={until} min={options.data_through} onChange={(e) => setUntil(e.target.value)} aria-label="The last day this deck covers" />
-              </label>
+              {/* a div, not a label: a label would hand a click on "Until" to the calendar button */}
+              <div className="flex items-center gap-2 text-xs font-semibold text-gray-700">Until
+                <DateInput className="w-44" value={until} min={options.data_through.slice(0, 10)} onChange={setUntil} ariaLabel="The last day this deck covers" />
+              </div>
               <small className="text-xs text-gray-500">{until ? "then it stops, and the Decks list shows it as ended" : "empty: until you stop it from the Decks list"}</small>
             </div>
           )}

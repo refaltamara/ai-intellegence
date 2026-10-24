@@ -12,7 +12,7 @@ import type { DeckState } from "@/decks/status";
 import { cn } from "../cn";
 import { ActionMenu, type ActionItem } from "../kit/ActionMenu";
 import { Button } from "../kit/Button";
-import { TextField } from "../kit/Form";
+import { DateInput } from "../kit/DateInput";
 import { ConfirmDialog } from "../kit/Modal";
 import { Segmented } from "../kit/Segmented";
 import { StatusPill, type PillTone } from "../kit/StatusPill";
@@ -128,7 +128,7 @@ export function DeckList({ decks, today }: { decks: DeckItem[]; today: string })
               <td className={cn(TD, "w-0")}>
                 {until?.id === d.id ? (
                   <span className="flex items-center gap-2">
-                    <TextField type="date" className="w-40" value={until.value} min={today} onChange={(e) => setUntil({ id: d.id, value: e.target.value })} aria-label={`Last day for ${d.name}`} />
+                    <DateInput className="w-40" value={until.value} min={today} onChange={(v) => setUntil({ id: d.id, value: v })} ariaLabel={`Last day for ${d.name}`} />
                     <Button size="sm" isLoading={busy === d.id} onClick={() => patch(d, { ends_on: until.value || null }, "set the date")}>Save</Button>
                     <Button size="sm" variant="ghost" onClick={() => setUntil(null)}>Cancel</Button>
                   </span>

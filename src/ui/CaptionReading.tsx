@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { fmtNum } from "./format";
+import { DateInput } from "./kit/DateInput";
 
 const day = (d: string) => new Date(`${d}T00:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
 
@@ -29,7 +30,7 @@ export function CaptionReading({ status, canEdit }: { status: { enabled: boolean
       <small>
         Powers the Campaigns and launches and Products and angles slides
         {canEdit && <> · <button className="linkbtn" style={{ border: 0, background: "none", padding: 0, cursor: "pointer", font: "inherit" }} disabled={busy} onClick={() => save({ enabled: !status.enabled })}>{status.enabled ? "Switch off" : "Switch on"}</button></>}
-        {canEdit && <> · read from <input type="date" defaultValue={status.since ?? ""} disabled={busy} onChange={(e) => save({ since: e.target.value || null })} style={{ font: "inherit", fontSize: 12, border: "1px solid var(--line)", borderRadius: 6, padding: "1px 4px" }} /> <span style={{ color: "var(--text-3)" }}>(empty = all)</span></>}
+        {canEdit && <> · read from <DateInput className="inline-flex w-40 align-middle" ariaLabel="Read captions from" value={status.since ?? ""} disabled={busy} onChange={(v) => save({ since: v || null })} /> <span style={{ color: "var(--text-3)" }}>(empty = all)</span></>}
         {msg && <> · {msg}</>}
       </small>
     </div>

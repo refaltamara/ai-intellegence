@@ -5,6 +5,7 @@
  */
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { DateInput } from "../../kit/DateInput";
 
 export type CaseView = {
   id: string; name: string; about: string | null; starts_on: string; ends_on: string | null; terms: string[]; platforms: string[] | null;
@@ -70,8 +71,9 @@ export function CasesEditor({ ws, me, cases, canManage }: { ws: string; me: stri
           <div className="grid2">
             <label className="wf"><span>Name</span><input value={edit.name} onChange={(e) => setEdit({ ...edit, name: e.target.value })} placeholder="Boycott, October 2026" /></label>
             <label className="wf"><span>Scraper request behind it</span><input value={edit.scraper_request ?? ""} onChange={(e) => setEdit({ ...edit, scraper_request: e.target.value })} placeholder="The request's name or link" /></label>
-            <label className="wf"><span>Starts</span><input type="date" value={edit.starts_on} onChange={(e) => setEdit({ ...edit, starts_on: e.target.value })} /></label>
-            <label className="wf"><span>Ends (empty while it runs on)</span><input type="date" value={edit.ends_on ?? ""} onChange={(e) => setEdit({ ...edit, ends_on: e.target.value || null })} /></label>
+            {/* divs, not labels: a label would hand a click on its text to the calendar button */}
+            <div className="wf"><span>Starts</span><DateInput ariaLabel="Starts" value={edit.starts_on} onChange={(v) => setEdit({ ...edit, starts_on: v })} /></div>
+            <div className="wf"><span>Ends (empty while it runs on)</span><DateInput ariaLabel="Ends" min={edit.starts_on || undefined} value={edit.ends_on ?? ""} onChange={(v) => setEdit({ ...edit, ends_on: v || null })} /></div>
           </div>
           <label className="wf"><span>What it is about</span><textarea rows={2} value={edit.about ?? ""} onChange={(e) => setEdit({ ...edit, about: e.target.value })} placeholder="What happened and what the case watches, in a sentence or two" /></label>
           <div className="grid2">
