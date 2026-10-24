@@ -1,23 +1,29 @@
 import type { ComponentType, ReactNode } from "react";
 import { cn } from "../cn";
+import { InfoTip } from "./InfoTip";
 
 /**
  * The stat card (DESIGN.md 6.2), drawn like the agency dashboard's StatCard: the label and one big orange number
  * on the left, the metric's icon in an orange tile on the right; under them how it moved against a named period
- * and a line that says what the number counts. Numbers come from the data layer; the tile only lays them out.
+ * and one short line that says what the number counts, its full sentence behind an ⓘ beside the label (`about`).
+ * Numbers come from the data layer; the tile only lays them out.
  */
-export function StatTile({ label, value, delta, sub, action, icon: Icon, className }: { label: ReactNode; value: ReactNode; delta?: ReactNode; sub?: ReactNode; action?: ReactNode; icon?: ComponentType<{ size?: number }>; className?: string }) {
+export function StatTile({ label, value, delta, sub, about, action, icon: Icon, className }: { label: ReactNode; value: ReactNode; delta?: ReactNode; sub?: ReactNode; about?: ReactNode; action?: ReactNode; icon?: ComponentType<{ size?: number }>; className?: string }) {
   return (
     <div className={cn("flex min-w-0 flex-col gap-2 rounded-3xl border border-card-border bg-white p-5", className)}>
       <div className="flex min-w-0 items-start justify-between gap-4">
         <div className="flex min-w-0 flex-col gap-2">
-          <span title={typeof label === "string" ? label : undefined} className="truncate text-sm font-medium text-gray-500">{label}</span>
+          <span className="flex min-w-0 items-center gap-1.5">
+            <span title={typeof label === "string" ? label : undefined} className="truncate text-sm font-medium text-gray-500">{label}</span>
+            {about && <InfoTip label={`About ${typeof label === "string" ? label.toLowerCase() : "this number"}`}>{about}</InfoTip>}
+          </span>
           <b className="truncate text-3xl font-bold leading-tight tabular-nums text-brand-palette-500">{value}</b>
         </div>
         {Icon && <span className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-brand-palette-100 text-brand-palette-600"><Icon size={24} /></span>}
       </div>
       {delta}
-      {sub && <span title={typeof sub === "string" ? sub : undefined} className="line-clamp-2 text-pretty text-xs leading-relaxed text-gray-500">{sub}</span>}
+      {/* one line on every tile so a row stays even; the full sentence sits behind the ⓘ (`about`) */}
+      {sub && <span title={typeof sub === "string" ? sub : undefined} className="truncate text-xs leading-relaxed text-gray-500">{sub}</span>}
       {action && <span className="mt-auto pt-1">{action}</span>}
     </div>
   );

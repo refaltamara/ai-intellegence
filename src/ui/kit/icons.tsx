@@ -223,3 +223,13 @@ export function IconCalendar(p: P) {
 export function IconDownload(p: P) {
   return <Svg {...p} view="0 0 24 24"><path d="M12 4v11M7.5 10.5L12 15l4.5-4.5M5 19.5h14" {...stroke} /></Svg>;
 }
+
+export function IconInfo(p: P) {
+  return (
+    <Svg {...p} view="0 0 16 16">
+      <circle opacity="0.4" cx="8" cy="8" r="6.667" fill="currentColor" />
+      <path d="M8 11.5a.6.6 0 0 1-.6-.6V7.4a.6.6 0 1 1 1.2 0v3.5a.6.6 0 0 1-.6.6Z" fill="currentColor" />
+      <circle cx="8" cy="5.3" r="0.75" fill="currentColor" />
+    </Svg>
+  );
+}

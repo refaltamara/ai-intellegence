@@ -141,14 +141,15 @@ export function Dashboard({ d, content, cq, view }: { d: DashboardData; content:
   const names = new Map(d.options.brands.map((b) => [b.id, b.name]));
   const prev = f.prev.short;
   const k = d.kpis;
-  const engNote = d.engagement_basis === "likes_comments" ? "Likes + comments, the measure every platform shares" : "Platform-native engagement";
+  const engNote = d.engagement_basis === "likes_comments" ? "Likes + comments" : "Platform-native engagement";
+  const engAbout = d.engagement_basis === "likes_comments" ? "Likes and comments, the measure every platform shares." : "Engagement as each platform counts it.";
   const contentHref = (extra: Record<string, string | number | undefined>) => `/dashboard?${filterQuery(f, { sort: cq.sort === "views" ? undefined : cq.sort, q: cq.q || undefined, ...extra })}#content`;
   const pages = Math.ceil(content.total / CONTENT_PAGE);
-  const tiles: { key: "posts" | "views" | "engagements" | "er"; label: string; value: string; sub: string }[] = [
+  const tiles: { key: "posts" | "views" | "engagements" | "er"; label: string; value: string; sub: string; about?: string }[] = [
     { key: "posts", label: "Total content", value: int(k.now.posts), sub: `${int(k.now.creators)} creators` },
-    { key: "views", label: k.now.so_far ? "Views (day 7, so far)" : "Views (day 7)", value: compact(k.now.views), sub: `Latest ${compact(k.now.views_latest)}${k.now.so_far ? ` · ${int(k.now.so_far)} posts under 7 days, counted so far` : ""} · ${compact(k.now.comments)} comments` },
-    { key: "engagements", label: "Engagement", value: compact(k.now.engagements), sub: engNote },
-    { key: "er", label: "Engagement rate", value: pct(k.now.er, 2), sub: "Engagement ÷ views at day 7, posts with views" },
+    { key: "views", label: k.now.so_far ? "Views (day 7, so far)" : "Views (day 7)", value: compact(k.now.views), sub: `Latest ${compact(k.now.views_latest)} · ${compact(k.now.comments)} comments`, about: `Views at day 7 after posting; ${compact(k.now.views_latest)} at the latest reading.${k.now.so_far ? ` ${int(k.now.so_far)} posts are under 7 days old and count their views so far.` : ""} ${compact(k.now.comments)} comments.` },
+    { key: "engagements", label: "Engagement", value: compact(k.now.engagements), sub: engNote, about: engAbout },
+    { key: "er", label: "Engagement rate", value: pct(k.now.er, 2), sub: "Engagement ÷ day-7 views", about: "Engagement divided by views at day 7, over posts that report views." },
   ];
   const deck = (slide: "scoreboard" | "tiers" | "trend" | "creators" | "content") => <AddToDeck payload={{ slide, brands: pin.brands, grain: f.period.grain }} />;
   const pageLink = (on: boolean, href: string, label: string) => on ? <Link className={buttonClass("outline", "sm")} href={href} scroll={false}>{label}</Link> : <span aria-disabled="true" className={buttonClass("outline", "sm", "pointer-events-none opacity-50")}>{label}</span>;
@@ -232,7 +233,7 @@ export function Dashboard({ d, content, cq, view }: { d: DashboardData; content:
 
       <StatRow n={4}>
         {tiles.map((t) => (
-          <StatTile key={t.key} icon={TILE_ICON[t.key]} label={t.label} value={t.value} delta={<Delta c={k.change[t.key]} prevLabel={prev} points={t.key === "er"} />} sub={t.sub}
+          <StatTile key={t.key} icon={TILE_ICON[t.key]} label={t.label} value={t.value} delta={<Delta c={k.change[t.key]} prevLabel={prev} points={t.key === "er"} />} sub={t.sub} about={t.about}
             action={<AskLink href={askHref({ ...base, k: "kpi", metric: t.key })} label={`Ask why about ${t.label.toLowerCase()}`} />} />
         ))}
       </StatRow>

@@ -79,11 +79,11 @@ export function SocialDashboard({ d, client, view }: { d: SocialData; client: st
   const ok = d.comparable;
   const weeks = Math.max(1, f.days / 7);
   const tiles = [
-    { key: "posts", label: "Posts", value: int(k.posts.now ?? 0), delta: <Delta k={k.posts} kind="count" ok={ok} />, sub: `${((k.posts.now ?? 0) / weeks).toFixed(1)} a week from own accounts` },
-    { key: "eng", label: "Engagement", value: compact(k.engagements.now), delta: <Delta k={k.engagements} kind="count" ok={ok} />, sub: "Likes, comments, shares and saves as each platform counts them" },
+    { key: "posts", label: "Posts", value: int(k.posts.now ?? 0), delta: <Delta k={k.posts} kind="count" ok={ok} />, sub: `${((k.posts.now ?? 0) / weeks).toFixed(1)} a week`, about: `Posts from own accounts, ${((k.posts.now ?? 0) / weeks).toFixed(1)} a week on average.` },
+    { key: "eng", label: "Engagement", value: compact(k.engagements.now), delta: <Delta k={k.engagements} kind="count" ok={ok} />, sub: "Likes, comments, shares, saves", about: "Likes, comments, shares and saves as each platform counts them." },
     { key: "med", label: "Typical post", value: k.median_eng.now == null ? "–" : int(k.median_eng.now), delta: <Delta k={k.median_eng} kind="count" ok={ok} />, sub: "Median engagement per post" },
-    { key: "views", label: "Typical video views", value: compact(k.video_views.now), delta: <Delta k={k.video_views} kind="count" ok={ok} />, sub: "Median, where the platform reports views" },
-    { key: "neg", label: "Negative comments", value: pct(k.neg_pct.now), delta: <Delta k={k.neg_pct} kind="pct" ok={ok} good="down" />, sub: `${int(k.comments.now ?? 0)} comments under these posts` },
+    { key: "views", label: "Typical video views", value: compact(k.video_views.now), delta: <Delta k={k.video_views} kind="count" ok={ok} />, sub: "Median, where reported", about: "Median views per video, where the platform reports views." },
+    { key: "neg", label: "Negative comments", value: pct(k.neg_pct.now), delta: <Delta k={k.neg_pct} kind="pct" ok={ok} good="down" />, sub: `Of ${int(k.comments.now ?? 0)} comments`, about: `Share of the ${int(k.comments.now ?? 0)} comments under these posts that are negative.` },
     { key: "reply", label: "Reply rate", value: pct(k.reply_rate.now), delta: <Delta k={k.reply_rate} kind="pct" ok={ok} />, sub: "Brand replies per comment" },
   ];
   const maxEng = Math.max(1, ...d.timing.map((t) => t.median_eng ?? 0));
@@ -205,7 +205,7 @@ export function SocialDashboard({ d, client, view }: { d: SocialData; client: st
       <Notes lines={d.notes} />
 
       <StatRow n={6}>
-        {tiles.map((t) => <StatTile key={t.key} icon={TILE_ICON[t.key]} label={t.label} value={t.value} delta={t.delta} sub={t.sub} />)}
+        {tiles.map((t) => <StatTile key={t.key} icon={TILE_ICON[t.key]} label={t.label} value={t.value} delta={t.delta} sub={t.sub} about={"about" in t ? t.about : undefined} />)}
       </StatRow>
 
       {view.builder && view.scope && <PanelAsk scope={view.scope} />}

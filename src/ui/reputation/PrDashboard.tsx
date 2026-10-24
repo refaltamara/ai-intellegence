@@ -80,17 +80,17 @@ export function PrDashboard({ d, client, view, hide = [] }: { d: PrDashboardData
   const since = noPrev ? <DeltaText dir="none">Tracked since {dayMonth(d.tracked_since!)}</DeltaText> : null;
   // around one subject: the posts and the comments each get their own tiles, so it is clear which is which
   const caseTiles: typeof tilesBase = [
-    { key: "mentions", label: "Posts about " + who, value: int(k.mentions.now ?? 0), delta: since ?? <Delta k={k.mentions} kind="count" />, sub: `${int(P.labelled)} by other accounts carry a stance` },
-    { key: "against", label: "Posts against", value: pct(shareK(P, "negative")), delta: since ?? <Delta k={{ now: shareK(P, "negative"), prev: shareK(cv.prev.posts, "negative") }} kind="pct" good="down" />, sub: `${int(P.negative)} posts; ${int(P.positive)} defending ${who}` },
-    { key: "comments", label: "Comments", value: int(Cm.n), delta: since ?? <Delta k={{ now: Cm.n, prev: cv.prev.comments.n }} kind="count" />, sub: [Cm.n > Cm.labelled ? `${int(Cm.n - Cm.labelled)} not read yet` : null, other ? `${int(other)} more in these threads are about something else` : d.per_comment ? null : "under those posts; off-topic left out"].filter(Boolean).join(" · ") || `about ${who}` },
-    { key: "neg", label: "Comments negative", value: pct(shareK(Cm, "negative")), delta: since ?? <Delta k={{ now: shareK(Cm, "negative"), prev: shareK(cv.prev.comments, "negative") }} kind="pct" good="down" />, sub: `${int(Cm.negative)} comments; ${int(Cm.positive)} defending ${who}` },
+    { key: "mentions", label: "Posts about " + who, value: int(k.mentions.now ?? 0), delta: since ?? <Delta k={k.mentions} kind="count" />, sub: `${int(P.labelled)} with a stance`, about: `${int(P.labelled)} posts by other accounts carry a stance.` },
+    { key: "against", label: "Posts against", value: pct(shareK(P, "negative")), delta: since ?? <Delta k={{ now: shareK(P, "negative"), prev: shareK(cv.prev.posts, "negative") }} kind="pct" good="down" />, sub: `${int(P.negative)} against · ${int(P.positive)} defending`, about: `${int(P.negative)} posts against ${who}; ${int(P.positive)} defending.` },
+    { key: "comments", label: "Comments", value: int(Cm.n), delta: since ?? <Delta k={{ now: Cm.n, prev: cv.prev.comments.n }} kind="count" />, sub: Cm.n > Cm.labelled ? `${int(Cm.n - Cm.labelled)} not read yet` : other ? `${int(other)} about something else` : `About ${who}`, about: [`Comments about ${who}.`, Cm.n > Cm.labelled ? `${int(Cm.n - Cm.labelled)} are not read yet.` : null, other ? `${int(other)} more in these threads are about something else and are left out.` : d.per_comment ? null : "Counted under those posts; off-topic comments are left out."].filter(Boolean).join(" ") },
+    { key: "neg", label: "Comments negative", value: pct(shareK(Cm, "negative")), delta: since ?? <Delta k={{ now: shareK(Cm, "negative"), prev: shareK(cv.prev.comments, "negative") }} kind="pct" good="down" />, sub: `${int(Cm.negative)} negative · ${int(Cm.positive)} defending`, about: `${int(Cm.negative)} comments negative; ${int(Cm.positive)} defending ${who}.` },
   ];
-  const tilesBase: { key: string; label: string; value: string; delta: React.ReactNode; sub: string }[] = [
+  const tilesBase: { key: string; label: string; value: string; delta: React.ReactNode; sub: string; about?: string }[] = [
     { key: "mentions", label: "Mentions", value: int(k.mentions.now ?? 0), delta: <Delta k={k.mentions} kind="count" />, sub: `Posts about ${who}` },
     { key: "reach", label: "Reach", value: k.reach.now == null ? "–" : compact(k.reach.now), delta: k.reach.now == null ? <DeltaText dir="none">Not reported</DeltaText> : <Delta k={k.reach} kind="count" />, sub: k.reach.now == null ? "These platforms report no views" : "Views of those posts" },
-    { key: "comments", label: withPosts ? "Posts and comments" : "Comments", value: int(k.comments.now ?? 0), delta: <Delta k={k.comments} kind="count" />, sub: withPosts ? `${int(d.voice_posts)} posts with a stance, and the comments under them; ${who}'s own replies left out` : "Under those posts; brand replies left out" },
-    { key: "neg", label: "Negative", value: pct(k.neg_pct.now), delta: <Delta k={k.neg_pct} kind="pct" good="down" />, sub: `Share of labelled ${said}` },
-    { key: "intent", label: "Purchase intent", value: pct(k.intent_pct.now), delta: <Delta k={k.intent_pct} kind="pct" />, sub: "Comments that want to buy or sign up" },
+    { key: "comments", label: withPosts ? "Posts and comments" : "Comments", value: int(k.comments.now ?? 0), delta: <Delta k={k.comments} kind="count" />, sub: withPosts ? `${int(d.voice_posts)} posts with a stance, plus comments` : "Brand replies left out", about: withPosts ? `${int(d.voice_posts)} posts with a stance, and the comments under them; ${who}'s own replies are left out.` : "Comments under those posts; the brand's own replies are left out." },
+    { key: "neg", label: "Negative", value: pct(k.neg_pct.now), delta: <Delta k={k.neg_pct} kind="pct" good="down" />, sub: `Share of labelled ${said}`, about: `Share of the ${said} the labeller has read that are negative.` },
+    { key: "intent", label: "Purchase intent", value: pct(k.intent_pct.now), delta: <Delta k={k.intent_pct} kind="pct" />, sub: "Ready to buy or sign up", about: "Share of comments that want to buy or sign up." },
   ];
   const extra = tilesBase.filter((t) => ["reach", "intent"].includes(t.key));
   // a case workspace leaves out what does not apply (settings.pr.hide: status, reach, intent)
@@ -342,7 +342,7 @@ export function PrDashboard({ d, client, view, hide = [] }: { d: PrDashboardData
       )}
 
       <StatRow n={tiles.length}>
-        {tiles.map((t) => <StatTile key={t.key} icon={TILE_ICON[t.key]} label={t.label} value={t.value} delta={t.delta} sub={t.sub} />)}
+        {tiles.map((t) => <StatTile key={t.key} icon={TILE_ICON[t.key]} label={t.label} value={t.value} delta={t.delta} sub={t.sub} about={t.about} />)}
       </StatRow>
 
       {view.builder && view.scope && <PanelAsk scope={view.scope} />}

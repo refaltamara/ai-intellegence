@@ -6,8 +6,8 @@ This file is for any agent working in this repository (Antigravity, Codex, Curso
 2. **UI rules:** any work that creates or changes an interface follows `DESIGN.md`, the design standard for this product. In short:
    - Tailwind CSS v4 utilities only, without preflight. `app/legacy.css` styles the pages not yet rebuilt; never add classes to it or use its classes in new UI.
    - Orange brand tokens (`brand-palette-*`, `primary`), Museo Sans Rounded, light theme only.
-   - Stat cards (`StatTile`) follow the agency dashboard's StatCard: an orange `brand-palette-500` number, the metric's icon in an orange tile on the right.
-   - Reuse `src/ui/kit/` (Button, TextInput, SelectInput, DateInput, Form, PickMenu, ProposalShell, PageHeader, Modal/ConfirmDialog/PromptDialog, Toast, ActionMenu, Segmented, Switch, StatusPill, Skeleton, icons) before building anything new; add new shared pieces there.
+   - Stat cards (`StatTile`) follow the agency dashboard's StatCard: an orange `brand-palette-500` number, the metric's icon in an orange tile on the right, one short line under the number on every tile, its full sentence behind an `InfoTip` ⓘ beside the label.
+   - Reuse `src/ui/kit/` (Button, TextInput, SelectInput, DateInput, Form, PickMenu, ProposalShell, PageHeader, Modal/ConfirmDialog/PromptDialog, Toast, ActionMenu, Segmented, Switch, StatusPill, InfoTip, Skeleton, icons) before building anything new; add new shared pieces there.
    - No global header and no width cap on app pages, forms included (fill the width with responsive grids); each page owns its header, the compact `PageHeader`.
    - Dropdowns: every choice from a list is a `SelectInput` with `withSearch`, never a native `<select>`.
    - Dates: every date field is the kit `DateInput` (typed `DD/MM/YYYY` or picked from its calendar; value `YYYY-MM-DD`), never `<input type="date">`.
