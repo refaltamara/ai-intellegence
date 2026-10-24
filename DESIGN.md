@@ -173,11 +173,11 @@ Most things sit flat on a border. Shadow marks something that floats.
 
 ## 4. Icons
 
-- First choice: **Fair's two-tone icons** in `src/ui/kit/icons.tsx`. Each is one shape at `opacity="0.4"` under one solid shape, both `fill="currentColor"`, drawn on a 16, 20 or 24 viewBox, rendered by the internal `Svg` helper (`block shrink-0`, `aria-hidden`).
+- First choice: **Fair's two-tone icons**, imported from `src/ui/kit/icons.tsx`. Each is one shape at `opacity="0.4"` under one solid shape, both `fill="currentColor"`, drawn on a 16, 20, 21 or 24 viewBox (a few larger), rendered by the `Svg` helper in `iconSvg.tsx` (`block shrink-0`, `aria-hidden`). The whole agency dashboard set (new-agency-dashboard/src/components/icons) is here: `icons.tsx` holds the ones drawn or copied first and re-exports `agencyIcons.tsx`, the rest copied as they are (money, wallet, receipt, document, user, clock, task and others; search the file before drawing one). `IconFlagEn` and `IconFlagId` keep the flags' own colours, the one place an icon carries fixed colours.
   Available: `IconCalendar`, `IconChart`, `IconDocument`, `IconMessages`, `IconBriefcase`, `IconFolderFavorite`, `IconPlug`, `IconPeople`, `IconSetting`, `IconDocumentCloud`, `IconEye`, `IconEyeSlash`, `IconSignOut`, `IconNotification`, `IconProfile2User`, `IconLikeShapes`.
 - System glyphs, stroked 2px round: `IconMenu`, `IconClose`, `IconChevronLeft/Right/Down`, `IconCheck`, `IconSearch`, `IconPlus`, `IconDownload`; `IconMore` is three filled dots.
 - Team icons always through `<RoleIcon role="pr|brand_kol|social" />` (bell, two people, like-badge), so the picker and the sidebar never disagree.
-- **Adding an icon:** add a function to `icons.tsx` in the same two-tone manner (a 40% background shape, a solid foreground shape). No icon library imports (no `lucide-react`), no emoji, no generic "AI" sparkles.
+- **Adding an icon:** check `agencyIcons.tsx` first; otherwise add a function to `icons.tsx` in the same two-tone manner (a 40% background shape, a solid foreground shape). No icon library imports (no `lucide-react`), no emoji, no generic "AI" sparkles.
 - Sizes: 20px in nav items and buttons, 18px in menus and icon buttons, 14 to 16px inline with small text, 22 to 24px inside 48px tiles.
 - Icons inherit colour (`currentColor`). Never hardcode a colour on an icon.
 

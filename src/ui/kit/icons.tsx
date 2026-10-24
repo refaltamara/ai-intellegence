@@ -3,18 +3,10 @@
  * one shape at 40% under one solid, both in currentColor. The plug and the system glyphs (chevrons,
  * menu, close, sign out) are drawn here in the same manner.
  */
-import { cn } from "../cn";
+import { Svg, type P } from "./iconSvg";
 
-type P = { size?: number; className?: string };
-
-// block, not inline: an inline svg sits on the text baseline and rides above the middle of its label
-function Svg({ size = 20, className, view, children }: P & { view: string; children: React.ReactNode }) {
-  return (
-    <svg width={size} height={size} viewBox={view} fill="none" className={cn("block shrink-0", className)} aria-hidden="true" focusable="false">
-      {children}
-    </svg>
-  );
-}
+// the rest of the agency dashboard's set, so one import path serves every icon
+export * from "./agencyIcons";
 
 export function IconChart(p: P) {
   return (
