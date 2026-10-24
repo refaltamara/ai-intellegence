@@ -22,7 +22,7 @@ import { periodSetting } from "@/dashboard/period";
 import { AddToDeck } from "../AddToDeck";
 import { PageHeader } from "../kit/PageHeader";
 import { Delta as DeltaText, StatRow, StatTile } from "../kit/StatTile";
-import { IconChart, IconDocument, IconEye, IconLikeShapes } from "../kit/icons";
+import { IconChart, IconChevronRight, IconDocument, IconEye, IconLikeShapes } from "../kit/icons";
 import { Empty, Notes, Panel, SectionCard } from "../kit/Section";
 import { Pager, TABLE, TABLE_FRAME, TD, TD_NUM, TH, TH_NUM, THEAD, TR } from "../kit/Table";
 import { TextField } from "../kit/Form";
@@ -234,7 +234,11 @@ export function Dashboard({ d, content, cq, view }: { d: DashboardData; content:
       <StatRow n={4}>
         {tiles.map((t) => (
           <StatTile key={t.key} icon={TILE_ICON[t.key]} label={t.label} value={t.value} delta={<Delta c={k.change[t.key]} prevLabel={prev} points={t.key === "er"} />} sub={t.sub} about={t.about}
-            action={<AskLink href={askHref({ ...base, k: "kpi", metric: t.key })} label={`Ask why about ${t.label.toLowerCase()}`} />} />
+            action={(
+              <Link href={askHref({ ...base, k: "kpi", metric: t.key })} aria-label={`Ask CeMO why ${t.label.toLowerCase()} moved`} className={buttonClass("secondary", "sm", "group w-full")}>
+                Ask CeMO why<IconChevronRight size={14} className="transition-transform group-hover:translate-x-0.5" />
+              </Link>
+            )} />
         ))}
       </StatRow>
 

@@ -24,7 +24,8 @@ export function StatTile({ label, value, delta, sub, about, action, icon: Icon, 
       {delta}
       {/* one line on every tile so a row stays even; the full sentence sits behind the ⓘ (`about`) */}
       {sub && <span title={typeof sub === "string" ? sub : undefined} className="truncate text-xs leading-relaxed text-gray-500">{sub}</span>}
-      {action && <span className="mt-auto pt-1">{action}</span>}
+      {/* the action sits on the card's floor, so a row of tiles lines its buttons up whatever the content above */}
+      {action && <div className="mt-auto flex pt-2">{action}</div>}
     </div>
   );
 }
