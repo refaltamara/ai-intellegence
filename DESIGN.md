@@ -222,7 +222,7 @@ Most things sit flat on a border. Shadow marks something that floats.
 ```
 
 - Pair title block and actions with `md:items-center`, not `items-start`.
-- Chats, Decks (list, New deck, Edit, a deck and its versions), Weekly Reports, Reports (list, a schedule, a report), the Dashboard (every team's, the Pulse and a case), Data (and a brand's page under it), Team, Connect and Our {codename} use the compact version of this header instead (6.3, `PageHeader` in the kit). A page rebuilt next to them should use it too.
+- Chats, Decks (list, New deck, Edit, a deck and its versions), Weekly Reports, Reports (list, a schedule, a report), the Dashboard (every team's, the Pulse and a case), Data (and a brand's page under it), Team, Connect, Our {codename} and Cases use the compact version of this header instead (6.3, `PageHeader` in the kit). A page rebuilt next to them should use it too.
 - Page horizontal padding: `px-4 md:px-6`. Content is **full width**: no `max-w-*` container on app pages, forms included (a long form fills the width with responsive grids, `md:grid-cols-2 xl:grid-cols-3`, instead of leaving the right side empty). The only exceptions are reading width for long prose and the full-screen family (sign-in, team picker), whose centred column is part of the layout.
 - Sections stack with `gap-6`.
 
