@@ -11,6 +11,7 @@ import { compact, dayMonth, int, pct, pts } from "@/competitor/view";
 import { askHref, type AskRef } from "@/dashboard/askref";
 import { CONTENT_PAGE, ER_MIN_POSTS, ER_MIN_VIEWS, filterQuery, type ContentCard, type ContentQuery, type CreatorRow, type DashboardData, type MixRow } from "@/dashboard/data";
 import { DashFilters } from "./DashFilters";
+import { PendingArea, PendingLink } from "../kit/NavPending";
 import { Sections } from "./Sections";
 import { Customise } from "./Customise";
 import { DashTemplates } from "./DashTemplates";
@@ -152,7 +153,7 @@ export function Dashboard({ d, content, cq, view }: { d: DashboardData; content:
     { key: "er", label: "Engagement rate", value: pct(k.now.er, 2), sub: "Engagement ÷ day-7 views", about: "Engagement divided by views at day 7, over posts that report views." },
   ];
   const deck = (slide: "scoreboard" | "tiers" | "trend" | "creators" | "content") => <AddToDeck payload={{ slide, brands: pin.brands, grain: f.period.grain }} />;
-  const pageLink = (on: boolean, href: string, label: string) => on ? <Link className={buttonClass("outline", "sm")} href={href} scroll={false}>{label}</Link> : <span aria-disabled="true" className={buttonClass("outline", "sm", "pointer-events-none opacity-50")}>{label}</span>;
+  const pageLink = (on: boolean, href: string, label: string) => on ? <PendingLink className={buttonClass("outline", "sm")} href={href} scroll={false}>{label}</PendingLink> : <span aria-disabled="true" className={buttonClass("outline", "sm", "pointer-events-none opacity-50")}>{label}</span>;
   const render: Record<string, (t: string) => React.ReactNode> = {
     rankings: (t) => (
       <SectionCard title={t} actions={deck("scoreboard")} hint={<>Every brand with content in {f.period.label}, by share of views at day 7, with share of voice beside it; growth is views at day 7 against {f.prev.label}.</>}>
@@ -229,6 +230,7 @@ export function Dashboard({ d, content, cq, view }: { d: DashboardData; content:
       <PageHeader title="Dashboard" subtitle={<>{f.period.label} vs {f.prev.label} · data through {dayMonth(d.as_of)} {d.as_of.slice(0, 4)}</>}
         actions={<>{view.builder && <Customise sections={view.layout.all} builder codename={view.codename} client={view.clientName} />}<DashTemplates builder={view.builder} codename={view.codename} /></>} />
       <DashFilters platform={f.platform} brands={f.brands} period={f.period.key} months={d.options.months} weeks={d.options.weeks} brandOptions={d.options.brands} platforms={d.options.platforms} />
+      <PendingArea>
       <Notes lines={d.caveats} />
 
       <StatRow n={4}>
@@ -244,6 +246,7 @@ export function Dashboard({ d, content, cq, view }: { d: DashboardData; content:
 
       {view.builder && view.scope && <PanelAsk scope={view.scope} />}
       <Sections arranged={view.layout} render={render} who={view.clientName} showHref={view.showHref} panels={view.panels} builder={view.builder} scope={view.scope} />
+      </PendingArea>
     </section>
   );
 }

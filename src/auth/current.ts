@@ -1,4 +1,8 @@
-/** Read the current session and the workspace it acts in, in server components and route handlers. */
+/**
+ * Read the current session and the workspace it acts in, in server components and route handlers.
+ * Each is cached for one render (React cache): the layout and the page ask several times per request.
+ */
+import { cache } from "react";
 import { cookies } from "next/headers";
 import { SESSION_COOKIE, verifySession, type SessionPayload } from "./session";
 import { liveUser } from "./live";
@@ -16,7 +20,7 @@ export const ROLE_COOKIE = "fi_role";
 export const WS_COOKIE = "fi_ws";
 
 /** The signed-in person, with the role and home workspace the users table holds now (not what the cookie remembers). */
-export async function currentSession(): Promise<SessionPayload | null> {
+export const currentSession = cache(async (): Promise<SessionPayload | null> => {
   const jar = await cookies();
   const session = await verifySession(jar.get(SESSION_COOKIE)?.value);
   if (!session) return null;
@@ -26,17 +30,17 @@ export async function currentSession(): Promise<SessionPayload | null> {
   const actor = await loadActor(session.uid).catch(() => undefined);
   if (actor && !actor.staff.length && !actor.memberships.length) return null;
   return live ? { ...session, role: live.role, ws: live.workspace_id } : session;
-}
+});
 
 /** The person signed in, with their Fair duties and every workspace they belong to (src/auth/can.ts says what they may do). */
-export async function currentActor(): Promise<Actor | null> {
+export const currentActor = cache(async (): Promise<Actor | null> => {
   const session = await currentSession();
   if (!session) return null;
   return loadActor(session.uid).catch(() => null);
-}
+});
 
 /** The workspace every query in this request is scoped to: the person's own, or one they switched to and may reach. */
-export async function currentWorkspaceId(): Promise<string> {
+export const currentWorkspaceId = cache(async (): Promise<string> => {
   const jar = await cookies();
   const session = await currentSession();
   if (!session) return DEFAULT_WORKSPACE_ID; // public paths never reach data; the proxy gates everything else
@@ -49,7 +53,7 @@ export async function currentWorkspaceId(): Promise<string> {
   const actor = await loadActor(session.uid).catch(() => null);
   if (actor && session.ws && !can(actor, "workspace.reach", { workspace: session.ws }) && actor.memberships[0]) return actor.memberships[0].workspace_id;
   return session.ws || DEFAULT_WORKSPACE_ID;
-}
+});
 
 export function wsCookieHeader(workspaceId: string | null): string {
   const secure = process.env.NODE_ENV === "production" ? "; Secure" : "";
@@ -61,7 +65,7 @@ export function wsCookieHeader(workspaceId: string | null): string {
  * workspace's first, resolved for this workspace and person (src/roles/store.ts): Fair's
  * release, the company's changes, the person's own settings.
  */
-export async function currentRole(workspaceId?: string): Promise<RoleModel> {
+export const currentRole = cache(async (workspaceId?: string): Promise<RoleModel> => {
   const jar = await cookies();
   const ws = workspaceId ?? (await currentWorkspaceId());
   const offered = (await getWorkspace(ws).catch(() => null))?.roles ?? ["brand_kol"];
@@ -72,7 +76,7 @@ export async function currentRole(workspaceId?: string): Promise<RoleModel> {
   const allowed = actor ? rolesFor(actor, ws, offered) : offered;
   const roles = allowed.length ? allowed : offered;
   return getRole(ws, isRoleId(chosen) && roles.includes(chosen) ? chosen : roles[0], session?.uid);
-}
+});
 
 export function roleCookieHeader(role: string | null): string {
   const secure = process.env.NODE_ENV === "production" ? "; Secure" : "";

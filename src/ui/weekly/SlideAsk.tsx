@@ -98,7 +98,7 @@ export function SlideAsk({ reportId, n, slideTitle, week, onClose }: { reportId:
         )}
         {thread.map((m) =>
           m.role === "user" ? (
-            <div key={m.id} className="flex max-w-[92%] flex-col self-end rounded-2xl rounded-br-md border border-brand-palette-100 bg-brand-palette-50 px-3.5 py-2 text-sm leading-relaxed text-gray-900">
+            <div key={m.id} className="flex max-w-[92%] flex-col self-end rounded-2xl rounded-br-md border border-gray-200 bg-gray-100 px-3.5 py-2 text-sm leading-relaxed text-gray-900">
               <span className="text-[11px] font-semibold text-brand-palette-700">Slide {m.slide}</span>
               <span className="whitespace-pre-wrap wrap-break-word">{m.text}</span>
             </div>

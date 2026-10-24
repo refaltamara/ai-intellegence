@@ -5,6 +5,7 @@
  * (src/reputation/); Social Media gets its own accounts (src/social/); a one-person profile keeps the crisis view that used to be Pulse.
  */
 import { redirect } from "next/navigation";
+import { after } from "next/server";
 import { currentActor, currentRole, currentWorkspaceId } from "@/auth/current";
 import { can } from "@/auth/can";
 import { arrange, type DashLayout } from "@/dashboard/sections";
@@ -19,7 +20,7 @@ import { Dashboard } from "@/ui/dashboard/Dashboard";
 import { PulsePage } from "@/ui/PulsePage";
 import { getWorkspace } from "@/workspace/store";
 import { sql } from "@/db/client";
-import { by, signal } from "@/learning/signals";
+import { by, signals } from "@/learning/signals";
 import { runTeamPanels, teamPanels, type PanelScope } from "@/dashboard/panels";
 import { panelId } from "@/dashboard/panelSpec";
 import { ROLE_VIEWS } from "@/definitions/catalog";
@@ -37,19 +38,22 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     return <PulsePage d={d} />;
   }
   const sp = await searchParams;
-  // the team's own panels (src/dashboard/panels.ts) sit among the sections and run over the Dashboard's filters
-  const specsP = teamPanels(ws, role.id).catch(() => []);
+  // the team's own panels (src/dashboard/panels.ts) sit among the sections and run over the Dashboard's filters;
+  // Brand & KOL's context starts now too, so none of these wait on each other
+  const ctxP = role.id === "social" || role.id === "pr" ? null : loadContext(new SkillDb(), ws);
+  ctxP?.catch(() => {}); // awaited below; this only keeps an early return from leaving it unhandled
+  const [specs, actor, clientName] = await Promise.all([
+    teamPanels(ws, role.id).catch(() => []),
+    currentActor(),
+    cfg?.client_brand_id ? clientBrandName(ws, cfg.client_brand_id) : null,
+  ]);
   // the sections in the team's order, with what a Builder hid (Show brings them back for this view)
-  const actor = await currentActor();
-  const clientName = cfg?.client_brand_id ? (await clientBrandName(ws, cfg.client_brand_id)) : null;
   const q = new URLSearchParams(Object.entries(sp).flatMap(([k, v]) => (typeof v === "string" && k !== "show" ? [[k, v]] : [])));
   q.set("show", "all");
-  // the learning loop counts the visit and which filters it carries (their names, never their values)
+  // the learning loop counts the visit and which filters it carries (their names, never their values), after the page is sent
   const filters = [...q.keys()].filter((k) => k !== "show" && /^[a-z_]{1,24}$/.test(k));
   const ctxSig = by(actor, ws, role.id);
-  await signal(ctxSig, "dashboard.view", { filtered: filters.length > 0 });
-  for (const f of filters) await signal(ctxSig, "dashboard.filter", { filter: f });
-  const specs = await specsP;
+  after(() => signals(ctxSig, [{ kind: "dashboard.view", payload: { filtered: filters.length > 0 } }, ...filters.map((f) => ({ kind: "dashboard.filter" as const, payload: { filter: f } }))]));
   const runPanels = (scope: PanelScope) => runTeamPanels(ws, role.id, scope, ROLE_VIEWS[role.id], specs);
   const view: DashLayout = { layout: arrange(role.id, role.tiles, sp.show === "all", specs.map((p) => ({ key: panelId(p.key), label: p.title, width: p.width }))), builder: !!actor && can(actor, "company.change", { workspace: ws, role: role.id }), codename: role.codename, clientName, showHref: `/dashboard?${q}`, alert: role.alert, crisis: cfg?.kind === "profile" && !!cfg.reputation };
   if (role.id === "social") {
@@ -64,7 +68,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     const scope: PanelScope = { from: d.filters.from, to: d.filters.to, platform: d.filters.platform, brands: [d.filters.brand] };
     return <PrDashboard d={d} client={cfg?.client_brand_id ?? null} view={{ ...view, scope, panels: await runPanels(scope) }} hide={cfg?.pr_hide ?? []} />;
   }
-  const ctx = await loadContext(new SkillDb(), ws);
+  const ctx = await ctxP!;
   const cq = readContentQuery(sp);
   const f = readFilters(sp, ctx);
   const scope: PanelScope = { from: f.period.from, to: f.period.to, platform: f.platform, brands: f.brands };

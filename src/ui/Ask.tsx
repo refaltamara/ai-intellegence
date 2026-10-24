@@ -766,7 +766,7 @@ export function Ask({
                     ) : (
                       <Fragment key={m.id}>
                         {m.context && <AskContextCard c={m.context} sent />}
-                        <div className="flex max-w-[75%] flex-col gap-2 self-end rounded-2xl rounded-br-md border border-brand-palette-100 bg-brand-palette-50 px-4 py-2.5 text-sm leading-relaxed text-gray-900">
+                        <div className="flex max-w-[75%] flex-col gap-2 self-end rounded-2xl rounded-br-md border border-gray-200 bg-gray-100 px-4 py-2.5 text-sm leading-relaxed text-gray-900">
                           {m.attachments?.length ? (
                             <div className="flex flex-wrap gap-1.5">
                               {m.attachments.map((f) => (

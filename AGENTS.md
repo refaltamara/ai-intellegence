@@ -12,6 +12,7 @@ This file is for any agent working in this repository (Antigravity, Codex, Curso
    - Dropdowns: every choice from a list is a `SelectInput` with `withSearch`, never a native `<select>`.
    - Dates: every date field is the kit `DateInput` (typed `DD/MM/YYYY` or picked from its calendar; value `YYYY-MM-DD`), never `<input type="date">`.
    - Tables: the header row sits on the body's white (no grey band), its cells the body's size in `font-semibold text-gray-900`.
+   - Chat threads: user message in a quiet grey bubble (`rounded-2xl rounded-br-md border border-gray-200 bg-gray-100`), CeMO reply in an open column next to its "C" tile (no bubble container, allowing lists, tables and cards to render freely).
    - Sidebar recent chats: hover changes the text colour only, never the row's background.
    - Loading: each rebuilt page has a `loading.tsx` whose skeleton (`src/ui/kit/Skeleton.tsx`) has the shape of that page's components.
    - Keyboard, focus, 44px tap targets, WCAG AA contrast and the empty, loading and error states are required, not optional.

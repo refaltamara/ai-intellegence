@@ -11,6 +11,7 @@ import { DashTemplates } from "../dashboard/DashTemplates";
 import { PanelAsk } from "../dashboard/PanelBuilder";
 import type { DashLayout } from "@/dashboard/sections";
 import { PrFilters } from "../reputation/PrFilters";
+import { PendingArea } from "../kit/NavPending";
 import { PageHeader } from "../kit/PageHeader";
 import { Delta as DeltaText, StatRow, StatTile } from "../kit/StatTile";
 import { IconChart, IconDocument, IconEye, IconLikeShapes, IconMessages, IconNotification } from "../kit/icons";
@@ -202,6 +203,7 @@ export function SocialDashboard({ d, client, view }: { d: SocialData; client: st
       <PageHeader title="Dashboard" subtitle={<>{who}&apos;s own accounts · {range} vs the {f.days} days before · data through {dayMonth(d.as_of)} {d.as_of.slice(0, 4)}</>}
         actions={<>{view.builder && <Customise sections={view.layout.all} builder codename={view.codename} client={view.clientName} />}<DashTemplates builder={view.builder} codename={view.codename} /></>} />
       <PrFilters brand={f.brand} days={f.days} platform={f.platform} brands={d.brands} platforms={d.platforms} client={client} windows={[7, 30, 90]} def={30} />
+      <PendingArea>
       <Notes lines={d.notes} />
 
       <StatRow n={6}>
@@ -210,6 +212,7 @@ export function SocialDashboard({ d, client, view }: { d: SocialData; client: st
 
       {view.builder && view.scope && <PanelAsk scope={view.scope} />}
       <Sections arranged={view.layout} render={render} who={view.clientName} showHref={view.showHref} panels={view.panels} builder={view.builder} scope={view.scope} />
+      </PendingArea>
     </section>
   );
 }

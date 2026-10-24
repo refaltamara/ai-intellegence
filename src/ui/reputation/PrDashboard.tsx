@@ -11,6 +11,7 @@ import Link from "next/link";
 import { change, compact, dayMonth, int, pct, pts } from "@/competitor/view";
 import type { Issue, Kpi, PrDashboardData, Split } from "@/reputation/dashboard";
 import { PrFilters } from "./PrFilters";
+import { PendingArea } from "../kit/NavPending";
 import { LadderDrawer } from "./LadderDrawer";
 import { Sections } from "../dashboard/Sections";
 import { Customise } from "../dashboard/Customise";
@@ -304,6 +305,7 @@ export function PrDashboard({ d, client, view, hide = [] }: { d: PrDashboardData
         </>} />
       <PrFilters brand={f.brand} days={f.days} platform={f.platform} brands={d.brands} platforms={d.platforms} client={client} />
       <DashAsk who={who} brand={f.brand} days={f.days} platform={f.platform} />
+      <PendingArea>
       <Notes lines={d.notes} />
 
       {!showStatus && withPosts && (
@@ -347,6 +349,7 @@ export function PrDashboard({ d, client, view, hide = [] }: { d: PrDashboardData
 
       {view.builder && view.scope && <PanelAsk scope={view.scope} />}
       <Sections arranged={{ ...layout, shown: layout.shown.filter((x) => !unmeasured.has(x.key)) }} render={render} who={hiddenFor} showHref={showHref} panels={view.panels} builder={view.builder} scope={view.scope} />
+      </PendingArea>
     </section>
   );
 }

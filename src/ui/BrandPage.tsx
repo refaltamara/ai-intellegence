@@ -11,6 +11,7 @@ import { AskLink, Facts, SegLinks, Tag } from "./dashboard/parts";
 import { buttonClass } from "./kit/Button";
 import { AXIS, GRID, SERIES, Swatch } from "./kit/chart";
 import { PageHeader } from "./kit/PageHeader";
+import { PendingArea, PendingLink } from "./kit/NavPending";
 import { Empty, Panel, SectionCard } from "./kit/Section";
 import { StatusPill } from "./kit/StatusPill";
 import { EMPTY_ROW, SUB, TD, TD_NUM, TH, TH_NUM, TR, Table } from "./kit/Table";
@@ -113,6 +114,7 @@ export function BrandPage({ d, q, productName = "CeMO" }: { d: BrandPageData; q:
         subtitle={<><Link href="/data" className={cn(LINK, "font-semibold")}>Data</Link>{meta.map((m, i) => <span key={i}> · {m}</span>)}</>}
         actions={<SegLinks label="Period" items={PERIODS.map((p) => ({ href: href(base, q, { period: p.key }), label: p.label, on: d.period === p.key }))} />} />
 
+      <PendingArea>
       <p className="text-sm leading-relaxed text-gray-600">What {productName} has collected about {b.name}: every number below is an inventory of the loaded posts, {period} ({d.window.from} to {d.window.to}). Ask about any section to take it into a chat.</p>
 
       <SectionCard title="Coverage" hint="What was captured on each platform, month by month." actions={<Ask what="coverage" prompt={`What's missing in what you have on ${b.name}?`} />}>
@@ -232,14 +234,14 @@ export function BrandPage({ d, q, productName = "CeMO" }: { d: BrandPageData; q:
         </Table>
         {d.creators.length > 20 && (
           <div className="flex flex-wrap items-center gap-3">
-            <Link className={buttonClass("outline", "sm")} scroll={false} href={href(base, q, { creators: q.creators === "all" ? "" : "all" })}>{q.creators === "all" ? "Show 20" : `Show all ${d.creators.length}`}</Link>
+            <PendingLink className={buttonClass("outline", "sm")} scroll={false} href={href(base, q, { creators: q.creators === "all" ? "" : "all" })}>{q.creators === "all" ? "Show 20" : `Show all ${d.creators.length}`}</PendingLink>
           </div>
         )}
       </SectionCard>
 
       <SectionCard title="Hashtags" hint={`${period}, by views at day 7. Generic reach tags (fyp, viral…) are left out.`}
         actions={<>
-          {tagsHidden > 0 && <Link scroll={false} className="inline-flex min-h-8 items-center text-xs font-semibold text-brand-palette-700 underline-offset-2 hover:underline max-md:min-h-11" href={href(base, q, { tags: showTags ? "" : "all" })}>{showTags ? "Hide brand hashtags" : `Include ${tagsHidden} brand hashtag${tagsHidden === 1 ? "" : "s"}`}</Link>}
+          {tagsHidden > 0 && <PendingLink scroll={false} className="inline-flex min-h-8 items-center text-xs font-semibold text-brand-palette-700 underline-offset-2 hover:underline max-md:min-h-11" href={href(base, q, { tags: showTags ? "" : "all" })}>{showTags ? "Hide brand hashtags" : `Include ${tagsHidden} brand hashtag${tagsHidden === 1 ? "" : "s"}`}</PendingLink>}
           <Ask what="hashtags" prompt={b.is_client ? `Which hashtags are competitors riding that ${b.name} isn't?` : `Which hashtags is ${b.name} riding that ${clientName ?? "we"} ${clientName ? "isn't" : "aren't"}?`} />
         </>}>
         <Table min="min-w-[760px]" head={<><th className={TH}>Hashtag</th><th className={TH_NUM}>Posts</th><th className={TH_NUM}>Creators</th><th className={TH_NUM}>Views (day 7)</th><th className={TH_NUM}>Share of {b.name}&apos;s views</th><th className={TH_NUM}>vs prior period</th></>}>
@@ -260,12 +262,13 @@ export function BrandPage({ d, q, productName = "CeMO" }: { d: BrandPageData; q:
         </Table>
         {d.hashtags.length > 15 && (
           <div className="flex flex-wrap items-center gap-3">
-            <Link className={buttonClass("outline", "sm")} scroll={false} href={href(base, q, { hashtags: q.hashtags === "all" ? "" : "all" })}>{q.hashtags === "all" ? "Show 15" : "Show up to 100"}</Link>
+            <PendingLink className={buttonClass("outline", "sm")} scroll={false} href={href(base, q, { hashtags: q.hashtags === "all" ? "" : "all" })}>{q.hashtags === "all" ? "Show 15" : "Show up to 100"}</PendingLink>
           </div>
         )}
       </SectionCard>
 
       <p className="text-xs text-gray-500">Sounds, sentiment and comments are not loaded yet. Creator drill-downs live in the conversation: ask about a creator by handle.</p>
+      </PendingArea>
     </section>
   );
 }

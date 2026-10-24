@@ -10,6 +10,8 @@ import { AccountMenu } from "./AccountMenu";
 import { useDrawer } from "./Shell";
 import { cn } from "./cn";
 import { SelectInput } from "./kit/SelectInput";
+import { LinkPending, useNavPending } from "./kit/NavPending";
+import { Spinner } from "./kit/Spinner";
 import {
   IconBriefcase,
   IconChart,
@@ -93,6 +95,7 @@ export function Sidebar({
   const [collapsed, setCollapsed] = useState(startCollapsed);
   const [switching, setSwitching] = useState<string | null>(null);
   const [switchError, setSwitchError] = useState("");
+  const { setLeaving } = useNavPending();
   const left = useRef(false);
   const closeRef = useRef<HTMLButtonElement>(null);
   useEffect(() => {
@@ -143,8 +146,11 @@ export function Sidebar({
     if (t.key === team?.key) return;
     setSwitching(t.key);
     setSwitchError("");
+    // the page gives way to the next one's skeleton at once, not after the switch and the full load
+    setLeaving(true);
     const failed = (why: string) => {
       setSwitching(null);
+      setLeaving(false);
       setSwitchError(why);
     };
     try {
@@ -329,7 +335,8 @@ export function Sidebar({
                   </button>
                 );
               }
-              const on = t.key === team?.key;
+              // the tab picked lifts at once; the current one gives way while the switch runs
+              const on = switching ? t.key === switching : t.key === team?.key;
               return (
                 <button
                   key={t.key}
@@ -349,8 +356,9 @@ export function Sidebar({
                   )}
                 >
                   <RoleIcon role={t.role} size={18} />
-                  <span className={label || undefined}>
-                    {switching === t.key ? "…" : t.short}
+                  <span className={cn("inline-flex items-center gap-1", label)}>
+                    {t.short}
+                    {switching === t.key && <Spinner className="h-3 w-3" />}
                   </span>
                 </button>
               );
@@ -399,6 +407,7 @@ export function Sidebar({
                       collapsed={collapsed}
                     />
                   )}
+                  <LinkPending className={cn(collapsed && "md:hidden")} />
                   <Tip show={collapsed}>{n.label}</Tip>
                 </Link>
               );
@@ -430,11 +439,12 @@ export function Sidebar({
                 href={c.href}
                 title={c.title}
                 className={cn(
-                  "truncate rounded-xl px-2.5 py-0.5 max-md:py-2.5 text-[13px] leading-5 text-gray-700 transition-colors hover:text-brand-palette-700",
+                  "flex items-center gap-2 rounded-xl px-2.5 py-0.5 max-md:py-2.5 text-[13px] leading-5 text-gray-700 transition-colors hover:text-brand-palette-700",
                   FOCUS,
                 )}
               >
-                {c.title.replace(/^\/[\w-]+\s*/, "")}
+                <span className="min-w-0 flex-1 truncate">{c.title.replace(/^\/[\w-]+\s*/, "")}</span>
+                <LinkPending />
               </Link>
             ))}
           </section>

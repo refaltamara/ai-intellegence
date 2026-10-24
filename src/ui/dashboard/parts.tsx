@@ -53,19 +53,8 @@ export function Bar({ pct, className, colour, label }: { pct: number | null | un
   );
 }
 
-/** the segmented control (kit Segmented) as links, for a server-drawn choice that lives in the URL */
-export function SegLinks({ label, items }: { label: string; items: { href: string; label: string; on: boolean }[] }) {
-  return (
-    <nav aria-label={label} className="inline-flex max-w-full flex-wrap gap-1 rounded-xl bg-gray-100 p-1">
-      {items.map((x) => (
-        <Link key={x.href} href={x.href} scroll={false} aria-current={x.on ? "true" : undefined}
-          className={cn("inline-flex min-h-8 items-center justify-center rounded-lg px-3 text-xs font-semibold transition-colors duration-150 max-md:min-h-11", x.on ? "bg-white text-brand-palette-700 shadow-xs" : "text-gray-600 hover:text-gray-900")}>
-          {x.label}
-        </Link>
-      ))}
-    </nav>
-  );
-}
+/** the segmented control as links (client: the clicked option lifts at once) */
+export { SegLinks } from "./SegLinks";
 
 /** label and value pairs under a card (tiers, posts) */
 export function Facts({ items, cols = 2 }: { items: { k: string; v: ReactNode; title?: string }[]; cols?: 2 | 3 }) {

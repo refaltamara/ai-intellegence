@@ -16,6 +16,7 @@ The essentials, so they hold even before you open it:
 - Dropdowns: every choice from a list is a `SelectInput` with `withSearch`, never a native `<select>` (options may carry `disabled` and `group`; use `ariaLabel` when no label shows; inside a `Field`, give the `Field` `group`).
 - Dates: every date field is the kit `DateInput` (typed `DD/MM/YYYY` or picked from its calendar; value `YYYY-MM-DD`; `min`/`max` as strings), never `<input type="date">`.
 - Tables: the header row on the body's white (no grey band), header cells the body's size in `font-semibold text-gray-900`.
+- Chat threads: user message in a quiet grey bubble (`rounded-2xl rounded-br-md border border-gray-200 bg-gray-100`), CeMO reply in an open column next to its "C" tile (no bubble container, allowing lists, tables and cards to render freely).
 - Sidebar recent chats: hover changes the text colour only (`hover:text-brand-palette-700`), never a background.
 - Loading: each rebuilt page has a `loading.tsx` with a skeleton from `src/ui/kit/Skeleton.tsx` in the shape of its own components.
 - Accessibility is required: real buttons and links, visible focus, keyboard menus (arrows, Escape returns focus), 44px tap targets on phones, WCAG AA contrast, empty/loading/error states that say why and what to do.

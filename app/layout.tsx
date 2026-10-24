@@ -10,6 +10,8 @@ import { getWorkspace } from "@/workspace/store";
 import { teamsFor } from "@/workspace/teams";
 import { cookies, headers } from "next/headers";
 import { ShellProvider } from "@/ui/Shell";
+import { LeavingCover, NavPendingProvider } from "@/ui/kit/NavPending";
+import { PageLoading } from "@/ui/PageLoading";
 import { MobileBar } from "@/ui/MobileBar";
 import { caseNamesFor } from "@/cases/store";
 import { sql } from "@/db/client";
@@ -42,12 +44,14 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
         currentRole(ws),
       ])
     : [[], null, null, BRAND_KOL];
-  const teams = actor ? await teamsFor(actor).catch(() => []) : [];
   // "Our Chorus": the team's own version of its role; a Builder sees how many creations wait for them
   const builder = !!actor && can(actor, "company.change", { workspace: ws, role: role.id });
-  const waiting = builder ? await waitingCount(ws, role.id).catch(() => 0) : 0;
-  // a case shows only to the people on its list (DECISIONS, 10 Oct 2026, step 5)
-  const cases = actor ? (await caseNamesFor(actor, ws).catch(() => [])).length : 0;
+  const [teams, waiting, cases] = await Promise.all([
+    actor ? teamsFor(actor).catch(() => []) : [],
+    builder ? waitingCount(ws, role.id).catch(() => 0) : 0,
+    // a case shows only to the people on its list (DECISIONS, 10 Oct 2026, step 5)
+    actor ? caseNamesFor(actor, ws).then((c) => c.length).catch(() => 0) : 0,
+  ]);
   const productName = brand?.name ?? cfg?.product_name ?? "Fair Intelligence";
   // the desktop sidebar's width, chosen with its Hide menu button (src/ui/Sidebar.tsx)
   const collapsed = (await cookies()).get("fi_sidebar")?.value === "1";
@@ -61,6 +65,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
       <body>
         {session && !bare ? (
           <ShellProvider>
+            <NavPendingProvider>
             {/* "app has-apps" only marks the page for legacy.css (.app.has-apps .topbar keeps room for the app switcher) */}
             <div className={`${brand?.apps?.length ? "app has-apps" : "app"} flex h-dvh overflow-clip bg-gray-50 text-[#1C1C1C]`}>
               {brand?.apps?.length ? <AppSwitcher apps={brand.apps} owner={brand.short} /> : null}
@@ -69,8 +74,10 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
                 <MobileBar product={productName} />
                 {/* overflow stays with legacy .main, so .main:has(.screen.ask) can still turn it off for Chats */}
                 <main className="main min-h-0 flex-1 bg-gray-50 bg-none">{children}</main>
+                <LeavingCover cover={<PageLoading label="Opening the team…" />} />
               </div>
             </div>
+            </NavPendingProvider>
           </ShellProvider>
         ) : (
           children
