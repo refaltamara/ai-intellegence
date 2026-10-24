@@ -85,8 +85,10 @@ export function StatRowSkeleton({ n = 4 }: { n?: number }) {
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
       {Array.from({ length: n }, (_, i) => (
         <div key={i} className="flex flex-col gap-2 rounded-3xl border border-card-border bg-white p-5">
-          <Skel className="h-3.5 w-24" />
-          <Skel className="h-8 w-20" />
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex flex-col gap-2"><Skel className="h-3.5 w-24" /><Skel className="h-8 w-20" /></div>
+            <Skel className="size-12 rounded-2xl" />
+          </div>
           <Skel className="h-3 w-28" />
         </div>
       ))}

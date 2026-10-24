@@ -22,6 +22,7 @@ import { periodSetting } from "@/dashboard/period";
 import { AddToDeck } from "../AddToDeck";
 import { PageHeader } from "../kit/PageHeader";
 import { Delta as DeltaText, StatRow, StatTile } from "../kit/StatTile";
+import { IconChart, IconDocument, IconEye, IconLikeShapes } from "../kit/icons";
 import { Empty, Notes, Panel, SectionCard } from "../kit/Section";
 import { Pager, TABLE, TABLE_FRAME, TD, TD_NUM, TH, TH_NUM, THEAD, TR } from "../kit/Table";
 import { TextField } from "../kit/Form";
@@ -130,6 +131,9 @@ function PostCard({ c, base, names }: { c: ContentCard; base: Omit<AskRef, "k">;
   );
 }
 
+/** each stat tile's icon, by its key */
+const TILE_ICON = { posts: IconDocument, views: IconEye, engagements: IconLikeShapes, er: IconChart };
+
 export function Dashboard({ d, content, cq, view }: { d: DashboardData; content: { cards: ContentCard[]; total: number }; cq: ContentQuery; view: DashLayout }) {
   const f = d.filters;
   const pin = { platform: f.platform, brands: f.brands, period: periodSetting(f.period, d.as_of) };
@@ -228,7 +232,7 @@ export function Dashboard({ d, content, cq, view }: { d: DashboardData; content:
 
       <StatRow n={4}>
         {tiles.map((t) => (
-          <StatTile key={t.key} label={t.label} value={t.value} delta={<Delta c={k.change[t.key]} prevLabel={prev} points={t.key === "er"} />} sub={t.sub}
+          <StatTile key={t.key} icon={TILE_ICON[t.key]} label={t.label} value={t.value} delta={<Delta c={k.change[t.key]} prevLabel={prev} points={t.key === "er"} />} sub={t.sub}
             action={<AskLink href={askHref({ ...base, k: "kpi", metric: t.key })} label={`Ask why about ${t.label.toLowerCase()}`} />} />
         ))}
       </StatRow>

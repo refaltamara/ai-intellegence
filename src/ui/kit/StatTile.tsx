@@ -1,18 +1,24 @@
-import type { ReactNode } from "react";
+import type { ComponentType, ReactNode } from "react";
 import { cn } from "../cn";
 
 /**
- * The stat card (DESIGN.md 6.2): a label, one big number, how it moved against a named period, and a line
- * that says what the number counts. Numbers come from the data layer; the tile only lays them out.
+ * The stat card (DESIGN.md 6.2), drawn like the agency dashboard's StatCard: the label and one big orange number
+ * on the left, the metric's icon in an orange tile on the right; under them how it moved against a named period
+ * and a line that says what the number counts. Numbers come from the data layer; the tile only lays them out.
  */
-export function StatTile({ label, value, delta, sub, action, className }: { label: ReactNode; value: ReactNode; delta?: ReactNode; sub?: ReactNode; action?: ReactNode; className?: string }) {
+export function StatTile({ label, value, delta, sub, action, icon: Icon, className }: { label: ReactNode; value: ReactNode; delta?: ReactNode; sub?: ReactNode; action?: ReactNode; icon?: ComponentType<{ size?: number }>; className?: string }) {
   return (
-    <div className={cn("flex min-w-0 flex-col gap-1 rounded-3xl border border-card-border bg-white p-5", className)}>
-      <span className="text-sm text-gray-500">{label}</span>
-      <b className="truncate text-3xl font-bold leading-tight tabular-nums text-gray-900">{value}</b>
+    <div className={cn("flex min-w-0 flex-col gap-2 rounded-3xl border border-card-border bg-white p-5", className)}>
+      <div className="flex min-w-0 items-start justify-between gap-4">
+        <div className="flex min-w-0 flex-col gap-2">
+          <span title={typeof label === "string" ? label : undefined} className="truncate text-sm font-medium text-gray-500">{label}</span>
+          <b className="truncate text-3xl font-bold leading-tight tabular-nums text-brand-palette-500">{value}</b>
+        </div>
+        {Icon && <span className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-brand-palette-100 text-brand-palette-600"><Icon size={24} /></span>}
+      </div>
       {delta}
-      {sub && <span className="text-xs leading-relaxed text-gray-500">{sub}</span>}
-      {action && <span className="mt-auto pt-2">{action}</span>}
+      {sub && <span title={typeof sub === "string" ? sub : undefined} className="line-clamp-2 text-pretty text-xs leading-relaxed text-gray-500">{sub}</span>}
+      {action && <span className="mt-auto pt-1">{action}</span>}
     </div>
   );
 }
@@ -32,7 +38,7 @@ const GLYPH: Record<DeltaDir, string> = { up: "▲", down: "▼", flat: "", none
 export function Delta({ dir, glyph, children }: { dir: DeltaDir; glyph?: "▲" | "▼"; children: ReactNode }) {
   const g = glyph ?? GLYPH[dir];
   return (
-    <span className={cn("inline-flex items-center gap-1 text-xs font-semibold tabular-nums", DELTA[dir], dir === "none" && "font-regular")}>
+    <span className={cn("inline-flex items-center gap-1 text-xs font-semibold tabular-nums", DELTA[dir], dir === "none" && "font-normal")}>
       {g && <span aria-hidden="true" className="text-[10px]">{g}</span>}
       {children}
     </span>

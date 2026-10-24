@@ -13,6 +13,7 @@ import type { DashLayout } from "@/dashboard/sections";
 import { PrFilters } from "../reputation/PrFilters";
 import { PageHeader } from "../kit/PageHeader";
 import { Delta as DeltaText, StatRow, StatTile } from "../kit/StatTile";
+import { IconChart, IconDocument, IconEye, IconLikeShapes, IconMessages, IconNotification } from "../kit/icons";
 import { Empty, Notes, Panel, SectionCard } from "../kit/Section";
 import { EMPTY_ROW, SUB, TABLE, TABLE_FRAME, TD, TD_NUM, TH, TH_NUM, THEAD, TR } from "../kit/Table";
 import { SERIES, Swatch } from "../kit/chart";
@@ -66,6 +67,9 @@ function QuoteLine({ q }: { q: Quote }) {
     </blockquote>
   );
 }
+
+/** each stat tile's icon, by its key */
+const TILE_ICON: Record<string, typeof IconDocument> = { posts: IconDocument, eng: IconLikeShapes, med: IconChart, views: IconEye, neg: IconNotification, reply: IconMessages };
 
 export function SocialDashboard({ d, client, view }: { d: SocialData; client: string | null; view: DashLayout }) {
   const f = d.filters;
@@ -201,7 +205,7 @@ export function SocialDashboard({ d, client, view }: { d: SocialData; client: st
       <Notes lines={d.notes} />
 
       <StatRow n={6}>
-        {tiles.map((t) => <StatTile key={t.key} label={t.label} value={t.value} delta={t.delta} sub={t.sub} />)}
+        {tiles.map((t) => <StatTile key={t.key} icon={TILE_ICON[t.key]} label={t.label} value={t.value} delta={t.delta} sub={t.sub} />)}
       </StatRow>
 
       {view.builder && view.scope && <PanelAsk scope={view.scope} />}

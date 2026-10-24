@@ -25,10 +25,14 @@ import { buttonClass } from "../kit/Button";
 import { Delta as DeltaText, StatRow, StatTile } from "../kit/StatTile";
 import { CARD, Empty, Notes, SectionCard } from "../kit/Section";
 import { StatusPill } from "../kit/StatusPill";
+import { IconBriefcase, IconDocument, IconEye, IconMessages, IconNotification } from "../kit/icons";
 import { cn } from "../cn";
 import { AskLink, DASH_PAGE, OutLink, PlatformTag, Tag, TWO } from "../dashboard/parts";
 import { ask, H4, ITEM_CARD, LadderStrip, LEVEL, LEVEL_CELL, LEVEL_ORDER, LeanBar, MiniBars, MiniTable, MUTED, NEG, PLATFORM, POS, PostLine, PostList, QuoteLine, sharePct, TD, TD_NUM, TH, TH_NUM, TR, VoiceDot } from "./parts/common";
 import { DailyTable, PlatformCard, SplitTable, WatchCard } from "./parts/cards";
+
+/** each stat tile's icon, by its key */
+const TILE_ICON: Record<string, typeof IconDocument> = { mentions: IconDocument, against: IconNotification, reach: IconEye, comments: IconMessages, neg: IconNotification, intent: IconBriefcase };
 
 export { DailyTable, WatchCard };
 
@@ -338,7 +342,7 @@ export function PrDashboard({ d, client, view, hide = [] }: { d: PrDashboardData
       )}
 
       <StatRow n={tiles.length}>
-        {tiles.map((t) => <StatTile key={t.key} label={t.label} value={t.value} delta={t.delta} sub={t.sub} />)}
+        {tiles.map((t) => <StatTile key={t.key} icon={TILE_ICON[t.key]} label={t.label} value={t.value} delta={t.delta} sub={t.sub} />)}
       </StatRow>
 
       {view.builder && view.scope && <PanelAsk scope={view.scope} />}
