@@ -8,7 +8,7 @@ This file is for any agent working in this repository (Antigravity, Codex, Curso
    - Orange brand tokens (`brand-palette-*`, `primary`), Museo Sans Rounded, light theme only.
    - Stat cards (`StatTile`) follow the agency dashboard's StatCard: an orange `brand-palette-500` number, the metric's icon in an orange tile on the right, one short line under the number on every tile, its full sentence behind an `InfoTip` ⓘ beside the label.
    - Reuse `src/ui/kit/` (Button, TextInput, SelectInput, DateInput, Form, PickMenu, ProposalShell, PageHeader, Modal/ConfirmDialog/PromptDialog, Toast, ActionMenu, Segmented, Switch, StatusPill, InfoTip, Skeleton, icons) before building anything new; add new shared pieces there.
-   - No global header and no width cap on app pages, forms included (fill the width with responsive grids); each page owns its header, the compact `PageHeader`.
+   - No global header and no width cap on app pages, forms included (fill the width with responsive grids); each page owns its header, the compact `PageHeader`, and it scrolls with the page, except on Chats, where it is pinned above the thread (DESIGN.md 5.1, 6.3).
    - Dropdowns: every choice from a list is a `SelectInput` with `withSearch`, never a native `<select>`.
    - Dates: every date field is the kit `DateInput` (typed `DD/MM/YYYY` or picked from its calendar; value `YYYY-MM-DD`), never `<input type="date">`.
    - Tables: the header row sits on the body's white (no grey band), its cells the body's size in `font-semibold text-gray-900`.

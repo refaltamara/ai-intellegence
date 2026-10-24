@@ -196,7 +196,7 @@ Most things sit flat on a border. Shadow marks something that floats.
 ```
 
 - Root: `flex h-dvh overflow-clip bg-gray-50 text-[#1C1C1C]`, wrapped in `<ShellProvider>` (drawer state).
-- **There is no global header.** Each page owns its header, inside the page, and it scrolls with the content.
+- **There is no global header.** Each page owns its header, inside the page, and it scrolls with the content. The one exception is Chats: the screen itself does not scroll, so its header stays pinned above the thread, the composer stays pinned below it, and only the thread scrolls between them (6.3).
 - Use `h-dvh`, never `h-screen`; `overflow-clip`, never `overflow-hidden`, on root containers.
 - Full-screen routes (sign-in, team picker, consent, CMS) skip the shell: `FULL_SCREEN` in `app/layout.tsx`.
 
@@ -363,6 +363,7 @@ These come from the shared Fair design system. Build them to these specs in oran
 - User message: quiet grey bubble, `self-end max-w-[75%] rounded-2xl rounded-br-md border border-gray-200 bg-gray-100 px-4 py-2.5 text-sm text-gray-900`.
 - CeMO message: a 32px `rounded-xl bg-brand-palette-100 text-brand-palette-700` "C" tile, then the open answer column (`text-sm leading-relaxed text-gray-800`, without a bubble container so tables, cards and lists render freely), with tool result cards and actions below it.
 - Composer: `rounded-2xl border bg-white p-3 shadow-xs` with `focus-within:border-brand-palette-600 focus-within:ring-2 focus-within:ring-brand-palette-500/15`; the textarea inside has no border, outline or shadow of its own; the dock around it has no border or background of its own (it sits on the page's `bg-gray-50`, like the thread) and lines up with the thread (`px-4 pb-4 md:px-6 md:pb-6`; the thread's `pb-6` is the gap above). The page header's top padding matches the sides (`pt-4 md:pt-6`) ; its title is smaller than other pages' (`h1` `text-xl font-semibold leading-tight`, subtitle `text-xs text-gray-500`, still flush) so it sits with the `text-xs` pills beside it and stays under the empty-state hero; a dashed line closes it (`border-0 border-b border-dashed border-gray-300 pb-4`; without preflight `border-0` is needed, or `border-dashed` draws the browser's default width on the other three sides).
+- Thread: the header (`PageHeader` in a `shrink-0 px-4 md:px-6` wrapper) and the composer dock are pinned; only the thread between them scrolls. The thread is a `role="log"` (`aria-label="Conversation"`, `aria-busy` while a reply streams), one memoised `ThreadMessage` per turn keyed by a key that never changes (not the server id, which arrives at the end of a reply). It stays on its newest line while the reader is there (`useStickToEnd`: it follows a streaming reply and growing cards, and opens a saved conversation at its end without animation). It leaves a reader who scrolled up where they are and shows a centred outline `sm` **Latest** button above the composer. Sending always brings your own message into view.
 - Evidence chip: a real `<button>`, `h-5 min-w-5 rounded-md bg-brand-palette-100 text-[11px] font-bold text-brand-palette-800`.
 - Empty-screen hero (a new conversation), vertically centred (`py-10 md:py-16`):
   - It opens with the 44px CeMO tile (`rounded-2xl bg-brand-palette-100 text-brand-palette-700`) and the name "CeMO", which says who answers. Parts are spaced `gap-6`.

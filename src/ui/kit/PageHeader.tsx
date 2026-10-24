@@ -3,7 +3,8 @@ import { cn } from "../cn";
 
 /**
  * The compact page header Chats has (DESIGN.md 6.3): a small title with its line flush under it, the page's
- * actions beside them, and a dashed line that closes the header. It scrolls with the page.
+ * actions beside them, and a dashed line that closes the header. It scrolls with the page, except on Chats, which pins it
+ * above the thread.
  */
 export function PageHeader({ title, subtitle, actions, className }: { title: ReactNode; subtitle?: ReactNode; actions?: ReactNode; className?: string }) {
   return (

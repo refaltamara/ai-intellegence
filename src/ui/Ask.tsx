@@ -11,8 +11,10 @@ import { useRouter } from "next/navigation";
 import { sendSignal } from "./signal";
 import {
   Fragment,
+  memo,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -30,8 +32,9 @@ import { matchSkills, SlashMenu, type SkillOption } from "./SlashMenu";
 import { AskContextCard } from "./AskContextCard";
 import { cn } from "./cn";
 import { Button } from "./kit/Button";
+import { PageHeader } from "./kit/PageHeader";
 import { Spinner } from "./kit/Spinner";
-import { IconCheck } from "./kit/icons";
+import { IconCheck, IconChevronDown } from "./kit/icons";
 import type { AskContext, AskRef } from "@/dashboard/askref";
 
 export type Attachment = { id: string; filename: string; bytes: number };
@@ -42,7 +45,10 @@ type Ask = {
   answered?: string;
 };
 type Msg = {
+  /** the server's id once it has one */
   id: string;
+  /** set once in this browser and never changed: the row's React key and what its open evidence hangs on */
+  key: string;
   role: "user" | "assistant";
   text: string;
   tools: ToolCallRecord[];
@@ -69,6 +75,50 @@ type Msg = {
 };
 
 const MAX_FILES = 3;
+/** how close to the end of the thread still counts as reading the newest line */
+const NEAR_END_PX = 80;
+let seq = 0;
+/** a key for a message made here; crypto.randomUUID needs a secure context, a dev server on a LAN address is not */
+const localKey = (p: string) => `${p}${Date.now().toString(36)}-${++seq}`;
+
+/**
+ * Keeps the thread on its newest line while the reader is there: it follows a reply as it streams and as cards and
+ * charts grow, opens a saved conversation at its end without sliding through it, and leaves a reader who scrolled
+ * up where they are (`away` then shows "Latest").
+ */
+function useStickToEnd() {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const stuck = useRef(true);
+  const [away, setAway] = useState(false);
+  useLayoutEffect(() => {
+    const el = scrollRef.current;
+    const content = contentRef.current;
+    if (!el || !content) return;
+    el.scrollTop = el.scrollHeight;
+    const onScroll = () => {
+      const atEnd = el.scrollHeight - el.scrollTop - el.clientHeight < NEAR_END_PX;
+      stuck.current = atEnd;
+      setAway(!atEnd);
+    };
+    const ro = new ResizeObserver(() => {
+      if (stuck.current) el.scrollTop = el.scrollHeight;
+    });
+    ro.observe(content);
+    el.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      ro.disconnect();
+      el.removeEventListener("scroll", onScroll);
+    };
+  }, []);
+  const stick = useCallback((smooth = false) => {
+    stuck.current = true;
+    setAway(false);
+    const el = scrollRef.current;
+    el?.scrollTo({ top: el.scrollHeight, behavior: smooth ? "smooth" : "auto" });
+  }, []);
+  return { scrollRef, contentRef, away, stick };
+}
 const MAX_TABS = 6;
 function fileSize(bytes: number): string {
   return bytes >= 1024 * 1024
@@ -183,6 +233,7 @@ export function Ask({
   const [thread, setThread] = useState<Msg[]>(() => {
     const out: Msg[] = initialMessages.map((m) => ({
       id: m.id,
+      key: m.id,
       role: m.role,
       text: m.content_json?.text ?? "",
       tools: m.content_json?.tools ?? [],
@@ -239,7 +290,6 @@ export function Ask({
   const [dragging, setDragging] = useState(false);
   const taRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
-  const bottomRef = useRef<HTMLDivElement>(null);
   const colsRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (prefill || fromDashboard) taRef.current?.focus();
@@ -397,9 +447,7 @@ export function Ask({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [thread.length, busy]);
+  const { scrollRef, contentRef, away, stick } = useStickToEnd();
 
   function showToast(m: string) {
     setToast(m);
@@ -445,7 +493,9 @@ export function Ask({
   /** One turn: a typed message, a tapped chip, or a pane action. Streams the reply into a new assistant message. */
   async function turn(userMsg: Msg, body: Record<string, unknown>) {
     setBusy(true);
-    const aid = `a${Date.now()}`;
+    // your own message always comes into view, even when you had scrolled up
+    stick();
+    const aid = localKey("a");
     setThread((t) => {
       // answering the open question closes it
       const last = t[t.length - 1];
@@ -462,6 +512,7 @@ export function Ask({
         userMsg,
         {
           id: aid,
+          key: aid,
           role: "assistant",
           text: "",
           tools: [],
@@ -472,7 +523,7 @@ export function Ask({
       ];
     });
     const update = (fn: (m: Msg) => Msg) =>
-      setThread((t) => t.map((m) => (m.id === aid ? fn(m) : m)));
+      setThread((t) => t.map((m) => (m.key === aid ? fn(m) : m)));
     try {
       const res = await fetch("/api/chat", {
         method: "POST",
@@ -571,7 +622,8 @@ export function Ask({
     const asking = pendingAsk;
     setPendingAsk(null);
     const userMsg: Msg = {
-      id: `u${Date.now()}`,
+      id: "",
+      key: localKey("u"),
       role: "user",
       text: q,
       tools: [],
@@ -617,7 +669,8 @@ export function Ask({
       });
     }
     const userMsg: Msg = {
-      id: `u${Date.now()}`,
+      id: "",
+      key: localKey("u"),
       role: "user",
       text: action.human,
       tools: [],
@@ -635,7 +688,8 @@ export function Ask({
     setThread((t) => [
       ...t,
       {
-        id: `n${Date.now()}`,
+        id: "",
+        key: localKey("n"),
         role: "user",
         text: textLine,
         tools: [],
@@ -644,6 +698,65 @@ export function Ask({
       },
     ]);
   }
+
+  async function makeReport() {
+    if (!conversationId) return;
+    showToast("Writing the report from this conversation…");
+    const r = await fetch("/api/reports", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ conversation_id: conversationId }),
+    });
+    const j = await r.json();
+    if (j.error) {
+      showToast(j.error);
+      return;
+    }
+    router.push(`/reports/${j.id}`);
+  }
+  async function makeDeck() {
+    if (!conversationId) return;
+    setDeckBusy(true);
+    showToast("Making the deck from this conversation… (about a minute)");
+    const r = await fetch("/api/decks/from-chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ conversation_id: conversationId }),
+    });
+    const j = await r.json().catch(() => ({}));
+    setDeckBusy(false);
+    if (!r.ok || !j.deck) {
+      showToast(j.error ?? "Could not make the deck");
+      return;
+    }
+    router.push(
+      `/decks/${j.deck.id}${j.version?.report_id ? `?v=${j.version.report_id}` : ""}`,
+    );
+  }
+  // rows get one stable object; it calls whatever this render's functions are
+  const latest = useRef({ send, showObject, showToast, makeReport, makeDeck });
+  useLayoutEffect(() => {
+    latest.current = { send, showObject, showToast, makeReport, makeDeck };
+  });
+  const actions = useMemo<RowActions>(
+    () => ({
+      send: (message) => void latest.current.send(message),
+      toggleEvidence: (key, id) =>
+        setOpen((o) => ({
+          ...o,
+          [key]: o[key]?.[0] === id && o[key].length === 1 ? [] : [id],
+        })),
+      openEvidence: (key, ids) => setOpen((o) => ({ ...o, [key]: ids })),
+      showObject: (id) => latest.current.showObject(id),
+      showToast: (m) => latest.current.showToast(m),
+      makeReport: () => void latest.current.makeReport(),
+      makeDeck: () => void latest.current.makeDeck(),
+    }),
+    [],
+  );
+  // a new Set only when the pane's objects change, not on every streamed chunk
+  const paneKey = objects.map((o) => o.id).join(",");
+  const paneIds = useMemo(() => new Set(paneKey.split(",")), [paneKey]);
 
   const empty = thread.length === 0;
   const intro = splitLead(
@@ -690,23 +803,19 @@ export function Ask({
                 : "min-[1101px]:flex-[0_0_var(--thr)] min-[1101px]:min-w-95"),
           )}
         >
-          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
-            <div className="flex min-h-full flex-col px-4 md:px-6">
-              {/* the page's own header: it scrolls with the conversation instead of sitting in a bar above it */}
-              <header className="flex flex-col gap-3 border-0 border-b border-dashed border-gray-300 pb-4 pt-4 md:flex-row md:items-center md:justify-between md:gap-6 md:pt-6">
-                <div className="min-w-0">
-                  <h1 className="text-xl font-semibold leading-tight text-gray-900">
-                    Chats
-                  </h1>
-                  <p className="text-xs text-gray-500">
-                    {clientName
-                      ? copy.kind === "profile"
-                        ? `About ${clientName}`
-                        : `On the side of ${clientName}`
-                      : copy.label}
-                  </p>
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
+          {/* the header stays put; only the thread between it and the composer scrolls (DESIGN.md 6.3) */}
+          <div className="shrink-0 px-4 md:px-6">
+            <PageHeader
+              title="Chats"
+              subtitle={
+                clientName
+                  ? copy.kind === "profile"
+                    ? `About ${clientName}`
+                    : `On the side of ${clientName}`
+                  : copy.label
+              }
+              actions={
+                <>
                   <span
                     className={cn(
                       "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold",
@@ -731,9 +840,15 @@ export function Ask({
                       ? `${stats.platforms} platforms · ${stats.months} months`
                       : `${stats.brands} brands · ${stats.platforms} platforms · ${stats.months} months`}
                   </span>
-                </div>
-              </header>
-
+                </>
+              }
+            />
+          </div>
+          <div
+            ref={scrollRef}
+            className="min-h-0 flex-1 overflow-y-auto overscroll-contain"
+          >
+            <div ref={contentRef} className="flex min-h-full flex-col px-4 md:px-6">
               {empty && (
                 <div className="flex flex-1 flex-col justify-center py-10 md:py-16">
                   <div className="mx-auto flex w-full max-w-2xl flex-col items-center gap-4 text-center">
@@ -752,307 +867,43 @@ export function Ask({
                 </div>
               )}
               <div
+                role="log"
+                aria-label="Conversation"
+                aria-busy={busy}
                 className={cn("flex flex-col gap-6 pb-6", empty ? "" : "pt-4")}
               >
-                {thread.map((m) =>
-                  m.role === "user" ? (
-                    m.hidden ? (
-                      <div
-                        className="self-center rounded-full border border-card-border bg-white px-3 py-1 text-xs text-gray-500"
-                        key={m.id}
-                      >
-                        {m.text}
-                      </div>
-                    ) : (
-                      <Fragment key={m.id}>
-                        {m.context && <AskContextCard c={m.context} sent />}
-                        <div className="flex max-w-[75%] flex-col gap-2 self-end rounded-2xl rounded-br-md border border-gray-200 bg-gray-100 px-4 py-2.5 text-sm leading-relaxed text-gray-900">
-                          {m.attachments?.length ? (
-                            <div className="flex flex-wrap gap-1.5">
-                              {m.attachments.map((f) => (
-                                <FileTag key={f.id} name={f.filename} />
-                              ))}
-                            </div>
-                          ) : null}
-                          <span className="whitespace-pre-wrap wrap-break-word">
-                            {m.text}
-                          </span>
-                        </div>
-                      </Fragment>
-                    )
-                  ) : (
-                    <div
-                      className="grid grid-cols-[32px_minmax(0,1fr)] gap-3"
-                      key={m.id}
-                    >
-                      <div
-                        aria-hidden="true"
-                        className="flex h-8 w-8 items-center justify-center rounded-xl bg-brand-palette-100 text-xs font-bold text-brand-palette-700"
-                      >
-                        C
-                      </div>
-                      <div className="flex min-w-0 flex-col gap-3.5 text-sm leading-relaxed text-gray-800 [&_b]:font-semibold [&_b]:text-gray-900 [&_li]:pl-1 [&_ul]:flex [&_ul]:list-disc [&_ul]:flex-col [&_ul]:gap-1.5 [&_ul]:pl-5">
-                        {m.activity &&
-                          (m.streaming || m.tools.length === 0) && (
-                            <div
-                              className="flex min-h-8 items-center gap-2 text-sm text-gray-500"
-                              aria-live="polite"
-                            >
-                              {m.activity.done ? (
-                                <IconCheck
-                                  size={16}
-                                  className="text-green-600"
-                                />
-                              ) : (
-                                <Spinner />
-                              )}
-                              {m.activity.text}
-                            </div>
-                          )}
-                        {m.status && !m.activity && (
-                          <div className="flex min-h-8 items-center text-sm text-gray-500">
-                            {m.status}
-                          </div>
-                        )}
-                        {m.text && (
-                          <RichText
-                            text={m.text}
-                            onChip={(id) =>
-                              setOpen((o) => ({
-                                ...o,
-                                [m.id]:
-                                  o[m.id]?.[0] === id && o[m.id].length === 1
-                                    ? []
-                                    : [id],
-                              }))
-                            }
-                          />
-                        )}
-                        {m.tools.map((t) =>
-                          t.name === "export_run" && t.file ? (
-                            <FileChip
-                              key={t.id}
-                              tool={t}
-                              conversationId={conversationId}
-                            />
-                          ) : (
-                            <ResultCard
-                              key={t.id}
-                              tool={t}
-                              evidence={m.evidence}
-                              decisionId={decisionId}
-                              codename={team?.codename}
-                              onOpenEvidence={(ids) =>
-                                setOpen((o) => ({ ...o, [m.id]: ids }))
-                              }
-                              onOpenPane={
-                                objects.some((o) => o.id === t.id)
-                                  ? () => showObject(t.id)
-                                  : undefined
-                              }
-                            />
-                          ),
-                        )}
-                        {m.ask && (
-                          <div className="flex flex-col gap-3 rounded-2xl border border-card-border bg-white p-4">
-                            <div>
-                              <p className="text-sm font-semibold text-gray-900">
-                                {m.ask.question}
-                              </p>
-                              {m.ask.why && (
-                                <p className="text-xs text-gray-500">
-                                  {m.ask.why}
-                                </p>
-                              )}
-                            </div>
-                            <div className="flex flex-wrap gap-2">
-                              {m.ask.options.map((o) => {
-                                const picked =
-                                  m.ask!.answered === o.value ||
-                                  m.ask!.answered === o.label;
-                                return (
-                                  <button
-                                    key={o.value}
-                                    type="button"
-                                    onClick={() => send(o.label)}
-                                    disabled={busy || !!m.ask!.answered}
-                                    aria-pressed={picked}
-                                    className={cn(
-                                      "min-h-10 cursor-pointer rounded-xl border px-3.5 py-2 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-palette-600 disabled:cursor-default",
-                                      picked
-                                        ? "border-brand-palette-300 bg-brand-palette-50 text-brand-palette-700"
-                                        : m.ask!.answered
-                                          ? "border-slate-200 bg-white text-gray-400"
-                                          : "border-slate-200 bg-white text-gray-700 hover:border-brand-palette-300 hover:bg-brand-palette-50 hover:text-brand-palette-700",
-                                    )}
-                                  >
-                                    {o.label}
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        )}
-                        {open[m.id]?.length ? (
-                          <EvidencePanel
-                            ids={open[m.id]}
-                            evidence={m.evidence}
-                            title={`Evidence · ${open[m.id].join(", ")}`}
-                          />
-                        ) : null}
-                        {m.error && (
-                          <p
-                            role="alert"
-                            className="rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-700"
-                          >
-                            {m.error}
-                          </p>
-                        )}
-                        {!m.streaming &&
-                          !m.error &&
-                          !m.text &&
-                          !m.ask &&
-                          m.tools.length === 0 && (
-                            <p
-                              role="alert"
-                              className="rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-700"
-                            >
-                              This answer was cut off before it finished (the
-                              server did not save a reply). Ask again in a new
-                              conversation.
-                            </p>
-                          )}
-                        {!m.streaming && !m.error && m.text && !m.ask && (
-                          <div className="flex flex-wrap items-center gap-2">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() =>
-                                send(
-                                  "Watch this every Monday and only tell me when something changes",
-                                )
-                              }
-                            >
-                              Watch this weekly
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              disabled={!conversationId || busy}
-                              title="A report from this whole conversation: every question, answer, table and its evidence"
-                              onClick={async () => {
-                                if (!conversationId) return;
-                                showToast(
-                                  "Writing the report from this conversation…",
-                                );
-                                const r = await fetch("/api/reports", {
-                                  method: "POST",
-                                  headers: {
-                                    "Content-Type": "application/json",
-                                  },
-                                  body: JSON.stringify({
-                                    conversation_id: conversationId,
-                                  }),
-                                });
-                                const j = await r.json();
-                                if (j.error) {
-                                  showToast(j.error);
-                                  return;
-                                }
-                                router.push(`/reports/${j.id}`);
-                              }}
-                            >
-                              Turn into a report
-                            </Button>
-                            {copy.kind !== "profile" && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                disabled={!conversationId || busy || deckBusy}
-                                title="A deck from this conversation: every analysis becomes a slide, run again for each version, next to a scoreboard and the moves"
-                                onClick={async () => {
-                                  if (!conversationId) return;
-                                  setDeckBusy(true);
-                                  showToast(
-                                    "Making the deck from this conversation… (about a minute)",
-                                  );
-                                  const r = await fetch(
-                                    "/api/decks/from-chat",
-                                    {
-                                      method: "POST",
-                                      headers: {
-                                        "Content-Type": "application/json",
-                                      },
-                                      body: JSON.stringify({
-                                        conversation_id: conversationId,
-                                      }),
-                                    },
-                                  );
-                                  const j = await r.json().catch(() => ({}));
-                                  setDeckBusy(false);
-                                  if (!r.ok || !j.deck) {
-                                    showToast(
-                                      j.error ?? "Could not make the deck",
-                                    );
-                                    return;
-                                  }
-                                  router.push(
-                                    `/decks/${j.deck.id}${j.version?.report_id ? `?v=${j.version.report_id}` : ""}`,
-                                  );
-                                }}
-                              >
-                                {deckBusy
-                                  ? "Making the deck…"
-                                  : "Turn into a deck"}
-                              </Button>
-                            )}
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => {
-                                sendSignal("chat.copy");
-                                navigator.clipboard?.writeText(
-                                  m.text
-                                    .replace(
-                                      /<ev id="(ev_\d+)"><\/ev>/g,
-                                      "[$1]",
-                                    )
-                                    .replace(/<\/?counter>/g, ""),
-                                );
-                                showToast("Copied");
-                              }}
-                            >
-                              Copy
-                            </Button>
-                            {m.miss ? (
-                              <span
-                                className="rounded-full bg-gray-100 px-2.5 py-1 text-xs text-gray-600"
-                                title="citations to evidence that does not exist were removed"
-                              >
-                                evidence_miss {m.miss}
-                              </span>
-                            ) : null}
-                            {m.timings && (
-                              <span
-                                className="rounded-full bg-gray-100 px-2.5 py-1 text-xs text-gray-600"
-                                title={`setup ${m.timings.setup_ms} ms · effort ${m.timings.effort}`}
-                              >
-                                {(m.timings.total_ms / 1000).toFixed(1)}s
-                              </span>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ),
-                )}
-                <div ref={bottomRef} />
+                {thread.map((m) => (
+                  <ThreadMessage
+                    key={m.key}
+                    m={m}
+                    busy={busy}
+                    deckBusy={deckBusy}
+                    conversationId={conversationId}
+                    decisionId={decisionId}
+                    openIds={open[m.key]}
+                    paneIds={paneIds}
+                    kind={copy.kind}
+                    codename={team?.codename}
+                    act={actions}
+                  />
+                ))}
               </div>
             </div>
           </div>
 
           {/* the same space on every side of the input, and the same left edge as the header and the thread above */}
-          <div className="shrink-0 px-4 pb-4 md:px-6 md:pb-6">
+          <div className="relative shrink-0 px-4 pb-4 md:px-6 md:pb-6">
+            {away && !empty && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="absolute -top-12 left-1/2 z-10 -translate-x-1/2 shadow-xs"
+                onClick={() => stick(true)}
+              >
+                <IconChevronDown size={16} aria-hidden="true" />
+                Latest
+              </Button>
+            )}
             {pendingAsk && (
               <div className="mb-3">
                 <AskContextCard
@@ -1299,6 +1150,267 @@ export function Ask({
     </section>
   );
 }
+
+/** what a row may do: one object whose functions never change, so a row re-renders only when its own props do */
+type RowActions = {
+  send: (message: string) => void;
+  toggleEvidence: (key: string, id: string) => void;
+  openEvidence: (key: string, ids: string[]) => void;
+  showObject: (id: string) => void;
+  showToast: (m: string) => void;
+  makeReport: () => void;
+  makeDeck: () => void;
+};
+
+/**
+ * One turn in the thread. Memoised: while a reply streams only that message changes identity (`update` maps the
+ * others through untouched), so earlier answers, their cards and charts are not drawn again for every chunk.
+ */
+const ThreadMessage = memo(function ThreadMessage({
+  m,
+  busy,
+  deckBusy,
+  conversationId,
+  decisionId,
+  openIds,
+  paneIds,
+  kind,
+  codename,
+  act,
+}: {
+  m: Msg;
+  busy: boolean;
+  deckBusy: boolean;
+  conversationId: string | null;
+  decisionId: string | null;
+  openIds: string[] | undefined;
+  paneIds: Set<string>;
+  kind: string;
+  codename: string | undefined;
+  act: RowActions;
+}) {
+  return m.role === "user" ? (
+    m.hidden ? (
+      <div className="self-center rounded-full border border-card-border bg-white px-3 py-1 text-xs text-gray-500">
+        {m.text}
+      </div>
+    ) : (
+      <>
+        {m.context && <AskContextCard c={m.context} sent />}
+        <div className="flex max-w-[75%] flex-col gap-2 self-end rounded-2xl rounded-br-md border border-gray-200 bg-gray-100 px-4 py-2.5 text-sm leading-relaxed text-gray-900">
+          {m.attachments?.length ? (
+            <div className="flex flex-wrap gap-1.5">
+              {m.attachments.map((f) => (
+                <FileTag key={f.id} name={f.filename} />
+              ))}
+            </div>
+          ) : null}
+          <span className="whitespace-pre-wrap wrap-break-word">
+            {m.text}
+          </span>
+        </div>
+      </>
+    )
+  ) : (
+    <div className="grid grid-cols-[32px_minmax(0,1fr)] gap-3">
+      <div
+        aria-hidden="true"
+        className="flex h-8 w-8 items-center justify-center rounded-xl bg-brand-palette-100 text-xs font-bold text-brand-palette-700"
+      >
+        C
+      </div>
+      <div className="flex min-w-0 flex-col gap-3.5 text-sm leading-relaxed text-gray-800 [&_b]:font-semibold [&_b]:text-gray-900 [&_li]:pl-1 [&_ul]:flex [&_ul]:list-disc [&_ul]:flex-col [&_ul]:gap-1.5 [&_ul]:pl-5">
+        {m.activity &&
+          (m.streaming || m.tools.length === 0) && (
+            <div
+              className="flex min-h-8 items-center gap-2 text-sm text-gray-500"
+              aria-live="polite"
+            >
+              {m.activity.done ? (
+                <IconCheck
+                  size={16}
+                  className="text-green-600"
+                />
+              ) : (
+                <Spinner />
+              )}
+              {m.activity.text}
+            </div>
+          )}
+        {m.status && !m.activity && (
+          <div className="flex min-h-8 items-center text-sm text-gray-500">
+            {m.status}
+          </div>
+        )}
+        {m.text && (
+          <RichText
+            text={m.text}
+            onChip={(id) => act.toggleEvidence(m.key, id)}
+          />
+        )}
+        {m.tools.map((t) =>
+          t.name === "export_run" && t.file ? (
+            <FileChip
+              key={t.id}
+              tool={t}
+              conversationId={conversationId}
+            />
+          ) : (
+            <ResultCard
+              key={t.id}
+              tool={t}
+              evidence={m.evidence}
+              decisionId={decisionId}
+              codename={codename}
+              onOpenEvidence={(ids) => act.openEvidence(m.key, ids)}
+              onOpenPane={paneIds.has(t.id) ? () => act.showObject(t.id) : undefined}
+            />
+          ),
+        )}
+        {m.ask && (
+          <div className="flex flex-col gap-3 rounded-2xl border border-card-border bg-white p-4">
+            <div>
+              <p className="text-sm font-semibold text-gray-900">
+                {m.ask.question}
+              </p>
+              {m.ask.why && (
+                <p className="text-xs text-gray-500">
+                  {m.ask.why}
+                </p>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {m.ask.options.map((o) => {
+                const picked =
+                  m.ask!.answered === o.value ||
+                  m.ask!.answered === o.label;
+                return (
+                  <button
+                    key={o.value}
+                    type="button"
+                    onClick={() => act.send(o.label)}
+                    disabled={busy || !!m.ask!.answered}
+                    aria-pressed={picked}
+                    className={cn(
+                      "min-h-10 cursor-pointer rounded-xl border px-3.5 py-2 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-palette-600 disabled:cursor-default",
+                      picked
+                        ? "border-brand-palette-300 bg-brand-palette-50 text-brand-palette-700"
+                        : m.ask!.answered
+                          ? "border-slate-200 bg-white text-gray-400"
+                          : "border-slate-200 bg-white text-gray-700 hover:border-brand-palette-300 hover:bg-brand-palette-50 hover:text-brand-palette-700",
+                    )}
+                  >
+                    {o.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+        {openIds?.length ? (
+          <EvidencePanel
+            ids={openIds}
+            evidence={m.evidence}
+            title={`Evidence · ${openIds.join(", ")}`}
+          />
+        ) : null}
+        {m.error && (
+          <p
+            role="alert"
+            className="rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-700"
+          >
+            {m.error}
+          </p>
+        )}
+        {!m.streaming &&
+          !m.error &&
+          !m.text &&
+          !m.ask &&
+          m.tools.length === 0 && (
+            <p
+              role="alert"
+              className="rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-700"
+            >
+              This answer was cut off before it finished (the
+              server did not save a reply). Ask again in a new
+              conversation.
+            </p>
+          )}
+        {!m.streaming && !m.error && m.text && !m.ask && (
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() =>
+                act.send(
+"Watch this every Monday and only tell me when something changes",
+                )
+              }
+            >
+              Watch this weekly
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={!conversationId || busy}
+              title="A report from this whole conversation: every question, answer, table and its evidence"
+              onClick={act.makeReport}
+            >
+              Turn into a report
+            </Button>
+            {kind !== "profile" && (
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={!conversationId || busy || deckBusy}
+                title="A deck from this conversation: every analysis becomes a slide, run again for each version, next to a scoreboard and the moves"
+                onClick={act.makeDeck}
+              >
+                {deckBusy
+                  ? "Making the deck…"
+                  : "Turn into a deck"}
+              </Button>
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                sendSignal("chat.copy");
+                navigator.clipboard?.writeText(
+                  m.text
+                    .replace(
+                      /<ev id="(ev_\d+)"><\/ev>/g,
+                      "[$1]",
+                    )
+                    .replace(/<\/?counter>/g, ""),
+                );
+                act.showToast("Copied");
+              }}
+            >
+              Copy
+            </Button>
+            {m.miss ? (
+              <span
+                className="rounded-full bg-gray-100 px-2.5 py-1 text-xs text-gray-600"
+                title="citations to evidence that does not exist were removed"
+              >
+                evidence_miss {m.miss}
+              </span>
+            ) : null}
+            {m.timings && (
+              <span
+                className="rounded-full bg-gray-100 px-2.5 py-1 text-xs text-gray-600"
+                title={`setup ${m.timings.setup_ms} ms · effort ${m.timings.effort}`}
+              >
+                {(m.timings.total_ms / 1000).toFixed(1)}s
+              </span>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+});
 
 /** the first sentence of the empty screen's intro, and what follows it; one sentence leads alone */
 export function splitLead(s: string): { lead: string; rest: string } {
