@@ -45,7 +45,7 @@ export default async function RoleLearning({ params }: { params: Promise<{ role:
     <section className="screen">
       <div className="topbar">
         <div><h1><Link href="/admin/roles">Roles</Link> / {r.codename} · learning</h1><span className="meta">{ids.length} workspace{ids.length === 1 ? "" : "s"} learn for {r.codename} · insights need {INSIGHT_FLOOR} or more behind them · last {INSIGHT_WINDOW_DAYS} days, clients only</span></div>
-        {can(actor, "role.draft") && <Act label="Roll up now" url="/api/admin/learning" body={{ action: "rollup" }} className="btn sm" done="Done." />}
+        {can(actor, "role.draft") && <Act label="Roll up now" url="/api/admin/learning" body={{ action: "rollup" }} variant="outline" done="Done." />}
       </div>
       <div className="wrap wide cms">
         <div className="cmsblock" data-tone={r.tone}>

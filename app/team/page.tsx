@@ -5,6 +5,7 @@ import { listMembers } from "@/auth/accounts";
 import { listInvites } from "@/auth/invites";
 import { ROLES } from "@/roles/model";
 import { getWorkspace } from "@/workspace/store";
+import { PageHeader } from "@/ui/kit/PageHeader";
 import { TeamManager } from "@/ui/TeamManager";
 
 export const dynamic = "force-dynamic";
@@ -17,11 +18,9 @@ export default async function TeamPage() {
   // a Builder sees and invites to the teams they are on; Fair sees every team
   const roles = rolesFor(actor, ws, cfg?.roles ?? []).map((r) => ({ id: r, label: ROLES[r].label, codename: ROLES[r].codename }));
   return (
-    <section className="screen">
-      <div className="topbar"><div><h1>Team</h1><span className="meta">{cfg?.name ?? ws} · {members.length} {members.length === 1 ? "person" : "people"}</span></div></div>
-      <div className="wrap wide">
-        <TeamManager workspaceId={ws} workspaceName={cfg?.name ?? ws} roles={roles} members={members} invites={invites} canBuilders={can(actor, "workspace.builders", { workspace: ws })} meUid={actor.uid} />
-      </div>
+    <section data-tw className="flex min-h-full flex-col gap-6 px-4 pb-10 md:px-6">
+      <PageHeader title="Team" subtitle={`${cfg?.name ?? ws} · ${members.length} ${members.length === 1 ? "person" : "people"}`} />
+      <TeamManager workspaceId={ws} workspaceName={cfg?.name ?? ws} roles={roles} members={members} invites={invites} canBuilders={can(actor, "workspace.builders", { workspace: ws })} meUid={actor.uid} />
     </section>
   );
 }

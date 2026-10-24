@@ -175,7 +175,7 @@ export default async function WorkspaceData({ params, searchParams }: { params: 
             <>
               <div className="row">
                 <span>{sg.learning ? <>Learning across clients is <b>on</b>: its signals count in each role&apos;s insights, anonymously and only with two other workspaces beside it.</> : <>Learning across clients is <b>off</b> (its contract): its signals stay on this page.</>}</span>
-                <Act label={sg.learning ? "Switch learning off" : "Switch learning on"} url="/api/admin/learning" body={{ action: "learning", ws: d.id, on: !sg.learning }} className="btn sm" confirm={sg.learning ? "Keep this workspace's signals out of the roll-ups across clients?" : undefined} />
+                <Act label={sg.learning ? "Switch learning off" : "Switch learning on"} url="/api/admin/learning" body={{ action: "learning", ws: d.id, on: !sg.learning }} variant="outline" confirm={sg.learning ? "Keep this workspace's signals out of the roll-ups across clients?" : undefined} />
               </div>
               <p className="muted">Last {INSIGHT_WINDOW_DAYS} days. A signal carries ids and choices only: never a question, an answer, a post, a house rule&apos;s wording or a number from the data.{sg.last ? ` Latest ${when(sg.last)}.` : ""}</p>
               {Object.keys(sg.byRole).length === 0 && <p className="muted">No signals yet.</p>}

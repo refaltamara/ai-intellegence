@@ -222,7 +222,7 @@ Most things sit flat on a border. Shadow marks something that floats.
 ```
 
 - Pair title block and actions with `md:items-center`, not `items-start`.
-- Chats, Decks (list, New deck, Edit, a deck and its versions), Weekly Reports, Reports (list, a schedule, a report) and the Dashboard (every team's, the Pulse and a case) use the compact version of this header instead (6.3, `PageHeader` in the kit). A page rebuilt next to them should use it too.
+- Chats, Decks (list, New deck, Edit, a deck and its versions), Weekly Reports, Reports (list, a schedule, a report), the Dashboard (every team's, the Pulse and a case), Data (and a brand's page under it), Team, Connect and Our {codename} use the compact version of this header instead (6.3, `PageHeader` in the kit). A page rebuilt next to them should use it too.
 - Page horizontal padding: `px-4 md:px-6`. Content is **full width**: no `max-w-*` container on app pages, forms included (a long form fills the width with responsive grids, `md:grid-cols-2 xl:grid-cols-3`, instead of leaving the right side empty). The only exceptions are reading width for long prose and the full-screen family (sign-in, team picker), whose centred column is part of the layout.
 - Sections stack with `gap-6`.
 
@@ -279,7 +279,7 @@ Tailwind defaults: `sm` 640, `md` 768 (sidebar becomes a drawer below it), `lg` 
 
 **`PageHeader`** (`PageHeader.tsx`): the compact header Chats has (6.3): `h1 text-xl`, `text-xs` subtitle flush under it (a string or a node, such as a "Decks" link · "no version yet"), an actions slot, and the dashed line. Decks, its child pages, Weekly Reports and Reports use it.
 
-**`Modal`, `ConfirmDialog`, `PromptDialog`** (`Modal.tsx`): the modal spec in 6.2, portalled to the body. Focus goes to the text field or the first control, Tab stays inside, and Escape or the backdrop closes it, with focus returned to the opener. `ConfirmDialog` takes `danger` (a `bg-red-600` primary) and `busy`. `PromptDialog` is one labelled `TextField` whose Save stays off while it is empty. Use these instead of `confirm()`, `prompt()` and `alert()`.
+**`Modal`, `ConfirmDialog`, `PromptDialog`** (`Modal.tsx`): the modal spec in 6.2, portalled to the body. Focus goes to the text field or the first control, Tab stays inside, and Escape or the backdrop closes it, with focus returned to the opener. `ConfirmDialog` takes `danger` (a `bg-red-600` primary) and `busy`. `PromptDialog` is one labelled `TextField` whose Save stays off while it is empty, unless the answer is `optional` (a note, a value whose empty means "none"). Use these instead of `confirm()`, `prompt()` and `alert()`.
 
 **`Toast`, `useToast()`** (`Toast.tsx`): the toast spec in 6.2. `const toast = useToast(); toast.show("Saved.")` and render `<Toast text={toast.text} />` once.
 

@@ -38,7 +38,7 @@ export default async function CreditsPage() {
             {st.enforce ? "At the limit, CeMO and anything that uses it stop until next month; dashboards keep working." : "Credits are recorded but nothing stops yet: Fair turns billing on when your plan starts."}
           </p>
           <div className="acts left">
-            <Act label={st.cap != null ? "Change the cap" : "Set a monthly cap"} className="btn sm" url="/api/builder/credits" body={{}} ask="Monthly cap in credits (empty for none)" />
+            <Act label={st.cap != null ? "Change the cap" : "Set a monthly cap"} variant="outline" url="/api/builder/credits" body={{}} ask="Monthly cap in credits (empty for none)" />
             {st.cap != null && <Act label="Remove the cap" url="/api/builder/credits" body={{ cap: null }} />}
           </div>
         </div>

@@ -60,11 +60,11 @@ export function ConfirmDialog({ open, title, body, confirmLabel, danger, busy, o
   );
 }
 
-/** one line of text, such as a name; Save stays off while it is empty */
-export function PromptDialog({ open, title, body, label, initial = "", confirmLabel = "Save", maxLength = 80, busy, onSubmit, onClose }: { open: boolean; title: string; body?: ReactNode; label: string; initial?: string; confirmLabel?: string; maxLength?: number; busy?: boolean; onSubmit: (value: string) => void; onClose: () => void }) {
+/** one line of text, such as a name; Save stays off while it is empty unless the answer is `optional` (a note, "empty for none") */
+export function PromptDialog({ open, title, body, label, initial = "", confirmLabel = "Save", maxLength = 80, optional, busy, onSubmit, onClose }: { open: boolean; title: string; body?: ReactNode; label: string; initial?: string; confirmLabel?: string; maxLength?: number; optional?: boolean; busy?: boolean; onSubmit: (value: string) => void; onClose: () => void }) {
   const [value, setValue] = useState(initial);
   useEffect(() => { if (open) setValue(initial); }, [open, initial]);
-  const ok = value.trim().length > 0;
+  const ok = optional || value.trim().length > 0;
   return (
     <Modal open={open} title={title} onClose={onClose} footer={
       <>
