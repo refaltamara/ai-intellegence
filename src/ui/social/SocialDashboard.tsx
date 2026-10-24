@@ -97,7 +97,7 @@ export function SocialDashboard({ d, client, view }: { d: SocialData; client: st
       <SectionCard title={t} hint={<>Each of {who}&apos;s own accounts in {range}.</>}>
         {d.accounts.length === 0 ? <Empty>No own posts in these days.</Empty> : (
           <div className={TABLE_FRAME}>
-            <table className={cn(TABLE, "min-w-[900px]")}><thead className={THEAD}><tr><th className={TH}>Account</th><th className={TH_NUM}>Posts</th><th className={TH_NUM}>A week</th><th className={TH_NUM}>Typical post</th><th className={TH_NUM}>Typical views</th><th className={TH_NUM}>Eng. rate</th><th className={TH_NUM}>Comments</th><th className={TH_NUM}>Negative</th><th className={TH_NUM}>Replies</th></tr></thead>
+            <table className={cn(TABLE, "min-w-225")}><thead className={THEAD}><tr><th className={TH}>Account</th><th className={TH_NUM}>Posts</th><th className={TH_NUM}>A week</th><th className={TH_NUM}>Typical post</th><th className={TH_NUM}>Typical views</th><th className={TH_NUM}>Eng. rate</th><th className={TH_NUM}>Comments</th><th className={TH_NUM}>Negative</th><th className={TH_NUM}>Replies</th></tr></thead>
               <tbody>{d.accounts.map((a) => (
                 <tr key={a.platform + a.handle} className={TR}><td className={TD}><span className="flex items-center gap-1.5"><PlatformTag p={a.platform} /><b className="font-semibold text-gray-900">@{a.handle}</b></span></td><td className={TD_NUM}>{int(a.posts)}</td><td className={TD_NUM}>{a.per_week.toFixed(1)}</td><td className={TD_NUM}>{int(a.median_eng)}</td><td className={TD_NUM}>{a.median_views == null ? "–" : compact(a.median_views)}</td><td className={TD_NUM}>{a.er == null ? "–" : pct(a.er, 2)}</td><td className={TD_NUM}>{int(a.comments)}</td><td className={TD_NUM}>{pct(a.neg_pct)}</td><td className={TD_NUM}>{int(a.replies)}</td></tr>))}
               </tbody>
@@ -128,7 +128,7 @@ export function SocialDashboard({ d, client, view }: { d: SocialData; client: st
     timing: (t) => (
       <SectionCard title={t} hint={<>Typical engagement by day and time (WIB); cells with fewer than three posts are blank.{bestCell ? ` Best: ${DOW[bestCell.dow]} ${bestCell.band.toLowerCase()}.` : ""}</>}>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[520px] border-separate border-spacing-1 text-sm">
+          <table className="w-full min-w-130 border-separate border-spacing-1 text-sm">
             <thead><tr><th className="w-12" />{BAND_ORDER.map((b) => <th key={b} className="px-2 py-1 text-center text-xs font-semibold text-gray-900">{b}<small className="block font-regular text-[11px] text-gray-500">{BAND_HOURS[b]}</small></th>)}</tr></thead>
             <tbody>{[1, 2, 3, 4, 5, 6, 7].map((dow) => (
               <tr key={dow}><th className="pr-2 text-left text-xs font-semibold text-gray-700">{DOW[dow]}</th>{BAND_ORDER.map((b) => {
@@ -155,7 +155,7 @@ export function SocialDashboard({ d, client, view }: { d: SocialData; client: st
     competitors: (t) => (
       <SectionCard title={t} hint={<>Every brand&apos;s own accounts on the same measures, {range}.</>}>
         <div className={TABLE_FRAME}>
-          <table className={cn(TABLE, "min-w-[980px]")}><thead className={THEAD}><tr><th className={TH}>Brand</th><th className={TH_NUM}>Posts</th><th className={TH_NUM}>A week</th><th className={TH_NUM}>Typical post</th><th className={TH_NUM}>Typical views</th><th className={TH_NUM}>Comments</th><th className={TH_NUM}>Negative</th><th className={TH}>Best post</th></tr></thead>
+          <table className={cn(TABLE, "min-w-245")}><thead className={THEAD}><tr><th className={TH}>Brand</th><th className={TH_NUM}>Posts</th><th className={TH_NUM}>A week</th><th className={TH_NUM}>Typical post</th><th className={TH_NUM}>Typical views</th><th className={TH_NUM}>Comments</th><th className={TH_NUM}>Negative</th><th className={TH}>Best post</th></tr></thead>
             <tbody>{d.competitors.length === 0 ? <tr><td colSpan={8} className={EMPTY_ROW}>No brand has own posts in these days.</td></tr> : d.competitors.map((c) => (
               <tr key={c.id} className={cn(TR, c.is_focus && "bg-brand-palette-50/60")}><td className={TD}><b className="font-semibold text-gray-900">{c.name}</b>{c.is_focus && <span className="ml-1.5"><Tag tone="brand">you</Tag></span>}</td><td className={TD_NUM}>{int(c.posts)}</td><td className={TD_NUM}>{c.per_week.toFixed(1)}</td><td className={TD_NUM}>{int(c.median_eng)}</td><td className={TD_NUM}>{c.median_views == null ? "–" : compact(c.median_views)}</td><td className={TD_NUM}>{int(c.comments)}</td><td className={TD_NUM}>{pct(c.neg_pct)}</td>
                 <td className={cn(TD, "max-w-80")}>{c.top ? <a href={c.top.url} target="_blank" rel="noreferrer" className="flex items-start gap-1.5 text-gray-700 hover:text-brand-palette-700"><PlatformTag p={c.top.platform} /><span className="line-clamp-2"><b className="font-semibold tabular-nums text-gray-900">{int(c.top.engagements)}</b> · {c.top.caption.slice(0, 70)}{c.top.caption.length > 70 ? "…" : ""}</span></a> : <span className="text-gray-500">–</span>}</td></tr>))}
@@ -169,7 +169,7 @@ export function SocialDashboard({ d, client, view }: { d: SocialData; client: st
         actions={<AskLink href={ask(`Draft replies to the most-liked comments under ${who}'s own posts between ${dayMonth(f.from)} and ${dayMonth(f.to)}.`)}>Draft replies</AskLink>}>
         <div className={TWO}>
           <div className={TABLE_FRAME}>
-            <table className={cn(TABLE, "min-w-[520px]")}><thead className={THEAD}><tr><th className={TH}>Topic</th><th className={TH_NUM}>Comments</th><th className={TH_NUM}>Share</th><th className={TH_NUM}>Negative</th><th className={TH_NUM}>Purchase intent</th></tr></thead>
+            <table className={cn(TABLE, "min-w-130")}><thead className={THEAD}><tr><th className={TH}>Topic</th><th className={TH_NUM}>Comments</th><th className={TH_NUM}>Share</th><th className={TH_NUM}>Negative</th><th className={TH_NUM}>Purchase intent</th></tr></thead>
               <tbody>{d.topics.length === 0 ? <tr><td colSpan={5} className={EMPTY_ROW}>No comments with a topic in these days.</td></tr> : d.topics.map((t) => <tr key={t.topic} className={TR}><td className={TD}>{t.topic}</td><td className={TD_NUM}>{int(t.comments)}</td><td className={TD_NUM}>{pct(t.share)}</td><td className={TD_NUM}>{pct(t.neg_pct)}</td><td className={TD_NUM}>{pct(t.intent_pct)}</td></tr>)}</tbody>
             </table>
           </div>
@@ -184,7 +184,7 @@ export function SocialDashboard({ d, client, view }: { d: SocialData; client: st
       <SectionCard title={t} hint="Own-account capture per brand and platform. A day with far more posts than an account publishes is flagged above."
         actions={<AskLink href={ask(`What worked on ${who}'s own accounts between ${dayMonth(f.from)} and ${dayMonth(f.to)}, and what should we post next week?`)}>Ask CeMO what to post next</AskLink>}>
         <div className={TABLE_FRAME}>
-          <table className={cn(TABLE, "min-w-[820px]")}><thead className={THEAD}><tr><th className={TH}>Brand</th><th className={TH}>Platform</th><th className={TH}>Accounts</th><th className={TH_NUM}>Own posts</th><th className={TH}>Captured</th><th className={TH_NUM}>Busiest day</th></tr></thead>
+          <table className={cn(TABLE, "min-w-205")}><thead className={THEAD}><tr><th className={TH}>Brand</th><th className={TH}>Platform</th><th className={TH}>Accounts</th><th className={TH_NUM}>Own posts</th><th className={TH}>Captured</th><th className={TH_NUM}>Busiest day</th></tr></thead>
             <tbody>{d.capture.map((c) => (
               <tr key={c.brand + c.platform} className={cn(TR, c.brand === who && "bg-brand-palette-50/60")}><td className={TD}>{c.brand}</td><td className={TD}><span className="flex items-center gap-1.5"><PlatformTag p={c.platform} />{PLATFORM[c.platform] ?? c.platform}</span></td><td className={TD}>{c.handles.map((h) => `@${h}`).join(", ")}</td><td className={TD_NUM}>{int(c.posts)}</td><td className={cn(TD, "whitespace-nowrap")}>{dayMonth(c.first)} to {dayMonth(c.last)}</td><td className={cn(TD_NUM, c.busiest >= 20 && "font-semibold text-red-700")}>{int(c.busiest)}{c.busiest_day ? ` · ${dayMonth(c.busiest_day)}` : ""}{c.busiest >= 20 && <small className={SUB}>more than an account publishes</small>}</td></tr>))}
             </tbody>
