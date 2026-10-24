@@ -2,6 +2,7 @@
 /** Which brand CeMO is on the side of. Fair (owners or data ops) sets it; everyone sees it. */
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { SelectInput } from "./kit/SelectInput";
 
 export function ClientBrand({ brands, current, canEdit, productName = "CeMO", kind = "category" }: { brands: { id: string; name: string }[]; current: string | null; canEdit: boolean; productName?: string; kind?: string }) {
   const router = useRouter();
@@ -28,10 +29,8 @@ export function ClientBrand({ brands, current, canEdit, productName = "CeMO", ki
       </div>
       {canEdit ? (
         <div className="pick">
-          <select value={value} onChange={(e) => setValue(e.target.value)}>
-            <option value="">None — no client</option>
-            {brands.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-          </select>
+          <SelectInput withSearch size="sm" className="w-auto min-w-56" ariaLabel="Client brand" value={value} onChange={setValue} searchPlaceholder="Search brands"
+            options={[{ value: "", label: "None (no client)" }, ...brands.map((b) => ({ value: b.id, label: b.name }))]} />
           <button className="btn pri sm" onClick={save} disabled={busy || (value || null) === (current ?? null)}>{busy ? "Saving…" : "Save"}</button>
           {msg && <span className="hint">{msg}</span>}
         </div>

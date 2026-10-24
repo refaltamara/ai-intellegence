@@ -94,8 +94,8 @@ function AnalysisCard({ tool, evidence, onOpenEvidence, decisionId = null, onOpe
               <div className="overflow-x-auto">
                 <table className="w-full border-collapse text-sm">
                   <thead>
-                    <tr className="border-y border-gray-100 bg-gray-50">
-                      {cols.map((c) => <th key={c} className={cn("whitespace-nowrap px-4 py-2.5 text-left text-xs font-semibold capitalize text-gray-700", numeric(c) && "text-right")}>{c.replace(/_/g, " ")}</th>)}
+                    <tr className="border-0 border-y border-card-border bg-white">
+                      {cols.map((c) => <th key={c} className={cn("whitespace-nowrap px-4 py-2.5 text-left text-sm font-semibold capitalize text-gray-900", numeric(c) && "text-right")}>{c.replace(/_/g, " ")}</th>)}
                       {onOpenEvidence && <th className="px-4 py-2.5"><span className="sr-only">Evidence</span></th>}
                     </tr>
                   </thead>

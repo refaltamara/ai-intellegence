@@ -20,7 +20,8 @@ import { fmtDate, fmtNum } from "./format";
 import { columnsOf, cellOf } from "./ResultCard";
 import { cn } from "./cn";
 import { Button } from "./kit/Button";
-import { Chip, Field, NativeSelect, TextField } from "./kit/Form";
+import { Chip, Field, TextField } from "./kit/Form";
+import { SelectInput } from "./kit/SelectInput";
 
 /** a Refine drawer: under the pane's header, above the list it re-runs */
 const REFINE = "mx-5 mt-3 flex shrink-0 flex-col gap-4 rounded-2xl border border-card-border bg-gray-50 p-4";
@@ -62,7 +63,7 @@ export function Pane(p: Props) {
     <aside aria-label="Evidence" className={cn(
       "flex min-h-0 min-w-0 flex-col bg-white font-sans",
       "min-[1101px]:flex-1 min-[1101px]:border-l min-[1101px]:border-gray-200",
-      "max-[1100px]:fixed max-[1100px]:inset-x-0 max-[1100px]:bottom-0 max-[1100px]:z-[45] max-[1100px]:h-[72vh] max-[1100px]:rounded-t-3xl max-[1100px]:border-t max-[1100px]:border-gray-200 max-[1100px]:shadow-2xl",
+      "max-[1100px]:fixed max-[1100px]:inset-x-0 max-[1100px]:bottom-0 max-[1100px]:z-45 max-[1100px]:h-[72vh] max-[1100px]:rounded-t-3xl max-[1100px]:border-t max-[1100px]:border-gray-200 max-[1100px]:shadow-2xl",
     )}>
       <div className="flex shrink-0 items-stretch border-b border-gray-200 max-[1100px]:rounded-t-3xl">
         <div role="tablist" aria-label="Open results" className="no-scrollbar flex min-w-0 flex-1 overflow-x-auto">
@@ -229,18 +230,18 @@ function DataObject({ obj, p }: { obj: PaneObject; p: Props }) {
             <div className="overflow-x-auto rounded-2xl border border-card-border">
               <table className="w-full border-collapse text-sm">
                 <thead>
-                  <tr className="border-b border-gray-100 bg-gray-50">
+                  <tr className="border-0 border-b border-card-border bg-white">
                     {runId && (
                       <th className="w-10 px-3 py-2.5">
                         <input type="checkbox" aria-label="Select every row shown" className="h-4 w-4 cursor-pointer accent-brand-palette-600" checked={visible.length > 0 && visible.every((r) => selected.has(keyOf(r)) || excluded.has(keyOf(r)))} onChange={(e) => setSelected(e.target.checked ? new Set(visible.filter((r) => !excluded.has(keyOf(r))).map(keyOf)) : new Set())} />
                       </th>
                     )}
-                    <th className="w-10 px-3 py-2.5 text-left text-xs font-semibold text-gray-500">#</th>
+                    <th className="w-10 px-3 py-2.5 text-left text-sm font-semibold text-gray-900">#</th>
                     {cols.map((c) => {
                       const on = state.sort?.key === c;
                       return (
-                        <th key={c} aria-sort={on ? (state.sort!.dir === "desc" ? "descending" : "ascending") : undefined} className={cn("whitespace-nowrap px-3 py-2.5 text-xs font-semibold", numeric(c) ? "text-right" : "text-left")}>
-                          <button type="button" onClick={() => sortBy(c)} className={cn("cursor-pointer rounded-md hover:text-brand-palette-700 focus-visible:outline-2 focus-visible:outline-brand-palette-600", on ? "text-brand-palette-700" : "text-gray-700")}>
+                        <th key={c} aria-sort={on ? (state.sort!.dir === "desc" ? "descending" : "ascending") : undefined} className={cn("whitespace-nowrap px-3 py-2.5 text-sm font-semibold", numeric(c) ? "text-right" : "text-left")}>
+                          <button type="button" onClick={() => sortBy(c)} className={cn("cursor-pointer rounded-md hover:text-brand-palette-700 focus-visible:outline-2 focus-visible:outline-brand-palette-600", on ? "text-brand-palette-700" : "text-gray-900")}>
                             {columnLabel(c)}{on ? (state.sort!.dir === "desc" ? " ↓" : " ↑") : ""}
                           </button>
                         </th>
@@ -346,12 +347,14 @@ function RefineWindow({ params, months, onApply, onCancel }: { params: Record<st
   return (
     <div className={REFINE}>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Field label="Window">
-          <NativeSelect value={mode} onChange={(e) => setMode(e.target.value as "days" | "months")}><option value="days">Last N days of data</option><option value="months">Specific months</option></NativeSelect>
+        <Field label="Window" group>
+          <SelectInput withSearch size="sm" ariaLabel="Window" value={mode} onChange={(v) => setMode(v as "days" | "months")}
+            options={[{ value: "days", label: "Last N days of data" }, { value: "months", label: "Specific months" }]} />
         </Field>
         {hasPlatform && (
-          <Field label="Platform">
-            <NativeSelect value={platform} onChange={(e) => setPlatform(e.target.value)}><option value="all">All</option><option value="tiktok">TikTok</option><option value="instagram">Instagram</option></NativeSelect>
+          <Field label="Platform" group>
+            <SelectInput withSearch size="sm" ariaLabel="Platform" value={platform} onChange={setPlatform}
+              options={[{ value: "all", label: "All" }, { value: "tiktok", label: "TikTok" }, { value: "instagram", label: "Instagram" }]} />
           </Field>
         )}
         {mode === "days" ? (
@@ -404,8 +407,9 @@ function DraftObject({ obj, decisionId, onDone, toast }: { obj: PaneObject; deci
     <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-5 py-4">
       <p className="text-sm text-gray-600">Here is how I read that. Change anything, then schedule it; you can edit it later under Reports.</p>
       <Field label="Name"><TextField value={name} onChange={(e) => setName(e.target.value)} /></Field>
-      <Field label="When">
-        <NativeSelect value={cron} onChange={(e) => setCron(e.target.value)}>{SCHEDULES.map((s) => <option key={s.cron} value={s.cron}>{s.human}</option>)}{!known && <option value={cron}>{sched.human ?? cron}</option>}</NativeSelect>
+      <Field label="When" group>
+        <SelectInput withSearch size="sm" ariaLabel="When" value={cron} onChange={setCron}
+          options={[...SCHEDULES.map((s) => ({ value: s.cron, label: s.human })), ...(!known ? [{ value: cron, label: sched.human ?? cron }] : [])]} />
       </Field>
       <Field label="Email the findings to" hint="optional"><TextField type="email" value={email} placeholder="email@example.com" onChange={(e) => setEmail(e.target.value)} /></Field>
       <label className="flex cursor-pointer items-center gap-2.5 text-sm text-gray-800">

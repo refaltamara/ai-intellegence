@@ -7,6 +7,9 @@
  * (6 to 8 Oct) is one click away, not the last line of a list.
  */
 import { useState } from "react";
+import { TextField } from "../kit/Form";
+import { SelectInput } from "../kit/SelectInput";
+import { Segmented } from "../kit/Segmented";
 
 const DAY = "day";
 const RANGE = "range";
@@ -42,30 +45,29 @@ export function PeriodPick({ periods, value, onChange, range, day, replaced }: {
   const unit = day ? "day" : /W\d/.test(periods[0]?.key ?? "") ? "week" : "month";
   const n = from && to ? Math.abs(daysIn(from <= to ? from : to, from <= to ? to : from)) : 0;
   return (
-    <span className="periodpick">
+    <span className="flex flex-wrap items-center gap-2">
       {range && (
-        <span className="seg sm" role="group" aria-label="How many days">
-          <button type="button" className={mode !== RANGE ? "on" : ""} onClick={toList}>{day ? "One day" : `One ${unit}`}</button>
-          <button type="button" className={mode === RANGE ? "on" : ""} onClick={toRange}>{day ? "Several days" : "Chosen dates"}</button>
-        </span>
+        <Segmented size="sm" label="How many days" value={mode === RANGE ? RANGE : "list"} onChange={(k) => (k === RANGE ? toRange() : toList())}
+          options={[{ key: "list", label: day ? "One day" : `One ${unit}` }, { key: RANGE, label: day ? "Several days" : "Chosen dates" }]} />
       )}
       {mode !== RANGE && (
-        <select value={mode === "list" ? value : mode} onChange={(e) => pick(e.target.value)} aria-label={day ? "Day" : unit === "week" ? "Week" : "Month"}>
-          {periods.map((p) => <option key={p.key} value={p.key}>{p.label}{replaced?.(p.key) ? " (replace)" : ""}</option>)}
-          {range && day && <option value={DAY}>Another day…</option>}
-        </select>
+        <SelectInput withSearch size="sm" className="w-auto min-w-56" value={mode === "list" ? value : mode} onChange={pick} ariaLabel={day ? "Day" : unit === "week" ? "Week" : "Month"}
+          options={[
+            ...periods.map((p) => ({ value: p.key, label: `${p.label}${replaced?.(p.key) ? " (replace)" : ""}` })),
+            ...(range && day ? [{ value: DAY, label: "Another day…" }] : []),
+          ]} />
       )}
       {range && mode === DAY && (
-        <span className="dates">
-          <input type="date" value={one} {...bounds} onChange={(e) => { setOne(e.target.value); onChange(e.target.value); }} aria-label="Day" />
+        <span className="flex flex-wrap items-center gap-2 text-xs text-gray-500">
+          <TextField type="date" className="w-40" value={one} {...bounds} onChange={(e) => { setOne(e.target.value); onChange(e.target.value); }} aria-label="Day" />
           {replaced?.(one) && <span>(replace)</span>}
         </span>
       )}
       {range && mode === RANGE && (
-        <span className="dates">
-          <input type="date" value={from} {...bounds} onChange={(e) => { setFrom(e.target.value); set(e.target.value, to); }} aria-label="From" />
+        <span className="flex flex-wrap items-center gap-2 text-xs text-gray-500">
+          <TextField type="date" className="w-40" value={from} {...bounds} onChange={(e) => { setFrom(e.target.value); set(e.target.value, to); }} aria-label="From" />
           <span>to</span>
-          <input type="date" value={to} {...bounds} onChange={(e) => { setTo(e.target.value); set(from, e.target.value); }} aria-label="To" />
+          <TextField type="date" className="w-40" value={to} {...bounds} onChange={(e) => { setTo(e.target.value); set(from, e.target.value); }} aria-label="To" />
           {n > 0 && <span>{n} day{n === 1 ? "" : "s"}{day && n > 1 ? ", day by day" : ""}</span>}
         </span>
       )}

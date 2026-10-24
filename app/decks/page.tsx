@@ -16,8 +16,14 @@ import { DeckList, type DeckItem } from "@/ui/decks/DeckList";
 import { deckStatus, dateLabel } from "@/decks/status";
 import { listAgents } from "@/agents/store";
 import { sql } from "@/db/client";
+import { PageHeader } from "@/ui/kit/PageHeader";
+import { buttonClass } from "@/ui/kit/Button";
+import { IconPlus } from "@/ui/kit/icons";
 
 export const dynamic = "force-dynamic";
+
+const EMPTY = "rounded-3xl border border-card-border bg-white p-6 text-sm text-gray-700";
+const LINK = "font-semibold text-brand-palette-700 underline-offset-2 hover:text-brand-palette-800 hover:underline";
 
 const day = (iso: string) => new Date(iso).toLocaleDateString("en-GB", { timeZone: "Asia/Jakarta", day: "numeric", month: "short" });
 
@@ -26,11 +32,9 @@ export default async function DecksPage() {
   // a one-person profile that is not on the reputation dashboard has no decks yet: Decks says so (it stays one of the four places)
   if (!(await deckWorkspace(ws))) {
     return (
-      <section className="screen">
-        <div className="topbar"><div><h1>Decks</h1><span className="meta">Slide decks from a template, from scratch or from Chats.</span></div></div>
-        <div className="wrap wide">
-          <div className="empty">Decks are not available on this workspace yet: its data is watched hour by hour on the Dashboard. <Link href="/reports">Reports from Chats</Link> are kept on their own page.</div>
-        </div>
+      <section data-tw className="flex min-h-full flex-col gap-6 px-4 pb-6 md:px-6">
+        <PageHeader title="Decks" subtitle="Slide decks from a template, from scratch or from Chats." />
+        <p className={EMPTY}>Decks are not available on this workspace yet: its data is watched hour by hour on the Dashboard. <Link className={LINK} href="/reports">Reports from Chats</Link> are kept on their own page.</p>
       </section>
     );
   }
@@ -79,28 +83,34 @@ export default async function DecksPage() {
   items.sort((a, b) => ORDER[a.state] - ORDER[b.state]);
   const today = new Date(Date.now() + 7 * 3_600_000).toISOString().slice(0, 10);
   return (
-    <section className="screen">
-      <div className="topbar">
-        <div><h1>Decks</h1><span className="meta">Slide decks from a template, from scratch or from Chats: actual slides, Ask AI on each, PDF and PowerPoint, and a new version every day, week or month until a day you choose.</span></div>
-        <div className="topright">
-          <Link className="btn sm ghost" href="/reports" title="Reports made from Chats, and the schedules behind them">Reports</Link>
-          <Link className="btn pri sm" href="/decks/new">+ New deck</Link>
-        </div>
-      </div>
-      <div className="wrap wide">
-        {items.length > 0 ? (
-          <DeckList decks={items} today={today} />
-        ) : (
-          <div className="empty">No decks yet. <Link href="/decks/new">Start one from a template</Link>{pr ? ": the Weekly Reputation Report is the one to send up every week." : role.id === "social" ? ": the Monthly Content Review is the one to send up every month." : ", or ask CeMO something in Chats and turn the conversation into a deck."}</div>
-        )}
-        {boards.length > 0 && (
-          <div className="dold">
-            <h3>Pulse boards</h3>
-            <p className="muted">Boards made before Decks. They still open and refresh; new work goes into decks.</p>
-            <ul>{boards.map((p) => <li key={p.id}><Link href={`/pulse/${p.id}`}>{p.name}</Link> <small>{p.cards} cards · updated {day(p.updated_at)}</small></li>)}</ul>
-          </div>
-        )}
-      </div>
+    <section data-tw className="flex min-h-full flex-col gap-6 px-4 pb-6 md:px-6">
+      <PageHeader
+        title="Decks"
+        subtitle="Slide decks from a template, from scratch or from Chats: actual slides, Ask AI on each, PDF and PowerPoint, and a new version every day, week or month until a day you choose."
+        actions={<>
+          <Link className={buttonClass("outline", "sm")} href="/reports" title="Reports made from Chats, and the schedules behind them">Reports</Link>
+          <Link className={buttonClass("primary", "sm")} href="/decks/new"><IconPlus size={16} />New deck</Link>
+        </>}
+      />
+      {items.length > 0 ? (
+        <DeckList decks={items} today={today} />
+      ) : (
+        <p className={EMPTY}>No decks yet. <Link className={LINK} href="/decks/new">Start one from a template</Link>{pr ? ": the Weekly Reputation Report is the one to send up every week." : role.id === "social" ? ": the Monthly Content Review is the one to send up every month." : ", or ask CeMO something in Chats and turn the conversation into a deck."}</p>
+      )}
+      {boards.length > 0 && (
+        <section className="rounded-3xl border border-card-border bg-white p-5 md:p-6">
+          <h2 className="text-lg font-semibold leading-tight text-gray-900">Pulse boards</h2>
+          <p className="text-xs text-gray-500">Boards made before Decks. They still open and refresh; new work goes into decks.</p>
+          <ul className="mt-3 flex flex-col divide-y divide-card-border">
+            {boards.map((p) => (
+              <li key={p.id} className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-0.5 py-2.5">
+                <Link className={`${LINK} text-sm`} href={`/pulse/${p.id}`}>{p.name}</Link>
+                <small className="text-xs text-gray-500">{p.cards} cards · updated {day(p.updated_at)}</small>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
     </section>
   );
 }

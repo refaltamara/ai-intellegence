@@ -2,6 +2,7 @@
 /** A deck without a version yet (its first run failed, or it came from Chats): make one. */
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { Button, buttonClass } from "../kit/Button";
 import { PeriodPick } from "./PeriodPick";
 
 export function DeckFirst({ deckId, error, periods, range, day }: { deckId: string; error: string | null; periods: { key: string; label: string }[]; range?: { asOf: string; first?: string } | null; day?: boolean }) {
@@ -20,14 +21,14 @@ export function DeckFirst({ deckId, error, periods, range, day }: { deckId: stri
     router.refresh();
   }
   return (
-    <div className="dcard">
-      <h3>Make the first version</h3>
-      {err && <div className="errbox">Last run: {err}</div>}
-      <div className="wactions" style={{ justifyContent: "flex-start" }}>
+    <section className="flex flex-col gap-4 rounded-3xl border border-card-border bg-white p-5 md:p-6">
+      <h2 className="text-lg font-semibold leading-tight text-gray-900">Make the first version</h2>
+      {err && <p role="alert" className="rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-700">Last run: {err}</p>}
+      <div className="flex flex-wrap items-center gap-2">
         <PeriodPick periods={periods} value={period} onChange={setPeriod} range={range} day={day} />
-        <button className="btn pri sm" disabled={busy || !period} onClick={make}>{busy ? "Making it… (about a minute)" : "Make it"}</button>
-        <a className="btn sm ghost" href={`/decks/${deckId}/edit`}>Edit the deck</a>
+        <Button size="sm" isLoading={busy} loadingLabel="Making it… (about a minute)" disabled={!period} onClick={make}>Make it</Button>
+        <a className={buttonClass("outline", "sm")} href={`/decks/${deckId}/edit`}>Edit the deck</a>
       </div>
-    </div>
+    </section>
   );
 }

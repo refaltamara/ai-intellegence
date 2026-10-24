@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { SelectInput } from "./kit/SelectInput";
 import type { DecisionSummary, PinRow } from "@/decisions/store";
 import { fmtDate } from "./format";
 
@@ -32,10 +33,8 @@ export function DecisionHeader({ decision, pins, threads, currentThread, brands 
       <div className="row1">
         <input className="dname" value={name} onChange={(e) => setName(e.target.value)} onBlur={() => { if (name.trim() && name !== decision.name) void patch({ name: name.trim() }); }} onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }} />
         <span className={`pill ${decision.status === "open" ? "open" : ""}`}>{decision.status === "open" ? "Open" : decision.status === "decided" ? "Decided" : "Archived"}</span>
-        <select className="dclient" value={decision.client_brand_id ?? ""} onChange={(e) => patch({ client_brand_id: e.target.value || null })} title="The brand CeMO is on the side of for this decision">
-          <option value="">{decision.client_name ? "Workspace client" : "For: workspace client"}</option>
-          {brands.map((b) => <option key={b.id} value={b.id}>For {b.name}</option>)}
-        </select>
+        <SelectInput withSearch size="sm" className="w-auto min-w-52" ariaLabel="The brand CeMO is on the side of for this decision" value={decision.client_brand_id ?? ""} onChange={(v) => patch({ client_brand_id: v || null })} searchPlaceholder="Search brands"
+          options={[{ value: "", label: decision.client_name ? "Workspace client" : "For: workspace client" }, ...brands.map((b) => ({ value: b.id, label: `For ${b.name}` }))]} />
         <span className="dmeta">
           <button className="linkish" onClick={() => setShowPins((s) => !s)} disabled={!pins.length}>{pins.length} pinned</button>
           <span>{decision.watching} watching</span>

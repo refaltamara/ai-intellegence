@@ -6,7 +6,8 @@
  */
 import { MultiSelect } from "./MultiSelect";
 import { cn } from "./cn";
-import { Chip, Field, NativeSelect, TextField } from "./kit/Form";
+import { Chip, Field, TextField } from "./kit/Form";
+import { SelectInput } from "./kit/SelectInput";
 
 export const TIERS = ["nano", "micro", "mid", "macro", "mega"];
 export const TIER_LABEL: Record<string, string> = { nano: "Nano · ≤10K", micro: "Micro · 10K–50K", mid: "Mid · 50K–500K", macro: "Macro · 500K–1M", mega: "Mega · 1M+" };
@@ -79,11 +80,13 @@ export function DiscoveryFilters({ form, onChange, brands, months, compact = fal
   const invalid = followersInvalid(form);
   return (
     <div className={cn("grid grid-cols-1 gap-4 sm:grid-cols-2", !compact && "lg:grid-cols-4")}>
-      <Field label="Platform">
-        <NativeSelect value={form.platform} onChange={(e) => set("platform", e.target.value)}><option value="tiktok">TikTok</option><option value="instagram">Instagram</option><option value="all">All</option></NativeSelect>
+      <Field label="Platform" group>
+        <SelectInput withSearch size="sm" ariaLabel="Platform" value={form.platform} onChange={(v) => set("platform", v)}
+          options={[{ value: "tiktok", label: "TikTok" }, { value: "instagram", label: "Instagram" }, { value: "all", label: "All" }]} />
       </Field>
-      <Field label="Rank by">
-        <NativeSelect value={form.rank_by} onChange={(e) => set("rank_by", e.target.value)}>{Object.entries(RANK_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</NativeSelect>
+      <Field label="Rank by" group>
+        <SelectInput withSearch size="sm" ariaLabel="Rank by" value={form.rank_by} onChange={(v) => set("rank_by", v)}
+          options={Object.entries(RANK_LABEL).map(([k, v]) => ({ value: k, label: v }))} />
       </Field>
       <Field group label="Followers" hint={invalid ? <span className="font-semibold text-amber-700">min is above max</span> : undefined}>
         <div className="grid grid-cols-2 gap-2">

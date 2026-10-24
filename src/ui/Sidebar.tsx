@@ -430,7 +430,7 @@ export function Sidebar({
                 href={c.href}
                 title={c.title}
                 className={cn(
-                  "truncate rounded-xl px-2.5 py-0.5 max-md:py-2.5 text-[13px] leading-5 text-gray-700 transition-colors hover:bg-white hover:text-gray-900 hover:shadow-xs",
+                  "truncate rounded-xl px-2.5 py-0.5 max-md:py-2.5 text-[13px] leading-5 text-gray-700 transition-colors hover:text-brand-palette-700",
                   FOCUS,
                 )}
               >

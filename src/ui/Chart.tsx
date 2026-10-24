@@ -83,7 +83,7 @@ export function Chart({ spec }: { spec: ChartSpec }) {
         <summary className="cursor-pointer font-semibold text-gray-600 hover:text-brand-palette-700">Table view</summary>
         <div className="mt-2 overflow-auto rounded-xl border border-gray-100">
           <table className="w-full">
-            <thead><tr className="bg-gray-50"><th className="px-3 py-2 text-left font-semibold text-gray-700">{spec.y_label ?? ""}</th>{spec.x.map((x) => <th key={x} className="whitespace-nowrap px-3 py-2 text-right font-semibold text-gray-700">{x}</th>)}</tr></thead>
+            <thead><tr className="border-0 border-b border-gray-100 bg-white"><th className="px-3 py-2 text-left font-semibold text-gray-900">{spec.y_label ?? ""}</th>{spec.x.map((x) => <th key={x} className="whitespace-nowrap px-3 py-2 text-right font-semibold text-gray-900">{x}</th>)}</tr></thead>
             <tbody className="divide-y divide-gray-100">{series.map((s) => <tr key={s.name}><td className="px-3 py-2 text-gray-700">{s.name}</td>{s.data.map((v, i) => <td key={i} className="px-3 py-2 text-right tabular-nums text-gray-700">{fmt(v)}</td>)}</tr>)}</tbody>
           </table>
         </div>

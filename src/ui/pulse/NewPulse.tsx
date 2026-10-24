@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { MultiSelect } from "../MultiSelect";
+import { SelectInput } from "../kit/SelectInput";
 
 type T = { key: string; name: string; description: string; kinds: string[] };
 
@@ -41,7 +42,8 @@ export function NewPulse({ templates, brands, panel, first }: { templates: T[]; 
         <label className="wf"><span>Name</span><input value={name} onChange={(e) => setName(e.target.value)} placeholder={t?.name ?? "My Pulse"} maxLength={80} /></label>
         {panel && template !== "blank" && (
           <>
-            <label className="wf"><span>Platform</span><select value={platform} onChange={(e) => setPlatform(e.target.value)}><option value="all">TikTok + Instagram</option><option value="tiktok">TikTok</option><option value="instagram">Instagram</option></select></label>
+            <div className="wf"><span>Platform</span><SelectInput withSearch size="sm" ariaLabel="Platform" value={platform} onChange={setPlatform}
+              options={[{ value: "all", label: "TikTok + Instagram" }, { value: "tiktok", label: "TikTok" }, { value: "instagram", label: "Instagram" }]} /></div>
             <div className="wf wide"><span>Brands <small>(every card starts on these; empty = all brands)</small></span><MultiSelect options={brands} value={picked} onChange={setPicked} placeholder="All brands" /></div>
           </>
         )}

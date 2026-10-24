@@ -6,6 +6,7 @@
  */
 import { useMemo, useState } from "react";
 import { useOnboard } from "./useOnboard";
+import { SelectInput } from "../../kit/SelectInput";
 
 type Handle = { handle: string; platforms: string[]; posts: number; brand: string | null };
 type Brand = { id: string; name: string; handles: string[]; terms: string[]; never: string[] };
@@ -51,7 +52,8 @@ export function BrandMapper({ ws, handles, suggestions, current, client }: { ws:
         <div className="unmapped">
           {unmapped.map((h) => (
             <span key={h.handle} className="tag">@{h.handle} <small>{h.platforms.join(", ")} · {h.posts}</small>
-              <select value="" onChange={(e) => e.target.value && move(h.handle, e.target.value)}><option value="">→ brand</option>{brands.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}</select>
+              <SelectInput withSearch size="sm" className="w-auto min-w-36" ariaLabel={`Brand for @${h.handle}`} placeholder="→ brand" value="" onChange={(v) => v && move(h.handle, v)} searchPlaceholder="Search brands"
+                options={brands.map((b) => ({ value: b.id, label: b.name }))} />
             </span>
           ))}
         </div>
@@ -63,7 +65,8 @@ export function BrandMapper({ ws, handles, suggestions, current, client }: { ws:
             <td><input className="mini" value={b.id} onChange={(e) => set(i, { id: e.target.value.toLowerCase().replace(/[^a-z0-9_.-]/g, "") })} /></td>
             <td><input className="mini" value={b.name} onChange={(e) => set(i, { name: e.target.value })} /></td>
             <td>{b.handles.map((h) => (
-              <span key={h} className="tag">@{h} <select value={b.id} onChange={(e) => move(h, e.target.value)}>{brands.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select></span>
+              <span key={h} className="tag inline-flex items-center gap-1.5">@{h} <SelectInput withSearch size="sm" className="w-auto min-w-36" ariaLabel={`Brand for @${h}`} value={b.id} onChange={(v) => move(h, v)} searchPlaceholder="Search brands"
+                options={brands.map((x) => ({ value: x.id, label: x.name }))} /></span>
             ))}{!b.handles.length && <span className="muted">none</span>}</td>
             <td><input className="wide" defaultValue={b.terms.join(", ")} onBlur={(e) => set(i, { terms: list(e.target.value) })} placeholder="gopay, go-pay, go pay" /></td>
             <td><input className="wide" defaultValue={b.never.join(", ")} onBlur={(e) => set(i, { never: list(e.target.value) })} placeholder="go pay attention" /></td>

@@ -7,6 +7,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { PasswordLink } from "./admin/PasswordLink";
+import { SelectInput } from "./kit/SelectInput";
 
 type Level = "builder" | "member";
 type Levels = Record<string, Level | undefined>;
@@ -67,11 +68,8 @@ export function TeamManager({ workspaceId, workspaceName, roles, members, invite
                 <td><b>{m.name ?? m.email}</b>{m.name && <small>{m.email}</small>}{m.staff.map((d) => <span key={d} className="badge fair">Fair · {DUTY[d] ?? d}</span>)}</td>
                 {roles.map((r) => (
                   <td key={r.id}>
-                    <select value={m.levels[r.id] ?? ""} disabled={!!busy || locked(m) || m.user_id === meUid} onChange={(e) => change(m, r.id, e.target.value)} aria-label={`${m.email} on ${r.label}`}>
-                      <option value="">—</option>
-                      <option value="member">Member</option>
-                      <option value="builder" disabled={!canBuilders}>Builder</option>
-                    </select>
+                    <SelectInput withSearch size="sm" className="w-auto min-w-36" ariaLabel={`${m.email} on ${r.label}`} value={m.levels[r.id] ?? ""} disabled={!!busy || locked(m) || m.user_id === meUid} onChange={(v) => change(m, r.id, v)}
+                      options={[{ value: "", label: "None" }, { value: "member", label: "Member" }, { value: "builder", label: "Builder", disabled: !canBuilders }]} />
                   </td>
                 ))}
                 <td className="muted">{day(m.last_seen_at)}</td>
@@ -109,11 +107,8 @@ export function TeamManager({ workspaceId, workspaceName, roles, members, invite
         <div className="lv">
           {roles.map((r) => (
             <label key={r.id}>{r.label}
-              <select value={levels[r.id] ?? ""} onChange={(e) => setLevels({ ...levels, [r.id]: (e.target.value || undefined) as Level | undefined })}>
-                <option value="">—</option>
-                <option value="member">Member</option>
-                {canBuilders && <option value="builder">Builder</option>}
-              </select>
+              <SelectInput withSearch size="sm" ariaLabel={r.label} value={levels[r.id] ?? ""} onChange={(v) => setLevels({ ...levels, [r.id]: (v || undefined) as Level | undefined })}
+                options={[{ value: "", label: "None" }, { value: "member", label: "Member" }, ...(canBuilders ? [{ value: "builder", label: "Builder" }] : [])]} />
             </label>
           ))}
         </div>

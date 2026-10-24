@@ -1,9 +1,10 @@
 /**
  * Compact form pieces for filter drawers (the pane's Refine, creator discovery): a labelled field with an
- * optional hint, a native select and a text input in the agency dashboard's input look, and a row of
- * toggle chips. Labels sit above, as DESIGN.md 9.1 has them.
+ * optional hint, a text input in the agency dashboard's input look, and a row of toggle chips. Labels sit
+ * above, as DESIGN.md 9.1 has them. A choice from a list is a SelectInput (./SelectInput.tsx), never a
+ * native select; put it in a Field with `group` so the field's label does not wrap its button.
  */
-import type { InputHTMLAttributes, ReactNode, SelectHTMLAttributes } from "react";
+import type { InputHTMLAttributes, ReactNode } from "react";
 import { cn } from "../cn";
 
 /**
@@ -22,10 +23,6 @@ export function Field({ label, hint, wide, group, children, className }: { label
 }
 
 const INPUT = "h-10 w-full rounded-xl border border-slate-200 bg-white px-3 font-sans text-sm text-gray-900 outline-none transition-all duration-200 placeholder:text-gray-500 focus:border-brand-palette-600 focus:ring-2 focus:ring-brand-palette-500/15";
-
-export function NativeSelect({ className, children, ...rest }: SelectHTMLAttributes<HTMLSelectElement>) {
-  return <select className={cn(INPUT, "cursor-pointer pr-8", className)} {...rest}>{children}</select>;
-}
 
 export function TextField({ className, ...rest }: InputHTMLAttributes<HTMLInputElement>) {
   return <input className={cn(INPUT, className)} {...rest} />;

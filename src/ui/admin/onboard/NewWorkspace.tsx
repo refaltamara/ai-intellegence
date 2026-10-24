@@ -2,6 +2,7 @@
 /** The new-workspace wizard (CMS plan, "1. Create"): basics, the teams it offers, caption reading. The client brand is picked once the dump's brands are mapped. */
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { SelectInput } from "../../kit/SelectInput";
 
 const ROLES = [
   { id: "pr", label: "PR team · Chorus" },
@@ -37,7 +38,8 @@ export function NewWorkspace() {
         <div className="grid2">
           <label className="wf"><span>Name</span><input value={name} onChange={(e) => { setName(e.target.value); if (!touched) setId(slug(e.target.value)); }} placeholder="Bank Jago listening" /></label>
           <label className="wf"><span>Id (fixed once live)</span><input value={id} onChange={(e) => { setTouched(true); setId(slug(e.target.value)); }} placeholder="bank-jago" /></label>
-          <label className="wf"><span>Category</span><select value={category} onChange={(e) => setCategory(e.target.value)}>{CATEGORIES.map((c) => <option key={c}>{c}</option>)}</select></label>
+          <div className="wf"><span>Category</span><SelectInput withSearch size="sm" ariaLabel="Category" value={category} onChange={setCategory}
+            options={CATEGORIES.map((c) => ({ value: c, label: c }))} /></div>
           <label className="wf"><span>Label people see</span><input value={label} onChange={(e) => setLabel(e.target.value)} placeholder={`${category.charAt(0).toUpperCase() + category.slice(1)} · Indonesia`} /></label>
         </div>
         <p className="muted">A listening panel: brands compete, owned and earned on every platform, comments labelled by Fair Listening. Time zone Asia/Jakarta.</p>

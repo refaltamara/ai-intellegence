@@ -8,11 +8,19 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import type { DeckOptions } from "@/decks/page";
 import type { DeckSpec } from "@/decks/spec";
-import { isFairBadge } from "../../brand/demo";
 import { MultiSelect } from "../MultiSelect";
+import { cn } from "../cn";
+import { Button } from "../kit/Button";
+import { Chip, Field, TextField } from "../kit/Form";
+import { SelectInput } from "../kit/SelectInput";
+import { IconCheck } from "../kit/icons";
+import { Segmented } from "../kit/Segmented";
+import { Spinner } from "../kit/Spinner";
+import { Switch } from "../kit/Switch";
 import { PeriodPick } from "./PeriodPick";
 import { SlideDescriber, type AddedSlide } from "./SlideDescriber";
 import { DeckDescriber } from "./DeckDescriber";
+import { CARD, CheckCard, MadeBy, SectionTitle } from "./formParts";
 import type { DeckDraft } from "@/decks/describe";
 
 type Group = DeckSpec["watchlist"][number];
@@ -168,168 +176,199 @@ export function DeckForm({ options, initial, prefill }: { options: DeckOptions; 
     }
   }
 
+  const grainOptions = [
+    ...(family === "reputation" ? [{ key: "day" as const, label: "Day on day" }] : []),
+    { key: "week" as const, label: "Week on week" },
+    { key: "month" as const, label: "Month on month" },
+  ];
+  const pickGrain = (g: "day" | "week" | "month") => { setGrain(g); setPeriod(g === "day" ? options.periods.day[0]?.key ?? "" : ""); };
+
   return (
-    <div className="deckform">
+    <div className="flex w-full flex-col gap-6">
       {!edit && <DeckDescriber onDraft={applyDraft} />}
       {!edit && (
-        <section>
-          <h3>Or start from</h3>
-          <div className="tpls">
-            {options.templates.map((x) => (
-              <button key={x.key} type="button" className={template === x.key ? "on" : ""} onClick={() => pickTemplate(x.key)}>
-                <b>{x.name}{x.badge && <i className={`badge ${isFairBadge(x.badge) ? "fair" : "client"}`} title={x.by ? `Made by ${x.by}` : undefined}>{x.badge}</i>}</b><span>{x.description}</span>
-                <small>{x.grain === "month" ? "Month on month" : x.grain === "day" ? "Day on day" : "Week on week"} · {(x.rep_slides ?? x.social_slides ?? x.slides).length} slide types</small>
-              </button>
-            ))}
+        <section className={CARD}>
+          <SectionTitle title="Or start from" />
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+            {options.templates.map((x) => {
+              const on = template === x.key;
+              return (
+                <button key={x.key} type="button" aria-pressed={on} onClick={() => pickTemplate(x.key)}
+                  className={cn("flex cursor-pointer flex-col gap-1.5 rounded-2xl border p-4 text-left font-sans transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-palette-600",
+                    on ? "border-brand-palette-200 bg-brand-palette-50" : "border-card-border bg-white hover:border-brand-palette-300")}>
+                  <span className="flex items-start justify-between gap-2">
+                    <b className="text-sm font-semibold text-gray-900">{x.name}</b>
+                    <span className="flex shrink-0 items-center gap-1.5">
+                      <MadeBy badge={x.badge} by={x.by} />
+                      {on && <span className="flex h-5 w-5 items-center justify-center rounded-full bg-brand-palette-600 text-white"><IconCheck size={12} /></span>}
+                    </span>
+                  </span>
+                  <span className="text-xs leading-relaxed text-gray-600">{x.description}</span>
+                  <small className="mt-auto pt-1 text-xs text-gray-500">{x.grain === "month" ? "Month on month" : x.grain === "day" ? "Day on day" : "Week on week"} · {(x.rep_slides ?? x.social_slides ?? x.slides).length} slide types</small>
+                </button>
+              );
+            })}
           </div>
         </section>
       )}
 
-      <section className="cgrid">
-        <label className="wf"><span>Name</span><input value={name} onChange={(e) => setName(e.target.value)} placeholder={initial?.name ?? (family === "reputation" ? tTitle : t.title)} maxLength={80} /></label>
-        <div className="wf">
-          <span>Compare</span>
-          <div className="seg">
-            {family === "reputation" && <button type="button" className={grain === "day" ? "on" : ""} onClick={() => { setGrain("day"); setPeriod(options.periods.day[0]?.key ?? ""); }}>Day on day</button>}
-            <button type="button" className={grain === "week" ? "on" : ""} onClick={() => { setGrain("week"); setPeriod(""); }}>Week on week</button>
-            <button type="button" className={grain === "month" ? "on" : ""} onClick={() => { setGrain("month"); setPeriod(""); }}>Month on month</button>
-          </div>
-        </div>
-        <div className="wf">
-          <span>Platforms</span>
-          {isRep ? (
-            <div className="seg">
-              {["all", ...options.platforms].map((p) => (
-                <button key={p} type="button" className={repPlatform === p ? "on" : ""} onClick={() => setRepPlatform(p)}>{p === "all" ? "All" : PLATFORM_NAME[p] ?? p}</button>
-              ))}
-            </div>
-          ) : (
-            <div className="seg">
-              {options.platforms.map((p) => (
-                <button key={p} type="button" className={platforms.includes(p) ? "on" : ""} onClick={() => setPlatforms((x) => (x.includes(p) ? x.filter((y) => y !== p) : [...x, p]))}>{PLATFORM_NAME[p] ?? p}</button>
-              ))}
-            </div>
+      <section className={CARD}>
+        <SectionTitle title="The deck" />
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <Field label="Name"><TextField value={name} onChange={(e) => setName(e.target.value)} placeholder={initial?.name ?? (family === "reputation" ? tTitle : t.title)} maxLength={80} /></Field>
+          <Field label="Compare" group>
+            <Segmented label="Compare" value={grain} onChange={pickGrain} options={grainOptions} className="self-start" />
+          </Field>
+          <Field label="Platforms" group wide>
+            {isRep ? (
+              <Segmented label="Platforms" value={repPlatform} onChange={setRepPlatform} className="self-start"
+                options={["all", ...options.platforms].map((p) => ({ key: p, label: p === "all" ? "All" : PLATFORM_NAME[p] ?? p }))} />
+            ) : (
+              <span className="flex flex-wrap gap-2">
+                {options.platforms.map((p) => (
+                  <Chip key={p} on={platforms.includes(p)} onClick={() => setPlatforms((x) => (x.includes(p) ? x.filter((y) => y !== p) : [...x, p]))}>{PLATFORM_NAME[p] ?? p}</Chip>
+                ))}
+              </span>
+            )}
+          </Field>
+          {isRep && (
+            <Field label="The brand this deck is about" group>
+              <SelectInput withSearch size="sm" ariaLabel="The brand this deck is about" value={focus} onChange={setFocus} searchPlaceholder="Search brands"
+                options={options.brands.map((b) => ({ value: b.id, label: `${b.name}${b.id === options.focus ? " (you)" : ""}` }))} />
+            </Field>
           )}
         </div>
       </section>
 
       {isRep && (
+        <section className={CARD}>
+          <SectionTitle title="Slides" hint={`${repSlides.length} picked; every other brand is the benchmark`} />
+          <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+            {library.map((s) => {
+              const locked = s.kind === "summary";
+              return (
+                <CheckCard key={s.kind} checked={locked || repSlides.includes(s.kind)} disabled={locked} title={s.title} description={s.description}
+                  onChange={() => setRepSlides((x) => (x.includes(s.kind) ? x.filter((y) => y !== s.kind) : [...x, s.kind]))} />
+              );
+            })}
+          </div>
+        </section>
+      )}
+
+      {!isRep && (
         <>
-          <section className="cgrid">
-            <label className="wf"><span>The brand this deck is about</span>
-              <select value={focus} onChange={(e) => setFocus(e.target.value)}>
-                {options.brands.map((b) => <option key={b.id} value={b.id}>{b.name}{b.id === options.focus ? " (you)" : ""}</option>)}
-              </select>
-            </label>
+          <section className={CARD}>
+            <SectionTitle title={t.brands === "focus" && !edit ? "The brands this deck is about" : "Brands to watch"} />
+            {watch.length > 0 && (
+              <ul className="flex flex-wrap gap-1.5">
+                {watch.map((w, i) => {
+                  const label = `${w.name}${w.brand_ids.length > 1 ? ` (${w.brand_ids.length} brands)` : ""}`;
+                  return (
+                    <li key={`${w.name}-${i}`} className="inline-flex items-center gap-1 rounded-lg bg-brand-palette-50 py-0.5 pl-2.5 pr-0.5 text-xs font-semibold text-brand-palette-800">
+                      {label}
+                      <button type="button" aria-label={`Remove ${label}`} onClick={() => setWatch((x) => x.filter((_, j) => j !== i))}
+                        className="flex h-6 w-6 cursor-pointer items-center justify-center rounded-md hover:bg-brand-palette-100 focus-visible:outline-2 focus-visible:outline-brand-palette-600 max-md:h-9 max-md:w-9">×</button>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+            <MultiSelect options={options.brands.filter((b) => !taken.has(b.id))} value={[]} onChange={addBrands} placeholder={watch.length ? "Add another brand…" : "Search brands…"} />
+            {options.starter && !edit && (
+              <button type="button" className="self-start cursor-pointer rounded-lg px-1 text-sm font-semibold text-brand-palette-700 underline-offset-2 hover:text-brand-palette-800 hover:underline focus-visible:outline-2 focus-visible:outline-brand-palette-600 max-md:min-h-11"
+                onClick={() => { setWatch(options.starter!.watchlist); if (options.starter!.client) { setClientOn(true); setClientName(options.starter!.client.name); setClientIds(options.starter!.client.brands.flatMap((b) => b.brand_ids)); } }}>
+                Use the watchlist of {options.starter.label}
+              </button>
+            )}
+            <div className="border-t border-card-border pt-3">
+              <Switch on={clientOn} onChange={setClientOn} label="Prepared for a client" hint="The moves are written for them; their brands get an appendix." />
+              {clientOn && (
+                <div className="mt-3 grid gap-4 md:grid-cols-[1fr_2fr]">
+                  <Field label="Client"><TextField value={clientName} onChange={(e) => setClientName(e.target.value)} placeholder="Paragon" maxLength={60} /></Field>
+                  <Field label="The client's brands" group><MultiSelect options={options.brands.filter((b) => !watch.some((w) => w.brand_ids.includes(b.id)))} value={clientIds} onChange={setClientIds} placeholder="Search brands…" /></Field>
+                </div>
+              )}
+            </div>
           </section>
-          <section>
-            <h3>Slides <small>{repSlides.length} picked; every other brand is the benchmark</small></h3>
-            <div className="slidepick">
-              {library.map((s) => {
-                const locked = s.kind === "summary";
-                return (
-                  <label key={s.kind} className={repSlides.includes(s.kind) ? "on" : ""}>
-                    <input type="checkbox" checked={locked || repSlides.includes(s.kind)} disabled={locked} onChange={() => setRepSlides((x) => (x.includes(s.kind) ? x.filter((y) => y !== s.kind) : [...x, s.kind]))} />
-                    <span><b>{s.title}</b><em>{s.description}</em></span>
-                  </label>
-                );
+
+          <section className={CARD}>
+            <SectionTitle title="Slides" hint={`${slides.length} picked; they print in this order`} />
+            <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+              {options.slides.filter((s) => s.kind !== "findings" || hasFindings).map((s) => {
+                const locked = !!s.required;
+                const blocked = s.needs === "client" && !clientOn;
+                const tag = [s.pages === "1" ? "" : s.pages, blocked ? "needs a client" : ""].filter(Boolean).join(" · ");
+                return <CheckCard key={s.kind} checked={locked || (slides.includes(s.kind) && !blocked)} disabled={locked || blocked} onChange={() => toggleSlide(s.kind)} title={s.title} tag={tag || undefined} description={s.description} />;
               })}
             </div>
           </section>
         </>
       )}
 
-      {!isRep && (
-        <>
-      <section>
-        <h3>{t.brands === "focus" && !edit ? "The brands this deck is about" : "Brands to watch"}</h3>
-        <div className="dgroups">
-          {watch.map((w, i) => (
-            <span key={`${w.name}-${i}`} className="ms-chip">
-              {w.name}{w.brand_ids.length > 1 ? ` (${w.brand_ids.length} brands)` : ""}
-              <i title="Remove" onClick={() => setWatch((x) => x.filter((_, j) => j !== i))}>×</i>
-            </span>
-          ))}
-        </div>
-        <MultiSelect options={options.brands.filter((b) => !taken.has(b.id))} value={[]} onChange={addBrands} placeholder={watch.length ? "Add another brand…" : "Search brands…"} />
-        {options.starter && !edit && (
-          <button type="button" className="linkbtn" onClick={() => { setWatch(options.starter!.watchlist); if (options.starter!.client) { setClientOn(true); setClientName(options.starter!.client.name); setClientIds(options.starter!.client.brands.flatMap((b) => b.brand_ids)); } }}>
-            Use the watchlist of {options.starter.label}
-          </button>
-        )}
-      </section>
-
-      <section>
-        <label className="dcheck"><input type="checkbox" checked={clientOn} onChange={(e) => setClientOn(e.target.checked)} /> Prepared for a client <small>(the moves are written for them; their brands get an appendix)</small></label>
-        {clientOn && (
-          <div className="cgrid">
-            <label className="wf"><span>Client</span><input value={clientName} onChange={(e) => setClientName(e.target.value)} placeholder="Paragon" maxLength={60} /></label>
-            <div className="wf wide"><span>The client&apos;s brands</span><MultiSelect options={options.brands.filter((b) => !watch.some((w) => w.brand_ids.includes(b.id)))} value={clientIds} onChange={setClientIds} placeholder="Search brands…" /></div>
+      <section className={CARD}>
+        <SectionTitle title="Your team's slides" hint={`Analyses counted again for every version's dates, a slide each${isRep ? ", after the slides above" : ""}.`} />
+        {teamSkills.length > 0 && (
+          <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+            {teamSkills.map((x) => (
+              <CheckCard key={x.key} checked={picked.includes(x.key)} title={x.title} description={x.description} badge={<MadeBy badge={x.badge} by={x.by} />}
+                onChange={() => setPicked((p) => (p.includes(x.key) ? p.filter((k) => k !== x.key) : [...p, x.key].slice(0, 6)))} />
+            ))}
           </div>
         )}
-      </section>
-
-      <section>
-        <h3>Slides <small>{slides.length} picked; they print in this order</small></h3>
-        <div className="slidepick">
-          {options.slides.filter((s) => s.kind !== "findings" || hasFindings).map((s) => {
-            const locked = !!s.required;
-            const blocked = s.needs === "client" && !clientOn;
-            return (
-              <label key={s.kind} className={`${slides.includes(s.kind) && !blocked ? "on" : ""} ${blocked ? "off" : ""}`}>
-                <input type="checkbox" checked={locked || (slides.includes(s.kind) && !blocked)} disabled={locked || blocked} onChange={() => toggleSlide(s.kind)} />
-                <span><b>{s.title}<small>{[s.pages === "1" ? "" : s.pages, blocked ? "needs a client" : ""].filter(Boolean).join(" · ")}</small></b><em>{s.description}</em></span>
-              </label>
-            );
-          })}
-        </div>
-      </section>
-
-        </>
-      )}
-
-      <section>
-        <h3>Your team&apos;s slides <small>analyses counted again for every version&apos;s dates, a slide each{isRep ? ", after the slides above" : ""}</small></h3>
-        <div className="slidepick">
-          {teamSkills.map((x) => (
-            <label key={x.key} className={picked.includes(x.key) ? "on" : ""}>
-              <input type="checkbox" checked={picked.includes(x.key)} onChange={() => setPicked((p) => (p.includes(x.key) ? p.filter((k) => k !== x.key) : [...p, x.key].slice(0, 6)))} />
-              <span><b>{x.title}<i className={`badge ${isFairBadge(x.badge) ? "fair" : "client"}`} title={x.by ? `Made by ${x.by}` : undefined}>{x.badge}</i></b><em>{x.description}</em></span>
-            </label>
-          ))}
-        </div>
         <SlideDescriber onAdd={(a) => { setAdded((x) => [...x, a]); setPicked((p) => [...p, a.key].slice(0, 6)); }} />
       </section>
 
-      <section className="cgrid">
-        {/* a div, not a label: a label hands a click on its text to the first button inside it */}
-        <div className="wf">
-          <span>{edit ? "Make a version for" : "First version"}</span>
+      <section className={CARD}>
+        <SectionTitle title={edit ? "Make a version for" : "First version"} hint={`Data runs to ${options.data_through}.`} />
+        {/* a group, not a label: a label hands a click on its text to the first button inside it */}
+        <div role="group" aria-label={edit ? "Make a version for" : "First version"}>
           {family === "reputation" || grain === "day" ? (
             // a PR deck names its period: one of the last days (the newest may still be filling), weeks or months, any day from a calendar, or a run of days (6 to 8 Oct)
             <PeriodPick key={grain} periods={periods} value={period || periods[0]?.key || ""} onChange={setPeriod} range={{ asOf: options.data_through.slice(0, 10), first: options.data_from }} day={grain === "day"} />
           ) : (
-          <select value={period} onChange={(e) => setPeriod(e.target.value)}>
-            <option value="">Latest {grain} the data covers{periods[0] ? ` (${periods[0].label})` : ""}</option>
-            {/* a brand deck by month can also cover the last three or six months as one period */}
-            {family == null && grain === "month" && options.runs.map((p) => <option key={p.key} value={p.key}>{p.label}</option>)}
-            {periods.slice(1).map((p) => <option key={p.key} value={p.key}>{p.label}</option>)}
-          </select>
+            <SelectInput withSearch size="sm" className="w-auto min-w-72 max-w-full" value={period} onChange={setPeriod} ariaLabel={edit ? "Make a version for" : "First version"}
+              options={[
+                { value: "", label: `Latest ${grain} the data covers${periods[0] ? ` (${periods[0].label})` : ""}` },
+                // a brand deck by month can also cover the last three or six months as one period
+                ...(family == null && grain === "month" ? options.runs.map((p) => ({ value: p.key, label: p.label })) : []),
+                ...periods.slice(1).map((p) => ({ value: p.key, label: p.label })),
+              ]} />
           )}
         </div>
-        {edit && <label className="dcheck wide"><input type="checkbox" checked={alsoTemplate} onChange={(e) => setAlsoTemplate(e.target.checked)} /> Also change the template this deck came from <small>({initial?.template?.startsWith("co-") ? "your team's template" : "saved as your team's own template; Fair's stays as it is"}; a Member&apos;s change waits for a Builder)</small></label>}
-        <label className="dcheck wide"><input type="checkbox" checked={recurring} onChange={(e) => setRecurring(e.target.checked)} /> Make the next version every {grain} <small>({grain === "day" ? "each morning at 07:00 WIB, for the day before, once its data has landed" : `when a new ${grain} of data lands`}; data runs to {options.data_through}{/\.\./.test(period) ? `; the days you chose make the first version, then one ${grain} each` : ""})</small></label>
-        {recurring && (
-          <label className="duntil">Until <input type="date" value={until} min={options.data_through} onChange={(e) => setUntil(e.target.value)} aria-label="The last day this deck covers" /> <small>{until ? "then it stops, and the Decks list shows it as ended" : "empty: until you stop it from the Decks list"}</small></label>
-        )}
+        <div className="flex flex-col gap-1 border-t border-card-border pt-3">
+          <Switch on={recurring} onChange={setRecurring} label={`Make the next version every ${grain}`}
+            hint={`${grain === "day" ? "Each morning at 07:00 WIB, for the day before, once its data has landed" : `When a new ${grain} of data lands`}${/\.\./.test(period) ? `; the days you chose make the first version, then one ${grain} each` : ""}.`} />
+          {recurring && (
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 pl-13">
+              <label className="flex items-center gap-2 text-xs font-semibold text-gray-700">Until
+                <TextField type="date" className="w-44" value={until} min={options.data_through} onChange={(e) => setUntil(e.target.value)} aria-label="The last day this deck covers" />
+              </label>
+              <small className="text-xs text-gray-500">{until ? "then it stops, and the Decks list shows it as ended" : "empty: until you stop it from the Decks list"}</small>
+            </div>
+          )}
+          {edit && (
+            <label className="mt-2 flex cursor-pointer items-start gap-3 px-1 py-2">
+              <input type="checkbox" checked={alsoTemplate} onChange={(e) => setAlsoTemplate(e.target.checked)} className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer accent-brand-palette-600" />
+              <span className="flex flex-col">
+                <span className="text-sm font-semibold text-gray-900">Also change the template this deck came from</span>
+                <span className="text-xs text-gray-500">{initial?.template?.startsWith("co-") ? "Your team's template" : "Saved as your team's own template; Fair's stays as it is"}; a Member&apos;s change waits for a Builder.</span>
+              </span>
+            </label>
+          )}
+        </div>
       </section>
 
-      {error && <div className="errbox">{error}</div>}
-      <div className="wactions">
-        {busy && <span className="muted">{edit ? "Saving" : "Building the deck"}: the numbers, the words, the slides… {elapsed}s (about a minute)</span>}
-        <button className="btn sm ghost" disabled={busy} onClick={() => router.back()}>Cancel</button>
-        {edit && <button className="btn sm" disabled={busy} onClick={() => submit(false)}>Save</button>}
-        <button className="btn pri sm" disabled={busy} onClick={() => submit(true)}>{busy ? "Working…" : edit ? "Save and make a new version" : "Create deck"}</button>
+      {/* the form is long: its buttons stay in reach at the bottom of the screen */}
+      <div className="sticky bottom-0 z-20 flex flex-col gap-2 border-0 border-t border-gray-200 bg-gray-50 py-3">
+        {error && <p role="alert" className="rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>}
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <span className="mr-auto flex min-h-8 items-center gap-2 text-xs text-gray-500" aria-live="polite">
+            {busy && <><Spinner />{edit ? "Saving" : "Building the deck"}: the numbers, the words, the slides… {elapsed}s (about a minute)</>}
+          </span>
+          <Button size="sm" variant="ghost" disabled={busy} onClick={() => router.back()}>Cancel</Button>
+          {edit && <Button size="sm" variant="outline" disabled={busy} onClick={() => submit(false)}>Save</Button>}
+          <Button size="sm" isLoading={busy} loadingLabel="Working…" onClick={() => submit(true)}>{edit ? "Save and make a new version" : "Create deck"}</Button>
+        </div>
       </div>
     </div>
   );

@@ -6,6 +6,7 @@ import { deckWorkspace } from "@/pulses/api";
 import { DeckForm } from "@/ui/decks/DeckForm";
 import { currentBrand } from "@/brand/current";
 import { fairBadge } from "@/brand/demo";
+import { PageHeader } from "@/ui/kit/PageHeader";
 
 export const dynamic = "force-dynamic";
 
@@ -18,9 +19,9 @@ export default async function NewDeckPage({ searchParams }: { searchParams: Prom
     ? { slide: sp.slide, brands: (sp.brands ?? "").split(",").filter(Boolean).slice(0, 12), grain: sp.grain === "month" ? ("month" as const) : sp.grain === "week" ? ("week" as const) : null }
     : null;
   return (
-    <section className="screen">
-      <div className="topbar"><div><h1>New deck</h1><span className="meta">Pick a starting point; every slide can be added or taken out. The first version is made when you create it.</span></div></div>
-      <div className="wrap wide"><DeckForm options={options} prefill={prefill} /></div>
+    <section data-tw className="flex min-h-full flex-col gap-6 px-4 md:px-6">
+      <PageHeader title="New deck" subtitle="Pick a starting point; every slide can be added or taken out. The first version is made when you create it." />
+      <DeckForm options={options} prefill={prefill} />
     </section>
   );
 }

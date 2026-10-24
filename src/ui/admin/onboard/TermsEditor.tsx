@@ -7,6 +7,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { TermsPreview } from "@/onboard/terms";
 import { useOnboard } from "./useOnboard";
+import { SelectInput } from "../../kit/SelectInput";
 
 const pct = (a: number, b: number) => (b ? `${Math.round((a / b) * 100)}%` : "–");
 const n = (x: number | null) => (x == null ? "–" : x >= 1e6 ? `${(x / 1e6).toFixed(1)}M` : x >= 1e3 ? `${(x / 1e3).toFixed(1)}K` : String(x));
@@ -41,7 +42,8 @@ export function TermsEditor({ ws, brands }: { ws: string; brands: { id: string; 
   return (
     <div className="terms">
       <div className="row">
-        <label className="wf"><span>Brand</span><select value={brand} onChange={(e) => setBrand(e.target.value)}>{brands.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select></label>
+        <div className="wf"><span>Brand</span><SelectInput withSearch size="sm" ariaLabel="Brand" value={brand} onChange={setBrand} searchPlaceholder="Search brands"
+          options={brands.map((x) => ({ value: x.id, label: x.name }))} /></div>
         <label className="wf grow"><span>Counts (a term at the start of a word; CAPITALS only in capitals)</span><input value={terms} onChange={(e) => setTerms(e.target.value)} /></label>
         <label className="wf grow"><span>Never counts</span><input value={never} onChange={(e) => setNever(e.target.value)} placeholder="go pay attention" /></label>
       </div>

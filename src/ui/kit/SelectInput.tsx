@@ -5,12 +5,16 @@
  * flipped above the button when there is no room below, with an optional search. Unlike the original it
  * also works from the keyboard: arrows move, Enter picks, Escape closes and gives focus back.
  */
-import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "../cn";
 import { IconCheck, IconChevronDown, IconSearch } from "./icons";
 
-export type SelectOption = { value: string; label: string };
+/**
+ * disabled: shown but not choosable (a level the person may not give), skipped by the arrows.
+ * group: a heading over a run of options with the same group, as an <optgroup> had ("Months", "Weeks").
+ */
+export type SelectOption = { value: string; label: string; disabled?: boolean; group?: string };
 type Size = "sm" | "md";
 
 const TRIGGER: Record<Size, string> = {
@@ -32,6 +36,7 @@ function initials(s: string): string {
  */
 export function SelectInput({
   label,
+  ariaLabel,
   options,
   value,
   onChange,
@@ -44,6 +49,8 @@ export function SelectInput({
   className,
 }: {
   label?: string;
+  /** the name when no label shows (a filter row, a table cell, inside a Field that names it already) */
+  ariaLabel?: string;
   options: SelectOption[];
   value: string;
   onChange: (value: string) => void;
@@ -109,9 +116,17 @@ export function SelectInput({
     if (refocus) triggerRef.current?.focus();
   }
   function pick(v: string) {
+    if (options.find((o) => o.value === v)?.disabled) return;
     close();
     if (v !== value) onChange(v);
   }
+  /** the next choosable row from i in direction d, or i itself when there is none */
+  function step(i: number, d: 1 | -1) {
+    for (let j = i + d; j >= 0 && j < shown.length; j += d) if (!shown[j].disabled) return j;
+    return i;
+  }
+  const firstOn = () => Math.max(0, shown.findIndex((o) => !o.disabled));
+  const lastOn = () => { for (let j = shown.length - 1; j >= 0; j--) if (!shown[j].disabled) return j; return 0; };
 
   useLayoutEffect(() => {
     if (!open) return;
@@ -126,12 +141,8 @@ export function SelectInput({
 
   useEffect(() => {
     if (!open) return;
-    setCursor(
-      Math.max(
-        0,
-        shown.findIndex((o) => o.value === value),
-      ),
-    );
+    const at = shown.findIndex((o) => o.value === value);
+    setCursor(at >= 0 ? at : firstOn());
     (withSearch ? searchRef.current : listRef.current)?.focus();
     const away = (e: MouseEvent) => {
       const t = e.target as Node;
@@ -155,16 +166,16 @@ export function SelectInput({
   function keys(e: React.KeyboardEvent) {
     if (e.key === "ArrowDown") {
       e.preventDefault();
-      setCursor((c) => Math.min(c + 1, shown.length - 1));
+      setCursor((c) => step(c, 1));
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
-      setCursor((c) => Math.max(c - 1, 0));
+      setCursor((c) => step(c, -1));
     } else if (e.key === "Home") {
       e.preventDefault();
-      setCursor(0);
+      setCursor(firstOn());
     } else if (e.key === "End") {
       e.preventDefault();
-      setCursor(shown.length - 1);
+      setCursor(lastOn());
     } else if (e.key === "Enter") {
       e.preventDefault();
       if (shown[cursor]) pick(shown[cursor].value);
@@ -199,9 +210,12 @@ export function SelectInput({
         aria-controls={open ? listId : undefined}
         aria-label={
           badge
-            ? `${label ?? "Choose"}: ${selected?.label ?? placeholder}`
-            : undefined
+            ? `${label ?? ariaLabel ?? "Choose"}: ${selected?.label ?? placeholder}`
+            : !label && ariaLabel
+              ? `${ariaLabel}: ${selected?.label ?? placeholder}`
+              : undefined
         }
+        title={badge ? undefined : selected?.label}
         onClick={() => (open ? close() : setOpen(true))}
         onKeyDown={(e) => {
           if (
@@ -220,7 +234,7 @@ export function SelectInput({
           open
             ? "border-brand-palette-600 ring-2 ring-brand-palette-500/15"
             : "border-slate-200 hover:border-gray-300",
-          "disabled:cursor-wait disabled:bg-gray-100 disabled:text-gray-500",
+          "disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500",
           badge
             ? "h-10 w-10 justify-center rounded-xl text-xs font-bold tracking-wide text-gray-800"
             : cn("w-full justify-between gap-2 text-left", TRIGGER[size]),
@@ -301,7 +315,7 @@ export function SelectInput({
               id={listId}
               role="listbox"
               tabIndex={withSearch ? undefined : -1}
-              aria-label={label}
+              aria-label={label ?? ariaLabel}
               aria-activedescendant={withSearch ? undefined : active}
               onKeyDown={withSearch ? undefined : keys}
               className="flex max-h-60 flex-col gap-0.5 overflow-y-auto p-1 outline-none"
@@ -313,27 +327,36 @@ export function SelectInput({
               ) : (
                 shown.map((o, i) => {
                   const on = o.value === value;
+                  const heading = o.group && (i === 0 || shown[i - 1].group !== o.group);
                   return (
-                    <div
-                      key={o.value}
-                      id={`${id}-opt-${i}`}
-                      role="option"
-                      aria-selected={on}
-                      onMouseDown={(e) => e.preventDefault()}
-                      onClick={() => pick(o.value)}
-                      onMouseMove={() => setCursor(i)}
-                      className={cn(
-                        "flex min-h-10 cursor-pointer items-center justify-between gap-2 rounded-lg px-3 py-2 text-sm transition-colors",
-                        on
-                          ? "bg-brand-palette-50 font-semibold text-brand-palette-700"
-                          : "text-gray-700",
-                        i === cursor && !on && "bg-gray-100",
-                        i === cursor && on && "ring-1 ring-brand-palette-300",
+                    <Fragment key={`${o.group ?? ""}:${o.value}`}>
+                      {heading && (
+                        <div role="presentation" className="px-3 pb-1 pt-2 text-[11px] font-semibold text-gray-500">{o.group}</div>
                       )}
-                    >
-                      <span className="min-w-0 truncate">{o.label}</span>
-                      {on && <IconCheck size={14} />}
-                    </div>
+                      <div
+                        id={`${id}-opt-${i}`}
+                        role="option"
+                        aria-selected={on}
+                        aria-disabled={o.disabled || undefined}
+                        aria-label={o.group ? `${o.label}, ${o.group}` : undefined}
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => pick(o.value)}
+                        onMouseMove={() => { if (!o.disabled) setCursor(i); }}
+                        className={cn(
+                          "flex min-h-10 items-center justify-between gap-2 rounded-lg px-3 py-2 text-sm transition-colors",
+                          o.disabled
+                            ? "cursor-not-allowed text-gray-500"
+                            : on
+                              ? "cursor-pointer bg-brand-palette-50 font-semibold text-brand-palette-700"
+                              : "cursor-pointer text-gray-700",
+                          i === cursor && !on && !o.disabled && "bg-gray-100",
+                          i === cursor && on && "ring-1 ring-brand-palette-300",
+                        )}
+                      >
+                        <span className="min-w-0 truncate">{o.label}</span>
+                        {on && <IconCheck size={14} />}
+                      </div>
+                    </Fragment>
                   );
                 })
               )}

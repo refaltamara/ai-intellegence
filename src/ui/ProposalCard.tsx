@@ -210,7 +210,7 @@ function MiniTable({ cols, rows }: { cols: string[]; rows: Record<string, unknow
   return (
     <div className="overflow-x-auto rounded-xl border border-gray-100">
       <table className="w-full text-xs">
-        <thead><tr className="bg-gray-50">{cols.map((c) => <th key={c} className="whitespace-nowrap px-3 py-2 text-left font-semibold capitalize text-gray-700">{c.replace(/_/g, " ")}</th>)}</tr></thead>
+        <thead><tr className="border-0 border-b border-gray-100 bg-white">{cols.map((c) => <th key={c} className="whitespace-nowrap px-3 py-2 text-left font-semibold capitalize text-gray-900">{c.replace(/_/g, " ")}</th>)}</tr></thead>
         <tbody className="divide-y divide-gray-100">{rows.map((r, i) => <tr key={i}>{cols.map((c) => <td key={c} className="px-3 py-2 text-gray-700">{cellOf(c, r[c])}</td>)}</tr>)}</tbody>
       </table>
     </div>

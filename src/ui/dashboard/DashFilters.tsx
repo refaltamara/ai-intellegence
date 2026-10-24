@@ -5,6 +5,7 @@ import { useState, useTransition } from "react";
 import type { Period } from "@/dashboard/period";
 import { PLATFORM_NAME } from "@/dashboard/askref";
 import { MultiSelect } from "../MultiSelect";
+import { SelectInput } from "../kit/SelectInput";
 
 type F = { platform: string; brands: string[]; period: string };
 
@@ -29,10 +30,8 @@ export function DashFilters({ platform, brands, period, months, weeks, brandOpti
           <a key={k} role="tab" aria-selected={platform === k} className={platform === k ? "on" : ""} href={href({ platform: k, brands, period })} onClick={(e) => { e.preventDefault(); go({ platform: k }); }}>{label}</a>
         ))}
       </div>
-      <select className="dsel" value={period} onChange={(e) => go({ period: e.target.value })} aria-label="Period">
-        <optgroup label="Months">{months.map((p) => <option key={p.key} value={p.key}>{p.label}</option>)}</optgroup>
-        <optgroup label="Weeks">{weeks.map((p) => <option key={p.key} value={p.key}>{p.label}</option>)}</optgroup>
-      </select>
+      <SelectInput withSearch size="sm" className="w-auto min-w-52" ariaLabel="Period" value={period} onChange={(v) => go({ period: v })} searchPlaceholder="Search periods"
+        options={[...months.map((p) => ({ value: p.key, label: p.label, group: "Months" })), ...weeks.map((p) => ({ value: p.key, label: p.label, group: "Weeks" }))]} />
       <div className="dbrands">
         <MultiSelect options={brandOptions} value={picked} onChange={setPicked} placeholder="All brands" />
         {dirty && <button className="btn pri sm" onClick={() => go({ brands: picked })}>Apply</button>}

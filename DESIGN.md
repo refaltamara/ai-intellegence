@@ -6,6 +6,8 @@
 
 **Keep it current.** When you add or change a token, a shared component in `src/ui/kit/`, or a layout pattern, update this file in the same change. Do not document one-off page code here.
 
+**When the standard changes, every place that repeats it changes too.** A change to the standard (a user's correction such as "headers on the body's background", a new pattern, a rule taken back) is written here first, then in the short versions other agents read: `AGENTS.md` (section 2), `.agent/rules/design-system.md`, and rule 11 in `CLAUDE.md` when it is touched. Apply the change to the screens already built to the standard (search for the old classes) so the product and this file never disagree, and say in your reply which documents and screens you updated.
+
 ---
 
 ## 0. Before you touch UI
@@ -173,7 +175,7 @@ Most things sit flat on a border. Shadow marks something that floats.
 
 - First choice: **Fair's two-tone icons** in `src/ui/kit/icons.tsx`. Each is one shape at `opacity="0.4"` under one solid shape, both `fill="currentColor"`, drawn on a 16, 20 or 24 viewBox, rendered by the internal `Svg` helper (`block shrink-0`, `aria-hidden`).
   Available: `IconChart`, `IconDocument`, `IconMessages`, `IconBriefcase`, `IconFolderFavorite`, `IconPlug`, `IconPeople`, `IconSetting`, `IconDocumentCloud`, `IconEye`, `IconEyeSlash`, `IconSignOut`, `IconNotification`, `IconProfile2User`, `IconLikeShapes`.
-- System glyphs, stroked 2px round: `IconMenu`, `IconClose`, `IconChevronLeft/Right/Down`, `IconCheck`, `IconSearch`.
+- System glyphs, stroked 2px round: `IconMenu`, `IconClose`, `IconChevronLeft/Right/Down`, `IconCheck`, `IconSearch`, `IconPlus`, `IconDownload`; `IconMore` is three filled dots.
 - Team icons always through `<RoleIcon role="pr|brand_kol|social" />` (bell, two people, like-badge), so the picker and the sidebar never disagree.
 - **Adding an icon:** add a function to `icons.tsx` in the same two-tone manner (a 40% background shape, a solid foreground shape). No icon library imports (no `lucide-react`), no emoji, no generic "AI" sparkles.
 - Sizes: 20px in nav items and buttons, 18px in menus and icon buttons, 14 to 16px inline with small text, 22 to 24px inside 48px tiles.
@@ -203,6 +205,7 @@ Most things sit flat on a border. Shadow marks something that floats.
 - `bg-white border-r border-gray-200`, `w-64` expanded, `w-18` collapsed (cookie `fi_sidebar`, read on the server so the first paint is right).
 - Order, top to bottom: logo + product + team label → workspace `SelectInput` (search; a 40px initials badge when collapsed) → team switcher (segmented, always three roles, the unavailable one disabled with its reason as a title) → nav (`MAIN_NAV` only) → **Recent chats** in a grey well (`rounded-2xl border border-card-border bg-gray-50 p-1.5`) so they read as conversations, not places → Our {codename}, Connect → `AccountMenu` → Hide menu.
 - Nav item: `flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-sm`; active `bg-brand-palette-50 font-semibold text-brand-palette-700`; idle `text-gray-600 hover:bg-brand-palette-50 hover:text-brand-palette-700`.
+- Recent chat row: `truncate rounded-xl px-2.5 text-[13px] text-gray-700`; hover changes only the text colour (`hover:text-brand-palette-700`), never a background or shadow on the row, so the well stays one quiet surface.
 - Collapsed: icons only, centred, each with a dark tooltip (`bg-gray-900 text-white text-xs rounded-lg`) on hover **and** on keyboard focus; the tooltip text is the accessible name.
 - Below `md`: a drawer from the left with a `bg-black/40` backdrop; closes on Escape, backdrop, navigation; focus moves to its close button and back to the menu button.
 
@@ -219,7 +222,8 @@ Most things sit flat on a border. Shadow marks something that floats.
 ```
 
 - Pair title block and actions with `md:items-center`, not `items-start`.
-- Page horizontal padding: `px-4 md:px-6`. Content is **full width**: no `max-w-*` container on app pages unless a page states a reason (reading width for long prose, a form).
+- Chats, Decks (list, New deck, Edit, a deck and its versions) and Weekly Reports use the compact version of this header instead (6.3, `PageHeader` in the kit). A page rebuilt next to them should use it too.
+- Page horizontal padding: `px-4 md:px-6`. Content is **full width**: no `max-w-*` container on app pages, forms included (a long form fills the width with responsive grids, `md:grid-cols-2 xl:grid-cols-3`, instead of leaving the right side empty). The only exceptions are reading width for long prose and the full-screen family (sign-in, team picker), whose centred column is part of the layout.
 - Sections stack with `gap-6`.
 
 ### 5.4 Sign-in family (`src/ui/AuthShell.tsx`)
@@ -247,8 +251,12 @@ Tailwind defaults: `sm` 640, `md` 768 (sidebar becomes a drawer below it), `lg` 
 **`TextInput`** (`TextInput.tsx`): label above (`text-sm text-gray-900`, `gap-1.5`), `h-13 rounded-2xl border-slate-200 px-4 text-sm`, focus `border-brand-palette-600 ring-2 ring-brand-palette-500/15`, error `border-red-500 bg-red-50/30` with `text-red-600` message below, `hint` below in `text-gray-500`, optional `right` slot (show password). Placeholders say what goes there (`email@example.com`), never fake data.
 
 **`SelectInput`** (`SelectInput.tsx`): a button that looks like the input, its list portalled to `document.body` (`data-dropdown-portal`, `z-[60]`), flipped above when there is no room. `withSearch` adds a search box that takes focus. Keyboard: arrows, Home/End, Enter, Escape returns focus. Sizes `sm` (40px, 44px on phones) and `md` (52px). `variant="badge"`: a 40px square with the option's initials for narrow rails; its list opens beside it.
+- **Every choice from a list is a `SelectInput` with `withSearch`**, whatever the page (rebuilt, legacy or CMS) and however short the list. Never a native `<select>`; `NativeSelect` is gone from the kit.
+- Options are `{ value, label, disabled?, group? }`. A `disabled` option shows but cannot be picked, and the arrows skip it. A run of options with the same `group` gets a small heading (what an `<optgroup>` was, such as "Months" and "Weeks"). Values are strings: map numbers with `String()` in and `Number()` out.
+- Name it with `label` (shown above it) or `ariaLabel` (no visible label: a filter row, a table cell, a `Field`). Inside a `Field`, pass `group` to the `Field`, because a `<label>` around the button would open it on a click on the label's text.
+- Width: full width by default. In a row of filters or a table cell, set `className="w-auto min-w-48"` (or the width the longest option needs). `placeholder` is shown while no option matches the value, such as "choose…" or "→ brand".
 
-**`Field`, `NativeSelect`, `TextField`, `Chip`** (`Form.tsx`): compact filter forms. `Field` puts a bold `text-xs` label and an optional hint above its control; pass `group` when it holds several controls (chips, min/max pair, multi-select) so it renders a labelled group instead of a `<label>`. Inputs are `h-10 rounded-xl`. `Chip` is a toggle (`aria-pressed`), `on` = `bg-brand-palette-50 border-brand-palette-300 text-brand-palette-700`.
+**`Field`, `TextField`, `Chip`** (`Form.tsx`): compact filter forms. `Field` puts a bold `text-xs` label and an optional hint above its control; pass `group` when it holds several controls (chips, min/max pair, multi-select, a `SelectInput`) so it renders a labelled group instead of a `<label>`. Inputs are `h-10 rounded-xl`. `Chip` is a toggle (`aria-pressed`), `on` = `bg-brand-palette-50 border-brand-palette-300 text-brand-palette-700`.
 
 **`MultiSelect`** (`src/ui/MultiSelect.tsx`): chips + search + checkbox list, `rounded-2xl`, removable chips are real buttons.
 
@@ -262,6 +270,22 @@ Tailwind defaults: `sm` 640, `md` 768 (sidebar becomes a drawer below it), `lg` 
 
 **`AccountMenu`** (`src/ui/AccountMenu.tsx`): avatar (initials on `bg-brand-palette-600`), email, role, chevron; opens a menu with a header (full email), items with a one-line hint, then Sign out in red. Upwards in the sidebar, sideways when collapsed.
 
+**`PageHeader`** (`PageHeader.tsx`): the compact header Chats has (6.3): `h1 text-xl`, `text-xs` subtitle flush under it (a string or a node, such as a "Decks" link · "no version yet"), an actions slot, and the dashed line. Decks, its child pages and Weekly Reports use it.
+
+**`Modal`, `ConfirmDialog`, `PromptDialog`** (`Modal.tsx`): the modal spec in 6.2, portalled to the body. Focus goes to the text field or the first control, Tab stays inside, and Escape or the backdrop closes it, with focus returned to the opener. `ConfirmDialog` takes `danger` (a `bg-red-600` primary) and `busy`. `PromptDialog` is one labelled `TextField` whose Save stays off while it is empty. Use these instead of `confirm()`, `prompt()` and `alert()`.
+
+**`Toast`, `useToast()`** (`Toast.tsx`): the toast spec in 6.2. `const toast = useToast(); toast.show("Saved.")` and render `<Toast text={toast.text} />` once.
+
+**`ActionMenu`** (`ActionMenu.tsx`): a 40px three-dot button (`IconMore`, `aria-haspopup="menu"`, `aria-expanded`). Its list is portalled with `data-dropdown-portal` (`z-[60]`), so a table's `overflow-x-auto` never clips it, and it flips up near the bottom of the screen. Items are `{ key, label, onSelect, danger?, disabled?, hint? }`. Arrows, Home/End and Escape work as in a menu. Picking an item puts focus back on the button before `onSelect` runs, so a dialog it opens returns focus there.
+
+**`Segmented`** (`Segmented.tsx`): the segmented control in 6.2. It is a radio group by default, and a tab list with `tabs` (filters over a list). An option may carry a `count` badge. Sizes `sm` and `md`, both 44px on phones.
+
+**`Switch`, `SwitchKnob`** (`Switch.tsx`): the toggle switch in 6.2 as a full row (knob, bold label, `text-xs` hint). Use `SwitchKnob` alone inside a tool button (the deck's "Every week", Chats' Builder mode).
+
+**`Skeleton` pieces** (`Skeleton.tsx`): `SkeletonPage`, `HeaderSkeleton`, `TableSkeleton`, `CardSkeleton`, `StatRowSkeleton`, `ViewerSkeleton`, `Skel`, `SkelPill`; see "Empty, loading, error states" in 6.2.
+
+**`StatusPill`** (`StatusPill.tsx`): the status pill with tones `live` (green, with the one dot), `waiting`, `neutral`, `brand`, `error`. `ProposalShell` keeps its own proposal tones.
+
 **`RoleIcon`, `LogoMark`, `cn`**: see sections 1, 2 and 4.
 
 ### 6.2 Patterns to follow when you build one (add it to the kit, then here)
@@ -272,7 +296,7 @@ These come from the shared Fair design system. Build them to these specs in oran
 
 **Table**
 - Wrapper `overflow-x-auto rounded-2xl border border-card-border` (or `rounded-xl` with `max-h-[720px] overflow-auto` for long lists).
-- Header row `bg-gray-50 border-b border-gray-100`, cells `px-3 py-2.5 text-xs font-semibold text-gray-700`; sticky header `sticky top-0 z-20`.
+- Header row on the same background as the body (`bg-white`, never a grey band), closed by a line (`border-0 border-b border-card-border`). Header cells are the body's size and say they are headers through weight and colour: `px-3 py-2.5 text-sm font-semibold text-gray-900` (in a `text-xs` mini table, `text-xs`). A sticky header is `sticky top-0 z-20 bg-white`.
 - Body cells `px-3 py-2.5 text-sm text-gray-700`, zebra `even:bg-gray-50/60`, hover `hover:bg-brand-palette-50`, selected/open row `bg-brand-palette-50`.
 - Sortable header: a `<button>` inside `<th>` with `aria-sort` on the `<th>`; active column `text-brand-palette-700` with ↓/↑.
 - Numbers right-aligned `tabular-nums`. Checkboxes `h-4 w-4 accent-brand-palette-600` with an `aria-label`.
@@ -306,6 +330,9 @@ These come from the shared Fair design system. Build them to these specs in oran
 
 **Empty, loading, error states** (required on every data view)
 - Loading: a skeleton with the same geometry as the content (`bg-gray-200 rounded animate-pulse` for text lines, `bg-gray-100` for pills and buttons), or a `Spinner` plus a line that says what is loading. No full-page spinner when the layout is known.
+  - **Every page rebuilt to this standard that loads on the server has a `loading.tsx`** (a legacy page gets its skeleton when it is rebuilt, so the skeleton and the page it stands for have the same shape), built from `src/ui/kit/Skeleton.tsx`, in the shape of that page's own components: `SkeletonPage` (the frame, `role="status"` with a hidden label), `HeaderSkeleton` (PageHeader), `TableSkeleton` (the table above), `CardSkeleton` (a section card, with `tiles` for a card grid), `StatRowSkeleton` (stat cards), `ViewerSkeleton` (the slide viewer), `Skel`/`SkelPill` for anything else. `PageLoading` is the dashboard shape (header, stat cards, two blocks) for the Dashboard, the Pulse and a case.
+  - A new page or a new layout adds its skeleton in the same change; a new kind of component that pages wait on gets a skeleton piece in `Skeleton.tsx`.
+  - Inside a component, a part that loads on its own (a PDF, a list fetched in the browser) shows its own skeleton in place, the size of what is coming.
 - Empty: why it is empty and the one action that fills it ("No chats yet. Ask CeMO something in Chats and it shows up here.").
 - Error: what failed and what to do next, in `rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-700` with `role="alert"`.
 
@@ -316,6 +343,23 @@ These come from the shared Fair design system. Build them to these specs in oran
 - CeMO message: a 32px `rounded-xl bg-brand-palette-100 text-brand-palette-700` "C" tile, then the answer column (`text-sm leading-relaxed text-gray-800`).
 - Composer: `rounded-2xl border bg-white p-3 shadow-xs` with `focus-within:border-brand-palette-600 focus-within:ring-2 focus-within:ring-brand-palette-500/15`; the textarea inside has no border, outline or shadow of its own; the dock around it has no border or background of its own (it sits on the page's `bg-gray-50`, like the thread) and lines up with the thread (`px-4 pb-4 md:px-6 md:pb-6`; the thread's `pb-6` is the gap above). The page header's top padding matches the sides (`pt-4 md:pt-6`) ; its title is smaller than other pages' (`h1` `text-xl font-semibold leading-tight`, subtitle `text-xs text-gray-500`, still flush) so it sits with the `text-xs` pills beside it and stays under the empty-state hero; a dashed line closes it (`border-0 border-b border-dashed border-gray-300 pb-4`; without preflight `border-0` is needed, or `border-dashed` draws the browser's default width on the other three sides).
 - Evidence chip: a real `<button>`, `h-5 min-w-5 rounded-md bg-brand-palette-100 text-[11px] font-bold text-brand-palette-800`.
+- Empty-screen hero (a new conversation), vertically centred (`py-10 md:py-16`):
+  - It opens with the 44px CeMO tile (`rounded-2xl bg-brand-palette-100 text-brand-palette-700`) and the name "CeMO", which says who answers. Parts are spaced `gap-6`.
+  - The title (`hero_title`) is `text-[32px] md:text-5xl font-semibold leading-[1.1] tracking-tight text-balance` at `max-w-3xl`. It uses 700, not 900: at this size 900 reads heavy in Museo Sans Rounded.
+  - The intro (`hero_intro`) is `text-base md:text-lg leading-relaxed text-gray-600 text-pretty` at `max-w-2xl` (reading width for prose). Its first sentence (`splitLead` in `Ask.tsx`, what CeMO has read) leads in `font-semibold text-gray-900`, and the rest follows in grey.
+  - There are no suggested questions on it (DECISIONS).
+  - Intro copy: short sentences, no semicolons. Say what CeMO has read, what to ask about, and that every number comes with its posts.
+
+### 6.4 Decks and the slide viewer (reference implementations)
+
+`src/ui/decks/` (`DeckList`, `DeckForm`, `DeckDescriber`, `SlideDescriber`, `PeriodPick`, `DeckFirst`, `DeckViewer`, `SlideComments`, shared pieces in `formParts.tsx`) and `src/ui/weekly/` (`WeeklyViewer`, `SlideAsk`). Copy these patterns:
+- **List with row actions:** the table in 6.2 at `min-w-[880px]` inside its scrolling wrapper. One visible quiet action (Pause or Resume, outline sm), and the rest in `ActionMenu`. Destructive items go through `ConfirmDialog`.
+- **Long form:** a column of section cards (`CARD`: `rounded-3xl border-card-border bg-white p-5 md:p-6`, `h2 text-lg` + `text-xs` hint via `SectionTitle`), full width, with the fields and card grids widening to three or four columns on wide screens. A sticky footer (`sticky bottom-0 border-t border-gray-200 bg-gray-50 py-3`) keeps the busy line, Cancel, Save and the primary in reach.
+- **Template cards:** `button aria-pressed` cards in `grid gap-3 sm:grid-cols-2 xl:grid-cols-3`. Selected is `border-brand-palette-200 bg-brand-palette-50` with a 20px `bg-brand-palette-600` check. `MadeBy` badges: Fair's work in `brand-palette-100/800`, a team's in `gray-100/700`.
+- **Checkbox cards** (`CheckCard`): a `<label>` card holding a `h-4 w-4 accent-brand-palette-600` checkbox, a bold title, an optional `text-[11px]` tag and badge, and a `text-xs` description. Checked uses the brand tint; locked or blocked is `bg-gray-50 text-gray-500`.
+- **Version tabs:** a `role="tablist"` row of `rounded-xl border px-3 text-xs` chips, active in the brand tint. On phones the row scrolls (`no-scrollbar overflow-x-auto`) instead of wrapping.
+- **Side panel beside a slide:** `rounded-2xl border-card-border bg-white`, sticky from 1101px. It has the Tabs spec (Ask AI | Comments with a count badge), a thread in the Chats bubble style without the "C" tile (the column is 380px), and the Chats composer (`COMPOSER`, `COMPOSER_INPUT`).
+- **Presenting** is the one exception to light only. The full-screen shell turns `bg-gray-900` so the slide is the only bright thing on screen. Text on it is `text-gray-300`/`text-white`, and its buttons are `text-gray-100 hover:bg-white/10`. Nothing else in the product is dark.
 
 ---
 
@@ -383,6 +427,7 @@ Spinners run only while work is running. Nothing pulses, floats or loops for dec
 - Build classes with string interpolation.
 - Add a global header bar, a `max-w` page container, gradients as decoration, glows, coloured shadows, blurred blobs, decorative status dots, or pill badges above headings.
 - Add `dark:` variants, an icon library, or emoji.
+- Use a native `<select>`; a choice from a list is a `SelectInput` with `withSearch`.
 - Use `h-screen`, `overflow-hidden` on root containers, or `<div onClick>`.
 
 ---

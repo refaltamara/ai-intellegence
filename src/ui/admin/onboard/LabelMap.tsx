@@ -2,6 +2,7 @@
 /** The dump's sentiment scale onto the product's three classes (CMS plan, "Map labels"), with how many comments each label holds. */
 import { useState } from "react";
 import { useOnboard } from "./useOnboard";
+import { SelectInput } from "../../kit/SelectInput";
 
 export function LabelMap({ ws, labels, current }: { ws: string; labels: { label: string; comments: number }[]; current: Record<string, string | null> }) {
   const { busy, error, call } = useOnboard(ws);
@@ -16,9 +17,8 @@ export function LabelMap({ ws, labels, current }: { ws: string; labels: { label:
         <tbody>{labels.map((l) => (
           <tr key={l.label}><td>{l.label}</td><td className="num">{l.comments.toLocaleString("en-US")} <small className="muted">{Math.round((l.comments / total) * 100)}%</small></td>
             <td>{l.label === "(none)" ? <span className="muted">no label: unlabelled, not neutral</span> : (
-              <select value={map[l.label] ?? ""} onChange={(e) => { setMap({ ...map, [l.label]: e.target.value }); setSaved(false); }}>
-                <option value="">choose…</option><option value="positive">positive</option><option value="neutral">neutral</option><option value="negative">negative</option><option value="none">no sentiment</option>
-              </select>
+              <SelectInput withSearch size="sm" className="w-auto min-w-40" ariaLabel={`Sentiment for ${l.label}`} placeholder="choose…" value={map[l.label] ?? ""} onChange={(v) => { setMap({ ...map, [l.label]: v }); setSaved(false); }}
+                options={[{ value: "positive", label: "positive" }, { value: "neutral", label: "neutral" }, { value: "negative", label: "negative" }, { value: "none", label: "no sentiment" }]} />
             )}</td></tr>
         ))}</tbody>
       </table></div>

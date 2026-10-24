@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { CardConfig, CardKind, CardSize } from "@/pulses/cards";
 import { MultiSelect } from "../MultiSelect";
+import { SelectInput } from "../kit/SelectInput";
 
 export type Options = { brands: { id: string; name: string }[]; months: { key: string; label: string }[]; weeks: { key: string; label: string }[] };
 const KINDS: { kind: CardKind; label: string; hint: string }[] = [
@@ -55,42 +56,51 @@ export function CardEditor({ options, initial, onSave, onCancel, busy }: {
       )}
       <div className="cgrid">
         <label className="wf"><span>Title <small>(optional)</small></span><input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Say what it is for" maxLength={80} /></label>
-        <label className="wf"><span>Platform</span>
-          <select value={platform} onChange={(e) => setPlatform(e.target.value as CardConfig["platform"])}><option value="all">TikTok + Instagram</option><option value="tiktok">TikTok</option><option value="instagram">Instagram</option></select>
-        </label>
-        <label className="wf"><span>Period</span>
-          <select value={period} onChange={(e) => setPeriod(e.target.value)}>
-            <optgroup label="Moves with the data"><option value="latest-month">Latest month</option><option value="latest-week">Latest full week</option></optgroup>
-            <optgroup label="Months">{options.months.map((m) => <option key={m.key} value={m.key}>{m.label}</option>)}</optgroup>
-            <optgroup label="Weeks">{options.weeks.map((w) => <option key={w.key} value={w.key}>{w.label}</option>)}</optgroup>
-          </select>
-        </label>
-        <label className="wf"><span>Size</span>
-          <select value={size} onChange={(e) => setSize(e.target.value as CardSize)}><option value="s">Small (a third)</option><option value="m">Half</option><option value="l">Full width</option></select>
-        </label>
+        {/* divs, not labels: a label around the select's button would open it on a click on its text */}
+        <div className="wf"><span>Platform</span>
+          <SelectInput withSearch size="sm" ariaLabel="Platform" value={platform ?? "all"} onChange={(v) => setPlatform(v as CardConfig["platform"])}
+            options={[{ value: "all", label: "TikTok + Instagram" }, { value: "tiktok", label: "TikTok" }, { value: "instagram", label: "Instagram" }]} />
+        </div>
+        <div className="wf"><span>Period</span>
+          <SelectInput withSearch size="sm" ariaLabel="Period" value={period} onChange={setPeriod} searchPlaceholder="Search periods"
+            options={[
+              { value: "latest-month", label: "Latest month", group: "Moves with the data" },
+              { value: "latest-week", label: "Latest full week", group: "Moves with the data" },
+              ...options.months.map((m) => ({ value: m.key, label: m.label, group: "Months" })),
+              ...options.weeks.map((w) => ({ value: w.key, label: w.label, group: "Weeks" })),
+            ]} />
+        </div>
+        <div className="wf"><span>Size</span>
+          <SelectInput withSearch size="sm" ariaLabel="Size" value={size} onChange={(v) => setSize(v as CardSize)}
+            options={[{ value: "s", label: "Small (a third)" }, { value: "m", label: "Half" }, { value: "l", label: "Full width" }]} />
+        </div>
         <div className="wf wide"><span>{kind === "closeup" ? <>Brand <small>(one; empty = the most-posted brand)</small></> : LANDSCAPE.has(kind) ? <>Brands <small>(up to 8; empty = the 8 most-posted)</small></> : <>Brands <small>(empty = all brands)</small></>}</span><MultiSelect options={options.brands} value={brands} onChange={(ids) => setBrands(kind === "closeup" ? ids.slice(-1) : ids)} placeholder={kind === "closeup" ? "Most-posted brand" : LANDSCAPE.has(kind) ? "Most-posted brands" : "All brands"} /></div>
         {kind === "kpi" && (
-          <label className="wf"><span>Number</span>
-            <select value={metric} onChange={(e) => setMetric(e.target.value as CardConfig["metric"] & string)}><option value="views">Views</option><option value="posts">Content</option><option value="engagements">Engagement</option><option value="er">Engagement rate</option></select>
-          </label>
+          <div className="wf"><span>Number</span>
+            <SelectInput withSearch size="sm" ariaLabel="Number" value={metric} onChange={(v) => setMetric(v as CardConfig["metric"] & string)}
+              options={[{ value: "views", label: "Views" }, { value: "posts", label: "Content" }, { value: "engagements", label: "Engagement" }, { value: "er", label: "Engagement rate" }]} />
+          </div>
         )}
         {kind === "trend" && (
-          <label className="wf"><span>Lines show</span>
-            <select value={metric} onChange={(e) => setMetric(e.target.value as CardConfig["metric"] & string)}><option value="posts">Content</option><option value="views">Views</option></select>
-          </label>
+          <div className="wf"><span>Lines show</span>
+            <SelectInput withSearch size="sm" ariaLabel="Lines show" value={metric} onChange={(v) => setMetric(v as CardConfig["metric"] & string)}
+              options={[{ value: "posts", label: "Content" }, { value: "views", label: "Views" }]} />
+          </div>
         )}
         {kind === "content" && (
           <>
-            <label className="wf"><span>Sort by</span>
-              <select value={sort} onChange={(e) => setSort(e.target.value as CardConfig["sort"] & string)}><option value="views">Views</option><option value="engagement">Engagement</option><option value="er">Engagement rate</option></select>
-            </label>
+            <div className="wf"><span>Sort by</span>
+              <SelectInput withSearch size="sm" ariaLabel="Sort by" value={sort} onChange={(v) => setSort(v as CardConfig["sort"] & string)}
+                options={[{ value: "views", label: "Views" }, { value: "engagement", label: "Engagement" }, { value: "er", label: "Engagement rate" }]} />
+            </div>
             <label className="wf"><span>Keyword or @username</span><input value={q} onChange={(e) => setQ(e.target.value)} placeholder="optional" maxLength={80} /></label>
           </>
         )}
         {kind === "creators" && (
-          <label className="wf"><span>Rank by</span>
-            <select value={by} onChange={(e) => setBy(e.target.value as "views" | "comments")}><option value="views">Views</option><option value="comments">Comments</option></select>
-          </label>
+          <div className="wf"><span>Rank by</span>
+            <SelectInput withSearch size="sm" ariaLabel="Rank by" value={by} onChange={(v) => setBy(v as "views" | "comments")}
+              options={[{ value: "views", label: "Views" }, { value: "comments", label: "Comments" }]} />
+          </div>
         )}
         {(kind === "rankings" || kind === "creators" || kind === "content") && (
           <label className="wf"><span>How many</span><input type="number" min={3} max={kind === "content" ? 12 : kind === "creators" ? 10 : 25} value={limit} onChange={(e) => setLimit(Number(e.target.value))} /></label>

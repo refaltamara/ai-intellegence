@@ -1,5 +1,11 @@
-import { PageLoading } from "@/ui/PageLoading";
+import { HeaderSkeleton, SkeletonPage, ViewerSkeleton } from "@/ui/kit/Skeleton";
 
+/** Weekly Reports: the same slide viewer as a deck */
 export default function Loading() {
-  return <PageLoading label="Loading the reports…" />;
+  return (
+    <SkeletonPage label="Loading the reports…" className="gap-4">
+      <HeaderSkeleton actions={3} />
+      <ViewerSkeleton />
+    </SkeletonPage>
+  );
 }

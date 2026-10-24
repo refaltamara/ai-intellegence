@@ -8,6 +8,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { ClientContract as WeeklyContract } from "@/competitor/contract";
 import { MultiSelect } from "./MultiSelect";
+import { SelectInput } from "./kit/SelectInput";
 
 type Watch = { name: string; brand_ids: string[]; group: "core" | "when_relevant"; untracked?: string[]; short?: string };
 export type WeeklyInitial = { id?: string; name?: string; contract: WeeklyContract | null; formats?: string[]; email?: string; cron?: string };
@@ -76,10 +77,8 @@ export function WeeklyForm({ brands, initial, onDone }: { brands: { id: string; 
             <div className="wrow" key={i}>
               <input className="wname" value={w.name} onChange={(e) => setRow(i, { name: e.target.value })} placeholder="Name on the slide" maxLength={60} />
               <div className="wbrands"><MultiSelect options={brands} value={w.brand_ids} onChange={(ids) => pickBrands(i, ids)} placeholder="Brands in this row" /></div>
-              <select value={w.group} onChange={(e) => setRow(i, { group: e.target.value as Watch["group"] })} aria-label="Core or when relevant">
-                <option value="core">Core</option>
-                <option value="when_relevant">When relevant</option>
-              </select>
+              <SelectInput withSearch size="sm" className="w-auto min-w-40" ariaLabel="Core or when relevant" value={w.group} onChange={(v) => setRow(i, { group: v as Watch["group"] })}
+                options={[{ value: "core", label: "Core" }, { value: "when_relevant", label: "When relevant" }]} />
               <button type="button" className="x" onClick={() => setWatch((ws) => ws.filter((_, j) => j !== i))} title="Remove" aria-label="Remove">×</button>
               {w.untracked?.length ? <small className="untracked">Not collected yet: {w.untracked.join(", ")}</small> : null}
             </div>
@@ -98,8 +97,10 @@ export function WeeklyForm({ brands, initial, onDone }: { brands: { id: string; 
       <label className="wf"><span>Send to <small>(emails, separated by commas; empty = Library only)</small></span><input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@company.com, other@company.com" /></label>
       <div className="wf"><span>When</span>
         <div className="wwhen">
-          <select value={day} onChange={(e) => setDay(Number(e.target.value))} aria-label="Day">{DAYS.map((d, i) => <option key={d} value={i}>Every {d}</option>)}</select>
-          <select value={hour} onChange={(e) => setHour(Number(e.target.value))} aria-label="Time">{Array.from({ length: 24 }, (_, h) => <option key={h} value={h}>{String(h).padStart(2, "0")}:00 WIB</option>)}</select>
+          <SelectInput withSearch size="sm" className="w-auto min-w-44" ariaLabel="Day" value={String(day)} onChange={(v) => setDay(Number(v))}
+            options={DAYS.map((d, i) => ({ value: String(i), label: `Every ${d}` }))} />
+          <SelectInput withSearch size="sm" className="w-auto min-w-36" ariaLabel="Time" value={String(hour)} onChange={(v) => setHour(Number(v))} searchPlaceholder="Search hours"
+            options={Array.from({ length: 24 }, (_, h) => ({ value: String(h), label: `${String(h).padStart(2, "0")}:00 WIB` }))} />
         </div>
         <small className="hint">It reports the last full week in the data, and sends nothing when there is no new week.</small>
       </div>

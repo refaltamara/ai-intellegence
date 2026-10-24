@@ -194,3 +194,16 @@ export function IconSearch(p: P) {
 export function IconChevronRight(p: P) {
   return <Svg {...p} view="0 0 24 24"><path d="M9.5 7l5 5-5 5" {...stroke} /></Svg>;
 }
+
+/** three dots: the "more actions" menu on a row or a page */
+export function IconMore(p: P) {
+  return <Svg {...p} view="0 0 24 24"><circle cx="5.5" cy="12" r="1.75" fill="currentColor" /><circle cx="12" cy="12" r="1.75" fill="currentColor" /><circle cx="18.5" cy="12" r="1.75" fill="currentColor" /></Svg>;
+}
+
+export function IconPlus(p: P) {
+  return <Svg {...p} view="0 0 24 24"><path d="M12 5v14M5 12h14" {...stroke} /></Svg>;
+}
+
+export function IconDownload(p: P) {
+  return <Svg {...p} view="0 0 24 24"><path d="M12 4v11M7.5 10.5L12 15l4.5-4.5M5 19.5h14" {...stroke} /></Svg>;
+}

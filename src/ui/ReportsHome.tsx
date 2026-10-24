@@ -14,6 +14,7 @@ import type { ClientContract as WeeklyContract } from "@/competitor/contract";
 import type { ReportRow } from "@/reports/store";
 import { fmtDate } from "./format";
 import { WeeklyForm } from "./WeeklyForm";
+import { SelectInput } from "./kit/SelectInput";
 
 export type AgentWithRuns = AgentRow & { runs: AgentRunRow[] };
 type WeeklyParams = { contract?: WeeklyContract; formats?: string[]; last_week?: string };
@@ -154,10 +155,8 @@ function ScheduleDetail({ a, setup, busy, onAct, onSaved }: { a: AgentWithRuns; 
       <p>{a.kind === "weekly_report" ? `For ${p.contract?.client.name ?? "?"} · ${a.schedule_human ?? a.schedule_cron} · to ${a.delivery.email || "the list only"}${p.last_week ? ` · last sent ${p.last_week}` : ""}` : `${titleOf(a.skill)} · ${a.schedule_human ?? a.schedule_cron} · via ${a.delivery.channels.join(" + ")}${a.only_if_changed ? " · only if changed" : ""}`}</p>
       <div className="acts" style={{ margin: "10px 0 14px" }}>
         {a.kind === "weekly_report" && (
-          <select className="dsel sm" value={week} onChange={(e) => setWeek(e.target.value)} aria-label="Week to report">
-            <option value="">Latest full week</option>
-            {setup.weeks.map((w) => <option key={w.key} value={w.key}>{w.label}</option>)}
-          </select>
+          <SelectInput withSearch size="sm" className="w-auto min-w-48" ariaLabel="Week to report" value={week} onChange={setWeek} searchPlaceholder="Search weeks"
+            options={[{ value: "", label: "Latest full week" }, ...setup.weeks.map((w) => ({ value: w.key, label: w.label }))]} />
         )}
         <button className="btn sm" disabled={!!busy} onClick={() => onAct("run", week || undefined)}>{busy === a.id + "run" ? (a.kind === "weekly_report" ? "Making the deck…" : "Running…") : "Run now"}</button>
         {a.status === "active" ? <button className="btn sm" disabled={!!busy} onClick={() => onAct("pause")}>Pause</button> : <button className="btn sm" disabled={!!busy} onClick={() => onAct("resume")}>Resume</button>}
@@ -242,7 +241,8 @@ function NewSchedule({ setup, onDone }: { setup: SetupOptions; onDone: (m: strin
             <div className="parsed on">
               <h5>Here's how we read that. Edit anything.</h5>
               <div className="field"><span>Name</span><input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} style={inp} /></div>
-              <div className="field"><span>Analysis</span><select value={draft.skill} onChange={(e) => setDraft({ ...draft, skill: e.target.value })} style={inp}>{setup.skills.map((s) => <option key={s.name} value={s.name}>{s.title}</option>)}</select></div>
+              <div className="field"><span>Analysis</span><SelectInput withSearch size="sm" ariaLabel="Analysis" value={draft.skill} onChange={(v) => setDraft({ ...draft, skill: v })} searchPlaceholder="Search analyses"
+                options={setup.skills.map((s) => ({ value: s.name, label: s.title }))} /></div>
               <div className="field"><span>Params</span><textarea value={paramsText} onChange={(e) => setParamsText(e.target.value)} style={{ ...inp, minHeight: 70, fontFamily: "monospace", fontSize: 12 }} /></div>
               <div className="field"><span>Cron</span><input value={draft.schedule.cron} onChange={(e) => setDraft({ ...draft, schedule: { ...draft.schedule, cron: e.target.value } })} style={inp} /></div>
               <div className="field"><span>Schedule</span><b>{draft.schedule.human} · {draft.schedule.tz}</b></div>

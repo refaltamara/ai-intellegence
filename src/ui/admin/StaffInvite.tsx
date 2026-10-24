@@ -1,6 +1,7 @@
 "use client";
 /** Refal or Rafli invite someone to Fair's staff: their duties and the workspace their chats live in. */
 import { useState } from "react";
+import { SelectInput } from "../kit/SelectInput";
 
 export function StaffInvite({ workspaces }: { workspaces: { id: string; name: string }[] }) {
   const [email, setEmail] = useState("");
@@ -21,7 +22,8 @@ export function StaffInvite({ workspaces }: { workspaces: { id: string; name: st
   return (
     <form className="inviteform card" onSubmit={send}>
       <label>Email<input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required placeholder="name@fair-indonesia.com" /></label>
-      <label>Home workspace<select value={ws} onChange={(e) => setWs(e.target.value)}>{workspaces.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}</select></label>
+      <label>Home workspace<SelectInput withSearch size="sm" ariaLabel="Home workspace" value={ws} onChange={setWs} searchPlaceholder="Search workspaces"
+        options={workspaces.map((w) => ({ value: w.id, label: w.name }))} /></label>
       <div className="lv">
         {[["owner", "Owner"], ["role_owner", "Role owner"], ["designer", "Design"], ["data_ops", "Data ops"]].map(([id, label]) => (
           <label key={id} className="tick"><input type="checkbox" checked={staff.includes(id)} onChange={() => tick(id)} /> {label}</label>

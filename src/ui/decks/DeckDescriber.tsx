@@ -6,6 +6,9 @@
  */
 import { useState } from "react";
 import type { DeckDraft } from "@/decks/describe";
+import { Button } from "../kit/Button";
+import { Spinner } from "../kit/Spinner";
+import { CARD, COMPOSER, COMPOSER_INPUT } from "./formParts";
 
 export function DeckDescriber({ onDraft }: { onDraft: (d: DeckDraft) => void }) {
   const [text, setText] = useState("");
@@ -27,18 +30,27 @@ export function DeckDescriber({ onDraft }: { onDraft: (d: DeckDraft) => void }) 
     }
   }
   return (
-    <section className="ddescribe">
-      <h3>Describe the deck you want</h3>
-      <p className="muted">Say what it should show and how often; CeMO picks the template, the brands and the slides below, and drafts a new slide only for what the library does not have. Check it, then create it.</p>
-      <div className="ddrow">
-        <textarea value={text} onChange={(e) => setText(e.target.value)} rows={2} maxLength={800} placeholder="e.g. Monthly: share of views for our brand and the top 5 competitors, top creators, then comments that mention halal per week" />
-        <button type="button" className="btn pri sm" disabled={busy || text.trim().length < 8} onClick={draft}>{busy ? "Laying it out…" : "Lay it out"}</button>
+    <section className={CARD}>
+      <div>
+        <h2 className="text-lg font-semibold leading-tight text-gray-900">Describe the deck you want</h2>
+        <p className="text-xs text-gray-500">Say what it should show and how often; CeMO picks the template, the brands and the slides below, and drafts a new slide only for what the library does not have. Check it, then create it.</p>
       </div>
-      {busy && <p className="muted">This takes up to a minute when a new slide is drafted and tried on the newest week.</p>}
-      {error && <div className="errbox">{error}</div>}
+      <div className={COMPOSER}>
+        <textarea value={text} onChange={(e) => setText(e.target.value)} rows={2} maxLength={800} aria-label="Describe the deck you want"
+          onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && !busy && text.trim().length >= 8) void draft(); }}
+          placeholder="e.g. Monthly: share of views for our brand and the top 5 competitors, top creators, then comments that mention halal per week"
+          className={COMPOSER_INPUT} />
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <span className="flex min-h-8 items-center gap-2 text-xs text-gray-500" aria-live="polite">
+            {busy && <><Spinner />This takes up to a minute when a new slide is drafted and tried on the newest week.</>}
+          </span>
+          <Button size="sm" isLoading={busy} loadingLabel="Laying it out…" disabled={text.trim().length < 8} onClick={draft}>Lay it out</Button>
+        </div>
+      </div>
+      {error && <p role="alert" className="rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>}
       {done && (
-        <p className="ddone">
-          Filled in below from <b>{done.name}</b>: {done.slides.length} slide type{done.slides.length === 1 ? "" : "s"}{done.skills.length ? `, ${done.skills.length} of the team's analyses` : ""}{done.added.length ? `; new: ${done.added.map((a) => a.title).join(", ")} (kept as your team's slides)` : ""}.
+        <p role="status" className="rounded-2xl bg-brand-palette-50 px-4 py-3 text-sm text-brand-palette-800">
+          Filled in below from <b className="font-semibold">{done.name}</b>: {done.slides.length} slide type{done.slides.length === 1 ? "" : "s"}{done.skills.length ? `, ${done.skills.length} of the team's analyses` : ""}{done.added.length ? `; new: ${done.added.map((a) => a.title).join(", ")} (kept as your team's slides)` : ""}.
           {done.notes.length > 0 && <> Not placed: {done.notes.join("; ")}.</>}
         </p>
       )}

@@ -2,6 +2,7 @@
 /** Brand in focus, window and platform. Every change is a URL, so a view can be shared. */
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
+import { SelectInput } from "../kit/SelectInput";
 
 type F = { brand: string; days: number; platform: string };
 const LABEL: Record<string, string> = { tiktok: "TikTok", instagram: "Instagram", threads: "Threads", x: "X", youtube: "YouTube" };
@@ -23,9 +24,8 @@ export function PrFilters({ brand, days, platform, brands, platforms, client, wi
   const go = (f: Partial<F>) => start(() => router.push(href({ ...cur, ...f }, client, def)));
   return (
     <div className={`dfilters ${pending ? "busy" : ""}`}>
-      <select className="dsel" value={brand} onChange={(e) => go({ brand: e.target.value })} aria-label="Brand in focus">
-        {brands.map((b) => <option key={b.id} value={b.id}>{b.name}{b.id === client ? " (you)" : ""}</option>)}
-      </select>
+      <SelectInput withSearch size="sm" className="w-auto min-w-52" ariaLabel="Brand in focus" value={brand} onChange={(v) => go({ brand: v })} searchPlaceholder="Search brands"
+        options={brands.map((b) => ({ value: b.id, label: `${b.name}${b.id === client ? " (you)" : ""}` }))} />
       <div className="seg" role="tablist" aria-label="Window">
         {windows.map((d) => (
           <a key={d} role="tab" aria-selected={days === d} className={days === d ? "on" : ""} href={href({ ...cur, days: d }, client, def)} onClick={(e) => { e.preventDefault(); go({ days: d }); }}>{d} days</a>

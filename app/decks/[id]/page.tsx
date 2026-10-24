@@ -6,6 +6,7 @@ import { dataSpan, deckPeriods } from "@/decks/generate";
 import { deckVersions, getDeck } from "@/decks/store";
 import { DeckFirst } from "@/ui/decks/DeckFirst";
 import { DeckViewer } from "@/ui/decks/DeckViewer";
+import { PageHeader } from "@/ui/kit/PageHeader";
 
 export const dynamic = "force-dynamic";
 
@@ -19,9 +20,9 @@ export default async function DeckPage({ params, searchParams }: { params: Promi
   const range = deck.spec.rep ? await dataSpan(ws) : null;
   if (!versions.length) {
     return (
-      <section className="screen">
-        <div className="topbar"><div><h1>{deck.name}</h1><span className="meta"><Link href="/decks">Decks</Link> · no version yet</span></div></div>
-        <div className="wrap"><DeckFirst deckId={deck.id} error={deck.last_error} periods={periods} range={range} day={deck.spec.grain === "day"} /></div>
+      <section data-tw className="flex min-h-full flex-col gap-6 px-4 pb-6 md:px-6">
+        <PageHeader title={deck.name} subtitle={<><Link className="font-semibold text-brand-palette-700 underline-offset-2 hover:underline" href="/decks">Decks</Link> · no version yet</>} />
+        <DeckFirst deckId={deck.id} error={deck.last_error} periods={periods} range={range} day={deck.spec.grain === "day"} />
       </section>
     );
   }
