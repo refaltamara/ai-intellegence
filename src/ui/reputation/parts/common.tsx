@@ -95,7 +95,7 @@ export function LeanBar({ label, x, neg, pos }: { label: string; x: Split; neg: 
 /** the 30 days (or 90) of status as a strip of day cells, each named in its title */
 export function LadderStrip({ days, label }: { days: { d: string; level: Level | "none"; title: string }[]; label: string }) {
   return (
-    <span role="img" aria-label={label} className="flex h-5 w-full gap-0.5">
+    <span role="img" aria-label={label} className="flex h-4 w-full gap-0.5">
       {days.map((h) => <i key={h.d} title={h.title} className={cn("block h-full min-w-0 flex-1 rounded-[3px]", LEVEL_CELL[h.level])} />)}
     </span>
   );

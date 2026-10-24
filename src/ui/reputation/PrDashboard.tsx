@@ -27,7 +27,7 @@ import { CARD, Empty, Notes, SectionCard } from "../kit/Section";
 import { StatusPill } from "../kit/StatusPill";
 import { cn } from "../cn";
 import { AskLink, DASH_PAGE, OutLink, PlatformTag, Tag, TWO } from "../dashboard/parts";
-import { ask, H4, ITEM_CARD, LadderStrip, LEVEL, LEVEL_ORDER, LeanBar, MiniBars, MiniTable, MUTED, NEG, PLATFORM, POS, PostLine, PostList, QuoteLine, sharePct, TD, TD_NUM, TH, TH_NUM, TR, VoiceDot } from "./parts/common";
+import { ask, H4, ITEM_CARD, LadderStrip, LEVEL, LEVEL_CELL, LEVEL_ORDER, LeanBar, MiniBars, MiniTable, MUTED, NEG, PLATFORM, POS, PostLine, PostList, QuoteLine, sharePct, TD, TD_NUM, TH, TH_NUM, TR, VoiceDot } from "./parts/common";
 import { DailyTable, PlatformCard, SplitTable, WatchCard } from "./parts/cards";
 
 export { DailyTable, WatchCard };
@@ -289,6 +289,7 @@ export function PrDashboard({ d, client, view, hide = [] }: { d: PrDashboardData
     ),
   };
   const level = noNorm ? null : st.level;
+  const strip = st.history.map((h) => ({ d: h.d, level: h.norm ? h.level : ("none" as const), title: `${dayMonth(h.d)}: ${h.norm ? LEVEL[h.level].label : "no norm yet"}${h.neg_pct != null ? `, ${h.neg_pct}% negative of ${int(h.comments)}` : ""}` }));
   return (
     <section data-tw className={DASH_PAGE}>
       <PageHeader title="Dashboard" subtitle={<>{who}{d.tracked_since ? ` · tracked since ${dayMonth(d.tracked_since)} ${d.tracked_since.slice(0, 4)}` : ""} · {range}{scopeWord}{noPrev ? "" : ` vs the ${f.days} days before`} · data through {dayMonth(d.as_of)} {d.as_of.slice(0, 4)}</>}
@@ -310,21 +311,27 @@ export function PrDashboard({ d, client, view, hide = [] }: { d: PrDashboardData
       )}
       {showStatus && (
         <div className={cn(CARD, "lg:flex-row lg:items-start lg:gap-6")}>
-          <div className="flex shrink-0 flex-col gap-2 lg:w-64">
+          <div className="flex shrink-0 flex-col gap-2 lg:w-52">
             <small className="text-xs text-gray-500">Reputation status · {st.day ? dayMonth(st.day.d) : "–"}</small>
             <StatusPill tone={level ? L.tone : "neutral"} className="self-start px-3 py-1 text-sm">{noNorm ? "No norm yet" : L.label}</StatusPill>
-            {/* the ladder: every level named, the current one marked as in the Stepper (DESIGN.md 6.2) */}
-            <ol aria-label="Levels" className="flex flex-wrap gap-1">
-              {LEVEL_ORDER.map((lv) => (
-                <li key={lv} aria-current={lv === level ? "step" : undefined}
-                  className={cn("rounded-lg px-2 py-0.5 text-[11px]", lv === level ? "bg-brand-palette-50 font-semibold text-brand-palette-700" : "bg-gray-100/70 text-gray-500")}>{LEVEL[lv].label}</li>
-              ))}
-            </ol>
           </div>
           <div className="flex min-w-0 flex-1 flex-col gap-3">
             <p className="text-sm leading-relaxed text-gray-700">{noNorm ? null : <b className="font-semibold text-gray-900">{L.line}</b>} {st.reason}</p>
-            <LadderStrip label="Status over the last 30 days" days={st.history.map((h) => ({ d: h.d, level: h.norm ? h.level : "none", title: `${dayMonth(h.d)}: ${h.norm ? LEVEL[h.level].label : "no norm yet"}${h.neg_pct != null ? `, ${h.neg_pct}% negative of ${int(h.comments)}` : ""}` }))} />
-            <small className="flex flex-wrap items-center gap-x-3 text-xs text-gray-500">{st.rule} {view.alert && <LadderDrawer brand={f.brand} alert={view.alert} builder={view.builder} />}</small>
+            <div className="flex flex-col gap-1.5">
+              <LadderStrip label="Status over the last 30 days" days={strip} />
+              {strip.length > 1 && <span className="flex justify-between text-[11px] tabular-nums text-gray-500"><span>{dayMonth(strip[0].d)}</span><span>{dayMonth(strip[strip.length - 1].d)}</span></span>}
+            </div>
+            {/* the ladder doubles as the strip's key: every level named with its colour, the current one marked */}
+            <ol aria-label="Levels" className="m-0 flex list-none flex-wrap gap-x-3 gap-y-1 p-0">
+              {[...LEVEL_ORDER, ...(strip.some((h) => h.level === "none") ? ["none" as const] : [])].map((lv) => (
+                <li key={lv} aria-current={lv === level ? "step" : undefined}
+                  className={cn("flex items-center gap-1.5 text-xs", lv === level ? "font-semibold text-gray-900" : "text-gray-500")}>
+                  <i aria-hidden className={cn("block size-2.5 rounded-[3px]", LEVEL_CELL[lv])} />{lv === "none" ? "No norm yet" : LEVEL[lv].label}
+                </li>
+              ))}
+            </ol>
+            <p className="text-xs leading-relaxed text-gray-500">{st.rule}</p>
+            {view.alert && <div className="-ml-1"><LadderDrawer brand={f.brand} alert={view.alert} builder={view.builder} /></div>}
           </div>
           {(st.level !== "calm" || noNorm) && <Link className={buttonClass("outline", "sm", "shrink-0 self-start")} href={ask(`What is driving the negative talk about ${who} around ${st.day ? dayMonth(st.day.d) : "the latest day"}, and should we respond?`)}>Ask CeMO</Link>}
         </div>

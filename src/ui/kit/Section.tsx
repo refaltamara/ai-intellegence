@@ -49,7 +49,7 @@ export function Empty({ children, className }: { children: ReactNode; className?
 export function Notes({ lines }: { lines: string[] }) {
   if (!lines.length) return null;
   return (
-    <div className="flex flex-col gap-1 rounded-2xl bg-amber-50 px-4 py-3 text-sm leading-relaxed text-amber-800">
+    <div className="flex flex-col gap-0.5 rounded-xl bg-amber-50 px-3.5 py-2.5 text-xs leading-relaxed text-amber-800">
       {lines.map((l) => <p key={l}>{l}</p>)}
     </div>
   );
