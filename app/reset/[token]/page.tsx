@@ -1,6 +1,7 @@
 import { readPasswordLink } from "@/auth/passwordLinks";
 import { NewPassword } from "@/ui/PasswordReset";
-import { LogoMark } from "@/ui/LogoMark";
+import { AuthShell } from "@/ui/AuthShell";
+import { ButtonLink } from "@/ui/kit/Button";
 
 export const dynamic = "force-dynamic";
 
@@ -8,14 +9,19 @@ export const dynamic = "force-dynamic";
 export default async function ResetTokenPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
   const link = await readPasswordLink(token);
+  if (!link) {
+    return (
+      <AuthShell title="This link has expired">
+        <div className="flex flex-col gap-4">
+          <p className="text-sm text-gray-600">A password link works once: for a day when Fair made it, two hours when it came by email.</p>
+          <ButtonLink href="/reset" className="self-start">Get a new link</ButtonLink>
+        </div>
+      </AuthShell>
+    );
+  }
   return (
-    <div className="login">
-      <div className="box">
-        <div className="brand"><LogoMark /><div><b>Fair Intelligence</b><small>Your password</small></div></div>
-        {link ? <NewPassword token={token} email={link.email} /> : (
-          <div className="card"><h2>This link has expired</h2><p>A password link works once: for a day when Fair made it, two hours when it came by email.</p><a className="btn pri" href="/reset">Get a new link</a></div>
-        )}
-      </div>
-    </div>
+    <AuthShell title="Set a new password">
+      <NewPassword token={token} email={link.email} />
+    </AuthShell>
   );
 }

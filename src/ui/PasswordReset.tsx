@@ -4,6 +4,9 @@
  * link, choose the new password. Either way the next step is signing in.
  */
 import { useState } from "react";
+import { TextInput } from "./kit/TextInput";
+import { Button, ButtonLink } from "./kit/Button";
+import { FormError, authLink } from "./AuthShell";
 
 const MIN = 10;
 
@@ -20,21 +23,20 @@ export function ForgotPassword() {
   }
   if (sent) {
     return (
-      <div className="card">
-        <h2>Check your email</h2>
-        <p>If <b>{email}</b> has an account, a link to set a new password is on its way. It works once, for two hours.</p>
-        <p>Nothing after a few minutes? Ask Fair or your team&apos;s Builder for a password link.</p>
-        <a className="btn" href="/login">Back to sign in</a>
+      <div className="flex flex-col gap-4" role="status">
+        <h2 className="text-lg font-semibold text-gray-900">Check your email</h2>
+        <p className="text-sm text-gray-600">If <b className="text-gray-900">{email}</b> has an account, a link to set a new password is on its way. It works once, for two hours.</p>
+        <p className="text-sm text-gray-600">Nothing after a few minutes? Ask Fair or your team&apos;s Builder for a password link.</p>
+        <ButtonLink href="/login" variant="secondary" className="self-start">Back to sign in</ButtonLink>
       </div>
     );
   }
   return (
-    <form onSubmit={submit} className="card">
-      <h2>Forgot your password?</h2>
-      <p>We&apos;ll email you a link to set a new one.</p>
-      <label>Email<input type="email" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} required autoFocus /></label>
-      <button className="btn pri" type="submit" disabled={busy}>{busy ? "Sending…" : "Send the link"}</button>
-      <p><a href="/login">Back to sign in</a></p>
+    <form onSubmit={submit} className="flex flex-col gap-5">
+      <p className="text-sm text-gray-600">We&apos;ll email you a link to set a new one.</p>
+      <TextInput label="Email" type="email" autoComplete="username" placeholder="email@example.com" value={email} onChange={(e) => setEmail(e.target.value)} required autoFocus />
+      <Button type="submit" size="lg" className="w-full" isLoading={busy} loadingLabel="Sending…">Send the link</Button>
+      <a href="/login" className={`text-sm ${authLink}`}>Back to sign in</a>
     </form>
   );
 }
@@ -57,22 +59,21 @@ export function NewPassword({ token, email }: { token: string; email: string }) 
   }
   if (done) {
     return (
-      <div className="card">
-        <h2>Password set</h2>
-        <p>Sign in as <b>{email}</b> with your new password. Anywhere else you were signed in, you&apos;ve been signed out.</p>
-        <a className="btn pri" href="/login">Sign in</a>
+      <div className="flex flex-col gap-4" role="status">
+        <h2 className="text-lg font-semibold text-gray-900">Password set</h2>
+        <p className="text-sm text-gray-600">Sign in as <b className="text-gray-900">{email}</b> with your new password. Anywhere else you were signed in, you&apos;ve been signed out.</p>
+        <ButtonLink href="/login" className="self-start">Sign in</ButtonLink>
       </div>
     );
   }
   return (
-    <form onSubmit={submit} className="card">
-      <h2>Set a new password</h2>
-      <p>For <b>{email}</b>. At least {MIN} characters.</p>
+    <form onSubmit={submit} className="flex flex-col gap-5">
+      <p className="text-sm text-gray-600">For <b className="text-gray-900">{email}</b>.</p>
       <input type="email" autoComplete="username" value={email} readOnly hidden />
-      <label>New password<input type="password" autoComplete="new-password" minLength={MIN} value={password} onChange={(e) => setPassword(e.target.value)} required autoFocus /></label>
-      <label>Once more<input type="password" autoComplete="new-password" minLength={MIN} value={again} onChange={(e) => setAgain(e.target.value)} required /></label>
-      {error && <div className="errbox">{error}</div>}
-      <button className="btn pri" type="submit" disabled={busy}>{busy ? "Saving…" : "Set the password"}</button>
+      <TextInput label="New password" type="password" autoComplete="new-password" minLength={MIN} hint={`At least ${MIN} characters.`} value={password} onChange={(e) => setPassword(e.target.value)} required autoFocus />
+      <TextInput label="Once more" type="password" autoComplete="new-password" minLength={MIN} value={again} onChange={(e) => setAgain(e.target.value)} required />
+      {error && <FormError>{error}</FormError>}
+      <Button type="submit" size="lg" className="w-full" isLoading={busy} loadingLabel="Saving…">Set the password</Button>
     </form>
   );
 }

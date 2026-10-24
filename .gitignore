@@ -18,3 +18,5 @@ next-env.d.ts
 # Local personal docs
 wahyu-docs/
 
+.vercel
+.env*

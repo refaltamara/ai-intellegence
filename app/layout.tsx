@@ -8,7 +8,9 @@ import { DUTY_LABEL } from "@/config/staff";
 import { BRAND_KOL } from "@/roles/model";
 import { getWorkspace } from "@/workspace/store";
 import { teamsFor } from "@/workspace/teams";
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
+import { ShellProvider } from "@/ui/Shell";
+import { MobileBar } from "@/ui/MobileBar";
 import { caseNamesFor } from "@/cases/store";
 import { sql } from "@/db/client";
 import { currentBrand } from "@/brand/current";
@@ -46,6 +48,9 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
   const waiting = builder ? await waitingCount(ws, role.id).catch(() => 0) : 0;
   // a case shows only to the people on its list (DECISIONS, 10 Oct 2026, step 5)
   const cases = actor ? (await caseNamesFor(actor, ws).catch(() => [])).length : 0;
+  const productName = brand?.name ?? cfg?.product_name ?? "Fair Intelligence";
+  // the desktop sidebar's width, chosen with its Hide menu button (src/ui/Sidebar.tsx)
+  const collapsed = (await cookies()).get("fi_sidebar")?.value === "1";
   const user = session ? { email: session.email, role: who(actor, ws, role.id, brand), team: !!actor && can(actor, "team.manage", { workspace: ws }), cms: !!actor && can(actor, "cms.open"), company: { label: `Our ${role.codename}`, waiting }, cases } : null;
   return (
     <html lang="en">
@@ -55,11 +60,18 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
       </head>
       <body>
         {session && !bare ? (
-          <div className={brand?.apps?.length ? "app has-apps" : "app"}>
-            {brand?.apps?.length ? <AppSwitcher apps={brand.apps} owner={brand.short} /> : null}
-            <Sidebar recent={recent.map((c) => ({ id: c.id, title: c.title ?? "Untitled", href: `/?c=${c.id}` }))} user={user!} product={{ name: brand?.name ?? cfg?.product_name ?? "Fair Intelligence", tagline: cfg?.tagline ?? "", label: cfg?.category_label ?? ws, kind: cfg?.kind ?? "category" }} teams={teams} currentWorkspace={ws} currentRole={role.id} />
-            <main className="main">{children}</main>
-          </div>
+          <ShellProvider>
+            {/* "app has-apps" only marks the page for legacy.css (.app.has-apps .topbar keeps room for the app switcher) */}
+            <div className={`${brand?.apps?.length ? "app has-apps" : "app"} flex h-dvh overflow-clip bg-gray-50 text-[#1C1C1C]`}>
+              {brand?.apps?.length ? <AppSwitcher apps={brand.apps} owner={brand.short} /> : null}
+              <Sidebar recent={recent.map((c) => ({ id: c.id, title: c.title ?? "Untitled", href: `/?c=${c.id}` }))} user={user!} product={{ name: productName, tagline: cfg?.tagline ?? "", label: cfg?.category_label ?? ws, kind: cfg?.kind ?? "category" }} teams={teams} currentWorkspace={ws} currentRole={role.id} collapsed={collapsed} />
+              <div className="relative flex min-w-0 flex-1 flex-col overflow-clip">
+                <MobileBar product={productName} />
+                {/* overflow stays with legacy .main, so .main:has(.screen.ask) can still turn it off for Chats */}
+                <main className="main min-h-0 flex-1 bg-gray-50 bg-none">{children}</main>
+              </div>
+            </div>
+          </ShellProvider>
         ) : (
           children
         )}

@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import { LoginForm } from "@/ui/LoginForm";
-import { LogoMark } from "@/ui/LogoMark";
+import { AuthShell } from "@/ui/AuthShell";
 import { currentBrand } from "@/brand/current";
 
 export const dynamic = "force-dynamic";
@@ -8,11 +8,8 @@ export const dynamic = "force-dynamic";
 export default async function LoginPage() {
   const brand = await currentBrand();
   return (
-    <div className="login">
-      <div className="box">
-        <div className="brand"><LogoMark /><div><b>{brand?.name ?? "Fair Intelligence"}</b><small>Sign in to your workspace</small></div></div>
-        <Suspense><LoginForm owner={brand?.short ?? "Fair"} /></Suspense>
-      </div>
-    </div>
+    <AuthShell product={brand?.name ?? "Fair Intelligence"} title="Sign in" subtitle="to your workspace">
+      <Suspense><LoginForm owner={brand?.short ?? "Fair"} /></Suspense>
+    </AuthShell>
   );
 }
