@@ -52,7 +52,10 @@ export function Delta({ dir, glyph, children }: { dir: DeltaDir; glyph?: "▲" |
   );
 }
 
-/** a row of stat tiles: two across on small screens, four (or six) on wide ones */
+/**
+ * a row of stat tiles: one across on a phone, two on a tablet, then on wide screens four in one row, five in one
+ * row, or six as two rows of three (six across leaves each tile too narrow for its number and its icon)
+ */
 export function StatRow({ n, children }: { n: number; children: ReactNode }) {
-  return <div className={cn("grid grid-cols-1 gap-3 sm:grid-cols-2", n >= 6 ? "lg:grid-cols-3 2xl:grid-cols-6" : n === 5 ? "lg:grid-cols-3 xl:grid-cols-5" : n === 3 ? "lg:grid-cols-3" : "lg:grid-cols-4")}>{children}</div>;
+  return <div className={cn("grid grid-cols-1 gap-3 sm:grid-cols-2", n >= 6 || n === 3 ? "lg:grid-cols-3" : n === 5 ? "lg:grid-cols-3 xl:grid-cols-5" : "lg:grid-cols-4")}>{children}</div>;
 }
