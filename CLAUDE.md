@@ -1,6 +1,6 @@
 Project: Fair Intel — AI marketing intelligence on Fair's social listening data (Indonesian beauty, TikTok + Instagram).
 
-Read in this order before doing anything: docs/DECISIONS.md (overrides), docs/DATA_NOTES.md (what the data actually contains), docs/PRD.md (full spec), skills.registry.json (skill catalogue). UI reference: docs/prototype/fair-intel-prototype-v2.html.
+Read in this order before doing anything: docs/DECISIONS.md (overrides), docs/DATA_NOTES.md (what the data actually contains), docs/PRD.md (full spec), skills.registry.json (skill catalogue). UI: DESIGN.md is the standard for every screen (tokens, components, layout, copy); docs/prototype/fair-intel-prototype-v2.html shows flows, not the look.
 
 Rules:
 1. The model never computes numbers; skills and the query builder do, in SQL. Every skill result must include evidence; the runner rejects results without it.
@@ -13,6 +13,7 @@ Rules:
 8. Stack: Next.js App Router + TypeScript, Drizzle, Neon Postgres, Vercel (Vercel Cron for agents), Resend email; loads through the TypeScript loader (`src/loader/`), Python/pandas for one-off analysis. Do not add Railway, pg-boss, or Redis.
 9. Use `pnpm skill run <name>` to verify skills before touching UI. Verification: pnpm test, pnpm smoke, pnpm db:stats; pnpm perf after touching a page's queries or a big load.
 10. Do not integrate Fair Space or Fair Hub. Never commit secrets; .env is gitignored.
+11. UI work follows DESIGN.md: Tailwind v4 utilities (no preflight; app/legacy.css is for pages not yet rebuilt and gets no new classes), the orange brand-palette tokens, the components in src/ui/kit/. Update DESIGN.md in the same change when you add a token, a kit component or a layout pattern.
 
 ## Partner experience (docs/PRD_V2_PARTNER.md, v2.1 amendments)
 - A workspace is a subject (a category panel of brands, or one profile such as an artist). The platform is "Fair Intelligence" everywhere; the assistant in Chats is CeMO on every team (DECISIONS, 30 Sep 2026). The one exception is a presenter's brand for a day, in one browser (`/brand/bpa`, Fair staff; `src/brand/demo.ts`; DECISIONS, 14 Oct 2026). Persona and on-screen copy come from `workspaces.kind` + `settings` via `src/workspace/config.ts`. Every page and route scopes by `currentWorkspaceId()` (the session's workspace, or an owner's switch); never import DEFAULT_WORKSPACE_ID in `app/`. Nothing is shared across workspaces.
