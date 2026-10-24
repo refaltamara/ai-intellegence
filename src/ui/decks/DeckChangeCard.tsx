@@ -8,6 +8,9 @@
 import Link from "next/link";
 import { useState } from "react";
 import type { DeckChangeProposal } from "@/decks/changes";
+import { cn } from "../cn";
+import { Button, buttonClass } from "../kit/Button";
+import { ProposalShell } from "../kit/ProposalShell";
 
 type Done = { template: boolean; note: string };
 
@@ -28,23 +31,26 @@ export function DeckChangeCard({ p, from = "chat", onApplied }: { p: DeckChangeP
   }
   const tplLabel = p.team_template ? "the template" : "a team template";
   return (
-    <div className="card proposal">
-      <h4><span><i className="badge client">Deck</i>Change to {p.deck_name}</span><span className={`pstatus ${done ? "approved" : "draft"}`}>{done ? "Applied" : "Not applied yet"}</span></h4>
-      <div className="body">
-        <ul className="dchanges">
-          {p.lines.map((l, i) => <li key={i} className={l.sign === "+" ? "add" : l.sign === "−" ? "drop" : l.sign === "=" ? "keep" : "set"}><b>{l.sign}</b><span>{l.text}{l.note && <small> {l.note}</small>}</span></li>)}
-        </ul>
-        {p.dropped.length > 0 && <ul className="dropped">{p.dropped.map((d, i) => <li key={i}>{d}</li>)}</ul>}
-        {done && <p className="muted">{done.note}</p>}
-      </div>
-      <footer>
-        {msg && <span className="err">{msg}</span>}
-        {!done && p.builder && <button className="btn pri sm" disabled={busy} onClick={() => apply(true)}>This deck + {tplLabel}</button>}
-        {!done && p.builder && <button className="btn sm" disabled={busy} onClick={() => apply(false)}>This deck only</button>}
-        {!done && !p.builder && <button className="btn pri sm" disabled={busy} onClick={() => apply(false)}>Apply to this deck</button>}
-        {!done && !p.builder && <button className="btn sm" disabled={busy} onClick={() => apply(true)}>Deck + send template to my Builder</button>}
-        {done && <Link className="btn sm ghost" href={`/decks/${p.deck_id}`}>Open the deck</Link>}
-      </footer>
-    </div>
+    <ProposalShell kind="Deck" title={`Change to ${p.deck_name}`} status={done ? "Applied" : "Not applied yet"} tone={done ? "approved" : "draft"} error={msg}
+      actions={<>
+        {!done && p.builder && <Button variant="outline" size="sm" disabled={busy} onClick={() => apply(false)}>This deck only</Button>}
+        {!done && p.builder && <Button size="sm" disabled={busy} onClick={() => apply(true)}>This deck + {tplLabel}</Button>}
+        {!done && !p.builder && <Button variant="outline" size="sm" disabled={busy} onClick={() => apply(true)}>Deck + send template to my Builder</Button>}
+        {!done && !p.builder && <Button size="sm" disabled={busy} onClick={() => apply(false)}>Apply to this deck</Button>}
+        {done && <Link className={buttonClass("outline", "sm")} href={`/decks/${p.deck_id}`}>Open the deck</Link>}
+      </>}>
+      <ul className="flex flex-col gap-1">
+        {p.lines.map((l, i) => (
+          <li key={i} className="flex gap-2">
+            <b aria-hidden="true" className={cn("w-4 shrink-0 text-center font-bold", l.sign === "+" ? "text-green-700" : l.sign === "−" ? "text-red-700" : "text-gray-400")}>{l.sign}</b>
+            <span className={cn(l.sign === "−" && "text-gray-500 line-through decoration-gray-300")}>
+              {l.text}{l.note && <small className="text-xs text-gray-500"> {l.note}</small>}
+            </span>
+          </li>
+        ))}
+      </ul>
+      {p.dropped.length > 0 && <ul className="flex list-disc flex-col gap-1 pl-5 text-xs text-amber-800">{p.dropped.map((d, i) => <li key={i}>{d}</li>)}</ul>}
+      {done && <p className="text-xs text-gray-500">{done.note}</p>}
+    </ProposalShell>
   );
 }

@@ -9,6 +9,8 @@ import { EvidenceList } from "./Evidence";
 import { fmtNum } from "./format";
 import { paneOf } from "../chat/pane";
 import { ProposalCard } from "./ProposalCard";
+import { cn } from "./cn";
+import { Button } from "./kit/Button";
 
 export { cellOf, columnsOf } from "./table";
 import { cellOf, columnsOf } from "./table";
@@ -40,9 +42,13 @@ function AnalysisCard({ tool, evidence, onOpenEvidence, decisionId = null, onOpe
     const m = (tool.meta ?? {}) as { matched?: number };
     const n = tool.status === "ok" ? `${fmtNum(m.matched ?? rows.length)} matched` : tool.status;
     return (
-      <div className="card strip" onClick={onOpenPane} role="button">
-        <h4><span><i className={`k ${pane.kind}`} />{pane.title}</span><span>{pane.kind === "agent_draft" ? "" : n}<b className="tog">{pane.kind === "table" ? "Open the list" : pane.kind === "chart" ? "Open the chart" : "Open"}</b></span></h4>
-      </div>
+      <button type="button" onClick={onOpenPane} className="group flex w-full cursor-pointer items-center justify-between gap-3 rounded-2xl border border-card-border bg-white px-4 py-3 text-left transition-all hover:border-brand-palette-300 hover:shadow-xs focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-palette-600">
+        <span className="min-w-0 truncate text-sm font-semibold text-gray-900">{pane.title}</span>
+        <span className="flex shrink-0 items-center gap-3 text-xs text-gray-500">
+          {pane.kind === "agent_draft" ? "" : n}
+          <b className="font-semibold text-brand-palette-700 group-hover:underline">{pane.kind === "table" ? "Open the list" : pane.kind === "chart" ? "Open the chart" : "Open"}</b>
+        </span>
+      </button>
     );
   }
   if (tool.name === "create_agent_draft") return <DraftCard draft={tool.draft as Record<string, unknown>} decisionId={decisionId} />;
@@ -51,45 +57,79 @@ function AnalysisCard({ tool, evidence, onOpenEvidence, decisionId = null, onOpe
   const showChart = !!chart && Array.isArray(chart.x) && chart.x.length >= 3;
   const hasBody = rows.length > 0 || showChart;
   const count = tool.status === "ok" ? `${fmtNum(meta.matched ?? rows.length)} matched` : tool.status;
+  const head = (
+    <>
+      <span className="min-w-0 text-sm font-semibold text-gray-900">{title}{meta.data_window ? <span className="font-normal text-gray-500"> · {meta.data_window.from} to {meta.data_window.to}</span> : null}</span>
+      <span className="flex shrink-0 items-center gap-3 text-xs text-gray-500">
+        {count}
+        {hasBody ? <b className="font-semibold text-brand-palette-700">{open ? "Hide" : rows.length ? "Show the list" : "Show the chart"}</b> : null}
+      </span>
+    </>
+  );
   return (
-    <div className={`card ${open ? "open" : "closed"}`}>
-      <h4 onClick={() => hasBody && setOpen((o) => !o)} style={{ cursor: hasBody ? "pointer" : "default" }}>
-        <span>{title}{meta.data_window ? ` · ${meta.data_window.from} to ${meta.data_window.to}` : ""}</span>
-        <span>{count}{hasBody ? <b className="tog">{open ? "Hide" : rows.length ? "Show the list" : "Show the chart"}</b> : null}</span>
-      </h4>
-      {tool.status === "unavailable" && <div className="unavail">{tool.message}</div>}
-      {tool.status === "error" && <div className="unavail" style={{ background: "var(--red-10)", color: "var(--red)" }}>{tool.message}</div>}
+    <div className="overflow-hidden rounded-2xl border border-card-border bg-white">
+      {hasBody ? (
+        <button type="button" aria-expanded={open} onClick={() => setOpen((o) => !o)} className="flex w-full cursor-pointer items-center justify-between gap-3 px-4 py-3 text-left hover:bg-gray-50 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand-palette-600">{head}</button>
+      ) : (
+        <div className="flex items-center justify-between gap-3 px-4 py-3">{head}</div>
+      )}
+      {tool.status === "unavailable" && <p className="mx-4 mb-3 rounded-xl bg-gray-50 px-3 py-2 text-sm text-gray-600">{tool.message}</p>}
+      {tool.status === "error" && <p role="alert" className="mx-4 mb-3 rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">{tool.message}</p>}
       {open && (
-        <>
+        <div className="border-t border-card-border">
           {isDiscovery && (
-            <div className="body"><Link className="btn sm pri" href={`/skills/discovery?run=${tool.run_id}`}>Open the full list</Link> <span style={{ fontSize: 12, color: "var(--text-3)", marginLeft: 8 }}>every row, filters, CSV export</span></div>
+            <div className="flex flex-wrap items-center gap-3 px-4 pt-3">
+              <Link className="inline-flex min-h-10 items-center rounded-xl bg-primary px-3 text-xs font-semibold text-white hover:bg-brand-palette-700" href={`/skills/discovery?run=${tool.run_id}`}>Open the full list</Link>
+              <span className="text-xs text-gray-500">every row, filters, CSV export</span>
+            </div>
           )}
-          {showChart && rows.length > 0 ? <div className="body"><button className="btn sm ghost" onClick={() => { if (!chartOn) sendSignal("chat.show_chart", { where: "card" }); setChartOn((c) => !c); }}>{chartOn ? "Hide chart" : "Show chart"}</button></div> : null}
-          {showChart && (chartOn || rows.length === 0) ? <div className="chart"><Chart spec={chart} /></div> : null}
+          {showChart && rows.length > 0 ? (
+            <div className="px-4 pt-3">
+              <button type="button" className="inline-flex min-h-10 cursor-pointer items-center rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-gray-700 hover:border-brand-palette-300 hover:text-brand-palette-700" onClick={() => { if (!chartOn) sendSignal("chat.show_chart", { where: "card" }); setChartOn((c) => !c); }}>{chartOn ? "Hide chart" : "Show chart"}</button>
+            </div>
+          ) : null}
+          {showChart && (chartOn || rows.length === 0) ? <div className="px-4 pt-3"><Chart spec={chart} /></div> : null}
           {rows.length > 0 && (
-            <div className="tablewrap">
-              <table>
-                <thead><tr>{cols.map((c) => <th key={c} className={numeric(c) ? "num" : ""}>{c.replace(/_/g, " ")}</th>)}{onOpenEvidence && <th />}</tr></thead>
-                <tbody>
-                  {visible.map((r, i) => (
-                    <tr key={i} onClick={() => onOpenEvidence?.((r.evidence_ids as string[]) ?? [])}>
-                      {cols.map((c) => <td key={c} className={numeric(c) ? "num" : ""}>{cellOf(c, r[c])}</td>)}
-                      {onOpenEvidence && <td>{((r.evidence_ids as string[]) ?? []).slice(0, 3).map((id) => <span key={id} className="ev" style={{ pointerEvents: "none" }}>{id.replace("ev_", "")}</span>)}</td>}
+            <div className="pt-3">
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse text-sm">
+                  <thead>
+                    <tr className="border-y border-gray-100 bg-gray-50">
+                      {cols.map((c) => <th key={c} className={cn("whitespace-nowrap px-4 py-2.5 text-left text-xs font-semibold capitalize text-gray-700", numeric(c) && "text-right")}>{c.replace(/_/g, " ")}</th>)}
+                      {onOpenEvidence && <th className="px-4 py-2.5"><span className="sr-only">Evidence</span></th>}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-              {rows.length > MAX_ROWS && <div className="more"><button className="btn sm" onClick={() => setShowAll(!showAll)}>{showAll ? `Show first ${MAX_ROWS}` : `Show all ${rows.length}`}</button><span>Click a row to open its evidence</span></div>}
+                  </thead>
+                  <tbody>
+                    {visible.map((r, i) => (
+                      <tr key={i} onClick={() => onOpenEvidence?.((r.evidence_ids as string[]) ?? [])} className={cn("border-b border-gray-100 last:border-b-0 even:bg-gray-50/60", onOpenEvidence && "cursor-pointer hover:bg-brand-palette-50")}>
+                        {cols.map((c) => <td key={c} className={cn("px-4 py-2.5 text-gray-700", numeric(c) && "text-right tabular-nums")}>{cellOf(c, r[c])}</td>)}
+                        {onOpenEvidence && (
+                          <td className="whitespace-nowrap px-4 py-2.5 text-right">
+                            {((r.evidence_ids as string[]) ?? []).slice(0, 3).map((id) => <span key={id} className="ml-1 inline-flex h-5 min-w-5 items-center justify-center rounded-md bg-brand-palette-100 px-1.5 text-[11px] font-bold text-brand-palette-800">{id.replace("ev_", "")}</span>)}
+                          </td>
+                        )}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {rows.length > MAX_ROWS && (
+                <div className="flex flex-wrap items-center gap-3 border-t border-gray-100 px-4 py-3">
+                  <button type="button" className="inline-flex min-h-10 cursor-pointer items-center rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-gray-700 hover:border-brand-palette-300 hover:text-brand-palette-700" onClick={() => setShowAll(!showAll)}>{showAll ? `Show first ${MAX_ROWS}` : `Show all ${rows.length}`}</button>
+                  <span className="text-xs text-gray-500">Click a row to open its evidence</span>
+                </div>
+              )}
             </div>
           )}
           {!!meta.caveats?.length && (
-            <div className="about">
-              <button className="linkish" onClick={() => setAbout((a) => !a)}>{about ? "Hide data notes" : "About this data"}</button>
-              {about && <ul className="caveats">{meta.caveats.map((c, i) => <li key={i}>{c}</li>)}</ul>}
+            <div className="border-t border-gray-100 px-4 py-3">
+              <button type="button" aria-expanded={about} className="cursor-pointer text-xs font-semibold text-brand-palette-700 underline-offset-2 hover:underline" onClick={() => setAbout((a) => !a)}>{about ? "Hide data notes" : "About this data"}</button>
+              {about && <ul className="mt-2 flex list-disc flex-col gap-1 pl-5 text-xs text-gray-600">{meta.caveats.map((c, i) => <li key={i}>{c}</li>)}</ul>}
             </div>
           )}
-          {rows.length === 0 && !showChart && tool.status === "ok" && <div className="body" style={{ fontSize: 13, color: "var(--text-3)" }}>No rows matched.</div>}
-        </>
+          {rows.length === 0 && !showChart && tool.status === "ok" && <p className="px-4 py-3 text-sm text-gray-500">No rows matched.</p>}
+          {!rows.length && !meta.caveats?.length ? <div className="h-3" /> : null}
+        </div>
       )}
     </div>
   );
@@ -106,18 +146,30 @@ export function DraftCard({ draft, decisionId = null }: { draft: Record<string, 
     const j = await r.json();
     setState({ busy: false, msg: j.error ? j.error : `Created "${j.agent.name}"`, done: !j.error });
   }
+  const fields: [string, React.ReactNode][] = [
+    ["Name", String(draft.name ?? "")],
+    ["Skill", <><span className="text-gray-500">/</span>{String(draft.skill ?? "")}</>],
+    ["Schedule", `${schedule.human ?? schedule.cron} · ${schedule.tz}`],
+    ["Params", <code key="p" className="break-all text-xs">{JSON.stringify(draft.params ?? {})}</code>],
+    ["Deliver to", (delivery.channels ?? []).join(", ") || "in_app"],
+    ["Only if changed", draft.only_if_changed ? "yes" : "no"],
+  ];
   return (
-    <div className="draft">
-      <h4>Here's how I read that. Schedule it as is, or edit it under Reports afterwards.</h4>
-      <div className="field"><span>Name</span><b>{String(draft.name ?? "")}</b></div>
-      <div className="field"><span>Skill</span><b><span className="slash">/</span>{String(draft.skill ?? "")}</b></div>
-      <div className="field"><span>Schedule</span><b>{schedule.human ?? schedule.cron} · {schedule.tz}</b></div>
-      <div className="field"><span>Params</span><b style={{ fontFamily: "monospace", fontSize: 12 }}>{JSON.stringify(draft.params ?? {})}</b></div>
-      <div className="field"><span>Deliver to</span><b>{(delivery.channels ?? []).join(", ") || "in_app"}</b></div>
-      <div className="field"><span>Only if changed</span><b>{draft.only_if_changed ? "yes" : "no"}</b></div>
-      <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 10, alignItems: "center" }}>
-        {state.msg && <span style={{ fontSize: 12, color: state.done ? "var(--green)" : "var(--red)" }}>{state.msg}</span>}
-        {state.done ? <Link className="btn sm" href="/reports">See it in Reports</Link> : <button className="btn pri sm" disabled={state.busy} onClick={create}>{state.busy ? "Starting…" : "Schedule it"}</button>}
+    <div className="flex flex-col gap-3 rounded-2xl border border-card-border bg-white p-4">
+      <h4 className="text-sm font-semibold text-gray-900">Here&apos;s how I read that. Schedule it as is, or edit it under Reports afterwards.</h4>
+      <dl className="flex flex-col divide-y divide-gray-100 rounded-xl border border-gray-100">
+        {fields.map(([k, v]) => (
+          <div key={k} className="grid grid-cols-[120px_minmax(0,1fr)] gap-3 px-3 py-2 text-sm">
+            <dt className="text-gray-500">{k}</dt>
+            <dd className="font-semibold text-gray-900">{v}</dd>
+          </div>
+        ))}
+      </dl>
+      <div className="flex flex-wrap items-center justify-end gap-3">
+        {state.msg && <span role={state.done ? "status" : "alert"} className={cn("text-xs", state.done ? "text-green-700" : "text-red-700")}>{state.msg}</span>}
+        {state.done
+          ? <Link className="inline-flex min-h-10 items-center rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-gray-700 hover:border-brand-palette-300 hover:text-brand-palette-700" href="/reports">See it in Reports</Link>
+          : <Button size="sm" isLoading={state.busy} loadingLabel="Starting…" onClick={create}>Schedule it</Button>}
       </div>
     </div>
   );

@@ -5,11 +5,13 @@
  */
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { buttonClass } from "./kit/Button";
+import { PickMenu } from "./kit/PickMenu";
 
 type PulseItem = { id: string; name: string; cards: number };
 export type CardPayload = { kind: string; config?: Record<string, unknown>; skill_run_id?: string; title?: string; size?: string };
 
-export function AddToPulse({ payload, label = "Add to a Pulse", className = "btn sm", onDone }: { payload: CardPayload; label?: string; className?: string; onDone?: (message: string) => void }) {
+export function AddToPulse({ payload, label = "Add to a Pulse", className = buttonClass("outline", "sm"), onDone, up = false }: { payload: CardPayload; label?: string; className?: string; onDone?: (message: string) => void; up?: boolean }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [pulses, setPulses] = useState<PulseItem[] | null>(null);
@@ -49,19 +51,22 @@ export function AddToPulse({ payload, label = "Add to a Pulse", className = "btn
   }
 
   return (
-    <span className="addpulse" ref={box}>
+    <span className="relative inline-flex" ref={box}>
       {done ? (
-        <button className={className} onClick={() => router.push(`/pulse/${done.id}`)} title={`Open “${done.name}”`}>Added ✓ Open</button>
+        <button type="button" className={className} onClick={() => router.push(`/pulse/${done.id}`)} title={`Open “${done.name}”`}>Added ✓ Open</button>
       ) : (
-        <button className={className} onClick={() => setOpen((o) => !o)} disabled={busy} aria-expanded={open}>{busy ? "Adding…" : `+ ${label}`}</button>
+        <button type="button" className={className} onClick={() => setOpen((o) => !o)} disabled={busy} aria-haspopup="menu" aria-expanded={open}>{busy ? "Adding…" : `+ ${label}`}</button>
       )}
       {open && (
-        <span className="menu" role="menu">
-          {pulses === null && <span className="none">Loading…</span>}
-          {pulses?.map((p) => <button key={p.id} role="menuitem" onClick={() => add(p)}>{p.name}<small>{p.cards} card{p.cards === 1 ? "" : "s"}</small></button>)}
-          <button role="menuitem" className="new" onClick={addToNew}>+ New Pulse…</button>
-          {error && <span className="err">{error}</span>}
-        </span>
+        <PickMenu
+          loading={pulses === null}
+          items={(pulses ?? []).map((p) => ({ key: p.id, label: p.name, hint: `${p.cards} card${p.cards === 1 ? "" : "s"}`, pick: () => add(p) }))}
+          newLabel="+ New Pulse…"
+          onNew={addToNew}
+          error={error}
+          onClose={() => setOpen(false)}
+          up={up}
+        />
       )}
     </span>
   );

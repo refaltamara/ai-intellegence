@@ -85,7 +85,17 @@
 }
 
 @layer shell {
-  :focus-visible { outline-color: var(--color-brand-palette-600); }
+  /* one focus mark everywhere: legacy.css also drew a blue box-shadow on every focused element, which
+     collided with the rings the rebuilt pages draw themselves (a composer's focus-within ring, say) */
+  :focus-visible { outline: 2px solid var(--color-brand-palette-600); outline-offset: 2px; box-shadow: none; }
+
+  /*
+   * A page rebuilt with utilities carries data-tw. legacy.css styles bare table, th and td (padding, borders,
+   * a gradient behind th, no wrapping in td); inside such a page those rules step aside so the utilities on
+   * each cell are the whole story. Pages still on legacy.css are untouched.
+   */
+  [data-tw] table { width: auto; font-size: inherit; }
+  [data-tw] th, [data-tw] td { padding: 0; border: 0; background: none; white-space: normal; color: inherit; font-size: inherit; font-weight: inherit; text-align: inherit; vertical-align: middle; transition: none; }
 }
 
 @utility no-scrollbar {

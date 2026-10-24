@@ -15,7 +15,7 @@ export function columnsOf(rows: Record<string, unknown>[]): string[] {
 
 export function cellOf(k: string, v: unknown): ReactNode {
   if (v == null) return "–";
-  if (k === "url" && typeof v === "string") return <a href={v} target="_blank" rel="noreferrer" className="linkbtn">open</a>;
+  if (k === "url" && typeof v === "string") return <a href={v} target="_blank" rel="noreferrer" className="font-semibold text-brand-palette-700 underline underline-offset-2 hover:text-brand-palette-800">open</a>;
   if (k === "creator_handle") return <b>@{String(v)}</b>;
   if (typeof v === "boolean") return v ? "yes" : "no";
   if (/(_at|posted|last_post|first_post|week_from|week_to|first_seen|last_seen)$/.test(k) && typeof v === "string" && /\d{4}-\d{2}-\d{2}/.test(v)) return fmtDate(v);

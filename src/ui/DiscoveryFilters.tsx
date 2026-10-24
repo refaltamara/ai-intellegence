@@ -5,6 +5,8 @@
  * Pure form state in, skill parameters out; nothing here runs anything.
  */
 import { MultiSelect } from "./MultiSelect";
+import { cn } from "./cn";
+import { Chip, Field, NativeSelect, TextField } from "./kit/Form";
 
 export const TIERS = ["nano", "micro", "mid", "macro", "mega"];
 export const TIER_LABEL: Record<string, string> = { nano: "Nano · ≤10K", micro: "Micro · 10K–50K", mid: "Mid · 50K–500K", macro: "Macro · 500K–1M", mega: "Mega · 1M+" };
@@ -76,24 +78,37 @@ export function DiscoveryFilters({ form, onChange, brands, months, compact = fal
   const gap = monthsBetween(form.months);
   const invalid = followersInvalid(form);
   return (
-    <div className={`form ${compact ? "compact" : ""}`}>
-      <label>Platform<select value={form.platform} onChange={(e) => set("platform", e.target.value)}><option value="tiktok">TikTok</option><option value="instagram">Instagram</option><option value="all">All</option></select></label>
-      <label>Rank by<select value={form.rank_by} onChange={(e) => set("rank_by", e.target.value)}>{Object.entries(RANK_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></label>
-      <label>Followers<div className="pair"><input inputMode="numeric" value={form.min_followers} onChange={(e) => set("min_followers", e.target.value.replace(/[^\d]/g, ""))} placeholder="min" /><input inputMode="numeric" value={form.max_followers} onChange={(e) => set("max_followers", e.target.value.replace(/[^\d]/g, ""))} placeholder="max" /></div>{invalid && <span className="hint" style={{ color: "var(--amber)" }}>min is above max</span>}</label>
-      <label>Limit<input inputMode="numeric" value={form.limit} onChange={(e) => set("limit", e.target.value.replace(/[^\d]/g, ""))} /></label>
-      <label className="wide">Tiers <span className="hint">{form.tiers.length ? `${form.tiers.length} selected` : "none selected = any tier"}</span>
-        <div className="tog">{TIERS.map((t) => <button type="button" key={t} className={form.tiers.includes(t) ? "on" : ""} onClick={() => toggleIn("tiers", t)}>{TIER_LABEL[t]}</button>)}</div>
-      </label>
-      <label className="wide">Months <span className="hint">{form.months.length === 0 ? "none selected = last 90 days of data" : gap > 0 ? `${gap} month${gap > 1 ? "s" : ""} in between included too (one continuous window)` : `${form.months.length} selected`}</span>
-        <div className="tog">{months.map((m) => <button type="button" key={m} className={form.months.includes(m) ? "on" : ""} onClick={() => toggleIn("months", m)}>{monthLabel(m)}</button>)}
-          <button type="button" onClick={() => set("months", form.months.length === months.length ? [] : [...months])} style={{ borderStyle: "dashed" }}>{form.months.length === months.length ? "Clear" : "All"}</button></div>
-      </label>
-      <label className="wide">Used by brands <span className="hint">creator must have posted for any of these; empty = any tracked brand</span>
+    <div className={cn("grid grid-cols-1 gap-4 sm:grid-cols-2", !compact && "lg:grid-cols-4")}>
+      <Field label="Platform">
+        <NativeSelect value={form.platform} onChange={(e) => set("platform", e.target.value)}><option value="tiktok">TikTok</option><option value="instagram">Instagram</option><option value="all">All</option></NativeSelect>
+      </Field>
+      <Field label="Rank by">
+        <NativeSelect value={form.rank_by} onChange={(e) => set("rank_by", e.target.value)}>{Object.entries(RANK_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</NativeSelect>
+      </Field>
+      <Field group label="Followers" hint={invalid ? <span className="font-semibold text-amber-700">min is above max</span> : undefined}>
+        <div className="grid grid-cols-2 gap-2">
+          <TextField inputMode="numeric" aria-label="Minimum followers" value={form.min_followers} onChange={(e) => set("min_followers", e.target.value.replace(/[^\d]/g, ""))} placeholder="min" />
+          <TextField inputMode="numeric" aria-label="Maximum followers" value={form.max_followers} onChange={(e) => set("max_followers", e.target.value.replace(/[^\d]/g, ""))} placeholder="max" />
+        </div>
+      </Field>
+      <Field label="Limit">
+        <TextField inputMode="numeric" value={form.limit} onChange={(e) => set("limit", e.target.value.replace(/[^\d]/g, ""))} />
+      </Field>
+      <Field wide group label="Tiers" hint={form.tiers.length ? `${form.tiers.length} selected` : "none selected = any tier"}>
+        <div className="flex flex-wrap gap-1.5">{TIERS.map((t) => <Chip key={t} on={form.tiers.includes(t)} onClick={() => toggleIn("tiers", t)}>{TIER_LABEL[t]}</Chip>)}</div>
+      </Field>
+      <Field wide group label="Months" hint={form.months.length === 0 ? "none selected = last 90 days of data" : gap > 0 ? `${gap} month${gap > 1 ? "s" : ""} in between included too (one continuous window)` : `${form.months.length} selected`}>
+        <div className="flex flex-wrap gap-1.5">
+          {months.map((m) => <Chip key={m} on={form.months.includes(m)} onClick={() => toggleIn("months", m)}>{monthLabel(m)}</Chip>)}
+          <Chip dashed onClick={() => set("months", form.months.length === months.length ? [] : [...months])}>{form.months.length === months.length ? "Clear" : "All"}</Chip>
+        </div>
+      </Field>
+      <Field wide group label="Used by brands" hint="creator must have posted for any of these; empty = any tracked brand">
         <MultiSelect options={brands} value={form.used_by} onChange={(v) => set("used_by", v)} placeholder="Search a brand…" />
-      </label>
-      <label className="wide">Exclude used by <span className="hint">creator must not have posted for these</span>
+      </Field>
+      <Field wide group label="Exclude used by" hint="creator must not have posted for these">
         <MultiSelect options={brands} value={form.exclude_used_by} onChange={(v) => set("exclude_used_by", v)} placeholder="Search a brand…" />
-      </label>
+      </Field>
     </div>
   );
 }

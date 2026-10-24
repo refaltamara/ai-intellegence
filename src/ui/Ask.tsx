@@ -20,6 +20,10 @@ import type { PaneContext } from "./paneContext";
 import { EvidencePanel, ResultCard } from "./ResultCard";
 import { matchSkills, SlashMenu, type SkillOption } from "./SlashMenu";
 import { AskContextCard } from "./AskContextCard";
+import { cn } from "./cn";
+import { Button } from "./kit/Button";
+import { Spinner } from "./kit/Spinner";
+import { IconCheck } from "./kit/icons";
 import type { AskContext, AskRef } from "@/dashboard/askref";
 
 export type Attachment = { id: string; filename: string; bytes: number };
@@ -39,10 +43,27 @@ function fileSize(bytes: number): string {
   return bytes >= 1024 * 1024 ? `${(bytes / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`;
 }
 
+/** the composer's small controls: +, Attach PDF, Builder mode, Open the evidence */
+const TOOL = "inline-flex h-10 cursor-pointer items-center rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-gray-700 transition-colors hover:border-brand-palette-300 hover:text-brand-palette-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-palette-600 disabled:cursor-not-allowed disabled:opacity-50";
+
+/** an attached PDF: in the composer it can be removed, in a sent message it only says what went with it */
+function FileTag({ name, size, onRemove }: { name: string; size?: string; onRemove?: () => void }) {
+  return (
+    <span className="inline-flex max-w-72 items-center gap-1.5 rounded-lg border border-card-border bg-white py-1 pl-1.5 pr-2 text-xs text-gray-700" title={name}>
+      <b className="rounded-md bg-red-50 px-1.5 py-0.5 text-[10px] font-bold text-red-700">PDF</b>
+      <span className="truncate font-semibold">{name}</span>
+      {size && <small className="shrink-0 text-gray-500">{size}</small>}
+      {onRemove && (
+        <button type="button" onClick={onRemove} aria-label={`Remove ${name}`} className="-mr-1 flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center rounded-md text-gray-500 hover:bg-gray-100 hover:text-gray-900 focus-visible:outline-2 focus-visible:outline-brand-palette-600">×</button>
+      )}
+    </span>
+  );
+}
+
 type Props = {
   initialConversation: string | null; initialMessages: MessageRow[]; prefill?: string;
   stats: { brands: number; platforms: number; months: number; freshness: string }; clientName: string | null;
-  decisionId?: string | null; basePath?: string; initialSend?: { prompt: string; followup?: Followup }; topbar?: boolean;
+  decisionId?: string | null; basePath?: string; initialSend?: { prompt: string; followup?: Followup };
   pane?: PaneContext;
   /** words from the workspace: what the empty screen says and offers */
   copy?: { hero_title: string; hero_intro: string; suggested: string[]; label: string; kind: string };
@@ -58,7 +79,7 @@ type Props = {
 
 const DEFAULT_COPY = { hero_title: "What's happening in Indonesian beauty?", hero_intro: "", suggested: ["What were competitors doing last week?", "Which brand grew fastest this month?", "Which campaigns ran in the last 90 days with 20 or more creators?", "Find 50 nano creators competitors used on TikTok in the last 90 days"], label: "Beauty · Indonesia", kind: "category" };
 
-export function Ask({ initialConversation, initialMessages, prefill, stats, clientName, decisionId = null, basePath = "/", initialSend, topbar = true, pane, copy = DEFAULT_COPY, skills = [], fromDashboard = null, autoSend = false, team = null }: Props) {
+export function Ask({ initialConversation, initialMessages, prefill, stats, clientName, decisionId = null, basePath = "/", initialSend, pane, copy = DEFAULT_COPY, skills = [], fromDashboard = null, autoSend = false, team = null }: Props) {
   const router = useRouter();
   const [conversationId, setConversationId] = useState<string | null>(initialConversation);
   const [thread, setThread] = useState<Msg[]>(() => {
@@ -285,55 +306,65 @@ export function Ask({ initialConversation, initialMessages, prefill, stats, clie
   const split = paneOpen && objects.length > 0;
   const activeObject = objects.find((o) => o.id === activeId) ?? objects[objects.length - 1];
   return (
-    <section className={`screen ask ${split ? "split" : ""} ${split && expanded ? "big" : ""}`}
+    // "screen ask" stays only as the marker legacy.css reads (.main:has(.screen.ask) stops the page scrolling;
+    // the feed scrolls instead); data-tw sets legacy's bare table rules aside (app/globals.css)
+    <section data-tw className="screen ask relative flex h-full min-h-0 flex-col bg-gray-50"
       onDragOver={(e) => { if (e.dataTransfer.types.includes("Files")) { e.preventDefault(); setDragging(true); } }}
       onDragLeave={(e) => { if (e.currentTarget === e.target) setDragging(false); }}
       onDrop={(e) => { if (e.dataTransfer.files?.length) { e.preventDefault(); setDragging(false); void upload(e.dataTransfer.files); } }}>
-      {topbar && (
-        <div className="topbar">
-          <div><h1>Chats</h1><span className="meta">{clientName ? (copy.kind === "profile" ? `About ${clientName}` : `On the side of ${clientName}`) : copy.label}</span></div>
-          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            {!split && objects.length > 0 && <button className="btn sm" onClick={() => { setPaneOpen(true); sendSignal("chat.pane_open"); }}>Open the evidence</button>}
-            <span className={`pill ${stats.freshness ? "live" : ""}`}>{stats.freshness ? `Data through ${stats.freshness}` : "No data loaded yet"}</span>
-            <span className="pill">{copy.kind === "profile" ? `${stats.platforms} platforms · ${stats.months} months` : `${stats.brands} brands · ${stats.platforms} platforms · ${stats.months} months`}</span>
-          </div>
-        </div>
-      )}
+      <div className="flex min-h-0 flex-1" ref={colsRef} style={{ ["--thr" as string]: `${Math.round(ratio * 100)}%` }}>
+        <div className={cn("flex min-h-0 min-w-0 flex-1 flex-col", split && (expanded ? "min-[1101px]:flex-[0_0_340px] min-[1101px]:min-w-75" : "min-[1101px]:flex-[0_0_var(--thr)] min-[1101px]:min-w-95"))}>
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+            <div className="flex min-h-full flex-col px-4 md:px-6">
+              {/* the page's own header: it scrolls with the conversation instead of sitting in a bar above it */}
+              <header className="flex flex-col gap-3 pb-2 pt-6 md:flex-row md:items-center md:justify-between md:gap-6 md:pt-8">
+                <div className="min-w-0">
+                  <h1 className="text-3xl font-semibold text-gray-900">Chats</h1>
+                  <p className="text-sm text-gray-500">{clientName ? (copy.kind === "profile" ? `About ${clientName}` : `On the side of ${clientName}`) : copy.label}</p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className={cn("inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold", stats.freshness ? "bg-green-50/60 text-green-700" : "bg-gray-100 text-gray-600")}>
+                    {/* the dot marks a real state: data is loaded */}
+                    {stats.freshness && <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-green-600" />}
+                    {stats.freshness ? `Data through ${stats.freshness}` : "No data loaded yet"}
+                  </span>
+                  <span className="rounded-full border border-card-border bg-white px-3 py-1 text-xs font-semibold text-gray-700">{copy.kind === "profile" ? `${stats.platforms} platforms · ${stats.months} months` : `${stats.brands} brands · ${stats.platforms} platforms · ${stats.months} months`}</span>
+                </div>
+              </header>
 
-      <div className="cols" ref={colsRef} style={{ ["--thr" as string]: `${Math.round(ratio * 100)}%` }}>
-        <div className="col">
-          <div className={`feed ${empty ? "start" : ""}`}>
-            <div className="wrap">
               {empty && (
-                <div className="hero">
-                  <h2>{copy.hero_title}</h2>
-                  <p>{copy.hero_intro || `I've read every creator post about ${stats.brands} brands on TikTok and Instagram. Ask me anything about creators, competitors or campaigns; every number I give you shows its evidence, and I'll tell you when the data disagrees with you.`}</p>
+                <div className="flex flex-1 flex-col justify-center py-10">
+                  <h2 className="text-3xl font-bold leading-tight tracking-tight text-gray-900 md:text-4xl">{copy.hero_title}</h2>
+                  <p className="mt-3 text-base leading-relaxed text-gray-600">{copy.hero_intro || `I've read every creator post about ${stats.brands} brands on TikTok and Instagram. Ask me anything about creators, competitors or campaigns; every number I give you shows its evidence, and I'll tell you when the data disagrees with you.`}</p>
                 </div>
               )}
-              <div className="thread">
+              <div className={cn("flex flex-col gap-6 pb-6", empty ? "" : "pt-4")}>
                 {thread.map((m) =>
                   m.role === "user" ? (
                     m.hidden ? (
-                      <div className="sysline" key={m.id}>{m.text}</div>
+                      <div className="self-center rounded-full border border-card-border bg-white px-3 py-1 text-xs text-gray-500" key={m.id}>{m.text}</div>
                     ) : (
                       <Fragment key={m.id}>
                         {m.context && <AskContextCard c={m.context} sent />}
-                        <div className="msg-u">
+                        <div className="flex max-w-[75%] flex-col gap-2 self-end rounded-2xl rounded-br-md border border-brand-palette-100 bg-brand-palette-50 px-4 py-2.5 text-sm leading-relaxed text-gray-900">
                           {m.attachments?.length ? (
-                            <div className="files sent">{m.attachments.map((f) => <span className="file" key={f.id} title={f.filename}><b>PDF</b>{f.filename}</span>)}</div>
+                            <div className="flex flex-wrap gap-1.5">{m.attachments.map((f) => <FileTag key={f.id} name={f.filename} />)}</div>
                           ) : null}
-                          {m.text}
+                          <span className="whitespace-pre-wrap wrap-break-word">{m.text}</span>
                         </div>
                       </Fragment>
                     )
                   ) : (
-                    <div className="msg-a" key={m.id}>
-                      <div className="who">C</div>
-                      <div className="ans">
+                    <div className="grid grid-cols-[32px_minmax(0,1fr)] gap-3" key={m.id}>
+                      <div aria-hidden="true" className="flex h-8 w-8 items-center justify-center rounded-xl bg-brand-palette-100 text-xs font-bold text-brand-palette-700">C</div>
+                      <div className="flex min-w-0 flex-col gap-3.5 text-sm leading-relaxed text-gray-800 [&_b]:font-semibold [&_b]:text-gray-900 [&_li]:pl-1 [&_ul]:flex [&_ul]:list-disc [&_ul]:flex-col [&_ul]:gap-1.5 [&_ul]:pl-5">
                         {m.activity && (m.streaming || m.tools.length === 0) && (
-                          <div className={`activity ${m.activity.done ? "done" : ""}`}><span className="dot" />{m.activity.text}</div>
+                          <div className="flex min-h-8 items-center gap-2 text-sm text-gray-500" aria-live="polite">
+                            {m.activity.done ? <IconCheck size={16} className="text-green-600" /> : <Spinner />}
+                            {m.activity.text}
+                          </div>
                         )}
-                        {m.status && !m.activity && <div className="status">{m.status}</div>}
+                        {m.status && !m.activity && <div className="flex min-h-8 items-center text-sm text-gray-500">{m.status}</div>}
                         {m.text && <RichText text={m.text} onChip={(id) => setOpen((o) => ({ ...o, [m.id]: o[m.id]?.[0] === id && o[m.id].length === 1 ? [] : [id] }))} />}
                         {m.tools.map((t) =>
                           t.name === "export_run" && t.file ? (
@@ -343,32 +374,41 @@ export function Ask({ initialConversation, initialMessages, prefill, stats, clie
                           ),
                         )}
                         {m.ask && (
-                          <div className={`ask-card ${m.ask.answered ? "done" : ""}`}>
-                            <div className="q">{m.ask.question}</div>
-                            {m.ask.why && <div className="why">{m.ask.why}</div>}
-                            <div className="opts">
-                              {m.ask.options.map((o) => (
-                                <button key={o.value} className={m.ask!.answered === o.value || m.ask!.answered === o.label ? "picked" : ""} onClick={() => send(o.label)} disabled={busy}>{o.label}</button>
-                              ))}
+                          <div className="flex flex-col gap-3 rounded-2xl border border-card-border bg-white p-4">
+                            <div>
+                              <p className="text-sm font-semibold text-gray-900">{m.ask.question}</p>
+                              {m.ask.why && <p className="text-xs text-gray-500">{m.ask.why}</p>}
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                              {m.ask.options.map((o) => {
+                                const picked = m.ask!.answered === o.value || m.ask!.answered === o.label;
+                                return (
+                                  <button key={o.value} type="button" onClick={() => send(o.label)} disabled={busy || !!m.ask!.answered} aria-pressed={picked}
+                                    className={cn("min-h-10 cursor-pointer rounded-xl border px-3.5 py-2 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-palette-600 disabled:cursor-default",
+                                      picked ? "border-brand-palette-300 bg-brand-palette-50 text-brand-palette-700" : m.ask!.answered ? "border-slate-200 bg-white text-gray-400" : "border-slate-200 bg-white text-gray-700 hover:border-brand-palette-300 hover:bg-brand-palette-50 hover:text-brand-palette-700")}>
+                                    {o.label}
+                                  </button>
+                                );
+                              })}
                             </div>
                           </div>
                         )}
                         {open[m.id]?.length ? <EvidencePanel ids={open[m.id]} evidence={m.evidence} title={`Evidence · ${open[m.id].join(", ")}`} /> : null}
-                        {m.error && <div className="errbox">{m.error}</div>}
-                        {!m.streaming && !m.error && !m.text && !m.ask && m.tools.length === 0 && <div className="errbox">This answer was cut off before it finished (the server did not save a reply). Ask again in a new conversation.</div>}
+                        {m.error && <p role="alert" className="rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-700">{m.error}</p>}
+                        {!m.streaming && !m.error && !m.text && !m.ask && m.tools.length === 0 && <p role="alert" className="rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-700">This answer was cut off before it finished (the server did not save a reply). Ask again in a new conversation.</p>}
                         {!m.streaming && !m.error && m.text && !m.ask && (
-                          <div className="acts">
-                            <button className="btn sm" onClick={() => send("Watch this every Monday and only tell me when something changes")}>Watch this weekly</button>
-                            <button className="btn sm" disabled={!conversationId || busy} title="A report from this whole conversation: every question, answer, table and its evidence" onClick={async () => {
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Button variant="outline" size="sm" onClick={() => send("Watch this every Monday and only tell me when something changes")}>Watch this weekly</Button>
+                            <Button variant="outline" size="sm" disabled={!conversationId || busy} title="A report from this whole conversation: every question, answer, table and its evidence" onClick={async () => {
                               if (!conversationId) return;
                               showToast("Writing the report from this conversation…");
                               const r = await fetch("/api/reports", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ conversation_id: conversationId }) });
                               const j = await r.json();
                               if (j.error) { showToast(j.error); return; }
                               router.push(`/reports/${j.id}`);
-                            }}>Turn into a report</button>
+                            }}>Turn into a report</Button>
                             {copy.kind !== "profile" && (
-                              <button className="btn sm" disabled={!conversationId || busy || deckBusy} title="A deck from this conversation: every analysis becomes a slide, run again for each version, next to a scoreboard and the moves" onClick={async () => {
+                              <Button variant="outline" size="sm" disabled={!conversationId || busy || deckBusy} title="A deck from this conversation: every analysis becomes a slide, run again for each version, next to a scoreboard and the moves" onClick={async () => {
                                 if (!conversationId) return;
                                 setDeckBusy(true);
                                 showToast("Making the deck from this conversation… (about a minute)");
@@ -377,11 +417,11 @@ export function Ask({ initialConversation, initialMessages, prefill, stats, clie
                                 setDeckBusy(false);
                                 if (!r.ok || !j.deck) { showToast(j.error ?? "Could not make the deck"); return; }
                                 router.push(`/decks/${j.deck.id}${j.version?.report_id ? `?v=${j.version.report_id}` : ""}`);
-                              }}>{deckBusy ? "Making the deck…" : "Turn into a deck"}</button>
+                              }}>{deckBusy ? "Making the deck…" : "Turn into a deck"}</Button>
                             )}
-                            <button className="btn sm" onClick={() => { sendSignal("chat.copy"); navigator.clipboard?.writeText(m.text.replace(/<ev id="(ev_\d+)"><\/ev>/g, "[$1]").replace(/<\/?counter>/g, "")); showToast("Copied"); }}>Copy</button>
-                            {m.miss ? <span className="pill" title="citations to evidence that does not exist were removed">evidence_miss {m.miss}</span> : null}
-                            {m.timings && <span className="pill" title={`setup ${m.timings.setup_ms} ms · effort ${m.timings.effort}`}>{(m.timings.total_ms / 1000).toFixed(1)}s</span>}
+                            <Button variant="outline" size="sm" onClick={() => { sendSignal("chat.copy"); navigator.clipboard?.writeText(m.text.replace(/<ev id="(ev_\d+)"><\/ev>/g, "[$1]").replace(/<\/?counter>/g, "")); showToast("Copied"); }}>Copy</Button>
+                            {m.miss ? <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs text-gray-600" title="citations to evidence that does not exist were removed">evidence_miss {m.miss}</span> : null}
+                            {m.timings && <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs text-gray-600" title={`setup ${m.timings.setup_ms} ms · effort ${m.timings.effort}`}>{(m.timings.total_ms / 1000).toFixed(1)}s</span>}
                           </div>
                         )}
                       </div>
@@ -393,42 +433,54 @@ export function Ask({ initialConversation, initialMessages, prefill, stats, clie
             </div>
           </div>
 
-          <div className="dock">
-            <div className="wrap">
-              {pendingAsk && <AskContextCard c={pendingAsk.context} onRemove={() => setPendingAsk(null)} />}
-              <div className={`composer ${builderMode && team?.builder ? "building" : ""}`}>
-                {builderMode && team?.builder && <div className="buildbar">Builder mode · what you change here applies to everyone on {team.codename}, after you press Apply</div>}
-                {(files.length > 0 || uploading > 0) && (
-                  <div className="files">
-                    {files.map((f) => (
-                      <span className="file" key={f.id} title={f.filename}>
-                        <b>PDF</b>{f.filename}<small>{fileSize(f.bytes)}</small>
-                        <i onClick={() => removeFile(f.id)} title="Remove">×</i>
+          {/* the same space on every side of the input, and the same left edge as the header and the thread above */}
+          <div className="shrink-0 border-t border-gray-200 bg-white p-4 md:p-6">
+            {pendingAsk && <div className="mb-3"><AskContextCard c={pendingAsk.context} onRemove={() => setPendingAsk(null)} /></div>}
+            <div className={cn("relative flex flex-col gap-3 rounded-2xl border bg-white p-3 shadow-xs transition-all duration-200 focus-within:ring-2",
+              builderMode && team?.builder ? "border-brand-palette-400 focus-within:border-brand-palette-600 focus-within:ring-brand-palette-500/15" : "border-slate-200 focus-within:border-brand-palette-600 focus-within:ring-brand-palette-500/15")}>
+              {builderMode && team?.builder && <div className="-mx-3 -mt-3 rounded-t-2xl border-b border-brand-palette-100 bg-brand-palette-50 px-4 py-2 text-xs font-semibold text-brand-palette-800">Builder mode · what you change here applies to everyone on {team.codename}, after you press Apply</div>}
+              {(files.length > 0 || uploading > 0) && (
+                <div className="flex flex-wrap gap-1.5 px-1">
+                  {files.map((f) => <FileTag key={f.id} name={f.filename} size={fileSize(f.bytes)} onRemove={() => removeFile(f.id)} />)}
+                  {uploading > 0 && <span className="inline-flex items-center gap-1.5 rounded-lg border border-card-border bg-gray-50 px-2 py-1 text-xs text-gray-600"><Spinner className="h-3 w-3" />Uploading {uploading} file{uploading > 1 ? "s" : ""}…</span>}
+                </div>
+              )}
+              {menuOpen && <SlashMenu options={menuOptions} index={menuIndex} onPick={pickSkill} onHover={setMenuIndex} />}
+              <textarea ref={taRef} value={text} aria-label="Ask CeMO" placeholder="Ask CeMO anything, or type / to see what it can do" onChange={(e) => setText(e.target.value)} onFocus={() => setFocused(true)} onBlur={() => { setFocused(false); setPlusOpen(false); }}
+                onPaste={(e) => { const fs = Array.from(e.clipboardData.files ?? []); if (fs.length) { e.preventDefault(); void upload(fs); } }}
+                onKeyDown={(e) => { if (menuKeys(e)) return; if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(text); } if (e.key === "Escape") setText(""); }}
+                className="block min-h-12 w-full resize-none rounded-none border-0 bg-transparent px-1 py-0 font-sans text-sm leading-relaxed text-gray-900 shadow-none outline-none placeholder:text-gray-500 focus:outline-none focus-visible:outline-none" />
+              {/* end-aligned: when the tools wrap to two lines on a phone, Ask stays on the last one */}
+              <div className="flex items-end justify-between gap-3">
+                <div className="flex min-w-0 flex-wrap items-center gap-2">
+                  {skills.length > 0 && (
+                    <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={toggleMenu} title="What CeMO can do" aria-label="What CeMO can do" aria-expanded={menuOpen}
+                      className={cn(TOOL, "w-10 justify-center px-0 text-lg leading-none", menuOpen && "border-brand-palette-300 bg-brand-palette-50 text-brand-palette-700")}>+</button>
+                  )}
+                  <input ref={fileRef} type="file" accept="application/pdf" multiple hidden onChange={(e) => { if (e.target.files?.length) void upload(e.target.files); e.target.value = ""; }} />
+                  <button type="button" className={TOOL} onClick={() => fileRef.current?.click()} disabled={files.length >= MAX_FILES} title={files.length >= MAX_FILES ? `Up to ${MAX_FILES} documents` : "Attach a PDF brief or deck"}>Attach PDF</button>
+                  {team?.builder && (
+                    <button type="button" onClick={toggleBuilder} role="switch" aria-checked={builderMode} title="Shape the team's version by asking CeMO" className={cn(TOOL, "gap-2.5", builderMode && "border-brand-palette-300 bg-brand-palette-50 text-brand-palette-700")}>
+                      {/* track and knob in flow, no absolute positioning: the knob slides by exactly the track's free width */}
+                      <span aria-hidden="true" className={cn("inline-flex h-5 w-9 shrink-0 items-center rounded-full p-0.5 transition-colors duration-200", builderMode ? "bg-brand-palette-600" : "bg-gray-300")}>
+                        <span className={cn("h-4 w-4 rounded-full bg-white shadow-xs transition-transform duration-200", builderMode ? "translate-x-4" : "translate-x-0")} />
                       </span>
-                    ))}
-                    {uploading > 0 && <span className="file busy">Uploading {uploading} file{uploading > 1 ? "s" : ""}…</span>}
-                  </div>
-                )}
-                {menuOpen && <SlashMenu options={menuOptions} index={menuIndex} onPick={pickSkill} onHover={setMenuIndex} />}
-                <textarea ref={taRef} value={text} placeholder="Ask CeMO anything, or type / to see what it can do" onChange={(e) => setText(e.target.value)} onFocus={() => setFocused(true)} onBlur={() => { setFocused(false); setPlusOpen(false); }}
-                  onPaste={(e) => { const fs = Array.from(e.clipboardData.files ?? []); if (fs.length) { e.preventDefault(); void upload(fs); } }}
-                  onKeyDown={(e) => { if (menuKeys(e)) return; if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(text); } if (e.key === "Escape") setText(""); }} />
-                <div className="row">
-                  <span className="tools">
-                    {skills.length > 0 && <button type="button" className={`plus ${menuOpen ? "on" : ""}`} onMouseDown={(e) => e.preventDefault()} onClick={toggleMenu} title="What CeMO can do" aria-label="What CeMO can do" aria-expanded={menuOpen}>+</button>}
-                    <input ref={fileRef} type="file" accept="application/pdf" multiple hidden onChange={(e) => { if (e.target.files?.length) void upload(e.target.files); e.target.value = ""; }} />
-                    <button className="attach" onClick={() => fileRef.current?.click()} disabled={files.length >= MAX_FILES} title={files.length >= MAX_FILES ? `Up to ${MAX_FILES} documents` : "Attach a PDF brief or deck"}>Attach PDF</button>
-                    {team?.builder && <button type="button" className={`buildswitch ${builderMode ? "on" : ""}`} onClick={toggleBuilder} role="switch" aria-checked={builderMode} title="Shape the team's version by asking CeMO">Builder mode</button>}
-                    <span>Enter to send · / for what CeMO can do</span>
-                  </span>
-                  <button className="btn pri sm" disabled={busy || uploading > 0} onClick={() => send(text)}>{busy ? "Working…" : "Ask"}</button>
+                      Builder mode
+                    </button>
+                  )}
+                  <span className="hidden text-xs text-gray-500 lg:inline">Enter to send · / for what CeMO can do</span>
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  {!split && objects.length > 0 && <button type="button" className={TOOL} onClick={() => { setPaneOpen(true); sendSignal("chat.pane_open"); }}>Open the evidence</button>}
+                  <Button size="sm" className="min-w-20" disabled={busy || uploading > 0} onClick={() => send(text)}>{busy ? "Working…" : "Ask"}</Button>
                 </div>
               </div>
             </div>
           </div>
         </div>
 
-        {split && <div className="divider" onMouseDown={startDrag} role="separator" aria-orientation="vertical" />}
+        {/* drag to share the width between the thread and the pane; under 1101px the pane is a sheet and there is nothing to drag */}
+        {split && <div onMouseDown={startDrag} role="separator" aria-orientation="vertical" aria-label="Resize the evidence pane" className="group relative hidden w-1.5 shrink-0 cursor-col-resize min-[1101px]:block"><span aria-hidden="true" className="absolute inset-y-0 left-0.5 w-px bg-gray-200 transition-all group-hover:w-0.5 group-hover:bg-brand-palette-400" /></div>}
         {split && activeObject && (
           <Pane
             objects={objects} activeId={activeObject.id} onSelect={setActiveId} onClose={() => setPaneOpen(false)}
@@ -440,8 +492,12 @@ export function Ask({ initialConversation, initialMessages, prefill, stats, clie
         )}
       </div>
 
-      {dragging && <div className="dropzone" onDragLeave={() => setDragging(false)}><div>Drop a PDF brief or deck to add it to this conversation</div></div>}
-      <div className={`toast ${toast ? "show" : ""}`}>{toast}</div>
+      {dragging && (
+        <div className="pointer-events-none absolute inset-3 z-30 grid place-items-center rounded-3xl border-2 border-dashed border-brand-palette-400 bg-brand-palette-50/90" onDragLeave={() => setDragging(false)}>
+          <p className="rounded-2xl bg-white px-6 py-4 text-sm font-semibold text-brand-palette-800 shadow-xs">Drop a PDF brief or deck to add it to this conversation</p>
+        </div>
+      )}
+      <div role="status" aria-live="polite" className={cn("pointer-events-none fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-xl bg-gray-900 px-4 py-2.5 text-sm text-white shadow-lg transition-all duration-200", toast ? "translate-y-0 opacity-100" : "translate-y-3 opacity-0")}>{toast}</div>
     </section>
   );
 }
@@ -499,8 +555,11 @@ function inline(s: string, onChip?: (id: string) => void): ReactNode[] {
       const tail = /^[,.;:!?)]+/.exec(s.slice(last))?.[0] ?? "";
       last += tail.length;
       out.push(
-        <span key={k++} className={tail ? "nb tight" : "nb"}>
-          <span className="ev" onClick={() => onChip?.(id)} title={id}>{id.replace("ev_", "")}</span>
+        <span key={k++} className="whitespace-nowrap">
+          <button type="button" onClick={() => onChip?.(id)} title={`Evidence ${id}`} aria-label={`Evidence ${id.replace("ev_", "")}`}
+            className={cn("mx-0.5 inline-flex h-5 min-w-5 cursor-pointer items-center justify-center rounded-md bg-brand-palette-100 px-1.5 align-[1px] text-[11px] font-bold leading-none text-brand-palette-800 transition-colors hover:bg-brand-palette-200 focus-visible:outline-2 focus-visible:outline-brand-palette-600", tail && "mr-0")}>
+            {id.replace("ev_", "")}
+          </button>
           {tail}
         </span>,
       );
