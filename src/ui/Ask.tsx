@@ -317,10 +317,10 @@ export function Ask({ initialConversation, initialMessages, prefill, stats, clie
           <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
             <div className="flex min-h-full flex-col px-4 md:px-6">
               {/* the page's own header: it scrolls with the conversation instead of sitting in a bar above it */}
-              <header className="flex flex-col gap-3 pb-2 pt-6 md:flex-row md:items-center md:justify-between md:gap-6 md:pt-8">
+              <header className="flex flex-col gap-3 border-0 border-b border-dashed border-gray-300 pb-4 pt-4 md:flex-row md:items-center md:justify-between md:gap-6 md:pt-6">
                 <div className="min-w-0">
-                  <h1 className="text-3xl font-semibold text-gray-900">Chats</h1>
-                  <p className="text-sm text-gray-500">{clientName ? (copy.kind === "profile" ? `About ${clientName}` : `On the side of ${clientName}`) : copy.label}</p>
+                  <h1 className="text-xl font-semibold leading-tight text-gray-900">Chats</h1>
+                  <p className="text-xs text-gray-500">{clientName ? (copy.kind === "profile" ? `About ${clientName}` : `On the side of ${clientName}`) : copy.label}</p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   <span className={cn("inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold", stats.freshness ? "bg-green-50/60 text-green-700" : "bg-gray-100 text-gray-600")}>
@@ -434,7 +434,7 @@ export function Ask({ initialConversation, initialMessages, prefill, stats, clie
           </div>
 
           {/* the same space on every side of the input, and the same left edge as the header and the thread above */}
-          <div className="shrink-0 border-t border-gray-200 bg-white p-4 md:p-6">
+          <div className="shrink-0 px-4 pb-4 md:px-6 md:pb-6">
             {pendingAsk && <div className="mb-3"><AskContextCard c={pendingAsk.context} onRemove={() => setPendingAsk(null)} /></div>}
             <div className={cn("relative flex flex-col gap-3 rounded-2xl border bg-white p-3 shadow-xs transition-all duration-200 focus-within:ring-2",
               builderMode && team?.builder ? "border-brand-palette-400 focus-within:border-brand-palette-600 focus-within:ring-brand-palette-500/15" : "border-slate-200 focus-within:border-brand-palette-600 focus-within:ring-brand-palette-500/15")}>
