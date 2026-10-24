@@ -3,7 +3,6 @@
  * every social team. Every figure comes from src/social/dashboard.ts; "Ask CeMO" opens Chats
  * with a question, never numbers.
  */
-import Link from "next/link";
 import { change, compact, dayMonth, int, pct, pts } from "@/competitor/view";
 import { BAND_HOURS, BAND_ORDER, type Kpi, type OwnPost, type Quote, type SocialData } from "@/social/dashboard";
 import { Sections } from "../dashboard/Sections";
@@ -12,40 +11,58 @@ import { DashTemplates } from "../dashboard/DashTemplates";
 import { PanelAsk } from "../dashboard/PanelBuilder";
 import type { DashLayout } from "@/dashboard/sections";
 import { PrFilters } from "../reputation/PrFilters";
+import { PageHeader } from "../kit/PageHeader";
+import { Delta as DeltaText, StatRow, StatTile } from "../kit/StatTile";
+import { Empty, Notes, Panel, SectionCard } from "../kit/Section";
+import { EMPTY_ROW, SUB, TABLE, TABLE_FRAME, TD, TD_NUM, TH, TH_NUM, THEAD, TR } from "../kit/Table";
+import { SERIES, Swatch } from "../kit/chart";
+import { cn } from "../cn";
+import { AskLink, DASH_PAGE, PlatformTag, Tag, TWO } from "../dashboard/parts";
 
-const PF: Record<string, string> = { tiktok: "TT", instagram: "IG", threads: "TH", x: "X", youtube: "YT" };
 const PLATFORM: Record<string, string> = { tiktok: "TikTok", instagram: "Instagram", threads: "Threads", x: "X", youtube: "YouTube" };
 const DOW = ["", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const ask = (q: string) => `/?q=${encodeURIComponent(q)}`;
-const pf = (p: string) => <span className={`pf ${p}`}>{PF[p] ?? p}</span>;
 const times = (x: number) => (x >= 100 ? `×${int(x)}` : `×${x.toFixed(1)}`);
+// posts against engagement: two categorical slots
+const FMT = { posts: SERIES[0], eng: SERIES[1] };
+// typical engagement in a cell, in five steps of the brand ramp; the number is always written in the cell too
+const HEAT = ["bg-brand-palette-50", "bg-brand-palette-100", "bg-brand-palette-200", "bg-brand-palette-300", "bg-brand-palette-400"];
+const LINK = "font-semibold text-gray-900 underline-offset-2 hover:text-brand-palette-700 hover:underline";
 
 function Delta({ k, kind, ok, good = "up" }: { k: Kpi; kind: "count" | "pct"; ok: boolean; good?: "up" | "down" }) {
-  if (!ok || k.now == null || k.prev == null) return <span className="delta flat">Too few posts before to compare</span>;
+  if (!ok || k.now == null || k.prev == null) return <DeltaText dir="none">Too few posts before to compare</DeltaText>;
   const diff = k.now - k.prev;
-  const dir = Math.abs(diff) < 1e-9 ? "flat" : (diff > 0) === (good === "up") ? "up" : "down";
-  return <span className={`delta ${dir}`}>{kind === "count" ? change(k.now, k.prev) : pts(k.now, k.prev)} vs before</span>;
+  const flat = Math.abs(diff) < 1e-9;
+  const dir = flat ? "flat" : (diff > 0) === (good === "up") ? "up" : "down";
+  return <DeltaText dir={dir} glyph={flat ? undefined : diff > 0 ? "▲" : "▼"}>{kind === "count" ? change(k.now, k.prev) : pts(k.now, k.prev)} vs before</DeltaText>;
 }
 
 function PostLine({ p, extra }: { p: OwnPost; extra?: string }) {
   return (
-    <li className="prpost">
-      {pf(p.platform)}
-      <div>
-        <a href={p.url} target="_blank" rel="noreferrer"><b>{p.handle ? `@${p.handle}` : "Own account"}</b><span className="tag">{p.format}</span></a>
-        <p>{p.caption || <i className="muted">No caption</i>}</p>
-        <small>{dayMonth(p.posted_at)} · {int(p.engagements)} engagements{p.views != null ? ` · ${compact(p.views)} views` : ""} · {int(p.comments)} comments{p.neg_pct != null ? `, ${pct(p.neg_pct)} negative` : ""}{extra ? ` · ${extra}` : ""}</small>
+    <li className="flex min-w-0 items-start gap-3 py-3 first:pt-0 last:pb-0">
+      <PlatformTag p={p.platform} />
+      <div className="flex min-w-0 flex-1 flex-col gap-1">
+        <span className="flex flex-wrap items-center gap-1.5 text-sm">
+          <a href={p.url} target="_blank" rel="noreferrer" className={LINK}>{p.handle ? `@${p.handle}` : "Own account"}</a>
+          <Tag>{p.format}</Tag>
+        </span>
+        <p className="line-clamp-2 text-sm leading-relaxed text-gray-700" title={p.caption || undefined}>{p.caption || <i className="text-gray-500">No caption</i>}</p>
+        <small className="text-xs text-gray-500">{dayMonth(p.posted_at)} · {int(p.engagements)} engagements{p.views != null ? ` · ${compact(p.views)} views` : ""} · {int(p.comments)} comments{p.neg_pct != null ? `, ${pct(p.neg_pct)} negative` : ""}{extra ? ` · ${extra}` : ""}</small>
       </div>
     </li>
   );
 }
 
+function Posts({ children }: { children: React.ReactNode }) {
+  return <ul className="flex flex-col divide-y divide-card-border">{children}</ul>;
+}
+
 function QuoteLine({ q }: { q: Quote }) {
   return (
-    <blockquote className="prq">
-      <p>“{q.text.length > 200 ? q.text.slice(0, 198) + "…" : q.text}”</p>
-      {q.translation && q.translation !== q.text && <small className="tr">{q.translation.length > 180 ? q.translation.slice(0, 178) + "…" : q.translation}</small>}
-      <footer>{pf(q.platform)}{q.likes > 0 ? `${int(q.likes)} like${q.likes === 1 ? "" : "s"} · ` : ""}<a href={q.url} target="_blank" rel="noreferrer">Open post ↗</a></footer>
+    <blockquote className="flex flex-col gap-1.5 rounded-2xl bg-gray-50 px-4 py-3">
+      <p className="text-sm leading-relaxed text-gray-800">“{q.text.length > 200 ? q.text.slice(0, 198) + "…" : q.text}”</p>
+      {q.translation && q.translation !== q.text && <small className="text-xs italic leading-relaxed text-gray-600">{q.translation.length > 180 ? q.translation.slice(0, 178) + "…" : q.translation}</small>}
+      <footer className="flex flex-wrap items-center gap-1.5 text-xs text-gray-500"><PlatformTag p={q.platform} />{q.likes > 0 ? `${int(q.likes)} like${q.likes === 1 ? "" : "s"} · ` : ""}<a href={q.url} target="_blank" rel="noreferrer" className="font-semibold text-gray-700 underline-offset-2 hover:text-brand-palette-700 hover:underline">Open post ↗</a></footer>
     </blockquote>
   );
 }
@@ -58,161 +75,137 @@ export function SocialDashboard({ d, client, view }: { d: SocialData; client: st
   const ok = d.comparable;
   const weeks = Math.max(1, f.days / 7);
   const tiles = [
-    { key: "posts", label: "Posts", value: int(k.posts.now ?? 0), delta: <Delta k={k.posts} kind="count" ok={ok} />, sub: `${((k.posts.now ?? 0) / weeks).toFixed(1)} a week from own accounts`, tone: "blue" },
-    { key: "eng", label: "Engagement", value: compact(k.engagements.now), delta: <Delta k={k.engagements} kind="count" ok={ok} />, sub: "Likes, comments, shares and saves as each platform counts them", tone: "violet" },
-    { key: "med", label: "Typical post", value: k.median_eng.now == null ? "–" : int(k.median_eng.now), delta: <Delta k={k.median_eng} kind="count" ok={ok} />, sub: "Median engagement per post", tone: "mint" },
-    { key: "views", label: "Typical video views", value: compact(k.video_views.now), delta: <Delta k={k.video_views} kind="count" ok={ok} />, sub: "Median, where the platform reports views", tone: "blue" },
-    { key: "neg", label: "Negative comments", value: pct(k.neg_pct.now), delta: <Delta k={k.neg_pct} kind="pct" ok={ok} good="down" />, sub: `${int(k.comments.now ?? 0)} comments under these posts`, tone: "coral" },
-    { key: "reply", label: "Reply rate", value: pct(k.reply_rate.now), delta: <Delta k={k.reply_rate} kind="pct" ok={ok} />, sub: "Brand replies per comment", tone: "mint" },
+    { key: "posts", label: "Posts", value: int(k.posts.now ?? 0), delta: <Delta k={k.posts} kind="count" ok={ok} />, sub: `${((k.posts.now ?? 0) / weeks).toFixed(1)} a week from own accounts` },
+    { key: "eng", label: "Engagement", value: compact(k.engagements.now), delta: <Delta k={k.engagements} kind="count" ok={ok} />, sub: "Likes, comments, shares and saves as each platform counts them" },
+    { key: "med", label: "Typical post", value: k.median_eng.now == null ? "–" : int(k.median_eng.now), delta: <Delta k={k.median_eng} kind="count" ok={ok} />, sub: "Median engagement per post" },
+    { key: "views", label: "Typical video views", value: compact(k.video_views.now), delta: <Delta k={k.video_views} kind="count" ok={ok} />, sub: "Median, where the platform reports views" },
+    { key: "neg", label: "Negative comments", value: pct(k.neg_pct.now), delta: <Delta k={k.neg_pct} kind="pct" ok={ok} good="down" />, sub: `${int(k.comments.now ?? 0)} comments under these posts` },
+    { key: "reply", label: "Reply rate", value: pct(k.reply_rate.now), delta: <Delta k={k.reply_rate} kind="pct" ok={ok} />, sub: "Brand replies per comment" },
   ];
   const maxEng = Math.max(1, ...d.timing.map((t) => t.median_eng ?? 0));
   const cell = (dow: number, band: string) => d.timing.find((t) => t.dow === dow && t.band === band);
   const bestCell = [...d.timing].filter((t) => t.median_eng != null).sort((a, b) => (b.median_eng ?? 0) - (a.median_eng ?? 0))[0];
   const render: Record<string, (t: string) => React.ReactNode> = {
     attention: (t) => (
-      <div className="dsection">
-        <header><h2>{t}</h2><span>Posts from the last week doing under half of their account&apos;s usual for their age, or drawing a wave of negative comments.{d.curve.length >= 4 ? ` Own posts here collect about ${pct(d.curve[1].share * 100, 0)} of their first-week likes by day 1 and ${pct(d.curve[3].share * 100, 0)} by day 3, so day one tells.` : ""}</span></header>
-        <div className="dcard">
-          {d.watch.length === 0 ? <div className="empty">Nothing under-performing or drawing a comment storm in the last week.</div> : (
-            <ul className="prposts">{d.watch.map((w) => <PostLine key={w.url} p={w} extra={w.why === "storm" ? "comment storm" : `day ${w.day}, about ${int(w.expected)} expected by now`} />)}</ul>
-          )}
-        </div>
-      </div>
+      <SectionCard title={t} hint={<>Posts from the last week doing under half of their account&apos;s usual for their age, or drawing a wave of negative comments.{d.curve.length >= 4 ? ` Own posts here collect about ${pct(d.curve[1].share * 100, 0)} of their first-week likes by day 1 and ${pct(d.curve[3].share * 100, 0)} by day 3, so day one tells.` : ""}</>}>
+        {d.watch.length === 0 ? <Empty>Nothing under-performing or drawing a comment storm in the last week.</Empty> : (
+          <Posts>{d.watch.map((w) => <PostLine key={w.url} p={w} extra={w.why === "storm" ? "comment storm" : `day ${w.day}, about ${int(w.expected)} expected by now`} />)}</Posts>
+        )}
+      </SectionCard>
     ),
     accounts: (t) => (
-      <div className="dsection">
-        <header><h2>{t}</h2><span>Each of {who}&apos;s own accounts in {range}.</span></header>
-        <div className="dcard tablewrap still">
-          {d.accounts.length === 0 ? <div className="empty">No own posts in these days.</div> : (
-            <table><thead><tr><th>Account</th><th className="num">Posts</th><th className="num">A week</th><th className="num">Typical post</th><th className="num">Typical views</th><th className="num">Eng. rate</th><th className="num">Comments</th><th className="num">Negative</th><th className="num">Replies</th></tr></thead>
+      <SectionCard title={t} hint={<>Each of {who}&apos;s own accounts in {range}.</>}>
+        {d.accounts.length === 0 ? <Empty>No own posts in these days.</Empty> : (
+          <div className={TABLE_FRAME}>
+            <table className={cn(TABLE, "min-w-[900px]")}><thead className={THEAD}><tr><th className={TH}>Account</th><th className={TH_NUM}>Posts</th><th className={TH_NUM}>A week</th><th className={TH_NUM}>Typical post</th><th className={TH_NUM}>Typical views</th><th className={TH_NUM}>Eng. rate</th><th className={TH_NUM}>Comments</th><th className={TH_NUM}>Negative</th><th className={TH_NUM}>Replies</th></tr></thead>
               <tbody>{d.accounts.map((a) => (
-                <tr key={a.platform + a.handle}><td>{pf(a.platform)}@{a.handle}</td><td className="num">{int(a.posts)}</td><td className="num">{a.per_week.toFixed(1)}</td><td className="num">{int(a.median_eng)}</td><td className="num">{a.median_views == null ? "–" : compact(a.median_views)}</td><td className="num">{a.er == null ? "–" : pct(a.er, 2)}</td><td className="num">{int(a.comments)}</td><td className="num">{pct(a.neg_pct)}</td><td className="num">{int(a.replies)}</td></tr>))}
+                <tr key={a.platform + a.handle} className={TR}><td className={TD}><span className="flex items-center gap-1.5"><PlatformTag p={a.platform} /><b className="font-semibold text-gray-900">@{a.handle}</b></span></td><td className={TD_NUM}>{int(a.posts)}</td><td className={TD_NUM}>{a.per_week.toFixed(1)}</td><td className={TD_NUM}>{int(a.median_eng)}</td><td className={TD_NUM}>{a.median_views == null ? "–" : compact(a.median_views)}</td><td className={TD_NUM}>{a.er == null ? "–" : pct(a.er, 2)}</td><td className={TD_NUM}>{int(a.comments)}</td><td className={TD_NUM}>{pct(a.neg_pct)}</td><td className={TD_NUM}>{int(a.replies)}</td></tr>))}
               </tbody>
             </table>
-          )}
-        </div>
-      </div>
+          </div>
+        )}
+      </SectionCard>
     ),
     formats: (t) => (
-      <div className="dsection">
-        <header><h2>{t}</h2><span>Share of posts against share of engagement: a format above the line earns more than its share.</span></header>
-        <div className="dcard">
-          {d.formats.length === 0 ? <div className="empty">No own posts in these days.</div> : (
-            <div className="fmtbars">
-              {d.formats.map((x) => (
-                <div key={x.format} className="fmt">
-                  <b>{x.format}</b>
-                  <div className="bars"><i className="p" style={{ width: `${x.post_share ?? 0}%` }} /><i className="e" style={{ width: `${x.eng_share ?? 0}%` }} /></div>
-                  <small>{pct(x.post_share, 0)} of posts · {pct(x.eng_share, 0)} of engagement · typical {int(x.median_eng)}{x.median_views != null ? ` · ${compact(x.median_views)} views` : ""}</small>
-                </div>
-              ))}
-              <p className="legend"><i className="p" /> posts <i className="e" /> engagement</p>
-            </div>
-          )}
-        </div>
-      </div>
+      <SectionCard title={t} hint="Share of posts against share of engagement: a format above the line earns more than its share.">
+        {d.formats.length === 0 ? <Empty>No own posts in these days.</Empty> : (
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-wrap gap-x-4 gap-y-1"><Swatch colour={FMT.posts}>posts</Swatch><Swatch colour={FMT.eng}>engagement</Swatch></div>
+            {d.formats.map((x) => (
+              <div key={x.format} className="flex flex-col gap-1.5">
+                <b className="text-sm font-semibold text-gray-900">{x.format}</b>
+                <span aria-hidden="true" className="flex flex-col gap-0.5">
+                  <span className="block h-2.5 rounded-r-md" style={{ width: `${Math.max(0.5, x.post_share ?? 0)}%`, background: FMT.posts }} />
+                  <span className="block h-2.5 rounded-r-md" style={{ width: `${Math.max(0.5, x.eng_share ?? 0)}%`, background: FMT.eng }} />
+                </span>
+                <small className="text-xs text-gray-500">{pct(x.post_share, 0)} of posts · {pct(x.eng_share, 0)} of engagement · typical {int(x.median_eng)}{x.median_views != null ? ` · ${compact(x.median_views)} views` : ""}</small>
+              </div>
+            ))}
+          </div>
+        )}
+      </SectionCard>
     ),
     timing: (t) => (
-      <div className="dsection">
-        <header><h2>{t}</h2><span>Typical engagement by day and time (WIB); cells with fewer than three posts are blank.{bestCell ? ` Best: ${DOW[bestCell.dow]} ${bestCell.band.toLowerCase()}.` : ""}</span></header>
-        <div className="dcard">
-          <table className="heat"><thead><tr><th />{BAND_ORDER.map((b) => <th key={b}>{b}<small>{BAND_HOURS[b]}</small></th>)}</tr></thead>
+      <SectionCard title={t} hint={<>Typical engagement by day and time (WIB); cells with fewer than three posts are blank.{bestCell ? ` Best: ${DOW[bestCell.dow]} ${bestCell.band.toLowerCase()}.` : ""}</>}>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[520px] border-separate border-spacing-1 text-sm">
+            <thead><tr><th className="w-12" />{BAND_ORDER.map((b) => <th key={b} className="px-2 py-1 text-center text-xs font-semibold text-gray-900">{b}<small className="block font-regular text-[11px] text-gray-500">{BAND_HOURS[b]}</small></th>)}</tr></thead>
             <tbody>{[1, 2, 3, 4, 5, 6, 7].map((dow) => (
-              <tr key={dow}><th>{DOW[dow]}</th>{BAND_ORDER.map((b) => {
+              <tr key={dow}><th className="pr-2 text-left text-xs font-semibold text-gray-700">{DOW[dow]}</th>{BAND_ORDER.map((b) => {
                 const c = cell(dow, b);
                 const v = c?.median_eng ?? null;
-                return <td key={b} title={c ? `${int(c.posts)} posts${v != null ? `, typical ${int(v)}` : ""}` : "no posts"} style={v != null ? { background: `rgba(15,168,151,${0.12 + 0.75 * (v / maxEng)})` } : undefined}>{v != null ? compact(v) : c ? <small>{c.posts}</small> : ""}</td>;
+                const step = v != null ? HEAT[Math.min(HEAT.length - 1, Math.floor((v / maxEng) * HEAT.length))] : null;
+                return <td key={b} title={c ? `${int(c.posts)} posts${v != null ? `, typical ${int(v)}` : ""}` : "no posts"} className={cn("h-10 rounded-lg text-center tabular-nums", step ?? "bg-gray-50", v != null ? "font-semibold text-gray-900" : "text-gray-500", bestCell && c === bestCell && "outline-2 -outline-offset-2 outline-brand-palette-700")}>{v != null ? compact(v) : c ? <small className="text-[11px]">{c.posts}</small> : ""}</td>;
               })}</tr>))}
             </tbody>
           </table>
         </div>
-      </div>
+      </SectionCard>
     ),
     best: (t) => (
-      <div className="dsection">
-        <header><h2>{t}</h2><span>Against their own account&apos;s typical post in {range}.</span></header>
-        <div className="dcard">{d.best.length === 0 ? <div className="empty">No account has enough measured posts to compare.</div> : <ul className="prposts">{d.best.map((p) => <PostLine key={p.url} p={p} extra={p.index != null ? `${times(p.index)} the account's usual` : undefined} />)}</ul>}</div>
-      </div>
+      <SectionCard title={t} hint={<>Against their own account&apos;s typical post in {range}.</>}>
+        {d.best.length === 0 ? <Empty>No account has enough measured posts to compare.</Empty> : <Posts>{d.best.map((p) => <PostLine key={p.url} p={p} extra={p.index != null ? `${times(p.index)} the account's usual` : undefined} />)}</Posts>}
+      </SectionCard>
     ),
     weakest: (t) => (
-      <div className="dsection">
-        <header><h2>{t}</h2><span>The ones to learn from, against the same account&apos;s usual.</span></header>
-        <div className="dcard">{d.weakest.length === 0 ? <div className="empty">No account has enough measured posts to compare.</div> : <ul className="prposts">{d.weakest.map((p) => <PostLine key={p.url} p={p} extra={p.index != null ? `${times(p.index)} the account's usual` : undefined} />)}</ul>}</div>
-      </div>
+      <SectionCard title={t} hint="The ones to learn from, against the same account's usual.">
+        {d.weakest.length === 0 ? <Empty>No account has enough measured posts to compare.</Empty> : <Posts>{d.weakest.map((p) => <PostLine key={p.url} p={p} extra={p.index != null ? `${times(p.index)} the account's usual` : undefined} />)}</Posts>}
+      </SectionCard>
     ),
     competitors: (t) => (
-      <div className="dsection">
-        <header><h2>{t}</h2><span>Every brand&apos;s own accounts on the same measures, {range}.</span></header>
-        <div className="dcard tablewrap still">
-          <table><thead><tr><th>Brand</th><th className="num">Posts</th><th className="num">A week</th><th className="num">Typical post</th><th className="num">Typical views</th><th className="num">Comments</th><th className="num">Negative</th><th>Best post</th></tr></thead>
-            <tbody>{d.competitors.map((c) => (
-              <tr key={c.id} className={c.is_focus ? "me" : ""}><td><b>{c.name}</b></td><td className="num">{int(c.posts)}</td><td className="num">{c.per_week.toFixed(1)}</td><td className="num">{int(c.median_eng)}</td><td className="num">{c.median_views == null ? "–" : compact(c.median_views)}</td><td className="num">{int(c.comments)}</td><td className="num">{pct(c.neg_pct)}</td>
-                <td className="q">{c.top ? <a href={c.top.url} target="_blank" rel="noreferrer">{pf(c.top.platform)}{int(c.top.engagements)} · {c.top.caption.slice(0, 70)}{c.top.caption.length > 70 ? "…" : ""}</a> : <span className="muted">–</span>}</td></tr>))}
+      <SectionCard title={t} hint={<>Every brand&apos;s own accounts on the same measures, {range}.</>}>
+        <div className={TABLE_FRAME}>
+          <table className={cn(TABLE, "min-w-[980px]")}><thead className={THEAD}><tr><th className={TH}>Brand</th><th className={TH_NUM}>Posts</th><th className={TH_NUM}>A week</th><th className={TH_NUM}>Typical post</th><th className={TH_NUM}>Typical views</th><th className={TH_NUM}>Comments</th><th className={TH_NUM}>Negative</th><th className={TH}>Best post</th></tr></thead>
+            <tbody>{d.competitors.length === 0 ? <tr><td colSpan={8} className={EMPTY_ROW}>No brand has own posts in these days.</td></tr> : d.competitors.map((c) => (
+              <tr key={c.id} className={cn(TR, c.is_focus && "bg-brand-palette-50/60")}><td className={TD}><b className="font-semibold text-gray-900">{c.name}</b>{c.is_focus && <span className="ml-1.5"><Tag tone="brand">you</Tag></span>}</td><td className={TD_NUM}>{int(c.posts)}</td><td className={TD_NUM}>{c.per_week.toFixed(1)}</td><td className={TD_NUM}>{int(c.median_eng)}</td><td className={TD_NUM}>{c.median_views == null ? "–" : compact(c.median_views)}</td><td className={TD_NUM}>{int(c.comments)}</td><td className={TD_NUM}>{pct(c.neg_pct)}</td>
+                <td className={cn(TD, "max-w-80")}>{c.top ? <a href={c.top.url} target="_blank" rel="noreferrer" className="flex items-start gap-1.5 text-gray-700 hover:text-brand-palette-700"><PlatformTag p={c.top.platform} /><span className="line-clamp-2"><b className="font-semibold tabular-nums text-gray-900">{int(c.top.engagements)}</b> · {c.top.caption.slice(0, 70)}{c.top.caption.length > 70 ? "…" : ""}</span></a> : <span className="text-gray-500">–</span>}</td></tr>))}
             </tbody>
           </table>
         </div>
-      </div>
+      </SectionCard>
     ),
     community: (t) => (
-      <div className="dsection">
-        <header><h2>{t}</h2><span>What people say under {who}&apos;s own posts in {range}: topics, how they lean, and who wants to buy.</span>
-          <Link className="askwhy" href={ask(`Draft replies to the most-liked comments under ${who}'s own posts between ${dayMonth(f.from)} and ${dayMonth(f.to)}.`)}>Draft replies</Link></header>
-        <div className="two-eq">
-          <div className="dcard tablewrap still">
-            <table><thead><tr><th>Topic</th><th className="num">Comments</th><th className="num">Share</th><th className="num">Negative</th><th className="num">Purchase intent</th></tr></thead>
-              <tbody>{d.topics.map((t) => <tr key={t.topic}><td>{t.topic}</td><td className="num">{int(t.comments)}</td><td className="num">{pct(t.share)}</td><td className="num">{pct(t.neg_pct)}</td><td className="num">{pct(t.intent_pct)}</td></tr>)}</tbody>
+      <SectionCard title={t} hint={<>What people say under {who}&apos;s own posts in {range}: topics, how they lean, and who wants to buy.</>}
+        actions={<AskLink href={ask(`Draft replies to the most-liked comments under ${who}'s own posts between ${dayMonth(f.from)} and ${dayMonth(f.to)}.`)}>Draft replies</AskLink>}>
+        <div className={TWO}>
+          <div className={TABLE_FRAME}>
+            <table className={cn(TABLE, "min-w-[520px]")}><thead className={THEAD}><tr><th className={TH}>Topic</th><th className={TH_NUM}>Comments</th><th className={TH_NUM}>Share</th><th className={TH_NUM}>Negative</th><th className={TH_NUM}>Purchase intent</th></tr></thead>
+              <tbody>{d.topics.length === 0 ? <tr><td colSpan={5} className={EMPTY_ROW}>No comments with a topic in these days.</td></tr> : d.topics.map((t) => <tr key={t.topic} className={TR}><td className={TD}>{t.topic}</td><td className={TD_NUM}>{int(t.comments)}</td><td className={TD_NUM}>{pct(t.share)}</td><td className={TD_NUM}>{pct(t.neg_pct)}</td><td className={TD_NUM}>{pct(t.intent_pct)}</td></tr>)}</tbody>
             </table>
           </div>
-          <div className="dcard">
-            <h4>Liked most, positive</h4>
-            {d.quotes.positive.map((q, i) => <QuoteLine key={i} q={q} />)}
-            <h4>Liked most, negative</h4>
-            {d.quotes.negative.map((q, i) => <QuoteLine key={i} q={q} />)}
+          <div className="flex min-w-0 flex-col gap-4">
+            <Panel title="Liked most, positive">{d.quotes.positive.length ? d.quotes.positive.map((q, i) => <QuoteLine key={i} q={q} />) : <p className="text-sm text-gray-500">No positive comments in these days.</p>}</Panel>
+            <Panel title="Liked most, negative">{d.quotes.negative.length ? d.quotes.negative.map((q, i) => <QuoteLine key={i} q={q} />) : <p className="text-sm text-gray-500">No negative comments in these days.</p>}</Panel>
           </div>
         </div>
-      </div>
+      </SectionCard>
     ),
     health: (t) => (
-      <div className="dsection">
-        <header><h2>{t}</h2><span>Own-account capture per brand and platform. A day with far more posts than an account publishes is flagged above.</span>
-          <Link className="askwhy" href={ask(`What worked on ${who}'s own accounts between ${dayMonth(f.from)} and ${dayMonth(f.to)}, and what should we post next week?`)}>Ask CeMO what to post next</Link></header>
-        <div className="dcard tablewrap still">
-          <table><thead><tr><th>Brand</th><th>Platform</th><th>Accounts</th><th className="num">Own posts</th><th>Captured</th><th className="num">Busiest day</th></tr></thead>
+      <SectionCard title={t} hint="Own-account capture per brand and platform. A day with far more posts than an account publishes is flagged above."
+        actions={<AskLink href={ask(`What worked on ${who}'s own accounts between ${dayMonth(f.from)} and ${dayMonth(f.to)}, and what should we post next week?`)}>Ask CeMO what to post next</AskLink>}>
+        <div className={TABLE_FRAME}>
+          <table className={cn(TABLE, "min-w-[820px]")}><thead className={THEAD}><tr><th className={TH}>Brand</th><th className={TH}>Platform</th><th className={TH}>Accounts</th><th className={TH_NUM}>Own posts</th><th className={TH}>Captured</th><th className={TH_NUM}>Busiest day</th></tr></thead>
             <tbody>{d.capture.map((c) => (
-              <tr key={c.brand + c.platform} className={c.brand === who ? "me" : ""}><td>{c.brand}</td><td>{pf(c.platform)}{PLATFORM[c.platform] ?? c.platform}</td><td>{c.handles.map((h) => `@${h}`).join(", ")}</td><td className="num">{int(c.posts)}</td><td>{dayMonth(c.first)} to {dayMonth(c.last)}</td><td className={`num ${c.busiest >= 20 ? "down" : ""}`}>{int(c.busiest)}{c.busiest_day ? ` · ${dayMonth(c.busiest_day)}` : ""}</td></tr>))}
+              <tr key={c.brand + c.platform} className={cn(TR, c.brand === who && "bg-brand-palette-50/60")}><td className={TD}>{c.brand}</td><td className={TD}><span className="flex items-center gap-1.5"><PlatformTag p={c.platform} />{PLATFORM[c.platform] ?? c.platform}</span></td><td className={TD}>{c.handles.map((h) => `@${h}`).join(", ")}</td><td className={TD_NUM}>{int(c.posts)}</td><td className={cn(TD, "whitespace-nowrap")}>{dayMonth(c.first)} to {dayMonth(c.last)}</td><td className={cn(TD_NUM, c.busiest >= 20 && "font-semibold text-red-700")}>{int(c.busiest)}{c.busiest_day ? ` · ${dayMonth(c.busiest_day)}` : ""}{c.busiest >= 20 && <small className={SUB}>more than an account publishes</small>}</td></tr>))}
             </tbody>
           </table>
         </div>
-      </div>
+      </SectionCard>
     ),
   };
   return (
-    <section className="screen dash pr social">
-      <div className="topbar">
-        <div><h1>Dashboard</h1><span className="meta">{who}&apos;s own accounts · {range} vs the {f.days} days before · data through {dayMonth(d.as_of)} {d.as_of.slice(0, 4)}</span></div>
-        <div className="topright">
-          <PrFilters brand={f.brand} days={f.days} platform={f.platform} brands={d.brands} platforms={d.platforms} client={client} windows={[7, 30, 90]} def={30} />
-          {view.builder && <Customise sections={view.layout.all} builder codename={view.codename} client={view.clientName} />}
-          <DashTemplates builder={view.builder} codename={view.codename} />
-        </div>
-      </div>
-      <div className="wrap wide">
-        {d.notes.length > 0 && <div className="dcaveats">{d.notes.map((c) => <p key={c}>{c}</p>)}</div>}
+    <section data-tw className={DASH_PAGE}>
+      <PageHeader title="Dashboard" subtitle={<>{who}&apos;s own accounts · {range} vs the {f.days} days before · data through {dayMonth(d.as_of)} {d.as_of.slice(0, 4)}</>}
+        actions={<>{view.builder && <Customise sections={view.layout.all} builder codename={view.codename} client={view.clientName} />}<DashTemplates builder={view.builder} codename={view.codename} /></>} />
+      <PrFilters brand={f.brand} days={f.days} platform={f.platform} brands={d.brands} platforms={d.platforms} client={client} windows={[7, 30, 90]} def={30} />
+      <Notes lines={d.notes} />
 
-        <div className="kpis six">
-          {tiles.map((t) => (
-            <div className="kpi" data-tone={t.tone} key={t.key}>
-              <span className="label">{t.label}</span>
-              <b>{t.value}</b>
-              {t.delta}
-              <small>{t.sub}</small>
-            </div>
-          ))}
-        </div>
+      <StatRow n={6}>
+        {tiles.map((t) => <StatTile key={t.key} label={t.label} value={t.value} delta={t.delta} sub={t.sub} />)}
+      </StatRow>
 
-        {view.builder && view.scope && <PanelAsk scope={view.scope} />}
-        <Sections arranged={view.layout} render={render} who={view.clientName} showHref={view.showHref} panels={view.panels} builder={view.builder} scope={view.scope} />
-      </div>
+      {view.builder && view.scope && <PanelAsk scope={view.scope} />}
+      <Sections arranged={view.layout} render={render} who={view.clientName} showHref={view.showHref} panels={view.panels} builder={view.builder} scope={view.scope} />
     </section>
   );
 }

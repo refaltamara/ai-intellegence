@@ -6,6 +6,7 @@
  */
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { AskBar } from "../dashboard/AskBar";
 import { repAskHref } from "@/dashboard/askref";
 
 export function DashAsk({ who, brand, days, platform }: { who: string; brand: string; days: number; platform: string }) {
@@ -19,11 +20,7 @@ export function DashAsk({ who, brand, days, platform }: { who: string; brand: st
     router.push(`${repAskHref(brand, days, platform)}&q=${encodeURIComponent(t.slice(0, 1500))}&go=1`);
   }
   return (
-    <form className="pulse-ask" onSubmit={(e) => { e.preventDefault(); go(); }}>
-      <b>Ask CeMO anything about this</b>
-      <input value={q} onChange={(e) => setQ(e.target.value)} maxLength={1500} aria-label={`Ask CeMO about this dashboard on ${who}`}
-        placeholder={`About ${who} on this dashboard: why the anger, which platform, who is pulled in, what to say next…`} />
-      <button className="btn pri sm" disabled={!q.trim() || busy}>{busy ? "Opening…" : "Ask"}</button>
-    </form>
+    <AskBar label="Ask CeMO anything about this" value={q} onChange={setQ} onSubmit={go} busy={busy} disabled={!q.trim()} submitLabel="Ask" busyLabel="Opening…"
+      ariaLabel={`Ask CeMO about this dashboard on ${who}`} placeholder={`About ${who} on this dashboard: why the anger, which platform, who is pulled in, what to say next…`} />
   );
 }

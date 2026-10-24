@@ -82,13 +82,38 @@ export function CardSkeleton({ lines = 3, tiles = 0, className }: { lines?: numb
 /** a row of stat cards (6.2): label, a big number */
 export function StatRowSkeleton({ n = 4 }: { n?: number }) {
   return (
-    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
       {Array.from({ length: n }, (_, i) => (
-        <div key={i} className="flex flex-col gap-3 rounded-3xl border border-card-border bg-white p-5">
+        <div key={i} className="flex flex-col gap-2 rounded-3xl border border-card-border bg-white p-5">
           <Skel className="h-3.5 w-24" />
           <Skel className="h-8 w-20" />
+          <Skel className="h-3 w-28" />
         </div>
       ))}
+    </div>
+  );
+}
+
+/** a row of filters: a segmented track, a select, a picker */
+export function FilterRowSkeleton() {
+  return (
+    <div className="flex flex-wrap gap-2">
+      <SkelPill className="h-10 w-72 max-w-full" />
+      <SkelPill className="h-10 w-52" />
+      <SkelPill className="h-10 w-56" />
+    </div>
+  );
+}
+
+/** a section card holding a chart: heading, then a plot of the chart's height */
+export function ChartSkeleton({ className }: { className?: string }) {
+  return (
+    <div className={cn("flex flex-col gap-4 rounded-3xl border border-card-border bg-white p-5 md:p-6", className)}>
+      <div className="flex flex-col gap-1.5">
+        <Skel className="h-5 w-48" />
+        <Skel className="h-3 w-80 max-w-full" />
+      </div>
+      <span aria-hidden="true" className="block h-56 animate-pulse rounded-2xl bg-gray-100" />
     </div>
   );
 }

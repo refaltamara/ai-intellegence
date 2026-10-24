@@ -3,6 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 import { SelectInput } from "../kit/SelectInput";
+import { Segmented } from "../kit/Segmented";
+import { FilterBusy } from "../dashboard/FilterBusy";
 
 type F = { brand: string; days: number; platform: string };
 const LABEL: Record<string, string> = { tiktok: "TikTok", instagram: "Instagram", threads: "Threads", x: "X", youtube: "YouTube" };
@@ -23,20 +25,12 @@ export function PrFilters({ brand, days, platform, brands, platforms, client, wi
   const cur = { brand, days, platform };
   const go = (f: Partial<F>) => start(() => router.push(href({ ...cur, ...f }, client, def)));
   return (
-    <div className={`dfilters ${pending ? "busy" : ""}`}>
+    <div className="flex flex-wrap items-center gap-2" aria-busy={pending || undefined}>
       <SelectInput withSearch size="sm" className="w-auto min-w-52" ariaLabel="Brand in focus" value={brand} onChange={(v) => go({ brand: v })} searchPlaceholder="Search brands"
         options={brands.map((b) => ({ value: b.id, label: `${b.name}${b.id === client ? " (you)" : ""}` }))} />
-      <div className="seg" role="tablist" aria-label="Window">
-        {windows.map((d) => (
-          <a key={d} role="tab" aria-selected={days === d} className={days === d ? "on" : ""} href={href({ ...cur, days: d }, client, def)} onClick={(e) => { e.preventDefault(); go({ days: d }); }}>{d} days</a>
-        ))}
-      </div>
-      <div className="seg" role="tablist" aria-label="Platform">
-        {["all", ...platforms].map((p) => (
-          <a key={p} role="tab" aria-selected={platform === p} className={platform === p ? "on" : ""} href={href({ ...cur, platform: p }, client, def)} onClick={(e) => { e.preventDefault(); go({ platform: p }); }}>{p === "all" ? "All" : LABEL[p] ?? p}</a>
-        ))}
-      </div>
-      {pending && <span className="dspin" aria-live="polite">Updating…</span>}
+      <Segmented label="Window" size="sm" value={String(days)} onChange={(k) => go({ days: Number(k) })} options={windows.map((d) => ({ key: String(d), label: `${d} days` }))} />
+      <Segmented label="Platform" size="sm" value={platform} onChange={(k) => go({ platform: k })} options={["all", ...platforms].map((p) => ({ key: p, label: p === "all" ? "All" : LABEL[p] ?? p }))} />
+      <FilterBusy on={pending} />
     </div>
   );
 }

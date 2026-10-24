@@ -222,7 +222,7 @@ Most things sit flat on a border. Shadow marks something that floats.
 ```
 
 - Pair title block and actions with `md:items-center`, not `items-start`.
-- Chats, Decks (list, New deck, Edit, a deck and its versions) and Weekly Reports use the compact version of this header instead (6.3, `PageHeader` in the kit). A page rebuilt next to them should use it too.
+- Chats, Decks (list, New deck, Edit, a deck and its versions), Weekly Reports, Reports (list, a schedule, a report) and the Dashboard (every team's, the Pulse and a case) use the compact version of this header instead (6.3, `PageHeader` in the kit). A page rebuilt next to them should use it too.
 - Page horizontal padding: `px-4 md:px-6`. Content is **full width**: no `max-w-*` container on app pages, forms included (a long form fills the width with responsive grids, `md:grid-cols-2 xl:grid-cols-3`, instead of leaving the right side empty). The only exceptions are reading width for long prose and the full-screen family (sign-in, team picker), whose centred column is part of the layout.
 - Sections stack with `gap-6`.
 
@@ -277,7 +277,7 @@ Tailwind defaults: `sm` 640, `md` 768 (sidebar becomes a drawer below it), `lg` 
 
 **`AccountMenu`** (`src/ui/AccountMenu.tsx`): avatar (initials on `bg-brand-palette-600`), email, role, chevron; opens a menu with a header (full email), items with a one-line hint, then Sign out in red. Upwards in the sidebar, sideways when collapsed.
 
-**`PageHeader`** (`PageHeader.tsx`): the compact header Chats has (6.3): `h1 text-xl`, `text-xs` subtitle flush under it (a string or a node, such as a "Decks" link · "no version yet"), an actions slot, and the dashed line. Decks, its child pages and Weekly Reports use it.
+**`PageHeader`** (`PageHeader.tsx`): the compact header Chats has (6.3): `h1 text-xl`, `text-xs` subtitle flush under it (a string or a node, such as a "Decks" link · "no version yet"), an actions slot, and the dashed line. Decks, its child pages, Weekly Reports and Reports use it.
 
 **`Modal`, `ConfirmDialog`, `PromptDialog`** (`Modal.tsx`): the modal spec in 6.2, portalled to the body. Focus goes to the text field or the first control, Tab stays inside, and Escape or the backdrop closes it, with focus returned to the opener. `ConfirmDialog` takes `danger` (a `bg-red-600` primary) and `busy`. `PromptDialog` is one labelled `TextField` whose Save stays off while it is empty. Use these instead of `confirm()`, `prompt()` and `alert()`.
 
@@ -289,9 +289,19 @@ Tailwind defaults: `sm` 640, `md` 768 (sidebar becomes a drawer below it), `lg` 
 
 **`Switch`, `SwitchKnob`** (`Switch.tsx`): the toggle switch in 6.2 as a full row (knob, bold label, `text-xs` hint). Use `SwitchKnob` alone inside a tool button (the deck's "Every week", Chats' Builder mode).
 
-**`Skeleton` pieces** (`Skeleton.tsx`): `SkeletonPage`, `HeaderSkeleton`, `TableSkeleton`, `CardSkeleton`, `StatRowSkeleton`, `ViewerSkeleton`, `Skel`, `SkelPill`; see "Empty, loading, error states" in 6.2.
+**`Skeleton` pieces** (`Skeleton.tsx`): `SkeletonPage`, `HeaderSkeleton`, `FilterRowSkeleton`, `TableSkeleton`, `CardSkeleton`, `ChartSkeleton`, `StatRowSkeleton`, `ViewerSkeleton`, `Skel`, `SkelPill`; see "Empty, loading, error states" in 6.2.
 
-**`StatusPill`** (`StatusPill.tsx`): the status pill with tones `live` (green, with the one dot), `waiting`, `neutral`, `brand`, `error`. `ProposalShell` keeps its own proposal tones.
+**`StatusPill`** (`StatusPill.tsx`): the status pill with tones `live` (green, with the one dot), `ok` (green, no dot: good but not live), `waiting`, `neutral`, `brand`, `error`, `critical` (`bg-red-700 text-white`, the worst state only, such as PR's Crisis). `ProposalShell` keeps its own proposal tones.
+
+**`StatTile`, `Delta`, `StatRow`** (`StatTile.tsx`): the stat card in 6.2. `StatTile({ label, value, delta?, sub?, action? })`: label `text-sm text-gray-500`, value `text-3xl font-bold text-gray-900 tabular-nums`, then the delta, a `text-xs` line that says what the number counts, and an optional action (an "Ask why" link) at the bottom. `Delta({ dir, glyph? })`: `dir` is good (`up`, green-700) or bad (`down`, red-700), `flat` or `none` (no comparison, grey); the ▲/▼ glyph says which way the number went, so a rise in negative comments is a red ▲. It always names the comparison ("vs Sep", "vs before"). `StatRow({ n })` lays tiles one, two, then four (or three and six) across. No tinted tiles, no corner shapes.
+
+**`SectionCard`, `SectionTitle`, `CARD`, `Panel`, `Empty`, `Notes`, `ErrorBox`** (`Section.tsx`): a screen's section as the card in 6.2 with its `h2 text-lg` title, a `text-xs` line flush under it, the section's own actions on the right (Add to a deck, a quiet link) and the content. `Panel` is a `rounded-2xl` inner panel (one of two lists side by side). `Empty` is the in-section empty state (`rounded-2xl bg-gray-50`, one centred sentence). `Notes` is the amber box for the data's caveats above a screen. `ErrorBox` is the one-error box. `decks/formParts.tsx` re-exports `CARD` and `SectionTitle`.
+
+**Table pieces** (`Table.tsx`): the table in 6.2 as class names a server component can use: `TABLE_FRAME`, `TABLE` (add a `min-w-[…]` so it scrolls instead of squashing), `THEAD`, `TH`, `TH_NUM`, `TR`, `TD`, `TD_NUM`, `SUB` (a second line in a cell), `EMPTY_ROW`; `Table({ head, children, min })` puts them together; `SortHeader` is the sortable header (button inside the `th`, `aria-sort`, active in `brand-palette-700` with ↓); `Pager` is the pagination line (range on the left, Previous and Next on the right, as links or buttons).
+
+**`Drawer`** (`Drawer.tsx`): the side sheet in 6.2, portalled: `bg-black/30` backdrop, the panel `sm:w-[420px]` (`wide`: 640px) with a grey header (title and a close button) and a grey footer for its actions; the body scrolls. Escape and the backdrop close it, focus goes in, stays in and comes back; a dialog opened from it (a `ConfirmDialog`) owns the keys while it is open.
+
+**Chart pieces** (`chart.tsx`): `SERIES` (the categorical palette, fixed order; the one place chart hex values live), `OTHER` (a neutral for the rest), `GRID`, `AXIS`, `LABEL` (SVG paints), `niceCeil` (the top of an axis), `ChartTip` + `TipRow` (the dark hover card and its rows), `Swatch` (a legend entry) and `LegendToggles` (legend entries as `aria-pressed` buttons that hide and show a series). Charts are hand-drawn SVG: dashed `gray-200` grid, 2px lines, 8px markers with a white ring, 2px white gaps between stacked parts, one y-axis per chart (two measures are two charts), a legend from two series, and a "Table view" under the chart.
 
 **`RoleIcon`, `LogoMark`, `cn`**: see sections 1, 2 and 4.
 
@@ -329,7 +339,7 @@ These come from the shared Fair design system. Build them to these specs in oran
 
 **Toast**: `fixed bottom-6 left-1/2 -translate-x-1/2 z-50 rounded-xl bg-gray-900 px-4 py-2.5 text-sm text-white shadow-lg`, `role="status" aria-live="polite"`, slides up 12px on show. One short sentence that says what happened.
 
-**Stat card**: card `p-5`; label `text-sm text-gray-500`; value `text-3xl font-bold text-gray-900` (orange values only where the number is the brand's own); optional icon tile `h-12 w-12 rounded-2xl bg-brand-palette-100 text-brand-palette-700`. Every number comes from the data layer (CLAUDE.md rule 1); never a placeholder figure, never a delta without a named comparison period.
+**Stat card** (in the kit as `StatTile`): card `p-5`; label `text-sm text-gray-500`; value `text-3xl font-bold text-gray-900` (orange values only where the number is the brand's own); optional icon tile `h-12 w-12 rounded-2xl bg-brand-palette-100 text-brand-palette-700`. Every number comes from the data layer (CLAUDE.md rule 1); never a placeholder figure, never a delta without a named comparison period.
 
 **Stepper**: steps as `rounded-xl px-3 py-1.5 text-sm`; active `bg-brand-palette-50 text-brand-palette-700 font-semibold` with a `bg-brand-palette-600 text-white` index box; done `bg-gray-100 text-gray-900` with a check; idle `bg-gray-100/70 text-gray-500`.
 
@@ -337,7 +347,7 @@ These come from the shared Fair design system. Build them to these specs in oran
 
 **Empty, loading, error states** (required on every data view)
 - Loading: a skeleton with the same geometry as the content (`bg-gray-200 rounded animate-pulse` for text lines, `bg-gray-100` for pills and buttons), or a `Spinner` plus a line that says what is loading. No full-page spinner when the layout is known.
-  - **Every page rebuilt to this standard that loads on the server has a `loading.tsx`** (a legacy page gets its skeleton when it is rebuilt, so the skeleton and the page it stands for have the same shape), built from `src/ui/kit/Skeleton.tsx`, in the shape of that page's own components: `SkeletonPage` (the frame, `role="status"` with a hidden label), `HeaderSkeleton` (PageHeader), `TableSkeleton` (the table above), `CardSkeleton` (a section card, with `tiles` for a card grid), `StatRowSkeleton` (stat cards), `ViewerSkeleton` (the slide viewer), `Skel`/`SkelPill` for anything else. `PageLoading` is the dashboard shape (header, stat cards, two blocks) for the Dashboard, the Pulse and a case.
+  - **Every page rebuilt to this standard that loads on the server has a `loading.tsx`** (a legacy page gets its skeleton when it is rebuilt, so the skeleton and the page it stands for have the same shape), built from `src/ui/kit/Skeleton.tsx`, in the shape of that page's own components: `SkeletonPage` (the frame, `role="status"` with a hidden label), `HeaderSkeleton` (PageHeader), `TableSkeleton` (the table above), `CardSkeleton` (a section card, with `tiles` for a card grid), `StatRowSkeleton` (stat cards), `ViewerSkeleton` (the slide viewer), `Skel`/`SkelPill` for anything else. `PageLoading` is the dashboard shape (header, filter row, stat tiles, a chart, a table, a card) for the Dashboard, the Pulse and a case.
   - A new page or a new layout adds its skeleton in the same change; a new kind of component that pages wait on gets a skeleton piece in `Skeleton.tsx`.
   - Inside a component, a part that loads on its own (a PDF, a list fetched in the browser) shows its own skeleton in place, the size of what is coming.
 - Empty: why it is empty and the one action that fills it ("No chats yet. Ask CeMO something in Chats and it shows up here.").
@@ -359,7 +369,7 @@ These come from the shared Fair design system. Build them to these specs in oran
 
 ### 6.4 Decks and the slide viewer (reference implementations)
 
-`src/ui/decks/` (`DeckList`, `DeckForm`, `DeckDescriber`, `SlideDescriber`, `PeriodPick`, `DeckFirst`, `DeckViewer`, `SlideComments`, shared pieces in `formParts.tsx`) and `src/ui/weekly/` (`WeeklyViewer`, `SlideAsk`). Copy these patterns:
+`src/ui/decks/` (`DeckList`, `DeckForm`, `DeckDescriber`, `SlideDescriber`, `PeriodPick`, `DeckFirst`, `DeckViewer`, `SlideComments`, shared pieces in `formParts.tsx`) and `src/ui/weekly/` (`WeeklyViewer`, `SlideAsk`), and `src/ui/reports/` (Reports: `ReportList`, `ScheduleDetail`, `NewSchedule`, `WeeklyForm`, the report documents on `docParts.tsx`). Copy these patterns:
 - **List with row actions:** the table in 6.2 at `min-w-[880px]` inside its scrolling wrapper. One visible quiet action (Pause or Resume, outline sm), and the rest in `ActionMenu`. Destructive items go through `ConfirmDialog`.
 - **Long form:** a column of section cards (`CARD`: `rounded-3xl border-card-border bg-white p-5 md:p-6`, `h2 text-lg` + `text-xs` hint via `SectionTitle`), full width, with the fields and card grids widening to three or four columns on wide screens. A sticky footer (`sticky bottom-0 border-t border-gray-200 bg-gray-50 py-3`) keeps the busy line, Cancel, Save and the primary in reach.
 - **Template cards:** `button aria-pressed` cards in `grid gap-3 sm:grid-cols-2 xl:grid-cols-3`. Selected is `border-brand-palette-200 bg-brand-palette-50` with a 20px `bg-brand-palette-600` check. `MadeBy` badges: Fair's work in `brand-palette-100/800`, a team's in `gray-100/700`.
@@ -367,6 +377,16 @@ These come from the shared Fair design system. Build them to these specs in oran
 - **Version tabs:** a `role="tablist"` row of `rounded-xl border px-3 text-xs` chips, active in the brand tint. On phones the row scrolls (`no-scrollbar overflow-x-auto`) instead of wrapping.
 - **Side panel beside a slide:** `rounded-2xl border-card-border bg-white`, sticky from 1101px. It has the Tabs spec (Ask AI | Comments with a count badge), a thread in the Chats bubble style without the "C" tile (the column is 380px), and the Chats composer (`COMPOSER`, `COMPOSER_INPUT`).
 - **Presenting** is the one exception to light only. The full-screen shell turns `bg-gray-900` so the slide is the only bright thing on screen. Text on it is `text-gray-300`/`text-white`, and its buttons are `text-gray-100 hover:bg-white/10`. Nothing else in the product is dark.
+
+### 6.5 The Dashboard (reference implementation)
+
+`src/ui/dashboard/` (`Dashboard` for Brand & KOL, the shared `DashFilters`, `Sections`, `Customise`, `DashTemplates`, `PanelBuilder`, `PanelView`, `RankTable`, `MentionsChart`, `AskBar`, and the small server-safe pieces in `parts.tsx`), `src/ui/reputation/PrDashboard.tsx` (PR), `src/ui/social/SocialDashboard.tsx` (Social Media) and `src/ui/PulsePage.tsx` (a profile's crisis view, also `/pulse` and a case). Copy these patterns:
+- **Frame:** `<section data-tw className={DASH_PAGE}>` (`flex min-h-full flex-col gap-6 px-4 pb-10 md:px-6`), the compact `PageHeader` (title, the period and "data through" line, Customise and Templates as outline `sm` buttons), the filter row under it, the data's notes (`Notes`), the stat tiles (`StatRow` + `StatTile`), a Builder's "What do you want to see here?" (`AskBar`), then the sections in the team's order.
+- **Filter row:** one wrapping row of kit controls: platform and window as `Segmented` (`sm`), the period or brand in focus as `SelectInput withSearch`, brands as `MultiSelect` with a primary Apply that shows only when the choice changed, and `FilterBusy` ("Updating…" with a spinner) while the new view loads. Every change is a URL.
+- **Sections:** each is a `SectionCard`; two half-width sections share `TWO` (`grid gap-6 lg:grid-cols-2`). Inner lists (creators, posts, quotes) are rows divided by `divide-card-border` or `Panel`s; post cards are `rounded-2xl border-card-border p-4` in `sm:grid-cols-2 xl:grid-cols-3`.
+- **"Ask why" and "Ask CeMO":** `AskLink`, a quiet `text-xs font-semibold text-brand-palette-700` link that is always visible (never shown only on hover, which a phone cannot do), with an `aria-label` that names the figure.
+- **Small marks:** `PlatformTag` (a neutral two-letter tag with the full name for screen readers), `Tag` (format, client, own post), `Bar` (one value on a grey track in `brand-palette-600`), `Facts` (label and value pairs), `SegLinks` (the segmented control as links when the choice lives in the URL of a server-drawn list).
+- **Colour in data:** ordinal scales (creator tiers, a heat table) use one hue: `brand-palette-600` bars, or the brand ramp 50 to 400 in steps with the number written in each cell. Identity (brands, own vs affiliators vs creators) uses `SERIES` in order. State (PR's Calm to Crisis) uses `StatusPill` tones with the word written, never colour alone.
 
 ---
 

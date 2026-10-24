@@ -23,5 +23,6 @@ export function SeenTile({ tile, children }: { tile: string; children: ReactNode
     io.observe(el);
     return () => { io.disconnect(); if (t) clearTimeout(t); };
   }, [tile]);
-  return <div ref={ref} className="seen">{children}</div>;
+  // min-w-0: inside a two-column grid a wide table must scroll, not stretch the column
+  return <div ref={ref} className="flex min-w-0 flex-col">{children}</div>;
 }

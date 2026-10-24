@@ -5,6 +5,7 @@
  */
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { AskBar } from "../dashboard/AskBar";
 import { pulseAskHref } from "@/dashboard/askref";
 
 export function PulseAsk({ subject }: { subject: string }) {
@@ -18,11 +19,7 @@ export function PulseAsk({ subject }: { subject: string }) {
     router.push(`${pulseAskHref("overview")}&q=${encodeURIComponent(t.slice(0, 1500))}&go=1`);
   }
   return (
-    <form className="pulse-ask" onSubmit={(e) => { e.preventDefault(); go(); }}>
-      <b>Ask CeMO</b>
-      <input value={q} onChange={(e) => setQ(e.target.value)} maxLength={1500} aria-label={`Ask CeMO about ${subject}`}
-        placeholder={`Anything about ${subject}: why the anger rose, who is driving it, what to say next…`} />
-      <button className="btn pri sm" disabled={!q.trim() || busy}>{busy ? "Opening…" : "Ask"}</button>
-    </form>
+    <AskBar label="Ask CeMO" value={q} onChange={setQ} onSubmit={go} busy={busy} disabled={!q.trim()} submitLabel="Ask" busyLabel="Opening…"
+      ariaLabel={`Ask CeMO about ${subject}`} placeholder={`Anything about ${subject}: why the anger rose, who is driving it, what to say next…`} />
   );
 }

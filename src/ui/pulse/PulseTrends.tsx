@@ -10,6 +10,38 @@ import type { Trend, TrendPoint } from "@/pulse/page";
 import { TrendChart } from "@/ui/TrendChart";
 import { fmtNum } from "@/ui/format";
 import { PULSE_MIN_READ } from "@/config/pulse";
+import { SERIES } from "../kit/chart";
+import { Segmented } from "../kit/Segmented";
+import { SectionCard } from "../kit/Section";
+
+/**
+ * Volume in the product's first series blue (the caveat calls it "the blue bar"), what is not read yet in a pale
+ * mix of it, other talk in grey. Lean is polarity, so it keeps red against green with grey between.
+ */
+const C = {
+  about: SERIES[0],
+  waiting: `color-mix(in srgb, ${SERIES[0]} 30%, white)`,
+  other: "var(--color-gray-300)",
+  negative: "var(--color-red-600)",
+  neutral: "var(--color-gray-500)",
+  positive: "var(--color-green-600)",
+  none: "var(--color-gray-200)",
+};
+const NOTE = "text-xs leading-relaxed text-gray-500";
+
+/** a card with its title, or, where the page titles it already, the span line and the controls alone */
+function Frame({ titled, title, hint, actions, children }: { titled: boolean; title: ReactNode; hint: ReactNode; actions: ReactNode; children: ReactNode }) {
+  if (titled) return <SectionCard title={title} hint={hint} actions={actions}>{children}</SectionCard>;
+  return (
+    <div className="flex min-w-0 flex-col gap-4">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-xs text-gray-500">{hint}</p>
+        <div className="flex flex-wrap items-center gap-2">{actions}</div>
+      </div>
+      {children}
+    </div>
+  );
+}
 
 type Grain = "hour" | "day";
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -52,58 +84,50 @@ export function PulseTrends({ subject, trend, askTrend, askStance, postsDaily, p
   const peakOf = (k: (p: TrendPoint) => number) => pts.reduce<TrendPoint | null>((a, p) => (a == null || k(p) > k(a) ? p : a), null);
   const peakC = peakOf((p) => p.comments), peakP = peakOf((p) => p.posts);
   const switcher = trend.days.length > 0 && (
-    <span className="seg sm" role="tablist" aria-label="Per hour or per day" style={{ marginLeft: 8 }}>
-      {(["day", "hour"] as const).map((g) => (
-        <button key={g} type="button" role="tab" aria-selected={grain === g} className={grain === g ? "on" : ""} onClick={() => setGrain(g)}>{g === "day" ? "Per day" : "Per hour"}</button>
-      ))}
-    </span>
+    <Segmented label="Per hour or per day" size="sm" value={grain} onChange={setGrain} options={[{ key: "day", label: "Per day" }, { key: "hour", label: "Per hour" }]} />
   );
 
   return (
     <>
-      <div className="card" style={{ marginBottom: 12 }}>
-        <h4>{titled ? <>Comments per {unit}, and which way they lean </> : null}<span>{span} · WIB · bars are volume, the three lines are shares of the blue bar</span>{switcher}{askTrend}</h4>
-        <div className="body">
-          <TrendChart
-            grain={grain}
-            x={pts.map((p) => p.h)}
-            bars={[
-              { name: `About ${subject}`, data: pts.map((p) => p.labelled), color: "var(--blue)" },
-              { name: "Waiting to be read", data: pts.map((p) => Math.max(0, p.on_topic - p.labelled)), color: "var(--blue-20)" },
-              { name: "Other talk in the same threads", data: pts.map((p) => p.off_topic), color: "#D5DDE8" },
-            ]}
-            lines={[
-              { name: "Negative", data: pts.map((p) => share(p.negative, p.labelled)), color: "var(--red)" },
-              { name: "Neutral", data: pts.map((p) => share(p.neutral, p.labelled)), color: "#8593A8" },
-              { name: `Defending ${subject}`, data: pts.map((p) => share(p.positive, p.labelled)), color: "var(--green)" },
-            ]}
-            barLabel="Comments" lineLabel={`share of the comments read that ${unit}`}
-            peakNote={peakC && peakC.comments > 0 ? `${fmtNum(peakC.comments)} in one ${unit}` : undefined}
-          />
-        </div>
-        <div className="caveats">The three lines are shares of the same blue bar and add up to 100%: every comment about {subject} is negative, neutral or defending {subject}. Neutral means it is about {subject} or the controversy but takes no side — anger at the government or the news, unless it blames {subject}. Pale blue is comments the labeller has not reached yet, which is why a bar can be tall and its lines short. Lines are blank under {PULSE_MIN_READ} comments read in the {unit}, where a percentage would be noise, and the last {unit} is still filling.{trend.cut && grain === "hour" ? " The hourly view covers the last five days; the wave started earlier, so switch to days to see all of it." : ""}</div>
-      </div>
+      <Frame titled={titled} title={<>Comments per {unit}, and which way they lean</>} hint={<>{span} · WIB · bars are volume, the three lines are shares of the blue bar</>} actions={<>{switcher}{askTrend}</>}>
+        <TrendChart
+          grain={grain}
+          x={pts.map((p) => p.h)}
+          bars={[
+            { name: `About ${subject}`, data: pts.map((p) => p.labelled), color: C.about },
+            { name: "Waiting to be read", data: pts.map((p) => Math.max(0, p.on_topic - p.labelled)), color: C.waiting },
+            { name: "Other talk in the same threads", data: pts.map((p) => p.off_topic), color: C.other },
+          ]}
+          lines={[
+            { name: "Negative", data: pts.map((p) => share(p.negative, p.labelled)), color: C.negative },
+            { name: "Neutral", data: pts.map((p) => share(p.neutral, p.labelled)), color: C.neutral },
+            { name: `Defending ${subject}`, data: pts.map((p) => share(p.positive, p.labelled)), color: C.positive },
+          ]}
+          barLabel="Comments" lineLabel={`share of the comments read that ${unit}`}
+          peakNote={peakC && peakC.comments > 0 ? `${fmtNum(peakC.comments)} in one ${unit}` : undefined}
+        />
+        <p className={NOTE}>The three lines are shares of the same blue bar and add up to 100%: every comment about {subject} is negative, neutral or defending {subject}. Neutral means it is about {subject} or the controversy but takes no side: anger at the government or the news, unless it blames {subject}. Pale blue is comments the labeller has not reached yet, which is why a bar can be tall and its lines short. Lines are blank under {PULSE_MIN_READ} comments read in the {unit}, where a percentage would be noise, and the last {unit} is still filling.{trend.cut && grain === "hour" ? " The hourly view covers the last five days; the wave started earlier, so switch to days to see all of it." : ""}</p>
+      </Frame>
 
-      {!commentsOnly && <div className="card" style={{ marginBottom: 12 }}>
-        <h4>Posts about {subject} per {unit}, by stance <span>what other accounts publish, not the replies under it</span>{switcher}{askStance}</h4>
-        <div className="body">
+      {!commentsOnly && (
+        <Frame titled title={<>Posts about {subject} per {unit}, by stance</>} hint="what other accounts publish, not the replies under it" actions={<>{switcher}{askStance}</>}>
           <TrendChart
             grain={grain}
             x={pts.map((p) => p.h)}
             bars={[
-              { name: `Against ${subject}`, data: pts.map((p) => p.against), color: "var(--red)" },
-              { name: "Neutral", data: pts.map((p) => p.neutral_posts), color: "#8593A8" },
-              { name: `Defending ${subject}`, data: pts.map((p) => p.for_), color: "var(--green)" },
-              { name: "No stance yet", data: pts.map((p) => Math.max(0, p.posts - p.against - p.neutral_posts - p.for_)), color: "#E6EBF2" },
+              { name: `Against ${subject}`, data: pts.map((p) => p.against), color: C.negative },
+              { name: "Neutral", data: pts.map((p) => p.neutral_posts), color: C.neutral },
+              { name: `Defending ${subject}`, data: pts.map((p) => p.for_), color: C.positive },
+              { name: "No stance yet", data: pts.map((p) => Math.max(0, p.posts - p.against - p.neutral_posts - p.for_)), color: C.none },
             ]}
-            lines={[{ name: `Share against ${subject}`, data: pts.map((p) => share(p.against, p.against + p.neutral_posts + p.for_)), color: "var(--red)" }]}
+            lines={[{ name: `Share against ${subject}`, data: pts.map((p) => share(p.against, p.against + p.neutral_posts + p.for_)), color: C.negative }]}
             barLabel="Posts" lineLabel={`share of the posts with a stance that ${unit}`} height={260}
             peakNote={peakP && peakP.posts > 0 ? `${fmtNum(peakP.posts)} posts in one ${unit}` : undefined}
           />
           {postsDaily}
-        </div>
-        <div className="caveats">{postsCaveat} The line is blank under {PULSE_MIN_READ} posts with a stance in the {unit}.</div>
-      </div>}
+          <p className={NOTE}>{postsCaveat} The line is blank under {PULSE_MIN_READ} posts with a stance in the {unit}.</p>
+        </Frame>
+      )}
     </>
   );
 }

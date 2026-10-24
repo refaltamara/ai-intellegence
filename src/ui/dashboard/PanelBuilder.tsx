@@ -10,6 +10,11 @@ import { useState } from "react";
 import type { PanelData, PanelScope } from "@/dashboard/panels";
 import type { PanelSpec } from "@/dashboard/panelSpec";
 import { PanelBody, PanelView } from "./PanelView";
+import { AskBar } from "./AskBar";
+import { Button } from "../kit/Button";
+import { ConfirmDialog } from "../kit/Modal";
+import { ErrorBox } from "../kit/Section";
+import { Spinner } from "../kit/Spinner";
 
 type Draft = { spec: PanelSpec; preview: PanelData };
 
@@ -51,26 +56,27 @@ function Asker({ scope, current, onDone, onCancel, placeholder }: { scope: Panel
     }
   }
   return (
-    <div className="pask">
-      <form className="pulse-ask" onSubmit={(e) => { e.preventDefault(); ask(); }}>
-        <b>{current ? "Change this panel" : "What do you want to see here?"}</b>
-        <input value={text} onChange={(e) => setText(e.target.value)} maxLength={500} placeholder={placeholder} aria-label={current ? `Change ${current.title}` : "Describe a panel for the Dashboard"} />
-        <button className="btn pri sm" disabled={text.trim().length < 6 || !!busy}>{busy === "draft" ? "Drafting…" : current ? "Redraft" : "Draft it"}</button>
-        {onCancel && <button type="button" className="btn sm ghost" onClick={onCancel}>Cancel</button>}
-      </form>
-      {busy === "draft" && <p className="muted">CeMO is drafting the panel and trying it on the Dashboard&apos;s period…</p>}
-      {error && <div className="errbox">{error}</div>}
+    <div className="flex flex-col gap-3">
+      <AskBar label={current ? "Change this panel" : "What do you want to see here?"} value={text} onChange={setText} onSubmit={ask} maxLength={500}
+        placeholder={placeholder} ariaLabel={current ? `Change ${current.title}` : "Describe a panel for the Dashboard"}
+        submitLabel={current ? "Redraft" : "Draft it"} busyLabel="Drafting…" busy={busy === "draft"} disabled={text.trim().length < 6 || !!busy}
+        extra={onCancel && <Button type="button" size="sm" variant="ghost" onClick={onCancel}>Cancel</Button>} />
+      {busy === "draft" && <p aria-live="polite" className="flex items-center gap-2 text-sm text-gray-600"><Spinner />CeMO is drafting the panel and trying it on the Dashboard&apos;s period…</p>}
+      {error && <ErrorBox>{error}</ErrorBox>}
       {draft && (
-        <div className="pdraft">
-          <div className="pdraft-head">
-            <span><b>{draft.spec.title}</b> <small className="muted">· preview over {draft.preview.window.from} to {draft.preview.window.to}; only you see it until you add it</small></span>
-            <span>
-              <button className="btn pri sm" disabled={!!busy} onClick={save}>{busy === "save" ? "Adding…" : current ? "Replace the panel" : "Add to the Dashboard"}</button>
-              <button className="btn sm ghost" disabled={!!busy} onClick={() => setDraft(null)}>Discard</button>
+        <div className="flex flex-col gap-4 rounded-3xl border border-brand-palette-200 bg-white p-5 md:p-6">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="min-w-0">
+              <h3 className="text-lg font-semibold leading-tight text-gray-900">{draft.spec.title}</h3>
+              <p className="text-xs text-gray-500">Preview over {draft.preview.window.from} to {draft.preview.window.to}; only you see it until you add it</p>
+            </div>
+            <span className="flex shrink-0 flex-wrap gap-2">
+              <Button size="sm" variant="ghost" disabled={!!busy} onClick={() => setDraft(null)}>Discard</Button>
+              <Button size="sm" isLoading={busy === "save"} loadingLabel="Adding…" disabled={!!busy} onClick={save}>{current ? "Replace the panel" : "Add to the Dashboard"}</Button>
             </span>
           </div>
           <PanelBody d={draft.preview} />
-          <p className="muted pnote">Everyone on the team sees it once added. Its numbers follow the Dashboard&apos;s period, platform and brands{draft.spec.query.filters && Object.keys(draft.spec.query.filters).length ? `, with its own: ${Object.keys(draft.spec.query.filters).join(", ").replace(/_/g, " ")}` : ""}.</p>
+          <p className="text-xs text-gray-500">Everyone on the team sees it once added. Its numbers follow the Dashboard&apos;s period, platform and brands{draft.spec.query.filters && Object.keys(draft.spec.query.filters).length ? `, with its own: ${Object.keys(draft.spec.query.filters).join(", ").replace(/_/g, " ")}` : ""}.</p>
         </div>
       )}
     </div>
@@ -88,20 +94,28 @@ export function PanelCard({ d, title, builder, scope }: { d: PanelData; title: s
   const router = useRouter();
   const [changing, setChanging] = useState(false);
   const [error, setError] = useState("");
+  const [asking, setAsking] = useState(false);
+  const [removing, setRemoving] = useState(false);
   async function remove() {
-    if (!confirm(`Take "${title}" off the Dashboard for everyone? A Builder can bring it back from the team's page.`)) return;
+    setRemoving(true);
     try {
       await post({ action: "remove", key: d.spec.key });
+      setAsking(false);
       router.refresh();
     } catch (e) {
       setError((e as Error).message);
+      setAsking(false);
+    } finally {
+      setRemoving(false);
     }
   }
   return (
-    <>
-      <PanelView d={d} title={title} builder={builder} onChange={builder && scope ? () => setChanging((x) => !x) : undefined} onRemove={builder ? remove : undefined} />
-      {error && <div className="errbox">{error}</div>}
+    <div className="flex min-w-0 flex-col gap-3">
+      <PanelView d={d} title={title} builder={builder} changing={changing} onChange={builder && scope ? () => setChanging((x) => !x) : undefined} onRemove={builder ? () => setAsking(true) : undefined} />
+      {error && <ErrorBox>{error}</ErrorBox>}
       {changing && scope && <Asker scope={scope} current={d.spec} onDone={() => { setChanging(false); router.refresh(); }} onCancel={() => setChanging(false)} placeholder="e.g. make it month on month · split by platform · only Instagram · as a table" />}
-    </>
+      <ConfirmDialog open={asking} title={`Take "${title}" off the Dashboard?`} body="It goes for everyone on the team. A Builder can bring it back from the team's page."
+        confirmLabel="Remove the panel" danger busy={removing} onConfirm={remove} onClose={() => setAsking(false)} />
+    </div>
   );
 }

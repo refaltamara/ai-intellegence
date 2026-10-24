@@ -5,6 +5,7 @@
  * team switcher does, and opens its Dashboard. Shown only to someone who can reach that team.
  */
 import { useState } from "react";
+import { Button } from "../kit/Button";
 
 export function OwnDashboard({ workspace, role, name }: { workspace: string; role: string; name: string }) {
   const [busy, setBusy] = useState(false);
@@ -16,9 +17,9 @@ export function OwnDashboard({ workspace, role, name }: { workspace: string; rol
     window.location.href = "/dashboard";
   }
   return (
-    <span className="owndash">
-      <button className="btn sm" disabled={busy} onClick={open} title={`Switch to ${name} and open its Dashboard`}>{busy ? "Opening…" : "Open its own dashboard"}</button>
-      {error && <small className="down">{error}</small>}
+    <span className="inline-flex flex-wrap items-center gap-2">
+      <Button size="sm" variant="outline" isLoading={busy} loadingLabel="Opening…" onClick={open} title={`Switch to ${name} and open its Dashboard`}>Open its own dashboard</Button>
+      {error && <small role="alert" className="text-xs text-red-700">{error}</small>}
     </span>
   );
 }

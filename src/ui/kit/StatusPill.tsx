@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { cn } from "../cn";
 
-export type PillTone = "live" | "waiting" | "neutral" | "brand" | "error";
+export type PillTone = "live" | "ok" | "waiting" | "neutral" | "brand" | "error" | "critical";
 
 const TONE: Record<PillTone, string> = {
   live: "bg-green-50/60 text-green-700",
@@ -9,6 +9,10 @@ const TONE: Record<PillTone, string> = {
   neutral: "bg-gray-100 text-gray-700",
   brand: "bg-brand-palette-100 text-brand-palette-800",
   error: "bg-red-50 text-red-700",
+  // good, but not a live state: no dot (the PR dashboard's Calm)
+  ok: "bg-green-50/60 text-green-700",
+  // the worst state there is (PR's Crisis): white on red-700, 6.5:1
+  critical: "bg-red-700 text-white",
 };
 
 /** Where something stands (DESIGN.md 6.2). The dot appears only on a live state and never pulses. */

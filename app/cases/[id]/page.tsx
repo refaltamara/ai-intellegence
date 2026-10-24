@@ -12,6 +12,9 @@ import { PageLoading } from "@/ui/PageLoading";
 import { PulsePage } from "@/ui/PulsePage";
 import { OwnDashboard } from "@/ui/cases/OwnDashboard";
 import { teamsFor } from "@/workspace/teams";
+import { PageHeader } from "@/ui/kit/PageHeader";
+import { Empty } from "@/ui/kit/Section";
+import { DASH_PAGE } from "@/ui/dashboard/parts";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -24,9 +27,9 @@ export default async function CasePage({ params }: { params: Promise<{ id: strin
   if (!actor || !c || c.workspace_id !== ws || !can(actor, "case.view", { workspace: ws, case: c })) notFound();
   if (!c.posts) {
     return (
-      <section className="screen">
-        <div className="topbar"><div><h1>{c.name}</h1><span className="meta">{c.about ?? ""}</span></div></div>
-        <div className="wrap"><p className="muted">This case holds no posts yet: they arrive with its first load.</p></div>
+      <section data-tw className={DASH_PAGE}>
+        <PageHeader title={c.name} subtitle={c.about || undefined} />
+        <Empty>This case holds no posts yet: they arrive with its first load.</Empty>
       </section>
     );
   }

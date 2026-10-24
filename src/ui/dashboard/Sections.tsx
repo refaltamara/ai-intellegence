@@ -9,6 +9,7 @@ import { rows, type Arranged } from "@/dashboard/sections";
 import type { PanelData, PanelScope } from "@/dashboard/panels";
 import { SeenTile } from "./SeenTile";
 import { PanelCard } from "./PanelBuilder";
+import { TWO } from "./parts";
 
 export function Sections({ arranged, render: own, who, showHref, panels = [], builder = false, scope }: { arranged: Arranged; render: Record<string, (title: string) => ReactNode>; who: string | null; showHref: string; panels?: PanelData[]; builder?: boolean; scope?: PanelScope }) {
   const title = (k: string) => arranged.shown.find((x) => x.key === k)!.title;
@@ -17,7 +18,7 @@ export function Sections({ arranged, render: own, who, showHref, panels = [], bu
     <>
       {rows(arranged.shown).map((row) =>
         row.length === 2 ? (
-          <div className="two-eq" key={row.map((s) => s.key).join("+")}>
+          <div className={TWO} key={row.map((s) => s.key).join("+")}>
             {row.map((s) => <SeenTile key={s.key} tile={s.key}>{render[s.key]?.(title(s.key))}</SeenTile>)}
           </div>
         ) : (
@@ -25,8 +26,8 @@ export function Sections({ arranged, render: own, who, showHref, panels = [], bu
         ),
       )}
       {arranged.hidden.length > 0 && (
-        <p className="hiddennote">
-          {arranged.hidden.map((s) => s.title).join(", ")} hidden{who ? ` for ${who}` : ""} · <Link href={showHref}>Show</Link>
+        <p className="text-sm text-gray-500">
+          {arranged.hidden.map((s) => s.title).join(", ")} hidden{who ? ` for ${who}` : ""} · <Link href={showHref} className="font-semibold text-brand-palette-700 underline-offset-2 hover:text-brand-palette-800 hover:underline">Show</Link>
         </p>
       )}
     </>

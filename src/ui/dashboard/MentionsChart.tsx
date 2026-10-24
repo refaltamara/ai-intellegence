@@ -9,14 +9,9 @@ import { useState } from "react";
 import { compact, dayMonth, int } from "@/competitor/view";
 import { askHref, type AskRef } from "@/dashboard/askref";
 import type { TrendSeries } from "@/dashboard/data";
-
-const SERIES = ["var(--series-1)", "var(--series-2)", "var(--series-3)", "var(--series-4)", "var(--series-5)", "var(--series-6)", "var(--series-7)", "var(--series-8)"];
-
-function niceCeil(v: number): number {
-  const p = 10 ** Math.floor(Math.log10(Math.max(1, v)));
-  const m = v / p;
-  return (m <= 1 ? 1 : m <= 2 ? 2 : m <= 2.5 ? 2.5 : m <= 5 ? 5 : 10) * p;
-}
+import { AXIS, ChartTip, GRID, LegendToggles, SERIES, TipRow, niceCeil } from "../kit/chart";
+import { Segmented } from "../kit/Segmented";
+import { Empty } from "../kit/Section";
 
 export function MentionsChart({ weeks, series, base, chosen }: { weeks: string[]; series: TrendSeries[]; base: Omit<AskRef, "k" | "brand" | "week">; chosen: "filter" | "top" }) {
   const router = useRouter();
@@ -30,55 +25,55 @@ export function MentionsChart({ weeks, series, base, chosen }: { weeks: string[]
   const y = (v: number) => padT + (H - padT - padB) * (1 - v / max);
   const fmt = metric === "posts" ? int : compact;
   const colour = (id: string) => SERIES[series.findIndex((s) => s.brand_id === id) % SERIES.length];
-  if (!series.length) return <div className="empty">No brand has content in these weeks.</div>;
+  const toggle = (id: string) => setHidden((h) => { const n = new Set(h); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  if (!series.length) return <Empty>No brand has content in these weeks. Pick a longer period or other brands above.</Empty>;
   return (
-    <div className="mentions viz">
-      <div className="mtools">
-        <div className="seg sm" role="tablist" aria-label="Measure">
-          <a role="tab" aria-selected={metric === "posts"} className={metric === "posts" ? "on" : ""} href="#" onClick={(e) => { e.preventDefault(); setMetric("posts"); }}>Content</a>
-          <a role="tab" aria-selected={metric === "views"} className={metric === "views" ? "on" : ""} href="#" onClick={(e) => { e.preventDefault(); setMetric("views"); }}>Views</a>
-        </div>
-        <span className="hint">{chosen === "top" ? "The eight brands with the most content this period; pick brands above to compare others." : "The brands you picked."} Click a point to ask about that week.</span>
+    // data-tw: a Pulse board (still on legacy.css) draws this chart too, and its table view must not take legacy's table rules
+    <div data-tw className="flex flex-col gap-3">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+        <Segmented label="Measure" size="sm" value={metric} onChange={setMetric} options={[{ key: "posts", label: "Content" }, { key: "views", label: "Views" }]} />
+        <span className="text-xs text-gray-500">{chosen === "top" ? "The eight brands with the most content this period; pick brands above to compare others." : "The brands you picked."} Click a point to ask about that week.</span>
       </div>
-      <div className="mplot" onMouseLeave={() => setAt(null)}>
+      <LegendToggles items={series.map((s) => ({ key: s.brand_id, label: s.name, colour: colour(s.brand_id) }))} hidden={hidden} onToggle={toggle} />
+      <div className="relative" onMouseLeave={() => setAt(null)}>
         {at != null && (
-          <div className="tip" style={{ left: `${(x(at) / W) * 100}%`, transform: at > weeks.length * 0.7 ? "translateX(-105%)" : "translateX(5%)" }}>
+          <ChartTip left={`${(x(at) / W) * 100}%`} flip={at > weeks.length * 0.7}>
             <b>Week of {dayMonth(weeks[at])}</b>
-            {shown.slice().sort((a, b) => b[metric][at] - a[metric][at]).map((s) => (
-              <div key={s.brand_id}><i style={{ background: colour(s.brand_id) }} />{s.name}: {fmt(s[metric][at])}</div>
-            ))}
-          </div>
+            {shown.slice().sort((a, b) => b[metric][at] - a[metric][at]).map((s) => <TipRow key={s.brand_id} colour={colour(s.brand_id)} name={s.name} value={fmt(s[metric][at])} />)}
+          </ChartTip>
         )}
-        <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`${metric === "posts" ? "Content" : "Views"} per brand per week`} style={{ width: "100%", height: "auto", display: "block" }}>
+        <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`${metric === "posts" ? "Content" : "Views"} per brand per week`} className="block h-auto w-full">
           {[0, 0.25, 0.5, 0.75, 1].map((t) => (
             <g key={t}>
-              <line x1={padL} x2={W - padR} y1={y(t * max)} y2={y(t * max)} stroke="var(--line)" strokeDasharray={t === 0 ? undefined : "3 4"} />
-              <text x={padL - 8} y={y(t * max) + 4} textAnchor="end" fontSize="11" fill="var(--text-3)">{fmt(t * max)}</text>
+              <line x1={padL} x2={W - padR} y1={y(t * max)} y2={y(t * max)} stroke={GRID} strokeDasharray={t === 0 ? undefined : "3 4"} />
+              <text x={padL - 8} y={y(t * max) + 4} textAnchor="end" fontSize="11" fill={AXIS}>{fmt(t * max)}</text>
             </g>
           ))}
-          {weeks.map((w, i) => (i % 2 === (weeks.length - 1) % 2 ? <text key={w} x={x(i)} y={H - 10} textAnchor="middle" fontSize="11" fill="var(--text-3)">{dayMonth(w)}</text> : null))}
+          {weeks.map((w, i) => (i % 2 === (weeks.length - 1) % 2 ? <text key={w} x={x(i)} y={H - 10} textAnchor="middle" fontSize="11" fill={AXIS}>{dayMonth(w)}</text> : null))}
           {weeks.map((w, i) => (
-            <rect key={`hit-${w}`} x={x(i) - (W - padL - padR) / weeks.length / 2} y={padT} width={(W - padL - padR) / weeks.length} height={H - padT - padB} fill="transparent" onMouseEnter={() => setAt(i)} style={{ pointerEvents: "all" }} className="hit" />
+            <rect key={`hit-${w}`} x={x(i) - (W - padL - padR) / weeks.length / 2} y={padT} width={(W - padL - padR) / weeks.length} height={H - padT - padB} fill="transparent" onMouseEnter={() => setAt(i)} style={{ pointerEvents: "all" }} />
           ))}
-          {at != null && <line x1={x(at)} x2={x(at)} y1={padT} y2={H - padB} stroke="var(--line-2)" />}
+          {at != null && <line x1={x(at)} x2={x(at)} y1={padT} y2={H - padB} stroke="var(--color-gray-300)" />}
           {shown.map((s) => (
-            <polyline key={s.brand_id} fill="none" stroke={colour(s.brand_id)} strokeWidth={2.2} strokeLinejoin="round" strokeLinecap="round" points={s[metric].map((v, i) => `${x(i)},${y(v)}`).join(" ")} />
+            <polyline key={s.brand_id} fill="none" stroke={colour(s.brand_id)} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" points={s[metric].map((v, i) => `${x(i)},${y(v)}`).join(" ")} />
           ))}
           {shown.map((s) => s[metric].map((v, i) => (
-            <circle key={`${s.brand_id}-${i}`} cx={x(i)} cy={y(v)} r={at === i ? 5 : 3} fill="#fff" stroke={colour(s.brand_id)} strokeWidth={2} className="pt"
+            <circle key={`${s.brand_id}-${i}`} cx={x(i)} cy={y(v)} r={at === i ? 5 : 4} fill={at === i ? colour(s.brand_id) : "#fff"} stroke={colour(s.brand_id)} strokeWidth={2} className="cursor-pointer"
               onMouseEnter={() => setAt(i)} onClick={() => router.push(askHref({ ...base, k: "week", brand: s.brand_id, week: weeks[i] }))}>
               <title>{`${s.name}, week of ${dayMonth(weeks[i])}: ${fmt(v)}. Click to ask why.`}</title>
             </circle>
           )))}
         </svg>
       </div>
-      <div className="legend">
-        {series.map((s) => (
-          <button key={s.brand_id} className={hidden.has(s.brand_id) ? "off" : ""} onClick={() => setHidden((h) => { const n = new Set(h); if (n.has(s.brand_id)) n.delete(s.brand_id); else n.add(s.brand_id); return n; })}>
-            <i style={{ background: colour(s.brand_id) }} />{s.name}
-          </button>
-        ))}
-      </div>
+      <details className="text-sm">
+        <summary className="inline-flex min-h-8 cursor-pointer items-center text-xs font-semibold text-gray-600 hover:text-brand-palette-700 max-md:min-h-11">Table view</summary>
+        <div className="mt-2 overflow-x-auto rounded-2xl border border-card-border">
+          <table className="w-full border-collapse text-xs">
+            <thead className="border-0 border-b border-card-border"><tr><th className="px-3 py-2 text-left font-semibold text-gray-900">{metric === "posts" ? "Content" : "Views"}</th>{weeks.map((w) => <th key={w} className="whitespace-nowrap px-3 py-2 text-right font-semibold text-gray-900">{dayMonth(w)}</th>)}</tr></thead>
+            <tbody>{series.map((s) => <tr key={s.brand_id} className="border-0 border-b border-card-border last:border-b-0 even:bg-gray-50/60"><td className="whitespace-nowrap px-3 py-2 text-gray-700">{s.name}</td>{s[metric].map((v, i) => <td key={i} className="px-3 py-2 text-right tabular-nums text-gray-700">{fmt(v)}</td>)}</tr>)}</tbody>
+          </table>
+        </div>
+      </details>
     </div>
   );
 }

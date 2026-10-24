@@ -7,12 +7,7 @@
  */
 import { useState } from "react";
 import type { ChartSpec } from "@/skills/types";
-
-// the categorical palette that sat on legacy.css's .viz, kept as it was so every chart reads the same
-const SERIES = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300", "#4a3aa7", "#e34948"];
-const GRID = "var(--color-gray-200)";
-const AXIS = "var(--color-gray-500)";
-const LABEL = "var(--color-gray-600)";
+import { AXIS, GRID, LABEL, SERIES, niceCeil } from "./kit/chart";
 const fmt = (n: number | null | undefined) => (n == null ? "" : Math.abs(n) >= 1000 ? n.toLocaleString("en-US", { maximumFractionDigits: 0 }) : n.toLocaleString("en-US", { maximumFractionDigits: 2 }));
 
 export function Chart({ spec }: { spec: ChartSpec }) {
@@ -97,13 +92,6 @@ function showTip(e: React.MouseEvent, set: (t: { x: number; y: number; text: str
   if (!host) return;
   const r = host.getBoundingClientRect();
   set({ x: e.clientX - r.left, y: e.clientY - r.top - 8, text });
-}
-
-function niceCeil(v: number): number {
-  const p = 10 ** Math.floor(Math.log10(v));
-  const m = v / p;
-  const nice = m <= 1 ? 1 : m <= 2 ? 2 : m <= 2.5 ? 2.5 : m <= 5 ? 5 : 10;
-  return nice * p;
 }
 
 function shortLabel(s: string): string {

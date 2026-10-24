@@ -6,20 +6,12 @@ import type { ReactNode } from "react";
 import { isFairBadge } from "../../brand/demo";
 import { cn } from "../cn";
 
-export const CARD = "flex flex-col gap-4 rounded-3xl border border-card-border bg-white p-5 md:p-6";
+// the section card and its heading live in the kit now (the Dashboard uses them too)
+export { CARD, SectionTitle } from "../kit/Section";
 
 /** the frame is the input; a textarea inside it has no border, outline or shadow of its own */
 export const COMPOSER = "flex flex-col gap-2 rounded-2xl border border-slate-200 bg-white p-3 shadow-xs transition-all duration-200 focus-within:border-brand-palette-600 focus-within:ring-2 focus-within:ring-brand-palette-500/15";
 export const COMPOSER_INPUT = "block min-h-12 w-full resize-none border-0 bg-transparent px-1 py-0 font-sans text-sm leading-relaxed text-gray-900 shadow-none outline-none placeholder:text-gray-500 focus:outline-none focus-visible:outline-none";
-
-export function SectionTitle({ title, hint }: { title: ReactNode; hint?: ReactNode }) {
-  return (
-    <div>
-      <h2 className="text-lg font-semibold leading-tight text-gray-900">{title}</h2>
-      {hint && <p className="text-xs text-gray-500">{hint}</p>}
-    </div>
-  );
-}
 
 /** Fair's own work in the brand tint, the team's in grey, so the two never read alike */
 export function MadeBy({ badge, by }: { badge?: string | null; by?: string | null }) {
